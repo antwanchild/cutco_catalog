@@ -33,12 +33,13 @@
           {% if item.is_unicorn %}<span title="Unicorn">🦄</span>{% endif %}
         </td>
         {% for p in people %}
-          {% set o = item_lookup.get((p.id, item.id)) %}
-          <td class="matrix-cell cell-{{ o.status | lower if o else 'none' }}"
-              title="{{ p.name }} / {{ item.name }}{% if o %}: {{ o.status }}{% endif %}">
-            {% if o %}
-              <a href="{{ url_for('ownership_edit', oid=o.id) }}" class="cell-link">
-                {{ {'Owned':'✓','Wishlist':'♡','Traded':'↔','Sold':'$'}.get(o.status, '?') }}
+          {% set ownership = item_lookup.get((p.id, item.id)) %}
+          <td class="matrix-cell cell-{{ ownership.status | lower if ownership else 'none' }}"
+              title="{{ p.name }} / {{ item.name }}{% if ownership %}: {{ ownership.status }}{% endif %}">
+            {% if ownership %}
+              <a href="{{ url_for('ownership_edit', oid=ownership.id) }}" class="cell-link">
+                {# Map status to display symbol #}
+                {{ {'Owned':'✓','Wishlist':'♡','Traded':'↔','Sold':'$'}.get(ownership.status, '?') }}
               </a>
             {% else %}
               <a href="{{ url_for('ownership_add', item_id=item.id, person_id=p.id) }}"
@@ -65,27 +66,28 @@
     </thead>
     <tbody>
       {% for item in items %}
-        {% set vlist = variants_by_item[item.id] %}
+        {% set variant_list = variants_by_item[item.id] %}
         <tr class="matrix-item-header">
           <td colspan="{{ people | length + 1 }}">
             <a href="{{ url_for('item_owners', iid=item.id) }}">{{ item.name }}</a>
           </td>
         </tr>
-        {% for v in vlist %}
+        {% for variant in variant_list %}
         <tr>
           <td class="matrix-variant-label">
-            {% if v.color != UNKNOWN_COLOR %}{{ v.color }}{% else %}<span class="muted">—</span>{% endif %}
+            {% if variant.color != UNKNOWN_COLOR %}{{ variant.color }}{% else %}<span class="muted">—</span>{% endif %}
           </td>
           {% for p in people %}
-            {% set o = variant_lookup.get((p.id, v.id)) %}
-            <td class="matrix-cell cell-{{ o.status | lower if o else 'none' }}"
-                title="{{ p.name }} / {{ item.name }} / {{ v.color }}{% if o %}: {{ o.status }}{% endif %}">
-              {% if o %}
-                <a href="{{ url_for('ownership_edit', oid=o.id) }}" class="cell-link">
-                  {{ {'Owned':'✓','Wishlist':'♡','Traded':'↔','Sold':'$'}.get(o.status, '?') }}
+            {% set ownership = variant_lookup.get((p.id, variant.id)) %}
+            <td class="matrix-cell cell-{{ ownership.status | lower if ownership else 'none' }}"
+                title="{{ p.name }} / {{ item.name }} / {{ variant.color }}{% if ownership %}: {{ ownership.status }}{% endif %}">
+              {% if ownership %}
+                <a href="{{ url_for('ownership_edit', oid=ownership.id) }}" class="cell-link">
+                  {# Map status to display symbol #}
+                  {{ {'Owned':'✓','Wishlist':'♡','Traded':'↔','Sold':'$'}.get(ownership.status, '?') }}
                 </a>
               {% else %}
-                <a href="{{ url_for('ownership_add', item_id=item.id, person_id=p.id, variant_id=v.id) }}"
+                <a href="{{ url_for('ownership_add', item_id=item.id, person_id=p.id, variant_id=variant.id) }}"
                    class="cell-add">+</a>
               {% endif %}
             </td>

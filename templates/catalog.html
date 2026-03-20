@@ -26,10 +26,11 @@
   <a href="{{ url_for('catalog') }}" class="btn btn-sm btn-ghost">Clear</a>
 </form>
 
-{% macro sort_link(col, label) %}
-  {% set new_dir = 'asc' if (sort == col and direction == 'desc') else 'desc' if sort == col else 'asc' %}
-  <a href="{{ url_for('catalog', q=q, category=cat_filter, unicorn=unicorn_f, sort=col, dir=new_dir) }}">
-    {{ label }}{% if sort == col %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}
+{% macro sort_link(column, label) %}
+  {# Toggle direction if already sorted by this column, otherwise default to asc #}
+  {% set new_dir = 'asc' if (sort == column and direction == 'desc') else 'desc' if sort == column else 'asc' %}
+  <a href="{{ url_for('catalog', q=q, category=cat_filter, unicorn=unicorn_f, sort=column, dir=new_dir) }}">
+    {{ label }}{% if sort == column %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}
   </a>
 {% endmacro %}
 
@@ -67,8 +68,8 @@
       <td>
         {% if item.sets %}
           <span class="set-chips">
-            {% for s in item.sets %}
-              <a href="{{ url_for('set_detail', sid=s.id) }}" class="chip">{{ s.name }}</a>
+            {% for knife_set in item.sets %}
+              <a href="{{ url_for('set_detail', sid=knife_set.id) }}" class="chip">{{ knife_set.name }}</a>
             {% endfor %}
           </span>
         {% else %}—{% endif %}

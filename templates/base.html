@@ -14,7 +14,7 @@
     <a href="{{ url_for('catalog') }}" {% if request.endpoint and request.endpoint.startswith('catalog') %}class="active"{% endif %}>Catalog</a>
     <a href="{{ url_for('sets_list') }}" {% if request.endpoint and 'set' in request.endpoint %}class="active"{% endif %}>Sets</a>
     <a href="{{ url_for('people') }}" {% if request.endpoint and 'people' in request.endpoint or request.endpoint == 'person_collection' %}class="active"{% endif %}>People</a>
-    <a href="{{ url_for('views/matrix')[:-1] if false else url_for('matrix') }}"
+    <a href="{{ url_for('matrix') }}"
        {% if request.endpoint == 'matrix' %}class="active"{% endif %}>Matrix</a>
     <a href="{{ url_for('import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
     <a href="{{ url_for('export_csv') }}">Export CSV</a>
