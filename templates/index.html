@@ -1,44 +1,81 @@
 {% extends "base.html" %}
 {% block title %}Dashboard – Cutco Vault{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h2 class="page-title">Dashboard</h2>
+<h1 class="page-title">Dashboard</h1>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.items }}</div>
+    <div class="stat-label">Catalog Items</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.variants }}</div>
+    <div class="stat-label">Color Variants</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.sets }}</div>
+    <div class="stat-label">Sets</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.unicorns }}</div>
+    <div class="stat-label">Unicorns</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.people }}</div>
+    <div class="stat-label">Collectors</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.owned }}</div>
+    <div class="stat-label">Owned</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.wishlist }}</div>
+    <div class="stat-label">Wishlist</div>
+  </div>
 </div>
-<div class="stats-bar">
-  <div class="stat-card"><span class="stat-value">{{ total_knives }}</span><span class="stat-label">Catalog Items</span></div>
-  <div class="stat-card"><span class="stat-value">{{ total_people }}</span><span class="stat-label">Collectors</span></div>
-  <div class="stat-card stat-owned"><span class="stat-value">{{ total_owned }}</span><span class="stat-label">Owned Records</span></div>
-  <div class="stat-card stat-unicorn"><span class="stat-value">{{ total_unicorn }}</span><span class="stat-label">🦄 Unicorns</span></div>
-</div>
-<div class="dash-grid">
-  <section class="dash-section">
-    <div class="section-header"><h3 class="section-title">Collectors</h3><a href="{{ url_for('people_add') }}" class="btn btn-primary btn-sm">+ Add</a></div>
-    {% if person_stats %}
-    <div class="collector-cards">
-      {% for ps in person_stats %}
-      <a href="{{ url_for('person_detail', pid=ps.person.id) }}" class="collector-card">
-        <span class="collector-name">{{ ps.person.name }}</span>
-        <span class="collector-meta">
-          <span class="cstat owned">{{ ps.owned }} owned</span>
-          {% if ps.wishlist %}<span class="cstat wish">{{ ps.wishlist }} wishlist</span>{% endif %}
-        </span>
-      </a>
-      {% endfor %}
-    </div>
-    {% else %}<p class="empty-inline">No collectors yet. <a href="{{ url_for('people_add') }}">Add one →</a></p>{% endif %}
-  </section>
-  <section class="dash-section">
-    <div class="section-header"><h3 class="section-title">Quick Actions</h3></div>
-    <div class="quick-actions">
-      <a href="{{ url_for('catalog_add') }}"   class="qa-btn">➕ Add Knife to Catalog</a>
-      <a href="{{ url_for('people_add') }}"    class="qa-btn">👤 Add Collector</a>
-      <a href="{{ url_for('ownership_add') }}" class="qa-btn">🔗 Log Ownership</a>
-      <a href="{{ url_for('matrix_view') }}"   class="qa-btn">🗂 View Matrix</a>
+
+<div class="dash-row">
+  <section class="dash-panel">
+    <h2>Quick Links</h2>
+    <ul class="link-list">
+      <li><a href="{{ url_for('catalog') }}">📋 Browse Catalog</a></li>
+      <li><a href="{{ url_for('sets_list') }}">🗂️ Browse Sets</a></li>
+      <li><a href="{{ url_for('matrix') }}">📊 Ownership Matrix</a></li>
+      <li><a href="{{ url_for('import_page') }}">📥 Import XLSX / CSV</a></li>
+      <li><a href="{{ url_for('export_csv') }}">📤 Export CSV</a></li>
       {% if is_admin() %}
-      <a href="{{ url_for('catalog_sync') }}" class="qa-btn qa-sync"
-         onclick="this.textContent='⏳ Syncing…'; this.style.pointerEvents='none';">🔄 Sync Cutco Catalog</a>
+      <li><a href="{{ url_for('catalog_sync') }}">🔄 Sync Catalog</a></li>
       {% endif %}
-    </div>
+    </ul>
+  </section>
+
+  <section class="dash-panel">
+    <h2>Collectors</h2>
+    <ul class="link-list">
+      {% for person in people %}
+        <li><a href="{{ url_for('person_collection', pid=person.id) }}">👤 {{ person.name }}</a></li>
+      {% else %}
+        <li class="muted">No collectors yet — <a href="{{ url_for('people_add') }}">add one</a>.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="dash-panel">
+    <h2>Recent Entries</h2>
+    <ul class="link-list">
+      {% for o in recent %}
+        <li>
+          <span class="badge badge-{{ o.status | lower }}">{{ o.status }}</span>
+          <a href="{{ url_for('person_collection', pid=o.person_id) }}">{{ o.person.name }}</a>
+          — {{ o.variant.item.name }}
+          {% if o.variant.color != UNKNOWN_COLOR %}
+            <span class="muted">({{ o.variant.color }})</span>
+          {% endif %}
+        </li>
+      {% else %}
+        <li class="muted">No entries yet.</li>
+      {% endfor %}
+    </ul>
   </section>
 </div>
 {% endblock %}

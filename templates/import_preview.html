@@ -1,268 +1,232 @@
 {% extends "base.html" %}
 {% block title %}Import Preview – Cutco Vault{% endblock %}
 {% block content %}
-
 <div class="page-header">
-  <h2 class="page-title">Import Preview</h2>
-  <a href="{{ url_for('import_page') }}" class="btn btn-ghost">← Re-upload</a>
+  <h1 class="page-title">Import Preview</h1>
+  <a href="{{ url_for('import_page') }}" class="btn btn-ghost">← Back</a>
 </div>
 
-<!-- Summary -->
-<div class="sync-summary" style="flex-wrap:wrap;gap:16px">
-  {% if person_override %}
-  <span>👤 All rows assigned to <strong>{{ person_override }}</strong></span>
-  <span class="sep">·</span>
-  {% endif %}
-  <span>✅ <strong>{{ already_in_catalog | length }}</strong> already in catalog</span>
-  <span class="sep">·</span>
-  <span>➕ <strong>{{ new_knives | length }}</strong> new knife{{ 's' if new_knives|length != 1 else '' }}</span>
-  <span class="sep">·</span>
-  <span>🦄 <strong>{{ likely_unicorns | length }}</strong> likely unicorn{{ 's' if likely_unicorns|length != 1 else '' }}</span>
-  <span class="sep">·</span>
-  <span>👤 <strong>{{ ownership_entries | length }}</strong> ownership entr{{ 'ies' if ownership_entries|length != 1 else 'y' }}</span>
-  {% if conflicts %}
-  <span class="sep">·</span>
-  <span style="color:var(--wishlist)">⚠️ <strong>{{ conflicts | length }}</strong> conflict{{ 's' if conflicts|length != 1 else '' }}</span>
-  {% endif %}
-  {% if errors %}
-  <span class="sep">·</span>
-  <span style="color:var(--danger)">✗ <strong>{{ errors | length }}</strong> error{{ 's' if errors|length != 1 else '' }}</span>
-  {% endif %}
+{% if errors %}
+<div class="flash flash-error">
+  <strong>{{ errors | length }} row(s) could not be parsed:</strong>
+  <ul>{% for e in errors %}<li>Row {{ e.row }}: {{ e.reason }}</li>{% endfor %}</ul>
 </div>
+{% endif %}
 
-<form method="POST" action="{{ url_for('import_confirm') }}">
-  <input type="hidden" name="knife_count" value="{{ (new_knives + likely_unicorns) | length }}">
-  <input type="hidden" name="own_count"   value="{{ ownership_entries | length }}">
+{% if conflicts %}
+<div class="flash flash-warning">
+  <strong>{{ conflicts | length }} status conflict(s) — existing entries unchanged:</strong>
+  <ul>
+    {% for c in conflicts %}
+      <li>{{ c.person }} / {{ c.item }} ({{ c.color }}):
+        existing <strong>{{ c.existing_status }}</strong> vs import <strong>{{ c.import_status }}</strong></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
 
-  <!-- ── Already in catalog ─────────────────────────────────────────────── -->
-  {% if already_in_catalog %}
-  <div class="import-section">
-    <div class="import-section-header already">
-      <span>✅ Already in Catalog</span>
-      <span class="import-section-count">{{ already_in_catalog | length }} — no action needed</span>
-    </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Knife</th><th>SKU</th><th>Color</th><th>Person</th><th>Status</th></tr></thead>
-        <tbody>
-          {% for item in already_in_catalog %}
-          <tr>
-            <td><a href="{{ url_for('knife_owners', kid=item.knife.id) }}" class="knife-name-link">{{ item.knife.name }}</a></td>
-            <td class="mono dim">{{ item.knife.sku or '—' }}</td>
-            <td>{% if item.color and item.color != 'Unknown / Unspecified' %}<span class="color-badge">{{ item.color }}</span>{% else %}<span class="dim">—</span>{% endif %}</td>
-            <td class="dim">{{ item.person or '—' }}</td>
-            <td>{% if item.status %}<span class="status-badge status-{{ item.status | lower }}">{{ item.status }}</span>{% else %}—{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+{% if already_in_catalog %}
+<p class="flash flash-info">
+  <strong>{{ already_in_catalog | length }}</strong> row(s) matched existing catalog items and will update ownership only.
+</p>
+{% endif %}
+
+<form method="post" action="{{ url_for('import_confirm') }}">
+
+  {# ── New Items ──────────────────────────────────────────────────────── #}
+  {% if new_items %}
+  <h2>New Catalog Items ({{ new_items | length }})</h2>
+  <p class="muted">Check items to add them to the catalog.</p>
+  <input type="hidden" name="item_count" value="{{ new_items | length }}">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
+        <th>Edge</th><th>Category</th><th>Unicorn</th><th>Person</th><th>Status</th><th>Sets</th><th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in new_items %}
+      <tr>
+        <td><input type="checkbox" name="item_accept_{{ loop.index0 }}" checked></td>
+        <td>
+          <input type="hidden" name="item_name_{{ loop.index0 }}" value="{{ item.name }}">
+          {{ item.name }}
+        </td>
+        <td>
+          <input type="hidden" name="item_sku_{{ loop.index0 }}" value="{{ item.sku or '' }}">
+          <span class="mono">{{ item.sku or '—' }}</span>
+        </td>
+        <td>
+          <input type="hidden" name="item_color_{{ loop.index0 }}" value="{{ item.color }}">
+          {{ item.color }}
+        </td>
+        <td>
+          <select name="item_edge_{{ loop.index0 }}" class="select-xs">
+            {% for et in edge_types %}
+              <option value="{{ et }}" {% if et == item.edge_type %}selected{% endif %}>{{ et }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <input type="text" name="item_category_{{ loop.index0 }}" value="{{ item.category or '' }}" class="input-xs">
+        </td>
+        <td>
+          <input type="checkbox" name="item_unicorn_{{ loop.index0 }}" {% if item.is_unicorn %}checked{% endif %}>
+        </td>
+        <td>
+          <input type="text" name="item_person_{{ loop.index0 }}" value="{{ item.person or '' }}" class="input-xs">
+        </td>
+        <td>
+          <select name="item_status_{{ loop.index0 }}" class="select-xs">
+            {% for s in status_options %}
+              <option value="{{ s }}" {% if s == item.status %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <input type="hidden" name="item_sets_{{ loop.index0 }}" value="{{ item.sets | join('|') }}">
+          {% if item.sets %}
+            <span class="set-chips">{% for s in item.sets %}<span class="chip">{{ s }}</span>{% endfor %}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          <input type="hidden" name="item_notes_{{ loop.index0 }}" value="{{ item.notes or '' }}">
+          <span class="muted small">{{ item.notes or '' }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% endif %}
 
-  <!-- ── New knives ─────────────────────────────────────────────────────── -->
-  {% set all_new = new_knives + likely_unicorns %}
-  {% if all_new %}
-  <div class="import-section">
-    <div class="import-section-header new-knives">
-      <label class="sync-cat-label">
-        <input type="checkbox" id="checkAllKnives" checked
-               onchange="toggleSection('knife', this.checked)">
-        <span>➕ New Knives to Add</span>
-        <span class="import-section-count">{{ all_new | length }} — review &amp; confirm each</span>
-      </label>
-    </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th style="width:36px"></th>
-            <th>Name</th>
-            <th>SKU</th>
-            <th>Color</th>
-            <th>Edge</th>
-            <th>🦄 Unicorn</th>
-            <th>Person</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in all_new %}
-          {% set i = loop.index0 %}
-          <tr class="{% if item.is_unicorn %}is-unicorn{% endif %}">
-            <td><input type="checkbox" name="knife_accept_{{ i }}" class="knife-check" checked onchange="updateImportCount()"></td>
-            <td>
-              <input type="hidden" name="knife_person_{{ i }}"   value="{{ item.person }}">
-              <input type="hidden" name="knife_status_{{ i }}"   value="{{ item.status }}">
-              <input type="text"   name="knife_name_{{ i }}"     value="{{ item.name }}"
-                     class="inline-input" required>
-            </td>
-            <td><input type="text" name="knife_sku_{{ i }}" value="{{ item.sku or '' }}" class="inline-input mono" placeholder="—"></td>
-            <td><input type="text" name="knife_color_{{ i }}" value="{{ item.color if item.color != 'Unknown / Unspecified' else '' }}" class="inline-input" placeholder="Unknown"></td>
-            <td>
-              <select name="knife_edge_{{ i }}" class="inline-select">
-                {% for e in edge_types %}
-                <option value="{{ e }}" {% if item.edge_type == e %}selected{% endif %}>{{ e }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td style="text-align:center">
-              <input type="checkbox" name="knife_unicorn_{{ i }}"
-                     {% if item.is_unicorn %}checked{% endif %}>
-            </td>
-            <td class="dim">{{ item.person or '—' }}</td>
-            <td>
-              {% if item.status %}
-              <span class="status-badge status-{{ item.status | lower }}">{{ item.status }}</span>
-              {% else %}—{% endif %}
-            </td>
-          </tr>
-          <tr><td colspan="8" style="padding:0">
-            <input type="hidden" name="knife_category_{{ i }}" value="{{ item.category or '' }}">
-            <input type="hidden" name="knife_notes_{{ i }}"    value="{{ item.notes or '' }}">
-          </td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  {# ── Likely Unicorns ────────────────────────────────────────────────── #}
+  {% if likely_unicorns %}
+  <h2>🦄 Likely Unicorns / Off-Catalog ({{ likely_unicorns | length }})</h2>
+  <p class="muted">No SKU match found or explicitly flagged. Review before accepting.</p>
+  <input type="hidden" name="item_count"
+         value="{{ (new_items | length) + (likely_unicorns | length) }}"
+         id="item_count_override">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
+        <th>Edge</th><th>Category</th><th>Unicorn</th><th>Person</th><th>Status</th><th>Sets</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set offset = new_items | length %}
+      {% for item in likely_unicorns %}
+      {% set idx = offset + loop.index0 %}
+      <tr>
+        <td><input type="checkbox" name="item_accept_{{ idx }}" checked></td>
+        <td>
+          <input type="hidden" name="item_name_{{ idx }}" value="{{ item.name }}">
+          {{ item.name }}
+        </td>
+        <td>
+          <input type="hidden" name="item_sku_{{ idx }}" value="{{ item.sku or '' }}">
+          <span class="mono">{{ item.sku or '—' }}</span>
+        </td>
+        <td>
+          <input type="hidden" name="item_color_{{ idx }}" value="{{ item.color }}">
+          {{ item.color }}
+        </td>
+        <td>
+          <select name="item_edge_{{ idx }}" class="select-xs">
+            {% for et in edge_types %}
+              <option value="{{ et }}" {% if et == item.edge_type %}selected{% endif %}>{{ et }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <input type="text" name="item_category_{{ idx }}" value="{{ item.category or '' }}" class="input-xs">
+        </td>
+        <td>
+          <input type="checkbox" name="item_unicorn_{{ idx }}" {% if item.is_unicorn %}checked{% endif %}>
+        </td>
+        <td>
+          <input type="text" name="item_person_{{ idx }}" value="{{ item.person or '' }}" class="input-xs">
+        </td>
+        <td>
+          <select name="item_status_{{ idx }}" class="select-xs">
+            {% for s in status_options %}
+              <option value="{{ s }}" {% if s == item.status %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <input type="hidden" name="item_sets_{{ idx }}" value="{{ item.sets | join('|') }}">
+          {% if item.sets %}
+            <span class="set-chips">{% for s in item.sets %}<span class="chip">{{ s }}</span>{% endfor %}</span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% endif %}
 
-  <!-- ── Ownership entries ──────────────────────────────────────────────── -->
+  {# ── Ownership Entries ──────────────────────────────────────────────── #}
   {% if ownership_entries %}
-  <div class="import-section">
-    <div class="import-section-header ownership">
-      <label class="sync-cat-label">
-        <input type="checkbox" id="checkAllOwn" checked
-               onchange="toggleSection('own', this.checked)">
-        <span>👤 Ownership Entries</span>
-        <span class="import-section-count">{{ ownership_entries | length }}</span>
-      </label>
-    </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th style="width:36px"></th>
-            <th>Person</th>
-            <th>Knife</th>
-            <th>Color</th>
-            <th>Status</th>
-            <th>New Person?</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in ownership_entries %}
-          {% set i = loop.index0 %}
-          <tr>
-            <td><input type="checkbox" name="own_accept_{{ i }}" class="own-check" checked onchange="updateImportCount()"></td>
-            <td>
-              {{ item.person }}
-              <input type="hidden" name="own_person_{{ i }}"   value="{{ item.person }}">
-              <input type="hidden" name="own_knife_id_{{ i }}" value="{{ item.knife_id }}">
-              <input type="hidden" name="own_color_{{ i }}"    value="{{ item.color }}">
-              <input type="hidden" name="own_status_{{ i }}"   value="{{ item.status }}">
-              <input type="hidden" name="own_notes_{{ i }}"    value="{{ item.notes or '' }}">
-            </td>
-            <td class="knife-name-link">{{ item.knife_name }}</td>
-            <td>{% if item.color and item.color != 'Unknown / Unspecified' %}<span class="color-badge">{{ item.color }}</span>{% else %}<span class="dim">—</span>{% endif %}</td>
-            <td><span class="status-badge status-{{ item.status | lower }}">{{ item.status }}</span></td>
-            <td>{% if item.is_new_person %}<span class="new-person-badge">+ new</span>{% else %}—{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  <h2>Ownership Entries ({{ ownership_entries | length }})</h2>
+  <p class="muted">These items already exist in the catalog. Check entries to log ownership.</p>
+  <input type="hidden" name="own_count" value="{{ ownership_entries | length }}">
+  <table class="data-table">
+    <thead>
+      <tr><th>Accept</th><th>Person</th><th>Item</th><th>Color</th><th>Status</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      {% for e in ownership_entries %}
+      <tr>
+        <td><input type="checkbox" name="own_accept_{{ loop.index0 }}" checked></td>
+        <td>
+          <input type="hidden" name="own_person_{{ loop.index0 }}" value="{{ e.person }}">
+          {{ e.person }}
+          {% if e.is_new_person %}<span class="badge badge-new">new</span>{% endif %}
+        </td>
+        <td>
+          <input type="hidden" name="own_item_id_{{ loop.index0 }}" value="{{ e.item_id }}">
+          {{ e.item_name }}
+        </td>
+        <td>
+          <input type="hidden" name="own_color_{{ loop.index0 }}" value="{{ e.color }}">
+          {{ e.color }}
+        </td>
+        <td>
+          <select name="own_status_{{ loop.index0 }}" class="select-xs">
+            {% for s in status_options %}
+              <option value="{{ s }}" {% if s == e.status %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <input type="hidden" name="own_notes_{{ loop.index0 }}" value="{{ e.notes or '' }}">
+          <span class="small muted">{{ e.notes or '' }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% endif %}
 
-  <!-- ── Conflicts ──────────────────────────────────────────────────────── -->
-  {% if conflicts %}
-  <div class="import-section">
-    <div class="import-section-header conflict">
-      <span>⚠️ Conflicts — Already Logged with Different Status</span>
-      <span class="import-section-count">{{ conflicts | length }} — not imported, edit manually if needed</span>
-    </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Person</th><th>Knife</th><th>Color</th><th>Existing Status</th><th>Import Status</th><th></th></tr></thead>
-        <tbody>
-          {% for c in conflicts %}
-          <tr>
-            <td>{{ c.person }}</td>
-            <td>{{ c.knife }}</td>
-            <td>{% if c.color and c.color != 'Unknown / Unspecified' %}<span class="color-badge">{{ c.color }}</span>{% else %}<span class="dim">—</span>{% endif %}</td>
-            <td><span class="status-badge status-{{ c.existing_status | lower }}">{{ c.existing_status }}</span></td>
-            <td><span class="status-badge status-{{ c.import_status | lower }}">{{ c.import_status }}</span></td>
-            <td><a href="{{ url_for('ownership_edit', oid=c.oid) }}" class="action-link edit" target="_blank">Edit ↗</a></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- ── Errors ─────────────────────────────────────────────────────────── -->
-  {% if errors %}
-  <div class="import-section">
-    <div class="import-section-header error">
-      <span>✗ Rows with Errors — Skipped</span>
-      <span class="import-section-count">{{ errors | length }}</span>
-    </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Row #</th><th>Reason</th><th>Data</th></tr></thead>
-        <tbody>
-          {% for e in errors %}
-          <tr>
-            <td class="mono dim">{{ e.row }}</td>
-            <td style="color:var(--danger)">{{ e.reason }}</td>
-            <td class="dim" style="font-size:.72rem">{{ e.data }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- Confirm button -->
-  {% if new_knives or likely_unicorns or ownership_entries %}
-  <div class="form-actions" style="margin-top:24px">
-    <button type="submit" class="btn btn-primary btn-lg" id="importBtn">Confirm Import</button>
-    <a href="{{ url_for('import_page') }}" class="btn btn-ghost">Cancel</a>
-    <span class="sync-count" id="importCount" style="margin-left:8px"></span>
-  </div>
+  {% if not new_items and not likely_unicorns and not ownership_entries %}
+  <p class="flash flash-info">Nothing new to import — all rows already exist.</p>
   {% else %}
-  <div class="form-actions" style="margin-top:24px">
-    <a href="{{ url_for('catalog') }}" class="btn btn-primary">Back to Catalog</a>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Confirm Import</button>
+    <a href="{{ url_for('import_page') }}" class="btn btn-ghost">Cancel</a>
   </div>
   {% endif %}
 
 </form>
 
 <script>
-function toggleSection(prefix, state) {
-  document.querySelectorAll('.' + prefix + '-check').forEach(cb => cb.checked = state);
-  updateImportCount();
+// Sync the item_count hidden field when both new and unicorn tables are present
+const override = document.getElementById('item_count_override');
+if (override) {
+  const base = document.querySelector('input[name="item_count"]');
+  if (base) base.remove();
 }
-
-function updateImportCount() {
-  const knives = document.querySelectorAll('.knife-check:checked').length;
-  const own    = document.querySelectorAll('.own-check:checked').length;
-  const total  = knives + own;
-  const parts  = [];
-  if (knives) parts.push(knives + ' knife' + (knives !== 1 ? 's' : ''));
-  if (own)    parts.push(own + ' ownership entr' + (own !== 1 ? 'ies' : 'y'));
-  const btn = document.getElementById('importBtn');
-  const count = document.getElementById('importCount');
-  if (btn) btn.textContent = total === 0 ? 'Nothing Selected' : 'Import ' + parts.join(' + ');
-  if (btn) btn.disabled = total === 0;
-  if (count) count.textContent = total > 0 ? parts.join(', ') + ' selected' : '';
-}
-
-updateImportCount();
 </script>
-
 {% endblock %}

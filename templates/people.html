@@ -1,39 +1,34 @@
 {% extends "base.html" %}
-{% block title %}Collectors – Cutco Vault{% endblock %}
+{% block title %}People – Cutco Vault{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h2 class="page-title">Collectors</h2>
-  <a href="{{ url_for('people_add') }}" class="btn btn-primary btn-sm">+ Add Collector</a>
+  <h1 class="page-title">Collectors</h1>
+  <a class="btn btn-primary" href="{{ url_for('people_add') }}">+ Add Collector</a>
 </div>
-{% if people %}
-<div class="collector-grid">
-  {% for p in people %}
-  {% set owned = p.ownerships | selectattr('status','eq','Owned') | list | length %}
-  {% set wish  = p.ownerships | selectattr('status','eq','Wishlist') | list | length %}
-  <div class="collector-card-lg">
-    <div class="cc-head">
-      <a href="{{ url_for('person_detail', pid=p.id) }}" class="collector-name-lg">{{ p.name }}</a>
-      <div class="cc-actions">
-        <a href="{{ url_for('person_edit', pid=p.id) }}" class="action-link edit">Edit</a>
-        <form method="POST" action="{{ url_for('person_delete', pid=p.id) }}" class="inline-form" onsubmit="return confirm('Delete {{ p.name }} and all their ownership records?')">
-          <button class="action-link delete">Delete</button>
+
+{% if persons %}
+<table class="data-table">
+  <thead>
+    <tr><th>Name</th><th>Owned</th><th>Notes</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for p in persons %}
+    <tr>
+      <td><a href="{{ url_for('person_collection', pid=p.id) }}">{{ p.name }}</a></td>
+      <td>{{ counts[p.id] }}</td>
+      <td>{{ p.notes or '—' }}</td>
+      <td class="actions">
+        <a href="{{ url_for('people_edit', pid=p.id) }}" class="btn btn-xs">Edit</a>
+        <form method="post" action="{{ url_for('people_delete', pid=p.id) }}"
+              onsubmit="return confirm('Remove {{ p.name }}?')" style="display:inline">
+          <button class="btn btn-xs btn-danger">Del</button>
         </form>
-      </div>
-    </div>
-    <div class="cc-stats">
-      <span class="cstat owned">{{ owned }} owned</span>
-      {% if wish %}<span class="cstat wish">{{ wish }} wishlist</span>{% endif %}
-      <span class="cstat total">{{ p.ownerships|length }} total</span>
-    </div>
-    {% if p.notes %}<p class="cc-notes">{{ p.notes }}</p>{% endif %}
-    <div class="cc-foot">
-      <a href="{{ url_for('person_detail', pid=p.id) }}" class="btn btn-ghost btn-sm">View Collection →</a>
-      <a href="{{ url_for('ownership_add', person_id=p.id) }}" class="btn btn-primary btn-sm">+ Add Knife</a>
-    </div>
-  </div>
-  {% endfor %}
-</div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% else %}
-<div class="empty-state"><p class="empty-icon">👤</p><p>No collectors yet.</p><a href="{{ url_for('people_add') }}" class="btn btn-primary">Add your first collector</a></div>
+<p class="empty">No collectors yet.</p>
 {% endif %}
 {% endblock %}
