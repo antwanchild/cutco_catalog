@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ knife.name }} – Cutco Vault{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">{{ knife.name }} {% if knife.is_unicorn %}🦄{% endif %}</h2>
+    <p class="page-sub mono dim">
+      {% if knife.sku %}SKU {{ knife.sku }} · {% endif %}
+      {{ knife.category or 'Uncategorized' }} ·
+      <span class="edge-badge edge-{{ knife.edge_type | lower | replace(' ','-') | replace('/','') }}">{{ knife.edge_type }}</span>
+      {% if knife.cutco_url %} · <a href="{{ knife.cutco_url }}" target="_blank" class="ext-link">cutco.com ↗</a>{% endif %}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('variants', kid=knife.id) }}" class="btn btn-ghost">
+      Variants ({{ knife.variants | length }})
+    </a>
+    <a href="{{ url_for('ownership_add') }}?knife_id={{ knife.id }}" class="btn btn-primary">+ Log Owner</a>
+    <a href="{{ url_for('catalog_edit', kid=knife.id) }}" class="btn btn-ghost">Edit</a>
+    <a href="{{ url_for('catalog') }}" class="btn btn-ghost">← Catalog</a>
+  </div>
+</div>
+
+<!-- Variants summary -->
+{% set real_variants = knife.variants | rejectattr('color','eq',UNKNOWN_COLOR) | list %}
+{% if real_variants %}
+<div class="variant-summary">
+  <span class="dim" style="font-size:.78rem">Known colors:</span>
+  {% for v in real_variants %}
+    <span class="color-badge">{{ v.color }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if entries %}
+<h3 class="section-title" style="margin-top:20px">Collectors who have this knife ({{ entries | length }})</h3>
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr><th>Person</th><th>Color</th><th>Status</th><th>Notes</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for o in entries %}
+      <tr>
+        <td><a href="{{ url_for('person_collection', pid=o.person_id) }}" class="knife-name-link">{{ o.person.name }}</a></td>
+        <td>
+          {% if o.variant.color == UNKNOWN_COLOR %}
+            <span class="dim" style="font-size:.75rem">{{ o.variant.color }}</span>
+          {% else %}
+            <span class="color-badge">{{ o.variant.color }}</span>
+          {% endif %}
+        </td>
+        <td><span class="status-badge status-{{ o.status | lower }}">{{ o.status }}</span></td>
+        <td class="dim notes-text">{{ o.notes or '—' }}</td>
+        <td class="actions-cell">
+          <a href="{{ url_for('ownership_edit', oid=o.id) }}" class="action-link edit">Edit</a>
+          <form method="POST" action="{{ url_for('ownership_delete', oid=o.id) }}" class="inline-form"
+                onsubmit="return confirm('Remove this entry?')">
+            <button class="action-link delete">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty-hint" style="margin:20px 0">No one has logged this knife yet.</p>
+{% endif %}
+
+{% if people_without %}
+<h3 class="section-title" style="margin-top:28px">Not logged by ({{ people_without | length }})</h3>
+<div class="without-list">
+  {% for p in people_without %}
+  <span class="without-pill">
+    {{ p.name }}
+    <a href="{{ url_for('ownership_add') }}?person_id={{ p.id }}&knife_id={{ knife.id }}"
+       class="without-add" title="Add for {{ p.name }}">+</a>
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

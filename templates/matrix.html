@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Ownership Matrix – Cutco Vault{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h2 class="page-title">Ownership Matrix</h2>
+  <div class="page-actions">
+    <div class="matrix-toggle">
+      <button class="toggle-btn active" id="btnKnife" onclick="setMode('knife')">By Knife</button>
+      <button class="toggle-btn" id="btnVariant" onclick="setMode('variant')">By Variant</button>
+    </div>
+  </div>
+</div>
+
+{% if knives and people %}
+
+<!-- Knife-level matrix -->
+<div id="matrix-knife">
+  <p class="matrix-hint">One row per knife model. Dot shows the best status across all variants for that collector.</p>
+  <div class="matrix-wrap">
+    <table class="matrix-table">
+      <thead>
+        <tr>
+          <th class="matrix-knife-col">Knife</th>
+          <th class="matrix-sku-col">SKU</th>
+          {% for p in people %}
+          <th class="matrix-person-col">
+            <a href="{{ url_for('person_collection', pid=p.id) }}" class="matrix-person-link">{{ p.name }}</a>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in knives %}
+        <tr {% if k.is_unicorn %}class="is-unicorn"{% endif %}>
+          <td class="matrix-knife-col">
+            <a href="{{ url_for('knife_owners', kid=k.id) }}" class="knife-name-link">
+              {{ k.name }}{% if k.is_unicorn %} 🦄{% endif %}
+            </a>
+          </td>
+          <td class="matrix-sku-col mono dim">{{ k.sku or '—' }}</td>
+          {% for p in people %}
+            {% set o = knife_lookup.get((p.id, k.id)) %}
+            <td class="matrix-cell">
+              {% if o %}
+                <a href="{{ url_for('ownership_edit', oid=o.id) }}"
+                   class="matrix-dot dot-{{ o.status | lower }}"
+                   title="{{ p.name }}: {{ o.status }} ({{ o.variant.color }})">{{ o.status[0] }}</a>
+              {% else %}
+                <a href="{{ url_for('ownership_add') }}?person_id={{ p.id }}&knife_id={{ k.id }}"
+                   class="matrix-dot dot-empty" title="Log for {{ p.name }}">·</a>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Variant-level matrix -->
+<div id="matrix-variant" class="hidden">
+  <p class="matrix-hint">One row per color variant. Shows exactly which version each collector has.</p>
+  <div class="matrix-wrap">
+    <table class="matrix-table">
+      <thead>
+        <tr>
+          <th class="matrix-knife-col">Knife</th>
+          <th class="matrix-variant-col">Color</th>
+          {% for p in people %}
+          <th class="matrix-person-col">
+            <a href="{{ url_for('person_collection', pid=p.id) }}" class="matrix-person-link">{{ p.name }}</a>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for k in knives %}
+          {% set kvariants = variants_by_knife[k.id] %}
+          {% for v in kvariants %}
+          <tr {% if k.is_unicorn %}class="is-unicorn"{% endif %}>
+            {% if loop.first %}
+            <td class="matrix-knife-col" rowspan="{{ kvariants | length }}">
+              <a href="{{ url_for('knife_owners', kid=k.id) }}" class="knife-name-link">
+                {{ k.name }}{% if k.is_unicorn %} 🦄{% endif %}
+              </a>
+            </td>
+            {% endif %}
+            <td class="matrix-variant-col">
+              {% if v.color == UNKNOWN_COLOR %}
+                <span class="dim" style="font-size:.72rem">{{ v.color }}</span>
+              {% else %}
+                <span class="color-badge">{{ v.color }}</span>
+              {% endif %}
+            </td>
+            {% for p in people %}
+              {% set o = variant_lookup.get((p.id, v.id)) %}
+              <td class="matrix-cell">
+                {% if o %}
+                  <a href="{{ url_for('ownership_edit', oid=o.id) }}"
+                     class="matrix-dot dot-{{ o.status | lower }}"
+                     title="{{ p.name }}: {{ o.status }}">{{ o.status[0] }}</a>
+                {% else %}
+                  <a href="{{ url_for('ownership_add') }}?person_id={{ p.id }}&knife_id={{ k.id }}&variant_id={{ v.id }}"
+                     class="matrix-dot dot-empty" title="Log for {{ p.name }}">·</a>
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="matrix-legend">
+  <span class="legend-item"><span class="matrix-dot dot-owned">O</span> Owned</span>
+  <span class="legend-item"><span class="matrix-dot dot-wishlist">W</span> Wishlist</span>
+  <span class="legend-item"><span class="matrix-dot dot-sold">S</span> Sold</span>
+  <span class="legend-item"><span class="matrix-dot dot-traded">T</span> Traded</span>
+  <span class="legend-item"><span class="matrix-dot dot-empty">·</span> Not logged (click to add)</span>
+</div>
+
+{% else %}
+<div class="empty-state">
+  <p>Add knives to the catalog and collectors to see the matrix.</p>
+</div>
+{% endif %}
+
+<script>
+function setMode(mode) {
+  document.getElementById('matrix-knife').classList.toggle('hidden', mode !== 'knife');
+  document.getElementById('matrix-variant').classList.toggle('hidden', mode !== 'variant');
+  document.getElementById('btnKnife').classList.toggle('active', mode === 'knife');
+  document.getElementById('btnVariant').classList.toggle('active', mode === 'variant');
+}
+</script>
+
+{% endblock %}

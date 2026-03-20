@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Catalog – Cutco Vault{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h2 class="page-title">Master Catalog</h2>
+  <div class="page-actions">
+    <a href="{{ url_for('catalog_add') }}" class="btn btn-primary">+ Add Knife</a>
+    {% if is_admin %}
+      <button id="syncBtn" class="btn btn-sync" onclick="startSync()">
+        <span id="syncLabel">↻ Sync Cutco Catalog</span>
+      </button>
+    {% else %}
+      <a href="{{ url_for('admin_login') }}" class="btn btn-ghost btn-sm" title="Admin login required">↻ Sync</a>
+    {% endif %}
+  </div>
+</div>
+
+<form method="GET" action="{{ url_for('catalog') }}" class="filter-form">
+  <input type="text" name="q" value="{{ q }}" placeholder="Search name or SKU…" class="filter-search">
+  <select name="category" onchange="this.form.submit()">
+    <option value="">All categories</option>
+    {% for cat in categories %}
+    <option value="{{ cat }}" {% if cat_filter == cat %}selected{% endif %}>{{ cat }}</option>
+    {% endfor %}
+  </select>
+  <label class="check-label">
+    <input type="checkbox" name="unicorn" value="1" onchange="this.form.submit()" {% if unicorn_f == '1' %}checked{% endif %}>
+    🦄 Unicorns only
+  </label>
+  {% if q or cat_filter or unicorn_f %}
+    <a href="{{ url_for('catalog') }}" class="btn btn-ghost btn-sm">✕ Clear</a>
+  {% endif %}
+  <input type="hidden" name="sort" value="{{ sort }}">
+  <input type="hidden" name="dir" value="{{ direction }}">
+  <button type="submit" class="btn btn-ghost btn-sm">Search</button>
+</form>
+
+{% if knives %}
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        {% set cols = [('name','Name'),('sku','SKU'),('category','Category'),('edge_type','Edge'),('in_catalog','In Catalog'),('is_unicorn','🦄')] %}
+        {% for col, label in cols %}
+          {% set nd = 'asc' if (sort != col or direction == 'desc') else 'desc' %}
+          <th><a href="{{ url_for('catalog', sort=col, dir=nd, q=q, category=cat_filter, unicorn=unicorn_f) }}"
+                 class="sort-link {% if sort == col %}active{% endif %}">
+            {{ label }}{% if sort == col %} {{ '↑' if direction == 'asc' else '↓' }}{% endif %}
+          </a></th>
+        {% endfor %}
+        <th>Colors</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for knife in knives %}
+      <tr {% if knife.is_unicorn %}class="is-unicorn"{% endif %}>
+        <td><a href="{{ url_for('knife_owners', kid=knife.id) }}" class="knife-name-link">{{ knife.name }}</a></td>
+        <td class="mono dim">{{ knife.sku or '—' }}</td>
+        <td class="dim">{{ knife.category or '—' }}</td>
+        <td><span class="edge-badge edge-{{ knife.edge_type | lower | replace(' ','-') | replace('/','') }}">{{ knife.edge_type }}</span></td>
+        <td>{% if knife.in_catalog %}<span class="dot dot-green"></span>{% else %}<span class="dot dot-gray"></span>{% endif %}</td>
+        <td>{% if knife.is_unicorn %}🦄{% else %}—{% endif %}</td>
+        <td>
+          {% set real = knife.variants | rejectattr('color','eq',UNKNOWN_COLOR) | list %}
+          <a href="{{ url_for('variants', kid=knife.id) }}" class="variants-link">
+            {% if real %}{{ real | length }} color{{ 's' if real|length != 1 else '' }}{% else %}<span class="dim">+ add</span>{% endif %}
+          </a>
+        </td>
+        <td class="actions-cell">
+          <a href="{{ url_for('catalog_edit', kid=knife.id) }}" class="action-link edit">Edit</a>
+          <a href="{{ url_for('variants', kid=knife.id) }}" class="action-link view">Colors</a>
+          <a href="{{ url_for('knife_owners', kid=knife.id) }}" class="action-link view">Owners</a>
+          <form method="POST" action="{{ url_for('catalog_delete', kid=knife.id) }}" class="inline-form"
+                onsubmit="return confirm('Delete {{ knife.name }}? This removes all ownership entries too.')">
+            <button class="action-link delete">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="result-count">{{ knives | length }} item{{ 's' if knives | length != 1 else '' }}</p>
+{% else %}
+<div class="empty-state">
+  <p class="empty-icon">⚔</p>
+  <p>No knives match your filters.</p>
+  <a href="{{ url_for('catalog_add') }}" class="btn btn-primary">Add a knife</a>
+</div>
+{% endif %}
+
+<div id="syncOverlay" class="sync-overlay hidden">
+  <div class="sync-dialog">
+    <div class="sync-spinner"></div>
+    <p class="sync-msg">Scraping Cutco catalog…</p>
+    <p class="sync-sub">Checking ~6 category pages, this takes a few seconds.</p>
+  </div>
+</div>
+
+<script>
+function startSync() {
+  document.getElementById('syncOverlay').classList.remove('hidden');
+  document.getElementById('syncBtn').disabled = true;
+  document.getElementById('syncLabel').textContent = 'Syncing…';
+  window.location.href = "{{ url_for('catalog_sync') }}";
+}
+</script>
+
+{% endblock %}

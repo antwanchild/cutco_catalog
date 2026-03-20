@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Import Spreadsheet – Cutco Vault{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h2 class="page-title">Import Spreadsheet</h2>
+  <a href="{{ url_for('catalog') }}" class="btn btn-ghost">← Catalog</a>
+</div>
+
+<div class="form-container">
+  <p style="margin-bottom:20px;font-size:.85rem;color:var(--text-dim)">
+    Upload a CSV to import knives, unicorns, and ownership data. The app compares
+    your file against the existing catalog and shows you exactly what's new, what
+    already exists, and what looks like a unicorn — before anything gets written.
+  </p>
+
+  <form method="POST" enctype="multipart/form-data" action="{{ url_for('import_page') }}" class="app-form">
+
+    <div class="field-group">
+      <label>CSV File <span class="required">*</span></label>
+      <input type="file" name="csvfile" accept=".csv,.xlsx" required
+             style="color:var(--text);font-family:var(--font-mono);font-size:.85rem">
+      <p class="field-hint">CSV (.csv) or Excel (.xlsx). First row must be a header.</p>
+    </div>
+
+    <div class="field-group">
+      <label>Assign All Rows to Person <span class="dim" style="text-transform:none;font-size:.75rem">(optional)</span></label>
+      <input type="text" name="person_override" list="people-list"
+             placeholder="e.g. Anthony — overrides the 'person' column in the file">
+      <datalist id="people-list">
+        {% for p in people %}
+        <option value="{{ p.name }}">
+        {% endfor %}
+      </datalist>
+      <p class="field-hint">
+        Use this when importing a single person's file. If set, every row is attributed
+        to this person. You can type a new name to create them on import.
+        Leave blank to use the <span class="mono">person</span> column from the CSV instead.
+      </p>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary btn-lg">Upload &amp; Preview</button>
+      <a href="{{ url_for('import_template') }}" class="btn btn-ghost">↓ Download Template</a>
+    </div>
+  </form>
+</div>
+
+<div class="form-container" style="margin-top:20px">
+  <h3 class="section-title" style="margin-bottom:12px">Expected Columns</h3>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>Column</th><th>Required</th><th>Example</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="mono">name</td><td>✓</td><td>2-3/4" Paring Knife</td><td>Knife model name</td></tr>
+        <tr><td class="mono">sku</td><td></td><td>1720</td><td>Used for catalog matching</td></tr>
+        <tr><td class="mono">color</td><td></td><td>Classic Brown</td><td>Handle color / variant</td></tr>
+        <tr><td class="mono">edge_type</td><td></td><td>Double-D</td><td>Straight, Double-D, Serrated…</td></tr>
+        <tr><td class="mono">is_unicorn</td><td></td><td>yes</td><td>yes / no</td></tr>
+        <tr><td class="mono">person</td><td></td><td>Anthony</td><td>Ignored if "Assign to Person" is set above</td></tr>
+        <tr><td class="mono">status</td><td></td><td>Owned</td><td>Owned, Wishlist, Sold, Traded</td></tr>
+        <tr><td class="mono">category</td><td></td><td>Kitchen Knives</td><td></td></tr>
+        <tr><td class="mono">notes</td><td></td><td>Got from grandma</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="field-hint" style="margin-top:10px">
+    Extra columns in your file are ignored. Multiple rows for the same knife with
+    different colors are all processed independently.
+  </p>
+</div>
+
+{% endblock %}
+

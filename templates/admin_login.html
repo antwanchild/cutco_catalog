@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Admin Login – Cutco Vault{% endblock %}
+{% block content %}
+
+<div style="max-width:380px; margin: 60px auto;">
+  <div class="form-container">
+    <h2 class="form-title" style="margin-bottom:20px">Admin Login</h2>
+    <p class="dim" style="margin-bottom:20px; font-size:.8rem">
+      Enter your admin token to enable catalog sync.<br>
+      Set <code>ADMIN_TOKEN</code> in your docker-compose environment.
+    </p>
+    <form method="POST" class="app-form">
+      <div class="field-group">
+        <label>Admin Token</label>
+        <input type="password" name="token" required autofocus placeholder="••••••••">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary btn-lg">Unlock</button>
+        <a href="{{ url_for('index') }}" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
