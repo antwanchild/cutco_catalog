@@ -3,5 +3,5 @@ flask-sqlalchemy==3.1.1
 gunicorn==25.1.0
 requests==2.32.5
 beautifulsoup4==4.14.3
-lxml==5.3.0
+lxml==6.0.2
 openpyxl==3.1.5
