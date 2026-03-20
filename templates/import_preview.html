@@ -79,15 +79,15 @@
         </td>
         <td>
           <select name="item_status_{{ loop.index0 }}" class="select-xs">
-            {% for s in status_options %}
-              <option value="{{ s }}" {% if s == item.status %}selected{% endif %}>{{ s }}</option>
+            {% for status_option in status_options %}
+              <option value="{{ s }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
             {% endfor %}
           </select>
         </td>
         <td>
           <input type="hidden" name="item_sets_{{ loop.index0 }}" value="{{ item.sets | join('|') }}">
           {% if item.sets %}
-            <span class="set-chips">{% for s in item.sets %}<span class="chip">{{ s }}</span>{% endfor %}</span>
+            <span class="set-chips">{% for set_name in item.sets %}<span class="chip">{{ set_name }}</span>{% endfor %}</span>
           {% else %}—{% endif %}
         </td>
         <td>
@@ -150,15 +150,15 @@
         </td>
         <td>
           <select name="item_status_{{ idx }}" class="select-xs">
-            {% for s in status_options %}
-              <option value="{{ s }}" {% if s == item.status %}selected{% endif %}>{{ s }}</option>
+            {% for status_option in status_options %}
+              <option value="{{ s }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
             {% endfor %}
           </select>
         </td>
         <td>
           <input type="hidden" name="item_sets_{{ idx }}" value="{{ item.sets | join('|') }}">
           {% if item.sets %}
-            <span class="set-chips">{% for s in item.sets %}<span class="chip">{{ s }}</span>{% endfor %}</span>
+            <span class="set-chips">{% for set_name in item.sets %}<span class="chip">{{ set_name }}</span>{% endfor %}</span>
           {% else %}—{% endif %}
         </td>
       </tr>
@@ -195,8 +195,8 @@
         </td>
         <td>
           <select name="own_status_{{ loop.index0 }}" class="select-xs">
-            {% for s in status_options %}
-              <option value="{{ s }}" {% if s == e.status %}selected{% endif %}>{{ s }}</option>
+            {% for status_option in status_options %}
+              <option value="{{ s }}" {% if status_option == e.status %}selected{% endif %}>{{ status_option }}</option>
             {% endfor %}
           </select>
         </td>

@@ -14,15 +14,15 @@
 <table class="data-table">
   <thead><tr><th>Item</th><th>Color</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
   <tbody>
-    {% for o in ownerships %}
+    {% for ownership in ownerships %}
     <tr>
-      <td><a href="{{ url_for('item_owners', iid=o.variant.item_id) }}">{{ o.variant.item.name }}</a></td>
-      <td>{% if o.variant.color != UNKNOWN_COLOR %}{{ o.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td><span class="badge badge-{{ o.status | lower }}">{{ o.status }}</span></td>
-      <td>{{ o.notes or '—' }}</td>
+      <td><a href="{{ url_for('item_owners', iid=ownership.variant.item_id) }}">{{ ownership.variant.item.name }}</a></td>
+      <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
+      <td>{{ ownership.notes or '—' }}</td>
       <td class="actions">
-        <a href="{{ url_for('ownership_edit', oid=o.id) }}" class="btn btn-xs">Edit</a>
-        <form method="post" action="{{ url_for('ownership_delete', oid=o.id) }}"
+        <a href="{{ url_for('ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
+        <form method="post" action="{{ url_for('ownership_delete', oid=ownership.id) }}"
               onsubmit="return confirm('Remove this entry?')" style="display:inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
@@ -57,9 +57,9 @@
     {% for item, missing in variant_gaps %}
       <li>
         <strong>{{ item.name }}</strong> — missing:
-        {% for v in missing %}
-          <span class="chip">{{ v.color }}</span>
-          <a href="{{ url_for('ownership_add', person_id=person.id, item_id=item.id, variant_id=v.id) }}"
+        {% for variant in missing %}
+          <span class="chip">{{ variant.color }}</span>
+          <a href="{{ url_for('ownership_add', person_id=person.id, item_id=item.id, variant_id=variant.id) }}"
              class="btn btn-xs btn-success">+ Add</a>
         {% endfor %}
       </li>
