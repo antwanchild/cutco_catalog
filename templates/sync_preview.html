@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Sync Preview – Cutco Vault{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h2 class="page-title">Catalog Sync Preview</h2>
+  <a href="{{ url_for('catalog') }}" class="btn btn-ghost">← Back to Catalog</a>
+</div>
+
+<!-- Summary bar -->
+<div class="sync-summary">
+  <span>Scraped <strong>{{ scraped_total }}</strong> items from cutco.com</span>
+  <span class="sep">·</span>
+  {% if blocked_categories %}
+    <span class="dim">Blocked: {{ blocked_categories | join(', ') }}</span>
+    <span class="sep">·</span>
+  {% endif %}
+  {% if new_items %}
+    <span class="highlight">
+      Found <strong>{{ new_items | length }}</strong> new item{{ 's' if new_items | length != 1 else '' }}
+      across <strong>{{ grouped | length }}</strong> categor{{ 'ies' if grouped | length != 1 else 'y' }}
+    </span>
+  {% else %}
+    <span class="all-good">✓ Your catalog is up to date — no new items found.</span>
+  {% endif %}
+</div>
+
+{% if new_items %}
+<form method="POST" action="{{ url_for('catalog_sync_confirm') }}">
+
+  <!-- Global toolbar -->
+  <div class="sync-toolbar">
+    <button type="button" class="btn btn-ghost btn-sm" onclick="selectAll(true)">Select All</button>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="selectAll(false)">Deselect All</button>
+    <span class="sync-count" id="selCount"></span>
+    <button type="submit" class="btn btn-primary" id="confirmBtn" style="margin-left:auto">
+      Add Selected to Catalog
+    </button>
+  </div>
+
+  <!-- One section per category -->
+  {% for category, items in grouped.items() %}
+  <div class="sync-category" id="cat-{{ loop.index }}">
+    <div class="sync-cat-header">
+      <label class="sync-cat-label">
+        <input type="checkbox" class="cat-check" data-cat="{{ loop.index }}"
+               checked onchange="toggleCategory({{ loop.index }}, this.checked)">
+        <span class="sync-cat-name">{{ category }}</span>
+        <span class="sync-cat-count">{{ items | length }} item{{ 's' if items|length != 1 else '' }}</span>
+      </label>
+    </div>
+
+    <div class="table-wrap sync-cat-table" id="cat-table-{{ loop.index }}">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:36px"></th>
+            <th>Name</th>
+            <th>SKU</th>
+            <th>Cutco URL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td>
+              <input type="checkbox" name="selected_skus" value="{{ item.sku }}"
+                     class="sync-check cat-item-{{ loop.parent.loop.index }}"
+                     checked onchange="updateCount()">
+            </td>
+            <td>{{ item.name }}</td>
+            <td class="mono dim">{{ item.sku }}</td>
+            <td><a href="{{ item.url }}" target="_blank" class="ext-link">cutco.com ↗</a></td>
+            <input type="hidden" name="name_{{ item.sku }}"     value="{{ item.name }}">
+            <input type="hidden" name="category_{{ item.sku }}" value="{{ item.category }}">
+            <input type="hidden" name="url_{{ item.sku }}"      value="{{ item.url }}">
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Bottom confirm -->
+  <div class="form-actions" style="margin-top:20px">
+    <button type="submit" class="btn btn-primary btn-lg" id="confirmBtn2">Add Selected to Catalog</button>
+    <a href="{{ url_for('catalog') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+
+</form>
+
+{% else %}
+<div class="empty-state">
+  <p class="empty-icon" style="font-size:2rem">✓</p>
+  <p>Nothing new to add.</p>
+  {% if blocked_categories %}
+  <p class="dim" style="font-size:.78rem;margin-top:8px">
+    Note: {{ blocked_categories | join(', ') }} are blocked from appearing here.<br>
+    Adjust <code>SYNC_BLOCKED_CATEGORIES</code> in your docker-compose env to change this.
+  </p>
+  {% endif %}
+  <a href="{{ url_for('catalog') }}" class="btn btn-primary" style="margin-top:16px">Back to Catalog</a>
+</div>
+{% endif %}
+
+<script>
+const total = {{ new_items | length }};
+
+function selectAll(state) {
+  document.querySelectorAll('.sync-check').forEach(cb => cb.checked = state);
+  document.querySelectorAll('.cat-check').forEach(cb => cb.checked = state);
+  updateCount();
+}
+
+function toggleCategory(catIdx, state) {
+  document.querySelectorAll('.cat-item-' + catIdx).forEach(cb => cb.checked = state);
+  updateCount();
+}
+
+function updateCount() {
+  const checked = document.querySelectorAll('.sync-check:checked');
+  const n = checked.length;
+
+  // Sync cat-level checkboxes to reflect partial/full selection
+  {% for category, items in grouped.items() %}
+  (function() {
+    const catItems = document.querySelectorAll('.cat-item-{{ loop.index }}');
+    const catChecked = document.querySelectorAll('.cat-item-{{ loop.index }}:checked');
+    const catCb = document.querySelector('.cat-check[data-cat="{{ loop.index }}"]');
+    if (catCb) {
+      catCb.checked = catChecked.length > 0;
+      catCb.indeterminate = catChecked.length > 0 && catChecked.length < catItems.length;
+    }
+  })();
+  {% endfor %}
+
+  const label = n === 0     ? 'Add Selected to Catalog' :
+                n === total ? `Add All ${total} to Catalog` :
+                              `Add ${n} to Catalog`;
+  const disabled = n === 0;
+
+  ['confirmBtn','confirmBtn2'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) { btn.textContent = label; btn.disabled = disabled; }
+  });
+
+  document.getElementById('selCount').textContent = n + ' selected';
+}
+
+updateCount();
+</script>
+
+{% endblock %}

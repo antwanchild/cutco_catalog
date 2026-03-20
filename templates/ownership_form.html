@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Ownership – Cutco Vault{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h2 class="page-title">{{ action }} Ownership Entry</h2>
+</div>
+
+<div class="form-container">
+  <form method="POST" class="app-form">
+
+    <div class="field-row">
+      <div class="field-group">
+        <label>Collector <span class="required">*</span></label>
+        <select name="person_id" {% if ownership %}disabled{% endif %}>
+          {% for p in people_list %}
+          <option value="{{ p.id }}" {% if sel_person_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+        {% if ownership %}<input type="hidden" name="person_id" value="{{ ownership.person_id }}">{% endif %}
+      </div>
+
+      <div class="field-group">
+        <label>Knife <span class="required">*</span></label>
+        <select name="knife_select" id="knifeSelect" {% if ownership %}disabled{% endif %}
+                onchange="loadVariants(this.value)">
+          <option value="">— select a knife —</option>
+          {% for k in knives_list %}
+          <option value="{{ k.id }}"
+                  {% if sel_knife_id == k.id %}selected{% endif %}>
+            {{ k.name }}{% if k.sku %} ({{ k.sku }}){% endif %}{% if k.is_unicorn %} 🦄{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field-group">
+        <label>Color Variant <span class="required">*</span></label>
+        <select name="variant_id" id="variantSelect" {% if ownership %}disabled{% endif %}>
+          {% if sel_knife %}
+            {% for v in sel_knife.variants %}
+            <option value="{{ v.id }}" {% if sel_variant_id == v.id %}selected{% endif %}>{{ v.color }}</option>
+            {% endfor %}
+          {% else %}
+            <option value="">— select a knife first —</option>
+          {% endif %}
+        </select>
+        {% if ownership %}<input type="hidden" name="variant_id" value="{{ ownership.variant_id }}">{% endif %}
+        {% if not ownership %}
+          <p class="field-hint">
+            Don't see the right color?
+            {% if sel_knife_id %}
+              <a href="{{ url_for('variants', kid=sel_knife_id) }}" target="_blank">Add variants for this knife ↗</a>
+            {% else %}
+              Select a knife first, then manage its variants.
+            {% endif %}
+          </p>
+        {% endif %}
+      </div>
+
+      <div class="field-group">
+        <label>Status</label>
+        <select name="status">
+          {% for s in status_options %}
+          <option value="{{ s }}"
+                  {% if (ownership and ownership.status == s) or (not ownership and s == 'Owned') %}selected{% endif %}>
+            {{ s }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>Notes</label>
+      <textarea name="notes" rows="2" placeholder="Condition, provenance, etc.">{{ ownership.notes if ownership and ownership.notes else '' }}</textarea>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary btn-lg">{{ action }}</button>
+      {% if ownership %}
+        <a href="{{ url_for('person_collection', pid=ownership.person_id) }}" class="btn btn-ghost">Cancel</a>
+      {% elif sel_person_id %}
+        <a href="{{ url_for('person_collection', pid=sel_person_id) }}" class="btn btn-ghost">Cancel</a>
+      {% else %}
+        <a href="{{ url_for('people') }}" class="btn btn-ghost">Cancel</a>
+      {% endif %}
+    </div>
+
+  </form>
+</div>
+
+<script>
+async function loadVariants(knifeId) {
+  const sel = document.getElementById('variantSelect');
+  if (!knifeId) {
+    sel.innerHTML = '<option value="">— select a knife first —</option>';
+    return;
+  }
+  sel.innerHTML = '<option>Loading…</option>';
+  try {
+    const resp = await fetch(`/api/variants/${knifeId}`);
+    const variants = await resp.json();
+    sel.innerHTML = variants.map(v =>
+      `<option value="${v.id}">${v.color}</option>`
+    ).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error loading variants</option>';
+  }
+  // Update the "add variants" hint link
+  const hint = document.querySelector('.field-hint a');
+  if (hint) hint.href = `/catalog/${knifeId}/variants`;
+}
+</script>
+
+{% endblock %}

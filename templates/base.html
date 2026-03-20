@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Cutco Vault{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <a href="{{ url_for('index') }}" class="brand">
+      <span class="brand-icon">⚔</span><span class="brand-name">CUTCO VAULT</span>
+    </a>
+    <nav class="main-nav">
+      <a href="{{ url_for('catalog') }}"     class="nav-link {% if request.endpoint and 'catalog' in request.endpoint %}active{% endif %}">Catalog</a>
+      <a href="{{ url_for('people_list') }}" class="nav-link {% if request.endpoint and ('person' in request.endpoint or request.endpoint == 'people_list') %}active{% endif %}">Collectors</a>
+      <a href="{{ url_for('matrix_view') }}" class="nav-link {% if request.endpoint == 'matrix_view' %}active{% endif %}">Matrix</a>
+    </nav>
+    <div class="header-right">
+      <a href="{{ url_for('import_page') }}" class="btn btn-ghost btn-sm">↑ Import</a>
+      <a href="{{ url_for('export_csv') }}" class="btn btn-ghost btn-sm">↓ CSV</a>
+      {% if is_admin() %}
+        <span class="admin-badge">Admin</span>
+        <a href="{{ url_for('admin_logout') }}" class="btn btn-ghost btn-sm">Logout</a>
+      {% else %}
+        <a href="{{ url_for('admin_login') }}" class="btn btn-ghost btn-sm">Admin</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}<div class="flash-bar">{% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+<main class="main-content">{% block content %}{% endblock %}</main>
+<footer class="site-footer">
+  <span>Cutco Vault &copy; 2025</span>
+  <span class="sep">·</span>
+  <a href="{{ url_for('version') }}" class="version-link" title="Version info">v{{ app_version }}</a>
+</footer>
+</body>
+</html>

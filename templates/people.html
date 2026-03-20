@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Collectors – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2 class="page-title">Collectors</h2>
+  <a href="{{ url_for('people_add') }}" class="btn btn-primary btn-sm">+ Add Collector</a>
+</div>
+{% if people %}
+<div class="collector-grid">
+  {% for p in people %}
+  {% set owned = p.ownerships | selectattr('status','eq','Owned') | list | length %}
+  {% set wish  = p.ownerships | selectattr('status','eq','Wishlist') | list | length %}
+  <div class="collector-card-lg">
+    <div class="cc-head">
+      <a href="{{ url_for('person_detail', pid=p.id) }}" class="collector-name-lg">{{ p.name }}</a>
+      <div class="cc-actions">
+        <a href="{{ url_for('person_edit', pid=p.id) }}" class="action-link edit">Edit</a>
+        <form method="POST" action="{{ url_for('person_delete', pid=p.id) }}" class="inline-form" onsubmit="return confirm('Delete {{ p.name }} and all their ownership records?')">
+          <button class="action-link delete">Delete</button>
+        </form>
+      </div>
+    </div>
+    <div class="cc-stats">
+      <span class="cstat owned">{{ owned }} owned</span>
+      {% if wish %}<span class="cstat wish">{{ wish }} wishlist</span>{% endif %}
+      <span class="cstat total">{{ p.ownerships|length }} total</span>
+    </div>
+    {% if p.notes %}<p class="cc-notes">{{ p.notes }}</p>{% endif %}
+    <div class="cc-foot">
+      <a href="{{ url_for('person_detail', pid=p.id) }}" class="btn btn-ghost btn-sm">View Collection →</a>
+      <a href="{{ url_for('ownership_add', person_id=p.id) }}" class="btn btn-primary btn-sm">+ Add Knife</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><p class="empty-icon">👤</p><p>No collectors yet.</p><a href="{{ url_for('people_add') }}" class="btn btn-primary">Add your first collector</a></div>
+{% endif %}
+{% endblock %}

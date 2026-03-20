@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Variants – {{ knife.name }} – Cutco Vault{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h2 class="page-title">{{ knife.name }}</h2>
+    <p class="page-sub">Color variants · {% if knife.sku %}SKU {{ knife.sku }} · {% endif %}{{ knife.category or 'Uncategorized' }}</p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('catalog_edit', kid=knife.id) }}" class="btn btn-ghost">Edit Knife</a>
+    <a href="{{ url_for('catalog') }}" class="btn btn-ghost">← Catalog</a>
+  </div>
+</div>
+
+<!-- Add variant -->
+<div class="form-container" style="margin-bottom:24px">
+  <h3 class="section-title" style="margin-bottom:14px">Add Color Variant</h3>
+  <form method="POST" action="{{ url_for('variant_add', kid=knife.id) }}" class="app-form">
+    <div class="field-row">
+      <div class="field-group" style="flex:2">
+        <label>Color Name <span class="required">*</span></label>
+        <input type="text" name="color" required placeholder="e.g. Classic Brown, Pearl White, Harvest Gold">
+      </div>
+      <div class="field-group" style="flex:2">
+        <label>Notes</label>
+        <input type="text" name="notes" placeholder="Optional — production years, region, etc.">
+      </div>
+      <div class="field-group" style="flex:0;justify-content:flex-end">
+        <label>&nbsp;</label>
+        <button type="submit" class="btn btn-primary">Add</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Existing variants -->
+<h3 class="section-title">Known Variants ({{ knife.variants | length }})</h3>
+
+{% if knife.variants %}
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr><th>Color</th><th>Notes</th><th>Owners</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for v in knife.variants %}
+      <tr>
+        <td>
+          {% if v.color == UNKNOWN_COLOR %}
+            <span class="dim">{{ v.color }}</span>
+          {% else %}
+            <span class="color-badge">{{ v.color }}</span>
+          {% endif %}
+        </td>
+        <td class="dim">{{ v.notes or '—' }}</td>
+        <td class="dim">{{ v.ownerships | length }}</td>
+        <td class="actions-cell">
+          <!-- Inline edit via small form -->
+          <button class="action-link edit" onclick="toggleEdit({{ v.id }})">Edit</button>
+          {% if knife.variants | length > 1 %}
+          <form method="POST" action="{{ url_for('variant_delete', vid=v.id) }}" class="inline-form"
+                onsubmit="return confirm('Delete this variant? Ownership entries tied to it will also be removed.')">
+            <button class="action-link delete">Del</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      <!-- Inline edit row -->
+      <tr id="edit-{{ v.id }}" class="hidden edit-row">
+        <td colspan="4">
+          <form method="POST" action="{{ url_for('variant_edit', vid=v.id) }}" class="app-form" style="flex-direction:row;gap:10px;padding:8px 0">
+            <input type="text" name="color" value="{{ v.color }}" required style="flex:2">
+            <input type="text" name="notes" value="{{ v.notes or '' }}" placeholder="Notes" style="flex:2">
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleEdit({{ v.id }})">Cancel</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><p>No variants yet.</p></div>
+{% endif %}
+
+<script>
+function toggleEdit(id) {
+  const row = document.getElementById('edit-' + id);
+  row.classList.toggle('hidden');
+}
+</script>
+
+<style>
+.edit-row td { background: var(--surface2); padding: 8px 14px; }
+</style>
+
+{% endblock %}
