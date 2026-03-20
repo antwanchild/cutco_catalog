@@ -243,7 +243,7 @@ def catalog():
     if cat_filter:
         query = query.filter(Item.category == cat_filter)
     if unicorn_f == "1":
-        query = query.filter(Item.is_unicorn == True)
+        query = query.filter(Item.is_unicorn)
 
     col   = getattr(Item, sort, Item.name)
     items = query.order_by(col.desc() if direction == "desc" else col).all()
@@ -1053,9 +1053,12 @@ def import_confirm():
                 added_items, added_ownership, added_persons)
 
     parts = []
-    if added_items:     parts.append(f"{added_items} item{'s' if added_items != 1 else ''}")
-    if added_persons:   parts.append(f"{added_persons} collector{'s' if added_persons != 1 else ''}")
-    if added_ownership: parts.append(f"{added_ownership} ownership entr{'ies' if added_ownership != 1 else 'y'}")
+    if added_items:
+        parts.append(f"{added_items} item{'s' if added_items != 1 else ''}")
+    if added_persons:
+        parts.append(f"{added_persons} collector{'s' if added_persons != 1 else ''}")
+    if added_ownership:
+        parts.append(f"{added_ownership} ownership entr{'ies' if added_ownership != 1 else 'y'}")
     flash("Import complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
     return redirect(url_for("catalog"))
 
