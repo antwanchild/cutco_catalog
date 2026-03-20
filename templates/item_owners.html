@@ -19,8 +19,8 @@
   {% if item.is_unicorn %}<span class="badge badge-unicorn">🦄 Unicorn</span>{% endif %}
   {% if item.sets %}
     <span><strong>Sets:</strong>
-      {% for s in item.sets %}
-        <a href="{{ url_for('set_detail', sid=s.id) }}" class="chip">{{ s.name }}</a>
+      {% for item_set in item.sets %}
+        <a href="{{ url_for('set_detail', sid=item_set.id) }}" class="chip">{{ item_set.name }}</a>
       {% endfor %}
     </span>
   {% endif %}
@@ -34,15 +34,15 @@
 <table class="data-table">
   <thead><tr><th>Person</th><th>Color</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
   <tbody>
-    {% for o in entries %}
+    {% for ownership in entries %}
     <tr>
-      <td><a href="{{ url_for('person_collection', pid=o.person_id) }}">{{ o.person.name }}</a></td>
-      <td>{% if o.variant.color != UNKNOWN_COLOR %}{{ o.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td><span class="badge badge-{{ o.status | lower }}">{{ o.status }}</span></td>
-      <td>{{ o.notes or '—' }}</td>
+      <td><a href="{{ url_for('person_collection', pid=ownership.person_id) }}">{{ ownership.person.name }}</a></td>
+      <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
+      <td>{{ ownership.notes or '—' }}</td>
       <td class="actions">
-        <a href="{{ url_for('ownership_edit', oid=o.id) }}" class="btn btn-xs">Edit</a>
-        <form method="post" action="{{ url_for('ownership_delete', oid=o.id) }}"
+        <a href="{{ url_for('ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
+        <form method="post" action="{{ url_for('ownership_delete', oid=ownership.id) }}"
               onsubmit="return confirm('Remove this entry?')" style="display:inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
@@ -58,9 +58,9 @@
 {% if people_without %}
 <h2>Add Collector</h2>
 <div class="quick-add-list">
-  {% for p in people_without %}
-    <a href="{{ url_for('ownership_add', item_id=item.id, person_id=p.id) }}"
-       class="btn btn-sm btn-outline">+ {{ p.name }}</a>
+  {% for person in people_without %}
+    <a href="{{ url_for('ownership_add', item_id=item.id, person_id=person.id) }}"
+       class="btn btn-sm btn-outline">+ {{ person.name }}</a>
   {% endfor %}
 </div>
 {% endif %}

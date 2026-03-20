@@ -33,8 +33,8 @@
     <span class="hint">If set, all rows are attributed to this person instead of the Owned? column value.</span>
     <select name="person_override" class="input-full">
       <option value="">— use Owned? column —</option>
-      {% for p in people %}
-        <option value="{{ p.name }}">{{ p.name }}</option>
+      {% for person in people %}
+        <option value="{{ person.name }}">{{ person.name }}</option>
       {% endfor %}
     </select>
   </label>

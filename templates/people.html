@@ -12,15 +12,15 @@
     <tr><th>Name</th><th>Owned</th><th>Notes</th><th>Actions</th></tr>
   </thead>
   <tbody>
-    {% for p in persons %}
+    {% for person in persons %}
     <tr>
-      <td><a href="{{ url_for('person_collection', pid=p.id) }}">{{ p.name }}</a></td>
-      <td>{{ counts[p.id] }}</td>
-      <td>{{ p.notes or '—' }}</td>
+      <td><a href="{{ url_for('person_collection', pid=person.id) }}">{{ person.name }}</a></td>
+      <td>{{ counts[person.id] }}</td>
+      <td>{{ person.notes or '—' }}</td>
       <td class="actions">
-        <a href="{{ url_for('people_edit', pid=p.id) }}" class="btn btn-xs">Edit</a>
-        <form method="post" action="{{ url_for('people_delete', pid=p.id) }}"
-              onsubmit="return confirm('Remove {{ p.name }}?')" style="display:inline">
+        <a href="{{ url_for('people_edit', pid=person.id) }}" class="btn btn-xs">Edit</a>
+        <form method="post" action="{{ url_for('people_delete', pid=person.id) }}"
+              onsubmit="return confirm('Remove {{ person.name }}?')" style="display:inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
       </td>

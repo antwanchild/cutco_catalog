@@ -15,8 +15,8 @@
   <input name="q" value="{{ q }}" placeholder="Search name or SKU…" class="input-search">
   <select name="category" class="select-sm">
     <option value="">All Categories</option>
-    {% for c in categories %}
-      <option value="{{ c }}" {% if c == cat_filter %}selected{% endif %}>{{ c }}</option>
+    {% for category in categories %}
+      <option value="{{ category }}" {% if category == cat_filter %}selected{% endif %}>{{ category }}</option>
     {% endfor %}
   </select>
   <label class="checkbox-label">
@@ -68,8 +68,8 @@
       <td>
         {% if item.sets %}
           <span class="set-chips">
-            {% for knife_set in item.sets %}
-              <a href="{{ url_for('set_detail', sid=knife_set.id) }}" class="chip">{{ knife_set.name }}</a>
+            {% for item_set in item.sets %}
+              <a href="{{ url_for('set_detail', sid=item_set.id) }}" class="chip">{{ item_set.name }}</a>
             {% endfor %}
           </span>
         {% else %}—{% endif %}

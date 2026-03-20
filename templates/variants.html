@@ -11,28 +11,28 @@
     <tr><th>Color</th><th>Notes</th><th>Ownerships</th><th>Actions</th></tr>
   </thead>
   <tbody>
-    {% for v in item.variants %}
+    {% for variant in item.variants %}
     <tr>
-      <td>{{ v.color }}{% if v.color == UNKNOWN_COLOR %} <span class="muted">(default)</span>{% endif %}</td>
-      <td>{{ v.notes or '—' }}</td>
-      <td>{{ v.ownerships | length }}</td>
+      <td>{{ variant.color }}{% if variant.color == UNKNOWN_COLOR %} <span class="muted">(default)</span>{% endif %}</td>
+      <td>{{ variant.notes or '—' }}</td>
+      <td>{{ variant.ownerships | length }}</td>
       <td class="actions">
-        <button class="btn btn-xs" onclick="toggleEdit({{ v.id }})">Edit</button>
+        <button class="btn btn-xs" onclick="toggleEdit({{ variant.id }})">Edit</button>
         {% if item.variants | length > 1 %}
-        <form method="post" action="{{ url_for('variant_delete', vid=v.id) }}"
+        <form method="post" action="{{ url_for('variant_delete', vid=variant.id) }}"
               onsubmit="return confirm('Remove this variant?')" style="display:inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
         {% endif %}
       </td>
     </tr>
-    <tr id="edit-{{ v.id }}" class="edit-row hidden">
+    <tr id="edit-{{ variant.id }}" class="edit-row hidden">
       <td colspan="4">
-        <form method="post" action="{{ url_for('variant_edit', vid=v.id) }}" class="inline-form">
-          <input type="text" name="color" value="{{ v.color }}" class="input-sm" required>
-          <input type="text" name="notes" value="{{ v.notes or '' }}" placeholder="Notes…" class="input-sm">
+        <form method="post" action="{{ url_for('variant_edit', vid=variant.id) }}" class="inline-form">
+          <input type="text" name="color" value="{{ variant.color }}" class="input-sm" required>
+          <input type="text" name="notes" value="{{ variant.notes or '' }}" placeholder="Notes…" class="input-sm">
           <button type="submit" class="btn btn-xs btn-primary">Save</button>
-          <button type="button" class="btn btn-xs btn-ghost" onclick="toggleEdit({{ v.id }})">Cancel</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="toggleEdit({{ variant.id }})">Cancel</button>
         </form>
       </td>
     </tr>

@@ -9,7 +9,7 @@
 {% if errors %}
 <div class="flash flash-error">
   <strong>{{ errors | length }} row(s) could not be parsed:</strong>
-  <ul>{% for e in errors %}<li>Row {{ e.row }}: {{ e.reason }}</li>{% endfor %}</ul>
+  <ul>{% for error in errors %}<li>Row {{ error.row }}: {{ error.reason }}</li>{% endfor %}</ul>
 </div>
 {% endif %}
 
@@ -17,9 +17,9 @@
 <div class="flash flash-warning">
   <strong>{{ conflicts | length }} status conflict(s) — existing entries unchanged:</strong>
   <ul>
-    {% for c in conflicts %}
-      <li>{{ c.person }} / {{ c.item }} ({{ c.color }}):
-        existing <strong>{{ c.existing_status }}</strong> vs import <strong>{{ c.import_status }}</strong></li>
+    {% for conflict in conflicts %}
+      <li>{{ conflict.person }} / {{ conflict.item }} ({{ conflict.color }}):
+        existing <strong>{{ conflict.existing_status }}</strong> vs import <strong>{{ conflict.import_status }}</strong></li>
     {% endfor %}
   </ul>
 </div>
@@ -177,32 +177,32 @@
       <tr><th>Accept</th><th>Person</th><th>Item</th><th>Color</th><th>Status</th><th>Notes</th></tr>
     </thead>
     <tbody>
-      {% for e in ownership_entries %}
+      {% for entry in ownership_entries %}
       <tr>
         <td><input type="checkbox" name="own_accept_{{ loop.index0 }}" checked></td>
         <td>
-          <input type="hidden" name="own_person_{{ loop.index0 }}" value="{{ e.person }}">
-          {{ e.person }}
-          {% if e.is_new_person %}<span class="badge badge-new">new</span>{% endif %}
+          <input type="hidden" name="own_person_{{ loop.index0 }}" value="{{ entry.person }}">
+          {{ entry.person }}
+          {% if entry.is_new_person %}<span class="badge badge-new">new</span>{% endif %}
         </td>
         <td>
-          <input type="hidden" name="own_item_id_{{ loop.index0 }}" value="{{ e.item_id }}">
-          {{ e.item_name }}
+          <input type="hidden" name="own_item_id_{{ loop.index0 }}" value="{{ entry.item_id }}">
+          {{ entry.item_name }}
         </td>
         <td>
-          <input type="hidden" name="own_color_{{ loop.index0 }}" value="{{ e.color }}">
-          {{ e.color }}
+          <input type="hidden" name="own_color_{{ loop.index0 }}" value="{{ entry.color }}">
+          {{ entry.color }}
         </td>
         <td>
           <select name="own_status_{{ loop.index0 }}" class="select-xs">
             {% for status_option in status_options %}
-              <option value="{{ s }}" {% if status_option == e.status %}selected{% endif %}>{{ status_option }}</option>
+              <option value="{{ status_option }}" {% if status_option == entry.status %}selected{% endif %}>{{ status_option }}</option>
             {% endfor %}
           </select>
         </td>
         <td>
-          <input type="hidden" name="own_notes_{{ loop.index0 }}" value="{{ e.notes or '' }}">
-          <span class="small muted">{{ e.notes or '' }}</span>
+          <input type="hidden" name="own_notes_{{ loop.index0 }}" value="{{ entry.notes or '' }}">
+          <span class="small muted">{{ entry.notes or '' }}</span>
         </td>
       </tr>
       {% endfor %}

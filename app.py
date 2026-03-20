@@ -36,6 +36,8 @@ db = SQLAlchemy(app)
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 EDGE_TYPES = ["Straight", "Double-D", "Serrated", "Micro-D", "Tec Edge", "Unknown"]
+# Lookup map for case-insensitive normalization of imported edge type values
+EDGE_TYPE_LOOKUP = {et.lower(): et for et in EDGE_TYPES}
 STATUS_OPTIONS = ["Owned", "Wishlist", "Sold", "Traded"]
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "admin")
 UNKNOWN_COLOR = "Unknown / Unspecified"
@@ -51,8 +53,8 @@ SCRAPE_CATEGORIES = [
 ]
 SCRAPE_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; CutcoVaultBot/1.0)"}
 
-_blocked_env = os.environ.get("SYNC_BLOCKED_CATEGORIES", "Knife Sets,Accessories,Tableware")
-SYNC_BLOCKED_CATEGORIES = {c.strip() for c in _blocked_env.split(",") if c.strip()}
+SYNC_BLOCKED_CATEGORIES = {c.strip() for c in os.environ.get(
+    "SYNC_BLOCKED_CATEGORIES", "Knife Sets,Accessories,Tableware").split(",") if c.strip()}
 
 # Set column names as they appear in the spreadsheet
 SPREADSHEET_SET_COLUMNS = [
@@ -159,6 +161,21 @@ with app.app_context():
     logger.info("Database ready")
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def normalize_text(value: str) -> str:
+    """Strip whitespace and apply title case for consistent storage.
+
+    Applied to item names, variant colors, person names, categories, and set
+    names so that entries from different sources (manual form, CSV, XLSX) are
+    stored with uniform casing and can be compared reliably.
+
+    Examples:
+        "classic brown"  → "Classic Brown"
+        "PEARL WHITE"    → "Pearl White"
+        "super shears"   → "Super Shears"
+    """
+    return value.strip().title() if value and value.strip() else ""
+
 
 def is_admin():
     """Return True if the current request carries a valid admin cookie."""
@@ -282,9 +299,9 @@ def catalog():
 def catalog_add():
     if request.method == "POST":
         item = Item(
-            name       = request.form["name"].strip(),
+            name       = normalize_text(request.form["name"]),
             sku        = request.form.get("sku", "").strip().upper() or None,
-            category   = request.form.get("category", "").strip() or None,
+            category   = normalize_text(request.form.get("category", "")) or None,
             edge_type  = request.form.get("edge_type", "Unknown"),
             is_unicorn = request.form.get("is_unicorn") == "on",
             in_catalog = request.form.get("in_catalog") == "on",
@@ -294,7 +311,7 @@ def catalog_add():
         db.session.add(item)
         db.session.flush()
         ensure_unknown_variant(item)
-        colors = [c.strip() for c in request.form.get("colors", "").split(",") if c.strip()]
+        colors = [normalize_text(c) for c in request.form.get("colors", "").split(",") if c.strip()]
         for color in colors:
             if color != UNKNOWN_COLOR:
                 db.session.add(ItemVariant(item_id=item.id, color=color))
@@ -312,9 +329,9 @@ def catalog_add():
 def catalog_edit(iid):
     item = Item.query.get_or_404(iid)
     if request.method == "POST":
-        item.name       = request.form["name"].strip()
+        item.name       = normalize_text(request.form["name"])
         item.sku        = request.form.get("sku", "").strip().upper() or None
-        item.category   = request.form.get("category", "").strip() or None
+        item.category   = normalize_text(request.form.get("category", "")) or None
         item.edge_type  = request.form.get("edge_type", "Unknown")
         item.is_unicorn = request.form.get("is_unicorn") == "on"
         item.in_catalog = request.form.get("in_catalog") == "on"
@@ -355,7 +372,7 @@ def variants(iid):
 @app.route("/catalog/<int:iid>/variants/add", methods=["POST"])
 def variant_add(iid):
     item = Item.query.get_or_404(iid)
-    color = request.form.get("color", "").strip()
+    color = normalize_text(request.form.get("color", ""))
     if not color:
         flash("Color is required.", "error")
         return redirect(url_for("variants", iid=iid))
@@ -373,7 +390,7 @@ def variant_add(iid):
 def variant_edit(vid):
     variant = ItemVariant.query.get_or_404(vid)
     iid = variant.item_id
-    color = request.form.get("color", "").strip()
+    color = normalize_text(request.form.get("color", ""))
     if not color:
         flash("Color cannot be empty.", "error")
         return redirect(url_for("variants", iid=iid))
@@ -407,7 +424,7 @@ def sets_list():
 @app.route("/sets/add", methods=["GET", "POST"])
 def set_add():
     if request.method == "POST":
-        name = request.form["name"].strip()
+        name = normalize_text(request.form["name"])
         if Set.query.filter(db.func.lower(Set.name) == name.lower()).first():
             flash(f'Set "{name}" already exists.', "error")
             return redirect(url_for("set_add"))
@@ -421,21 +438,21 @@ def set_add():
 
 @app.route("/sets/<int:sid>/edit", methods=["GET", "POST"])
 def set_edit(sid):
-    knife_set = Set.query.get_or_404(sid)
+    item_set = Set.query.get_or_404(sid)
     if request.method == "POST":
-        knife_set.name  = request.form["name"].strip()
-        knife_set.notes = request.form.get("notes", "").strip() or None
+        item_set.name  = normalize_text(request.form["name"])
+        item_set.notes = request.form.get("notes", "").strip() or None
         db.session.commit()
-        flash(f'Updated set "{knife_set.name}".', "success")
+        flash(f'Updated set "{item_set.name}".', "success")
         return redirect(url_for("sets_list"))
-    return render_template("set_form.html", set=knife_set, action="Edit")
+    return render_template("set_form.html", set=item_set, action="Edit")
 
 
 @app.route("/sets/<int:sid>/delete", methods=["POST"])
 def set_delete(sid):
-    knife_set = Set.query.get_or_404(sid)
-    name = knife_set.name
-    db.session.delete(knife_set)
+    item_set = Set.query.get_or_404(sid)
+    name = item_set.name
+    db.session.delete(item_set)
     db.session.commit()
     flash(f'Deleted set "{name}".', "info")
     return redirect(url_for("sets_list"))
@@ -443,8 +460,8 @@ def set_delete(sid):
 
 @app.route("/sets/<int:sid>")
 def set_detail(sid):
-    knife_set = Set.query.get_or_404(sid)
-    return render_template("set_detail.html", set=knife_set, UNKNOWN_COLOR=UNKNOWN_COLOR)
+    item_set = Set.query.get_or_404(sid)
+    return render_template("set_detail.html", set=item_set, UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 # ── Catalog Sync ──────────────────────────────────────────────────────────────
 
@@ -518,7 +535,7 @@ def people():
 @app.route("/people/add", methods=["GET", "POST"])
 def people_add():
     if request.method == "POST":
-        person = Person(name=request.form["name"].strip(),
+        person = Person(name=normalize_text(request.form["name"]),
                         notes=request.form.get("notes", "").strip() or None)
         db.session.add(person)
         db.session.commit()
@@ -531,7 +548,7 @@ def people_add():
 def people_edit(pid):
     person = Person.query.get_or_404(pid)
     if request.method == "POST":
-        person.name  = request.form["name"].strip()
+        person.name  = normalize_text(request.form["name"])
         person.notes = request.form.get("notes", "").strip() or None
         db.session.commit()
         flash(f"Updated {person.name}.", "success")
@@ -735,17 +752,17 @@ XLSX_COL_MAP = {
     # Ownership
     "owned?":                "owned_raw",
     # Notes fields (merged into notes column)
-    "price":                 "_notes_price",
-    "gift box":              "_notes_gift_box",
-    "sheath":                "_notes_sheath",
-    "quantity purchased":    "_notes_qty",
-    "given away":            "_notes_given_away",
+    "price":                 "notes_price",
+    "gift box":              "notes_gift_box",
+    "sheath":                "notes_sheath",
+    "quantity purchased":    "notes_qty",
+    "given away":            "notes_given_away",
 }
 # Set membership columns — key = lowercase spreadsheet header, value = canonical set name
 XLSX_SET_COLS = {s.lower(): s for s in SPREADSHEET_SET_COLUMNS}
 
 
-def _parse_owned_raw(owned_raw: str, default_person: str | None):
+def parse_owned_raw(owned_raw: str, default_person: str | None):
     """
     Parse 'Owned?' cell.
     - Truthy → status=Owned, person=default_person
@@ -762,7 +779,7 @@ def _parse_owned_raw(owned_raw: str, default_person: str | None):
     return "Owned", val or default_person
 
 
-def _build_notes(row: dict) -> str | None:
+def build_notes(row: dict) -> str | None:
     """Combine spreadsheet metadata columns into a single notes string.
 
     Fields like price, gift box, and sheath info are concatenated as
@@ -771,11 +788,11 @@ def _build_notes(row: dict) -> str | None:
     """
     parts = []
     for key, label in [
-        ("_notes_price",     "Price"),
-        ("_notes_gift_box",  "Gift Box"),
-        ("_notes_sheath",    "Sheath"),
-        ("_notes_qty",       "Qty Purchased"),
-        ("_notes_given_away","Given Away"),
+        ("notes_price",     "Price"),
+        ("notes_gift_box",  "Gift Box"),
+        ("notes_sheath",    "Sheath"),
+        ("notes_qty",       "Qty Purchased"),
+        ("notes_given_away","Given Away"),
     ]:
         field_value = row.get(key, "").strip()
         if field_value and field_value not in ("0", "none", "n/a", "-"):
@@ -841,7 +858,7 @@ def import_page():
                     else:
                         # Fallback: snake_case normalisation for CSV-style columns
                         out_row[lk.replace(" ", "_")] = val
-                out_row["_sets"] = set_memberships
+                out_row["set_memberships"] = set_memberships
                 parsed_rows.append(out_row)
         else:
             stream = io.StringIO(uploaded_file.stream.read().decode("utf-8-sig"))
@@ -850,7 +867,7 @@ def import_page():
             for row in reader:
                 out_row = {k.strip().lower().replace(" ", "_"): v.strip()
                            for k, v in row.items()}
-                out_row["_sets"] = []
+                out_row["set_memberships"] = []
                 parsed_rows.append(out_row)
 
     except Exception as exc:
@@ -862,7 +879,7 @@ def import_page():
     if person_override:
         for row in parsed_rows:
             row["owned_raw"] = row.get("owned_raw", "yes")
-            row["_person_override"] = person_override
+            row["person_override"] = person_override
 
     existing_items   = {k.sku.upper(): k for k in Item.query.filter(Item.sku.isnot(None)).all()}
     existing_names   = {k.name.lower(): k for k in Item.query.all()}
@@ -877,21 +894,23 @@ def import_page():
     seen_skus          = set()
 
     for i, row in enumerate(parsed_rows, start=2):
-        name       = row.get("name", "").strip()
+        name       = normalize_text(row.get("name", ""))
         sku        = (row.get("sku", "") or "").strip().upper() or None
-        color      = row.get("color", "").strip() or UNKNOWN_COLOR
-        edge_type  = row.get("edge_type", "").strip() or "Unknown"
+        color      = normalize_text(row.get("color", "")) or UNKNOWN_COLOR
+        edge_type  = EDGE_TYPE_LOOKUP.get(row.get("edge_type", "").strip().lower(), "Unknown")
         is_unicorn = row.get("is_unicorn", "").strip().lower() in TRUTHY
-        category   = row.get("category", "").strip() or None
-        notes      = _build_notes(row) or row.get("notes", "").strip() or None
-        set_names  = row.get("_sets", [])
+        category   = normalize_text(row.get("category", "")) or None
+        notes      = build_notes(row) or row.get("notes", "").strip() or None
+        set_names  = row.get("set_memberships", [])
 
         # Resolve person + status from 'Owned?' column
         owned_raw = row.get("owned_raw", row.get("status", "yes"))
-        status, person_name = _parse_owned_raw(owned_raw, row.get("_person_override") or row.get("person", ""))
+        status, person_name = parse_owned_raw(owned_raw, row.get("person_override") or row.get("person", ""))
 
         if person_override:
             person_name = person_override
+        if person_name:
+            person_name = normalize_text(person_name)
 
         if not name:
             errors.append({"row": i, "reason": "Missing name", "data": row})
@@ -979,14 +998,14 @@ def import_confirm():
         if request.form.get(f"item_accept_{i}") != "on":
             continue
 
-        name        = request.form.get(f"item_name_{i}", "").strip()
+        name        = normalize_text(request.form.get(f"item_name_{i}", ""))
         sku         = request.form.get(f"item_sku_{i}", "").strip().upper() or None
-        color       = request.form.get(f"item_color_{i}", "").strip() or UNKNOWN_COLOR
+        color       = normalize_text(request.form.get(f"item_color_{i}", "")) or UNKNOWN_COLOR
         edge_type   = request.form.get(f"item_edge_{i}", "Unknown")
         is_unicorn  = request.form.get(f"item_unicorn_{i}") == "on"
-        category    = request.form.get(f"item_category_{i}", "").strip() or None
+        category    = normalize_text(request.form.get(f"item_category_{i}", "")) or None
         notes       = request.form.get(f"item_notes_{i}", "").strip() or None
-        person_name = request.form.get(f"item_person_{i}", "").strip()
+        person_name = normalize_text(request.form.get(f"item_person_{i}", ""))
         status      = request.form.get(f"item_status_{i}", "Owned")
         set_names   = [s for s in request.form.get(f"item_sets_{i}", "").split("|") if s]
 
@@ -1013,9 +1032,9 @@ def import_confirm():
 
         # Assign set memberships
         for set_name in set_names:
-            knife_set = get_or_create_set(set_name)
-            if knife_set not in item.sets:
-                item.sets.append(knife_set)
+            item_set = get_or_create_set(set_name)
+            if item_set not in item.sets:
+                item.sets.append(item_set)
 
         if color and color != UNKNOWN_COLOR:
             if not any(v.color.lower() == color.lower() for v in item.variants):
@@ -1045,8 +1064,8 @@ def import_confirm():
             continue
 
         item_id     = int(request.form.get(f"own_item_id_{i}", 0))
-        person_name = request.form.get(f"own_person_{i}", "").strip()
-        color       = request.form.get(f"own_color_{i}", "").strip() or UNKNOWN_COLOR
+        person_name = normalize_text(request.form.get(f"own_person_{i}", ""))
+        color       = normalize_text(request.form.get(f"own_color_{i}", "")) or UNKNOWN_COLOR
         status      = request.form.get(f"own_status_{i}", "Owned")
         notes       = request.form.get(f"own_notes_{i}", "").strip() or None
 
