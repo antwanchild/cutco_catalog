@@ -59,11 +59,11 @@
   <div class="form-section">
     <label class="section-label">Set Memberships</label>
     <div class="checkbox-grid">
-      {% for s in all_sets %}
+      {% for item_set in all_sets %}
         <label class="checkbox-label">
-          <input type="checkbox" name="set_ids" value="{{ s.id }}"
-                 {% if s in item.sets %}checked{% endif %}>
-          {{ s.name }}
+          <input type="checkbox" name="set_ids" value="{{ item_set.id }}"
+                 {% if item_set in item.sets %}checked{% endif %}>
+          {{ item_set.name }}
         </label>
       {% else %}
         <p class="muted">No sets yet — <a href="{{ url_for('set_add') }}">create one</a>.</p>

@@ -34,16 +34,16 @@
       <label>Person *
         <select name="person_id" required class="input-full">
           <option value="">— select —</option>
-          {% for p in people_list %}
-            <option value="{{ p.id }}" {% if p.id == sel_person_id %}selected{% endif %}>{{ p.name }}</option>
+          {% for person in people_list %}
+            <option value="{{ person.id }}" {% if person.id == sel_person_id %}selected{% endif %}>{{ person.name }}</option>
           {% endfor %}
         </select>
       </label>
       <label>Item *
         <select name="item_id" id="item-select" required class="input-full" onchange="loadVariants(this.value)">
           <option value="">— select —</option>
-          {% for k in items_list %}
-            <option value="{{ k.id }}" {% if k.id == sel_item_id %}selected{% endif %}>{{ k.name }}</option>
+          {% for item in items_list %}
+            <option value="{{ item.id }}" {% if item.id == sel_item_id %}selected{% endif %}>{{ item.name }}</option>
           {% endfor %}
         </select>
       </label>
@@ -53,8 +53,8 @@
         <select name="variant_id" id="variant-select" required class="input-full">
           <option value="">— select item first —</option>
           {% if sel_item %}
-            {% for v in sel_item.variants %}
-              <option value="{{ v.id }}" {% if v.id == sel_variant_id %}selected{% endif %}>{{ v.color }}</option>
+            {% for variant in sel_item.variants %}
+              <option value="{{ variant.id }}" {% if variant.id == sel_variant_id %}selected{% endif %}>{{ variant.color }}</option>
             {% endfor %}
           {% endif %}
         </select>
@@ -65,8 +65,8 @@
   <div class="form-row">
     <label>Status *
       <select name="status" required class="input-full">
-        {% for s in status_options %}
-          <option value="{{ s }}" {% if (ownership and ownership.status == s) or (not ownership and s == 'Owned') %}selected{% endif %}>{{ s }}</option>
+        {% for status_option in status_options %}
+          <option value="{{ status_option }}" {% if (ownership and ownership.status == status_option) or (not ownership and status_option == 'Owned') %}selected{% endif %}>{{ status_option }}</option>
         {% endfor %}
       </select>
     </label>

@@ -63,13 +63,13 @@
   <section class="dash-panel">
     <h2>Recent Entries</h2>
     <ul class="link-list">
-      {% for o in recent %}
+      {% for ownership in recent %}
         <li>
-          <span class="badge badge-{{ o.status | lower }}">{{ o.status }}</span>
-          <a href="{{ url_for('person_collection', pid=o.person_id) }}">{{ o.person.name }}</a>
-          — {{ o.variant.item.name }}
-          {% if o.variant.color != UNKNOWN_COLOR %}
-            <span class="muted">({{ o.variant.color }})</span>
+          <span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span>
+          <a href="{{ url_for('person_collection', pid=ownership.person_id) }}">{{ ownership.person.name }}</a>
+          — {{ ownership.variant.item.name }}
+          {% if ownership.variant.color != UNKNOWN_COLOR %}
+            <span class="muted">({{ ownership.variant.color }})</span>
           {% endif %}
         </li>
       {% else %}
