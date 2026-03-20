@@ -1,151 +1,70 @@
 {% extends "base.html" %}
 {% block title %}{{ person.name }}'s Collection – Cutco Vault{% endblock %}
 {% block content %}
-
 <div class="page-header">
-  <div>
-    <h2 class="page-title">{{ person.name }}</h2>
-    <p class="page-sub">
-      {{ ownerships | length }} entries ·
-      {{ ownerships | selectattr('status','eq','Owned') | list | length }} owned ·
-      {{ knife_gaps | length }} knife gaps ·
-      {{ variant_gaps | length }} variant gaps
-    </p>
-  </div>
+  <h1 class="page-title">{{ person.name }}'s Collection</h1>
   <div class="page-actions">
-    <a href="{{ url_for('ownership_add') }}?person_id={{ person.id }}" class="btn btn-primary">+ Log Knife</a>
-    <a href="{{ url_for('people') }}" class="btn btn-ghost">← Collectors</a>
+    <a href="{{ url_for('ownership_add', person_id=person.id) }}" class="btn btn-primary">+ Add Entry</a>
+    <a href="{{ url_for('people') }}" class="btn btn-ghost">← People</a>
   </div>
 </div>
 
-<div class="tab-bar">
-  <button class="tab active" onclick="showTab('owned',this)">Collection</button>
-  <button class="tab" onclick="showTab('knife-gaps',this)">Missing Knives ({{ knife_gaps | length }})</button>
-  <button class="tab" onclick="showTab('variant-gaps',this)">Missing Variants ({{ variant_gaps | length }})</button>
-</div>
-
-<!-- ── Collection tab ─────────────────────────────────────── -->
-<div id="tab-owned">
 {% if ownerships %}
-<div class="table-wrap">
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>Knife</th><th>SKU</th><th>Color</th><th>Edge</th>
-        <th>Status</th><th>🦄</th><th>Notes</th><th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for o in ownerships %}
-      <tr {% if o.variant.knife.is_unicorn %}class="is-unicorn"{% endif %}>
-        <td><a href="{{ url_for('knife_owners', kid=o.variant.knife_id) }}" class="knife-name-link">{{ o.variant.knife.name }}</a></td>
-        <td class="mono dim">{{ o.variant.knife.sku or '—' }}</td>
-        <td>
-          {% if o.variant.color == UNKNOWN_COLOR %}
-            <span class="dim" style="font-size:.75rem">{{ o.variant.color }}</span>
-          {% else %}
-            <span class="color-badge">{{ o.variant.color }}</span>
-          {% endif %}
-        </td>
-        <td><span class="edge-badge edge-{{ o.variant.knife.edge_type | lower | replace(' ','-') | replace('/','') }}">{{ o.variant.knife.edge_type }}</span></td>
-        <td><span class="status-badge status-{{ o.status | lower }}">{{ o.status }}</span></td>
-        <td>{% if o.variant.knife.is_unicorn %}🦄{% else %}—{% endif %}</td>
-        <td class="dim notes-text" title="{{ o.notes or '' }}">{{ (o.notes or '')[:40] }}{% if o.notes and o.notes|length > 40 %}…{% endif %}</td>
-        <td class="actions-cell">
-          <a href="{{ url_for('ownership_edit', oid=o.id) }}" class="action-link edit">Edit</a>
-          <form method="POST" action="{{ url_for('ownership_delete', oid=o.id) }}" class="inline-form"
-                onsubmit="return confirm('Remove this entry?')">
-            <button class="action-link delete">Del</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+<h2>Owned / Tracked</h2>
+<table class="data-table">
+  <thead><tr><th>Item</th><th>Color</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for o in ownerships %}
+    <tr>
+      <td><a href="{{ url_for('item_owners', iid=o.variant.item_id) }}">{{ o.variant.item.name }}</a></td>
+      <td>{% if o.variant.color != UNKNOWN_COLOR %}{{ o.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td><span class="badge badge-{{ o.status | lower }}">{{ o.status }}</span></td>
+      <td>{{ o.notes or '—' }}</td>
+      <td class="actions">
+        <a href="{{ url_for('ownership_edit', oid=o.id) }}" class="btn btn-xs">Edit</a>
+        <form method="post" action="{{ url_for('ownership_delete', oid=o.id) }}"
+              onsubmit="return confirm('Remove this entry?')" style="display:inline">
+          <button class="btn btn-xs btn-danger">Del</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% else %}
-<div class="empty-state">
-  <p>No entries yet. <a href="{{ url_for('ownership_add') }}?person_id={{ person.id }}">Log a knife</a>.</p>
-</div>
+<p class="empty">No entries yet for {{ person.name }}.</p>
 {% endif %}
-</div>
 
-<!-- ── Knife gaps tab ─────────────────────────────────────── -->
-<div id="tab-knife-gaps" class="hidden">
-{% if knife_gaps %}
-<p class="gap-hint">Knives in the catalog with no ownership entry at all for {{ person.name }}.</p>
-<div class="table-wrap">
-  <table class="data-table">
-    <thead>
-      <tr><th>Knife</th><th>SKU</th><th>Category</th><th>Edge</th><th>Variants</th><th>🦄</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for k in knife_gaps %}
-      <tr {% if k.is_unicorn %}class="is-unicorn"{% endif %}>
-        <td><a href="{{ url_for('knife_owners', kid=k.id) }}" class="knife-name-link">{{ k.name }}</a></td>
-        <td class="mono dim">{{ k.sku or '—' }}</td>
-        <td class="dim">{{ k.category or '—' }}</td>
-        <td><span class="edge-badge edge-{{ k.edge_type | lower | replace(' ','-') | replace('/','') }}">{{ k.edge_type }}</span></td>
-        <td class="dim">
-          {% set real = k.variants | rejectattr('color','eq',UNKNOWN_COLOR) | list %}
-          {% if real %}{{ real | length }} color{{ 's' if real|length != 1 else '' }}{% else %}—{% endif %}
-        </td>
-        <td>{% if k.is_unicorn %}🦄{% else %}—{% endif %}</td>
-        <td><a href="{{ url_for('ownership_add') }}?person_id={{ person.id }}&knife_id={{ k.id }}" class="action-link edit">+ Log</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% else %}
-<div class="empty-state"><p>{{ person.name }} has an entry for every knife in the catalog! 🎉</p></div>
+{% if item_gaps %}
+<details class="gap-section">
+  <summary>Missing Items ({{ item_gaps | length }})</summary>
+  <ul class="gap-list">
+    {% for item in item_gaps %}
+      <li>
+        <a href="{{ url_for('item_owners', iid=item.id) }}">{{ item.name }}</a>
+        <a href="{{ url_for('ownership_add', person_id=person.id, item_id=item.id) }}"
+           class="btn btn-xs btn-success">+ Add</a>
+      </li>
+    {% endfor %}
+  </ul>
+</details>
 {% endif %}
-</div>
 
-<!-- ── Variant gaps tab ───────────────────────────────────── -->
-<div id="tab-variant-gaps" class="hidden">
 {% if variant_gaps %}
-<p class="gap-hint">Knives where {{ person.name }} owns some color variants but is missing others.</p>
-<div class="table-wrap">
-  <table class="data-table">
-    <thead>
-      <tr><th>Knife</th><th>SKU</th><th>Missing Colors</th><th>🦄</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for k, missing_variants in variant_gaps %}
-      <tr {% if k.is_unicorn %}class="is-unicorn"{% endif %}>
-        <td><a href="{{ url_for('knife_owners', kid=k.id) }}" class="knife-name-link">{{ k.name }}</a></td>
-        <td class="mono dim">{{ k.sku or '—' }}</td>
-        <td>
-          {% for v in missing_variants %}
-            <span class="color-badge" style="margin-right:4px">{{ v.color }}</span>
-          {% endfor %}
-        </td>
-        <td>{% if k.is_unicorn %}🦄{% else %}—{% endif %}</td>
-        <td>
-          {% for v in missing_variants %}
-            <a href="{{ url_for('ownership_add') }}?person_id={{ person.id }}&knife_id={{ k.id }}&variant_id={{ v.id }}"
-               class="action-link edit" style="margin-right:4px">+ {{ v.color }}</a>
-          {% endfor %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% else %}
-<div class="empty-state"><p>No variant gaps — {{ person.name }} has all known colors for every knife they own. 🎉</p></div>
+<details class="gap-section">
+  <summary>Variant Gaps ({{ variant_gaps | length }} item{{ 's' if variant_gaps | length != 1 }})</summary>
+  <ul class="gap-list">
+    {% for item, missing in variant_gaps %}
+      <li>
+        <strong>{{ item.name }}</strong> — missing:
+        {% for v in missing %}
+          <span class="chip">{{ v.color }}</span>
+          <a href="{{ url_for('ownership_add', person_id=person.id, item_id=item.id, variant_id=v.id) }}"
+             class="btn btn-xs btn-success">+ Add</a>
+        {% endfor %}
+      </li>
+    {% endfor %}
+  </ul>
+</details>
 {% endif %}
-</div>
-
-<script>
-function showTab(name, el) {
-  ['owned','knife-gaps','variant-gaps'].forEach(t =>
-    document.getElementById('tab-' + t).classList.add('hidden'));
-  document.getElementById('tab-' + name).classList.remove('hidden');
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-}
-</script>
-
 {% endblock %}

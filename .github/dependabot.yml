@@ -1,22 +1,31 @@
 version: 2
 updates:
-
-  - package-ecosystem: "pip"
+  - package-ecosystem: pip
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 10
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
     labels:
-      - "dependencies"
-      - "python"
+      - dependencies
+      - python
 
-  - package-ecosystem: "github-actions"
+  - package-ecosystem: docker
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 10
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
     labels:
-      - "dependencies"
-      - "github-actions"
+      - dependencies
+      - docker
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions

@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
-LABEL org.opencontainers.image.title="cutco-tracker"
-LABEL org.opencontainers.image.description="Cutco Knife Collection Tracker"
+LABEL org.opencontainers.image.title="cutco-vault"
+LABEL org.opencontainers.image.description="Cutco Collection Tracker"
 
 WORKDIR /app
 
@@ -17,6 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
 RUN mkdir -p /data
 
 ENV FLASK_ENV=production

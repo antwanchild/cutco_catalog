@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Item – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">{{ action }} Item</h1>
+  <a href="{{ url_for('catalog') }}" class="btn btn-ghost">← Back</a>
+</div>
+
+<form method="post" class="form-card">
+
+  <div class="form-row">
+    <label>Name *
+      <input type="text" name="name" value="{{ item.name if item else '' }}" required class="input-full">
+    </label>
+    <label>SKU / Model #
+      <input type="text" name="sku" value="{{ item.sku if item and item.sku else '' }}" class="input-full">
+    </label>
+  </div>
+
+  <div class="form-row">
+    <label>Category
+      <input type="text" name="category" value="{{ item.category if item and item.category else '' }}" class="input-full">
+    </label>
+    <label>Edge Type
+      <select name="edge_type" class="input-full">
+        {% for et in edge_types %}
+          <option value="{{ et }}" {% if item and item.edge_type == et %}selected{% endif %}>{{ et }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="form-row">
+    <label>Cutco URL
+      <input type="url" name="cutco_url" value="{{ item.cutco_url if item and item.cutco_url else '' }}" class="input-full">
+    </label>
+  </div>
+
+  {% if not item %}
+  <div class="form-row">
+    <label>Initial Colors <span class="hint">(comma-separated; leave blank for Unknown)</span>
+      <input type="text" name="colors" placeholder="Classic Brown, Pearl White" class="input-full">
+    </label>
+  </div>
+  {% endif %}
+
+  <div class="form-row checkbox-row">
+    <label class="checkbox-label">
+      <input type="checkbox" name="is_unicorn" {% if item and item.is_unicorn %}checked{% endif %}>
+      🦄 Unicorn (discontinued / rare)
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" name="in_catalog" {% if not item or item.in_catalog %}checked{% endif %}>
+      In Cutco catalog
+    </label>
+  </div>
+
+  {% if item %}
+  <div class="form-section">
+    <label class="section-label">Set Memberships</label>
+    <div class="checkbox-grid">
+      {% for s in all_sets %}
+        <label class="checkbox-label">
+          <input type="checkbox" name="set_ids" value="{{ s.id }}"
+                 {% if s in item.sets %}checked{% endif %}>
+          {{ s.name }}
+        </label>
+      {% else %}
+        <p class="muted">No sets yet — <a href="{{ url_for('set_add') }}">create one</a>.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <label>Notes
+    <textarea name="notes" rows="3" class="input-full">{{ item.notes if item and item.notes else '' }}</textarea>
+  </label>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">{{ action }} Item</button>
+    <a href="{{ url_for('catalog') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+
+</form>
+{% endblock %}

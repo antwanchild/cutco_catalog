@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ item.name }} Owners – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">{{ item.name }}</h1>
+  <div class="page-actions">
+    <a href="{{ url_for('variants', iid=item.id) }}" class="btn btn-secondary">Variants</a>
+    {% if is_admin() %}
+    <a href="{{ url_for('catalog_edit', iid=item.id) }}" class="btn btn-secondary">Edit</a>
+    {% endif %}
+    <a href="{{ url_for('catalog') }}" class="btn btn-ghost">← Catalog</a>
+  </div>
+</div>
+
+<div class="item-meta">
+  {% if item.sku %}<span><strong>SKU:</strong> {{ item.sku }}</span>{% endif %}
+  {% if item.category %}<span><strong>Category:</strong> {{ item.category }}</span>{% endif %}
+  <span><strong>Edge:</strong> {{ item.edge_type }}</span>
+  {% if item.is_unicorn %}<span class="badge badge-unicorn">🦄 Unicorn</span>{% endif %}
+  {% if item.sets %}
+    <span><strong>Sets:</strong>
+      {% for s in item.sets %}
+        <a href="{{ url_for('set_detail', sid=s.id) }}" class="chip">{{ s.name }}</a>
+      {% endfor %}
+    </span>
+  {% endif %}
+  {% if item.cutco_url %}<a href="{{ item.cutco_url }}" target="_blank" class="btn btn-xs">Cutco.com ↗</a>{% endif %}
+</div>
+
+{% if item.notes %}<p class="item-notes">{{ item.notes }}</p>{% endif %}
+
+{% if entries %}
+<h2>Collectors</h2>
+<table class="data-table">
+  <thead><tr><th>Person</th><th>Color</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for o in entries %}
+    <tr>
+      <td><a href="{{ url_for('person_collection', pid=o.person_id) }}">{{ o.person.name }}</a></td>
+      <td>{% if o.variant.color != UNKNOWN_COLOR %}{{ o.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td><span class="badge badge-{{ o.status | lower }}">{{ o.status }}</span></td>
+      <td>{{ o.notes or '—' }}</td>
+      <td class="actions">
+        <a href="{{ url_for('ownership_edit', oid=o.id) }}" class="btn btn-xs">Edit</a>
+        <form method="post" action="{{ url_for('ownership_delete', oid=o.id) }}"
+              onsubmit="return confirm('Remove this entry?')" style="display:inline">
+          <button class="btn btn-xs btn-danger">Del</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No one owns this item yet.</p>
+{% endif %}
+
+{% if people_without %}
+<h2>Add Collector</h2>
+<div class="quick-add-list">
+  {% for p in people_without %}
+    <a href="{{ url_for('ownership_add', item_id=item.id, person_id=p.id) }}"
+       class="btn btn-sm btn-outline">+ {{ p.name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

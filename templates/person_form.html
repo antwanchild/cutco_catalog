@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 {% block title %}{{ action }} Collector – Cutco Vault{% endblock %}
 {% block content %}
-<div class="form-container">
-  <div class="form-header">
-    <h2 class="form-title">{{ action }} Collector</h2>
-    <a href="{{ url_for('people_list') }}" class="btn btn-ghost btn-sm">← Back</a>
-  </div>
-  <form method="POST" class="knife-form">
-    <div class="field-group"><label>Name <span class="required">*</span></label>
-      <input type="text" name="name" required placeholder="e.g. Anthony" value="{{ person.name if person else '' }}"></div>
-    <div class="field-group"><label>Notes</label>
-      <textarea name="notes" rows="2" placeholder="Optional">{{ person.notes if person and person.notes else '' }}</textarea></div>
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary btn-lg">{{ action }} Collector</button>
-      <a href="{{ url_for('people_list') }}" class="btn btn-ghost">Cancel</a>
-    </div>
-  </form>
+<div class="page-header">
+  <h1 class="page-title">{{ action }} Collector</h1>
+  <a href="{{ url_for('people') }}" class="btn btn-ghost">← People</a>
 </div>
+<form method="post" class="form-card">
+  <label>Name *
+    <input type="text" name="name" value="{{ person.name if person else '' }}" required class="input-full">
+  </label>
+  <label>Notes
+    <textarea name="notes" rows="2" class="input-full">{{ person.notes if person and person.notes else '' }}</textarea>
+  </label>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">{{ action }}</button>
+    <a href="{{ url_for('people') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
 {% endblock %}

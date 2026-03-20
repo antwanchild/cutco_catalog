@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ set.name }} – Sets – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🗂️ {{ set.name }}</h1>
+  <div class="page-actions">
+    <a href="{{ url_for('set_edit', sid=set.id) }}" class="btn btn-secondary">Edit</a>
+    <a href="{{ url_for('sets_list') }}" class="btn btn-ghost">← Sets</a>
+  </div>
+</div>
+
+{% if set.notes %}
+<p class="set-notes">{{ set.notes }}</p>
+{% endif %}
+
+<p class="table-count">{{ set.items | length }} item{% if set.items | length != 1 %}s{% endif %} in this set</p>
+
+{% if set.items %}
+<table class="data-table">
+  <thead>
+    <tr><th>Name</th><th>SKU</th><th>Category</th><th>Edge</th><th>Variants</th></tr>
+  </thead>
+  <tbody>
+    {% for item in set.items | sort(attribute='name') %}
+    <tr>
+      <td>
+        <a href="{{ url_for('item_owners', iid=item.id) }}">{{ item.name }}</a>
+        {% if item.is_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+      </td>
+      <td class="mono">{{ item.sku or '—' }}</td>
+      <td>{{ item.category or '—' }}</td>
+      <td>{{ item.edge_type }}</td>
+      <td>
+        <a href="{{ url_for('variants', iid=item.id) }}">
+          {{ item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length }} color(s)
+        </a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No items in this set yet. Edit items from the catalog to assign them.</p>
+{% endif %}
+{% endblock %}
