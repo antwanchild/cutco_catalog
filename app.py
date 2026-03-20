@@ -240,6 +240,11 @@ def inject_globals():
 
 # ── Version ───────────────────────────────────────────────────────────────────
 
+@app.route("/health")
+def health():
+    return jsonify(status="ok")
+
+
 @app.route("/version")
 def version():
     return jsonify(version=APP_VERSION)
