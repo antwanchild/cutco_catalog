@@ -338,11 +338,18 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                 sku = tag["content"].strip().upper()
                 break
 
-        # Strategy 2: on-page text containing "#XXXX"
+        # Remove script/style blocks before text search so CSS hex colors
+        # (e.g. brand blue #0073A4) don't get matched as SKUs.
+        for noise in soup.find_all(["script", "style"]):
+            noise.decompose()
+
+        # Strategy 2: on-page visible text containing "#XXXX".
+        # Cutco SKUs are 2–4 digits with an optional single color letter.
+        # The word-boundary anchor prevents matching 6-char hex colors like 0073A4.
         if not sku:
-            sku_text = soup.find(string=re.compile(r"#\d{2,}"))
+            sku_text = soup.find(string=re.compile(r"#\d{2,4}[A-Z]?\b"))
             if sku_text:
-                m = re.search(r"#([0-9A-Z]{2,})", sku_text.strip(), re.IGNORECASE)
+                m = re.search(r"#(\d{2,4}[A-Z]?)\b", sku_text.strip(), re.IGNORECASE)
                 if m:
                     sku = m.group(1).upper()
 
@@ -350,10 +357,14 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         if not sku:
             page_text = soup.get_text(" ", strip=True)
             m = re.search(
-                r"(?:model|item|sku|product)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{2,}[A-Z]{0,3})\b",
+                r"(?:model|item|sku|product)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{2,4}[A-Z]?)\b",
                 page_text, re.IGNORECASE)
             if m:
                 sku = m.group(1).upper()
+
+        # Normalise: strip trailing color letter so we store the base SKU
+        if sku and len(sku) > 2 and sku[-1] in "CWRB":
+            sku = sku[:-1]
 
         h1 = soup.find("h1")
         name = h1.get_text(strip=True) if h1 else None
