@@ -307,10 +307,13 @@ def scrape_catalog():
 
             # Walk the DOM in order, collecting product links and stopping
             # once a bundle/gift section heading is encountered.
-            _bundle_keywords = {"gift", "set", "additional", "bundle", "collection"}
+            # Only stop at sections that explicitly indicate gift bundles or
+            # additional/accessory groupings — not generic headings like "set"
+            # or "collection" which appear in normal product sections too.
+            _bundle_keywords = {"gift", "additional"}
             product_links = []
             for element in soup.descendants:
-                if element.name in ("h2", "h3", "h4"):
+                if element.name in ("h2", "h3", "h4") and product_links:
                     if any(kw in element.get_text(strip=True).lower()
                            for kw in _bundle_keywords):
                         logger.debug("Bundle section detected on %s: '%s'",
