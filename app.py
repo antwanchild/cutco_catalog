@@ -67,7 +67,6 @@ UNKNOWN_COLOR = "Unknown / Unspecified"
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
 
 SCRAPE_CATEGORIES = [
-    ("Kitchen Knives", "https://www.cutco.com/shop/kitchen-knives"),
     ("Utility Knives",  "https://www.cutco.com/shop/utility-knives"),
     ("Chef Knives",     "https://www.cutco.com/shop/chef-knives"),
     ("Paring Knives",   "https://www.cutco.com/shop/paring-knives"),
@@ -86,6 +85,7 @@ SCRAPE_CATEGORIES = [
     ("Storage",          "https://www.cutco.com/shop/storage"),
     ("Knife Sheaths",    "https://www.cutco.com/shop/kitchen-knife-sheaths"),
     ("Garden Tools",     "https://www.cutco.com/shop/garden-tools"),
+    ("Kitchen Knives",   "https://www.cutco.com/shop/kitchen-knives"),
 ]
 
 # Individual product pages that don't appear under any category listing.
@@ -446,17 +446,21 @@ def scrape_catalog():
                         [a.get("href", "") for a in product_links[:10]])
 
             # Deduplicate: strip &view=product variants so each product is
-            # processed at most once per category.
+            # processed at most once per category, but keep the full href
+            # (including &view=product) for the actual fetch so the server
+            # returns the full product page with JSON-LD.
             seen_hrefs: set[str] = set()
             unique_links = []
             for a in product_links:
-                base_href = a.get("href", "").split("&")[0]
+                full_href = a.get("href", "")
+                base_href = full_href.split("&")[0]
                 if base_href not in seen_hrefs:
                     seen_hrefs.add(base_href)
-                    unique_links.append((a, base_href))
+                    unique_links.append((a, full_href))
 
             for a, href in unique_links:
-                sku = _extract_sku_from_href(href)
+                base_href = href.split("&")[0]
+                sku = _extract_sku_from_href(base_href)
                 prod_url = href if href.startswith("http") else f"https://www.cutco.com{href}"
 
                 name_el = a.find(["h2", "h3"])
