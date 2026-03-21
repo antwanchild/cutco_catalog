@@ -245,11 +245,25 @@ def _discover_categories() -> list[tuple[str, str]]:
     Returns a list of (category_name, url) tuples found in the shop navigation.
     Falls back to an empty list if the shop page cannot be reached.
     """
-    shop_index_url = "https://www.cutco.com/shop/"
+    # Try the homepage — it reliably has nav links to all /shop/ categories.
+    # The /shop/ index itself 404s on cutco.com.
+    discovery_urls = [
+        "https://www.cutco.com/",
+        "https://www.cutco.com/products/knives/",
+    ]
     discovered = []
     seen_slugs  = set()
     try:
-        resp = requests.get(shop_index_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        resp = None
+        for url in discovery_urls:
+            try:
+                resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+                if resp.status_code == 200:
+                    break
+            except Exception:
+                continue
+        if resp is None or resp.status_code != 200:
+            raise RuntimeError("No discovery URL returned 200")
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         for a in soup.select("a[href*='/shop/']"):
