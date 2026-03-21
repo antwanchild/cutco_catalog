@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import logging
 import os
 import re
@@ -319,9 +320,10 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
 
     Used for pure-slug URLs like /p/fishermans-solution where no numeric SKU
     appears in the URL itself.  Tries several extraction strategies in order:
-      1. Meta tag (product:retailer_item_id or similar)
-      2. On-page text matching "#XXXX" or "Model #XXXX"
-      3. Broader keyword context (Model/Item/SKU followed by a number)
+      1. JSON-LD structured data (<script type="application/ld+json">)
+      2. Meta tag (product:retailer_item_id or similar)
+      3. On-page visible text matching "#XXXX" (scripts/styles stripped first)
+      4. Broader keyword context (Model/Item/SKU followed by a number)
     """
     try:
         resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
@@ -331,12 +333,30 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         soup = BeautifulSoup(resp.text, "html.parser")
         sku = None
 
-        # Strategy 1: meta tags (Open Graph / Schema product SKU)
-        for attr in ("product:retailer_item_id", "product:sku"):
-            tag = soup.find("meta", property=attr) or soup.find("meta", attrs={"name": attr})
-            if tag and tag.get("content", "").strip():
-                sku = tag["content"].strip().upper()
+        # Strategy 1: JSON-LD structured data — most reliable, checked first
+        # before any script tags are stripped.
+        for ld in soup.find_all("script", type="application/ld+json"):
+            try:
+                data = json.loads(ld.string or "")
+                items = data if isinstance(data, list) else [data]
+                for entry in items:
+                    if isinstance(entry, dict) and entry.get("@type") == "Product":
+                        sku_val = entry.get("sku") or entry.get("productID")
+                        if sku_val:
+                            sku = str(sku_val).strip().upper()
+                            break
+            except (json.JSONDecodeError, AttributeError):
+                pass
+            if sku:
                 break
+
+        # Strategy 2: meta tags (Open Graph / Schema product SKU)
+        if not sku:
+            for attr in ("product:retailer_item_id", "product:sku"):
+                tag = soup.find("meta", property=attr) or soup.find("meta", attrs={"name": attr})
+                if tag and tag.get("content", "").strip():
+                    sku = tag["content"].strip().upper()
+                    break
 
         # Remove script/style blocks before text search so CSS hex colors
         # (e.g. brand blue #0073A4) don't get matched as SKUs.
@@ -436,6 +456,11 @@ def scrape_catalog():
 
                 if not sku:
                     # Pure-slug URL — queue for parallel page fetch after this loop.
+                    # Skip sheath categories: their pages report the parent knife's
+                    # model number rather than a distinct sheath SKU, which would
+                    # create duplicate catalog entries for the knife.
+                    if cat_name == "Knife Sheaths":
+                        continue
                     if prod_url not in seen_slug_urls:
                         seen_slug_urls.add(prod_url)
                         slug_queue.append((prod_url, cat_name, name))
