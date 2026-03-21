@@ -321,20 +321,21 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
     Used for pure-slug URLs like /p/fishermans-solution where no numeric SKU
     appears in the URL itself.  Tries several extraction strategies in order:
       1. JSON-LD structured data (<script type="application/ld+json">)
-      2. Meta tag (product:retailer_item_id or similar)
-      3. On-page visible text matching "#XXXX" (scripts/styles stripped first)
-      4. Broader keyword context (Model/Item/SKU followed by a number)
+      2. Inline JS variable — "sku":"1769" in raw HTML
+      3. Meta tag (product:retailer_item_id or similar)
+      4. On-page visible text matching "#XXXX" (scripts/styles stripped first)
+      5. Broader keyword context (Model/Item/SKU followed by a number)
     """
     try:
         resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         if resp.status_code != 200:
             logger.info("SKU fetch: HTTP %d for %s", resp.status_code, url)
             return None, None
-        soup = BeautifulSoup(resp.text, "html.parser")
+        raw_html = resp.text
+        soup = BeautifulSoup(raw_html, "html.parser")
         sku = None
 
-        # Strategy 1: JSON-LD structured data — most reliable, checked first
-        # before any script tags are stripped.
+        # Strategy 1: JSON-LD structured data — checked before script tags stripped.
         for ld in soup.find_all("script", type="application/ld+json"):
             try:
                 data = json.loads(ld.string or "")
@@ -350,7 +351,16 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
             if sku:
                 break
 
-        # Strategy 2: meta tags (Open Graph / Schema product SKU)
+        # Strategy 2: inline JS variable — catches patterns like:
+        #   "sku":"1769"  |  'sku': '1769'  |  sku: 1769
+        if not sku:
+            m = re.search(
+                r"""["']?sku["']?\s*:\s*["']?(\d{2,4}[A-Z]{0,2})["']?""",
+                raw_html, re.IGNORECASE)
+            if m:
+                sku = m.group(1).upper()
+
+        # Strategy 3: meta tags (Open Graph / Schema product SKU)
         if not sku:
             for attr in ("product:retailer_item_id", "product:sku"):
                 tag = soup.find("meta", property=attr) or soup.find("meta", attrs={"name": attr})
@@ -363,7 +373,7 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         for noise in soup.find_all(["script", "style"]):
             noise.decompose()
 
-        # Strategy 2: on-page visible text containing "#XXXX".
+        # Strategy 4: on-page visible text containing "#XXXX".
         # Cutco SKUs are 2–4 digits with an optional single color letter.
         # The word-boundary anchor prevents matching 6-char hex colors like 0073A4.
         if not sku:
@@ -373,7 +383,7 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                 if m:
                     sku = m.group(1).upper()
 
-        # Strategy 3: keyword context — "Model 1769", "Item No. 1769", etc.
+        # Strategy 5: keyword context — "Model 1769", "Item No. 1769", etc.
         if not sku:
             page_text = soup.get_text(" ", strip=True)
             m = re.search(
@@ -456,10 +466,9 @@ def scrape_catalog():
 
                 if not sku:
                     # Pure-slug URL — queue for parallel page fetch after this loop.
-                    # Skip sheath categories: their pages report the parent knife's
-                    # model number rather than a distinct sheath SKU, which would
-                    # create duplicate catalog entries for the knife.
-                    if cat_name == "Knife Sheaths":
+                    # Skip sheath pages: they report the parent knife's model number,
+                    # not a distinct sheath SKU, so they'd create duplicate entries.
+                    if "-sheath" in prod_url or cat_name == "Knife Sheaths":
                         continue
                     if prod_url not in seen_slug_urls:
                         seen_slug_urls.add(prod_url)
