@@ -2,6 +2,7 @@ import csv
 import io
 import logging
 import os
+import re
 import time
 from logging.handlers import RotatingFileHandler
 
@@ -69,9 +70,28 @@ SCRAPE_CATEGORIES = [
     ("Paring Knives",   "https://www.cutco.com/shop/paring-knives"),
     ("Outdoor Knives",  "https://www.cutco.com/shop/outdoor-knives"),
     ("Everyday Knives", "https://www.cutco.com/shop/everyday-knives"),
+    ("Table Knives",    "https://www.cutco.com/shop/table-knives"),
+    ("Steak Knives",    "https://www.cutco.com/shop/steak-knives"),
+    ("Kitchen Tools",   "https://www.cutco.com/shop/kitchen-tools"),
+    ("Gadgets",         "https://www.cutco.com/shop/gadgets"),
+    ("Cutting Boards",  "https://www.cutco.com/shop/cutting-boards"),
     ("Accessories",     "https://www.cutco.com/shop/cooks-tools"),
-    ("Tableware",       "https://www.cutco.com/shop/tableware"),
+    ("Flatware",         "https://www.cutco.com/shop/flatware"),
+    ("Tableware",        "https://www.cutco.com/shop/tableware"),
+    ("Cookware",         "https://www.cutco.com/shop/cookware"),
+    ("Ake Cookware",     "https://www.cutco.com/shop/ake-cookware"),
+    ("Storage",          "https://www.cutco.com/shop/storage"),
+    ("Knife Sheaths",    "https://www.cutco.com/shop/kitchen-knife-sheaths"),
+    ("Garden Tools",     "https://www.cutco.com/shop/garden-tools"),
 ]
+
+# Individual product pages that don't appear under any category listing.
+# Each entry is (category, url) — scraped directly as a single-item page.
+SCRAPE_INDIVIDUAL_URLS = [
+    ("Accessories", "https://www.cutco.com/p/super-shears"),
+    ("Accessories", "https://www.cutco.com/p/knife-sharpener"),
+]
+
 SCRAPE_SETS_URL = "https://www.cutco.com/shop/knife-sets"
 SCRAPE_HEADERS  = {"User-Agent": "Mozilla/5.0 (compatible; CutcoVaultBot/1.0)"}
 REQUEST_TIMEOUT = 12  # seconds for all outbound HTTP requests
@@ -218,11 +238,65 @@ def _extract_sku_from_href(href: str) -> str | None:
     return candidate or None
 
 
+def _discover_categories() -> list[tuple[str, str]]:
+    """Scrape the Cutco shop index to discover all category pages automatically.
+
+    Returns a list of (category_name, url) tuples found in the shop navigation.
+    Falls back to an empty list if the shop page cannot be reached.
+    """
+    shop_index_url = "https://www.cutco.com/shop/"
+    discovered = []
+    seen_slugs  = set()
+    try:
+        resp = requests.get(shop_index_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for a in soup.select("a[href*='/shop/']"):
+            href = a.get("href", "").rstrip("/")
+            slug = href.split("/shop/")[-1].split("?")[0]
+            # Skip empty slugs, set pages, and already-seen slugs
+            if not slug or slug in seen_slugs or "knife-set" in slug or "set" == slug:
+                continue
+            url  = href if href.startswith("http") else f"https://www.cutco.com{href}"
+            # Derive a human-readable name: title-case the slug
+            name = slug.replace("-", " ").title()
+            seen_slugs.add(slug)
+            discovered.append((name, url))
+        logger.info("Discovered %d categories from shop index", len(discovered))
+    except Exception as exc:
+        logger.warning("Category discovery failed: %s", exc)
+    return discovered
+
+
+def _build_category_list() -> list[tuple[str, str]]:
+    """Merge auto-discovered categories with the hardcoded SCRAPE_CATEGORIES list.
+
+    Hardcoded entries take precedence — their names override auto-discovered
+    names for the same URL slug, and they are always included even if discovery
+    fails.  Discovered categories not already in SCRAPE_CATEGORIES are appended.
+    """
+    # Build a slug→(name, url) map from hardcoded list (authoritative)
+    def slug_of(url):
+        return url.rstrip("/").split("/shop/")[-1].split("?")[0].lower()
+
+    known = {slug_of(url): (name, url) for name, url in SCRAPE_CATEGORIES}
+
+    # Add discovered categories that aren't already covered
+    for name, url in _discover_categories():
+        slug = slug_of(url)
+        if slug not in known:
+            known[slug] = (name, url)
+
+    return list(known.values())
+
+
 def scrape_catalog():
     """Scrape all item categories and return a list of item dicts."""
-    results  = []
+    results   = []
     seen_skus = set()
-    for cat_name, cat_url in SCRAPE_CATEGORIES:
+    categories = _build_category_list()
+    logger.info("Scraping %d categories", len(categories))
+    for cat_name, cat_url in categories:
         if cat_name in SYNC_BLOCKED_CATEGORIES:
             continue
         try:
@@ -246,6 +320,38 @@ def scrape_catalog():
             time.sleep(0.4)
         except Exception as exc:
             logger.warning("Scrape failed for %s: %s", cat_url, exc)
+
+    # Individual product pages not listed under any category.
+    # SKU is extracted from the page content (e.g. "#1778" text) since
+    # these URLs use slug-style paths with no numeric SKU in the URL itself.
+    for cat_name, prod_url in SCRAPE_INDIVIDUAL_URLS:
+        if cat_name in SYNC_BLOCKED_CATEGORIES:
+            continue
+        try:
+            resp = requests.get(prod_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # SKU appears on the page as text like "#1778" or "Model #1778"
+            sku_el = soup.find(string=re.compile(r"#\d"))
+            if not sku_el:
+                logger.warning("Could not find SKU on individual product page: %s", prod_url)
+                continue
+            sku = re.search(r"#([0-9A-Z]+)", sku_el.strip(), re.IGNORECASE)
+            if not sku:
+                continue
+            sku = sku.group(1).upper()
+            if sku in seen_skus:
+                continue
+            name_el = soup.find(["h1", "h2"])
+            name = name_el.get_text(strip=True) if name_el else None
+            if not name:
+                continue
+            seen_skus.add(sku)
+            results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
+            time.sleep(0.4)
+        except Exception as exc:
+            logger.warning("Scrape failed for individual product %s: %s", prod_url, exc)
+
     return results
 
 
@@ -257,7 +363,6 @@ def scrape_sets() -> list[dict]:
     Returns a list of dicts:
       { name, sku, url, member_skus: [str, ...] }
     """
-    import re
     results = []
     seen_set_skus = set()
 
