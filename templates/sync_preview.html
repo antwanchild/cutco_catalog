@@ -26,10 +26,11 @@
   <h2>New Items <span class="muted">({{ new_items | length }})</span></h2>
 
   {% for category, items in grouped.items() %}
-  <h3 class="sync-cat-header">
+  {% set cat_idx = loop.index %}
+  <h3 class="sync-category-header">
     {{ category }}
-    <label class="checkbox-label sync-toggle">
-      <input type="checkbox" class="cat-select-all" data-cat="{{ loop.index }}" checked>
+    <label class="checkbox-label sync-category-toggle">
+      <input type="checkbox" class="cat-select-all" data-cat="{{ cat_idx }}" checked>
       select all
     </label>
   </h3>
@@ -41,7 +42,7 @@
       {% for item in items %}
       <tr>
         <td><input type="checkbox" name="selected_skus" value="{{ item.sku }}"
-                   class="cat-cb cat-idx-{{ loop.index0 }}" checked></td>
+                   class="cat-cb" data-cat="{{ cat_idx }}" checked></td>
         <td>{{ item.name }}</td>
         <td class="mono">{{ item.sku }}</td>
         <td><input type="text" name="category_{{ item.sku }}" value="{{ item.category }}" class="input-xs"></td>
@@ -67,19 +68,19 @@
       </tr>
     </thead>
     <tbody>
-      {% for s in new_sets %}
+      {% for item_set in new_sets %}
       <tr>
         <td>
-          <input type="checkbox" name="selected_sets" value="{{ s.name }}" class="set-cb" checked>
-          <input type="hidden" name="set_name_{{ loop.index0 }}"    value="{{ s.name }}">
-          <input type="hidden" name="set_members_{{ loop.index0 }}" value="{{ s.member_skus | join('|') }}">
+          <input type="checkbox" name="selected_sets" value="{{ item_set.name }}" class="set-cb" checked>
+          <input type="hidden" name="set_name_{{ loop.index0 }}"    value="{{ item_set.name }}">
+          <input type="hidden" name="set_members_{{ loop.index0 }}" value="{{ item_set.member_skus | join('|') }}">
         </td>
-        <td>{{ s.name }}</td>
+        <td>{{ item_set.name }}</td>
         <td>
-          <span class="muted small">{{ s.member_skus | length }} item(s):</span>
-          <span class="mono small">{{ s.member_skus | join(', ') }}</span>
+          <span class="muted small">{{ item_set.member_skus | length }} item(s):</span>
+          <span class="mono small">{{ item_set.member_skus | join(', ') }}</span>
         </td>
-        <td><a href="{{ s.url }}" target="_blank" class="ext-link">↗</a></td>
+        <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -95,18 +96,19 @@
 {% endif %}
 
 <script>
-document.querySelectorAll('.cat-select-all').forEach(function(tog) {
-  tog.addEventListener('change', function() {
-    const idx = this.dataset.cat;
-    document.querySelectorAll('input[name="selected_skus"]').forEach(function(cb) {
-      cb.checked = tog.checked;
+// "Select all" checkbox for each category — only toggles that category's item checkboxes
+document.querySelectorAll('.cat-select-all').forEach(function(categoryToggle) {
+  categoryToggle.addEventListener('change', function() {
+    const categoryIndex = this.dataset.cat;
+    document.querySelectorAll('.cat-cb[data-cat="' + categoryIndex + '"]').forEach(function(itemCheckbox) {
+      itemCheckbox.checked = categoryToggle.checked;
     });
   });
 });
-const setsAll = document.getElementById('sets-select-all');
-if (setsAll) {
-  setsAll.addEventListener('change', function() {
-    document.querySelectorAll('.set-cb').forEach(cb => cb.checked = setsAll.checked);
+const setsSelectAll = document.getElementById('sets-select-all');
+if (setsSelectAll) {
+  setsSelectAll.addEventListener('change', function() {
+    document.querySelectorAll('.set-cb').forEach(cb => cb.checked = setsSelectAll.checked);
   });
 }
 </script>
