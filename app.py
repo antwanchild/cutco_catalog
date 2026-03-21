@@ -353,7 +353,7 @@ def version():
 @app.route("/")
 def index():
     stats = dict(
-        items    = Item.query.count(),
+        item_count = Item.query.count(),
         unicorns = Item.query.filter_by(is_unicorn=True).count(),
         people   = Person.query.count(),
         owned    = Ownership.query.filter_by(status="Owned").count(),
