@@ -395,7 +395,7 @@ def catalog():
     return render_template("catalog.html", items=items, categories=categories,
                            q=search_query, cat_filter=cat_filter, unicorn_f=unicorn_f,
                            sort=sort, direction=direction,
-                           edge_types=EDGE_TYPES, is_admin=is_admin(),
+                           edge_types=EDGE_TYPES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
