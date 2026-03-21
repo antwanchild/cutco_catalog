@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from flask import (Flask, flash, jsonify, redirect, render_template,
                    request, Response, url_for)
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import selectinload
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -304,21 +305,21 @@ def scrape_catalog():
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
 
-            # Find the position of any bundle/gift section header so we can
-            # ignore product links that appear after it on the page.
+            # Walk the DOM in order, collecting product links and stopping
+            # once a bundle/gift section heading is encountered.
             _bundle_keywords = {"gift", "set", "additional", "bundle", "collection"}
-            _bundle_cutoff = None
-            for heading in soup.find_all(["h2", "h3", "h4"]):
-                if any(kw in heading.get_text(strip=True).lower() for kw in _bundle_keywords):
-                    _bundle_cutoff = heading
-                    logger.debug("Bundle section detected on %s: '%s'",
-                                 cat_url, heading.get_text(strip=True))
-                    break
+            product_links = []
+            for element in soup.descendants:
+                if element.name in ("h2", "h3", "h4"):
+                    if any(kw in element.get_text(strip=True).lower()
+                           for kw in _bundle_keywords):
+                        logger.debug("Bundle section detected on %s: '%s'",
+                                     cat_url, element.get_text(strip=True))
+                        break
+                if element.name == "a" and "/p/" in element.get("href", ""):
+                    product_links.append(element)
 
-            for a in soup.select("a[href*='/p/']"):
-                # Skip links that appear after the bundle/gift section heading
-                if _bundle_cutoff and _bundle_cutoff in a.find_all_previous():
-                    continue
+            for a in product_links:
                 href = a.get("href", "")
                 sku  = _extract_sku_from_href(href)
                 if not sku or sku in seen_skus:
@@ -521,7 +522,10 @@ def catalog():
         query = query.filter(Item.is_unicorn)
 
     col   = getattr(Item, sort, Item.name)
-    items = query.order_by(col.desc() if direction == "desc" else col).all()
+    items = (query
+             .options(selectinload(Item.variants), selectinload(Item.sets))
+             .order_by(col.desc() if direction == "desc" else col)
+             .all())
 
     categories = [r[0] for r in
                   db.session.query(Item.category)
