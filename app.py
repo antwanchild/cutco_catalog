@@ -226,10 +226,18 @@ def _extract_sku_from_href(href: str) -> str | None:
     Returns None if the URL is not a product link.
     """
     parts = href.rstrip("/").split("/")
-    candidate = parts[-1].split("?")[0].split("&")[0].upper()
-    if not candidate or len(candidate) > 12:
+    slug = parts[-1].split("?")[0].split("&")[0].upper()
+    if not slug:
         return None
-    if not any(c.isdigit() for c in candidate):
+    # If slug starts with digits, extract the leading numeric+letter portion.
+    # This handles "1720-PETITE-CHEF" → "1720" as well as "4135CSH" → "4135C".
+    lead = re.match(r'^(\d+[A-Z]{0,3})', slug)
+    if lead:
+        candidate = lead.group(1)
+    elif any(c.isdigit() for c in slug) and len(slug) <= 12:
+        # Short slug with embedded digits (e.g. "ABC1234")
+        candidate = slug
+    else:
         return None
     # Strip sheath suffix, then optional color letter, to get the base SKU
     if candidate.endswith("SH"):
@@ -336,9 +344,15 @@ def scrape_catalog():
                 if element.name == "a" and "/p/" in element.get("href", ""):
                     product_links.append(element)
 
+            logger.info("%s: found %d /p/ links — %s",
+                        cat_name, len(product_links),
+                        [a.get("href", "") for a in product_links[:10]])
+
             for a in product_links:
                 href = a.get("href", "")
                 sku  = _extract_sku_from_href(href)
+                if not sku:
+                    logger.debug("%s: no SKU extracted from href=%s", cat_name, href)
                 if not sku or sku in seen_skus:
                     continue
                 url = href if href.startswith("http") else f"https://www.cutco.com{href}"
