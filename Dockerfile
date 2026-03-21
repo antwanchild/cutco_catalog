@@ -23,9 +23,9 @@ RUN mkdir -p /data
 ENV FLASK_ENV=production
 ENV LOG_LEVEL=INFO
 
-EXPOSE 8090
+EXPOSE 8095
 
 HEALTHCHECK --interval=5m --timeout=15s --start-period=30s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')" || exit 1
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8095/health')" || exit 1
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8090", "--workers", "2", "--timeout", "60", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8095", "--workers", "2", "--timeout", "60", "app:app"]
