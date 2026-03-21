@@ -17,7 +17,10 @@ from flask_sqlalchemy import SQLAlchemy
 LOG_LEVEL   = os.environ.get("LOG_LEVEL", "INFO").upper()
 LOG_DIR     = os.environ.get("LOG_DIR", "/data/logs")
 _log_level  = getattr(logging, LOG_LEVEL, logging.INFO)
-_log_format = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+_log_format = logging.Formatter(
+    "[%(asctime)s] [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S %z",
+)
 
 # Console handler — always on
 _console_handler = logging.StreamHandler()
@@ -417,6 +420,7 @@ def catalog_add():
             if color != UNKNOWN_COLOR:
                 db.session.add(ItemVariant(item_id=item.id, color=color))
         db.session.commit()
+        logger.info("Item added: %s (SKU: %s)", item.name, item.sku or "none")
         flash(f'Added "{item.name}" to catalog.', "success")
         return redirect(url_for("catalog"))
 
@@ -444,6 +448,7 @@ def catalog_edit(iid):
         item.sets = Set.query.filter(Set.id.in_(selected_set_ids)).all()
 
         db.session.commit()
+        logger.info("Item updated: %s (SKU: %s)", item.name, item.sku or "none")
         flash(f'Updated "{item.name}".', "success")
         return redirect(url_for("catalog"))
 
@@ -459,6 +464,7 @@ def catalog_delete(iid):
     name = item.name
     db.session.delete(item)
     db.session.commit()
+    logger.info("Item deleted: %s", name)
     flash(f'Deleted "{name}".', "info")
     return redirect(url_for("catalog"))
 
@@ -483,6 +489,7 @@ def variant_add(iid):
     db.session.add(ItemVariant(item_id=iid, color=color,
                                notes=request.form.get("notes", "").strip() or None))
     db.session.commit()
+    logger.info("Variant added: %s → %s", item.name, color)
     flash(f'Added variant "{color}".', "success")
     return redirect(url_for("variants", iid=iid))
 
@@ -498,6 +505,7 @@ def variant_edit(vid):
     variant.color = color
     variant.notes = request.form.get("notes", "").strip() or None
     db.session.commit()
+    logger.info("Variant updated: item %d → %s", iid, color)
     flash(f'Updated to "{color}".', "success")
     return redirect(url_for("variants", iid=iid))
 
@@ -511,6 +519,7 @@ def variant_delete(vid):
     iid = variant.item_id
     db.session.delete(variant)
     db.session.commit()
+    logger.info("Variant deleted: item %d", iid)
     flash("Variant removed.", "info")
     return redirect(url_for("variants", iid=iid))
 
@@ -532,6 +541,7 @@ def set_add():
         item_set = Set(name=name, notes=request.form.get("notes", "").strip() or None)
         db.session.add(item_set)
         db.session.commit()
+        logger.info("Set created: %s", name)
         flash(f'Created set "{name}".', "success")
         return redirect(url_for("sets_list"))
     return render_template("set_form.html", set=None, action="Add")
@@ -544,6 +554,7 @@ def set_edit(sid):
         item_set.name  = request.form["name"].strip()
         item_set.notes = request.form.get("notes", "").strip() or None
         db.session.commit()
+        logger.info("Set updated: %s", item_set.name)
         flash(f'Updated set "{item_set.name}".', "success")
         return redirect(url_for("sets_list"))
     return render_template("set_form.html", set=item_set, action="Edit")
@@ -555,6 +566,7 @@ def set_delete(sid):
     name = item_set.name
     db.session.delete(item_set)
     db.session.commit()
+    logger.info("Set deleted: %s", name)
     flash(f'Deleted set "{name}".', "info")
     return redirect(url_for("sets_list"))
 
@@ -683,6 +695,7 @@ def people_add():
                         notes=request.form.get("notes", "").strip() or None)
         db.session.add(person)
         db.session.commit()
+        logger.info("Person added: %s", person.name)
         flash(f"Added {person.name}.", "success")
         return redirect(url_for("people"))
     return render_template("person_form.html", person=None, action="Add")
@@ -695,6 +708,7 @@ def people_edit(pid):
         person.name  = request.form["name"].strip()
         person.notes = request.form.get("notes", "").strip() or None
         db.session.commit()
+        logger.info("Person updated: %s", person.name)
         flash(f"Updated {person.name}.", "success")
         return redirect(url_for("people"))
     return render_template("person_form.html", person=person, action="Edit")
@@ -706,6 +720,7 @@ def people_delete(pid):
     name   = person.name
     db.session.delete(person)
     db.session.commit()
+    logger.info("Person deleted: %s", name)
     flash(f"Removed {name}.", "info")
     return redirect(url_for("people"))
 
@@ -759,6 +774,7 @@ def ownership_add():
             notes      = request.form.get("notes", "").strip() or None,
         ))
         db.session.commit()
+        logger.info("Ownership added: person %d, variant %d", pid, vid)
         flash("Entry logged.", "success")
         return redirect(url_for("person_collection", pid=pid))
 
@@ -782,6 +798,7 @@ def ownership_edit(oid):
         ownership.status = request.form.get("status", "Owned")
         ownership.notes  = request.form.get("notes", "").strip() or None
         db.session.commit()
+        logger.info("Ownership updated: id %d → %s", oid, ownership.status)
         flash("Updated.", "success")
         return redirect(url_for("person_collection", pid=ownership.person_id))
 
@@ -803,6 +820,7 @@ def ownership_delete(oid):
     pid       = ownership.person_id
     db.session.delete(ownership)
     db.session.commit()
+    logger.info("Ownership deleted: id %d", oid)
     flash("Entry removed.", "info")
     return redirect(url_for("person_collection", pid=pid))
 
@@ -863,6 +881,7 @@ def export_csv():
             .join(Person,      Ownership.person_id   == Person.id)
             .order_by(Person.name, Item.name, ItemVariant.color).all())
 
+    logger.info("CSV export requested: %d rows", len(rows))
     out    = io.StringIO()
     writer = csv.writer(out)
     writer.writerow(["person", "item_name", "sku", "category", "edge_type",
@@ -974,6 +993,7 @@ def import_page():
 
     person_override = request.form.get("person_override", "").strip() or None
     ext = f.filename.rsplit(".", 1)[-1].lower()
+    logger.info("Import file received: %s (person override: %s)", f.filename, person_override or "none")
 
     try:
         if ext == "xlsx":
@@ -1259,14 +1279,17 @@ def admin_login():
         if request.form.get("token") == ADMIN_TOKEN:
             resp = redirect(url_for("catalog"))
             resp.set_cookie("admin_token", ADMIN_TOKEN, httponly=True, samesite="Lax")
+            logger.info("Admin login successful")
             flash("Admin access granted.", "success")
             return resp
+        logger.warning("Admin login failed — wrong token")
         flash("Wrong token.", "error")
     return render_template("admin_login.html")
 
 
 @app.route("/admin/logout")
 def admin_logout():
+    logger.info("Admin logged out")
     resp = redirect(url_for("index"))
     resp.delete_cookie("admin_token")
     return resp
