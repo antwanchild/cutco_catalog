@@ -326,7 +326,7 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
             return None, None
         soup = BeautifulSoup(resp.text, "html.parser")
         sku = None
-        sku_text = soup.find(string=re.compile(r"#\d"))
+        sku_text = soup.find(string=re.compile(r"#\d{2,}"))
         if sku_text:
             m = re.search(r"#([0-9A-Z]+)", sku_text.strip(), re.IGNORECASE)
             if m:
@@ -442,7 +442,7 @@ def scrape_catalog():
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
             # SKU appears on the page as text like "#1778" or "Model #1778"
-            sku_el = soup.find(string=re.compile(r"#\d"))
+            sku_el = soup.find(string=re.compile(r"#\d{2,}"))
             if not sku_el:
                 logger.warning("Could not find SKU on individual product page: %s", prod_url)
                 continue
