@@ -1321,7 +1321,10 @@ def import_page():
         elif name.lower() in existing_names:
             matched_item = existing_names[name.lower()]
 
-        dedup_key = (sku or name.lower())
+        # Dedup by (sku, color) so the same item with different handle colors
+        # each get their own row in the preview.  The commit creates the item
+        # once (first row) and adds variants for subsequent rows.
+        dedup_key = (sku or name.lower(), color.lower())
 
         if matched_item:
             already_in_catalog.append({"item": matched_item, "row": row,
