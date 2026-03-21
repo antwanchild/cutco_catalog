@@ -105,11 +105,31 @@
 </div>
 
 <script>
-document.getElementById('sync-btn').addEventListener('click', function() {
+document.getElementById('sync-btn').addEventListener('click', function(e) {
+  e.preventDefault();
+  const url = this.href;
+
+  // Disable button and show overlay while scrape runs
   this.textContent = 'Syncing…';
   this.classList.add('btn-disabled');
   this.style.pointerEvents = 'none';
   document.getElementById('sync-overlay').style.display = 'flex';
+
+  // Fetch the sync result in the background, then swap the page content in
+  fetch(url)
+    .then(res => {
+      history.pushState({}, '', res.url);
+      return res.text();
+    })
+    .then(html => {
+      document.open();
+      document.write(html);
+      document.close();
+    })
+    .catch(() => {
+      // Fall back to normal navigation if fetch fails
+      window.location.href = url;
+    });
 });
 </script>
 {% endblock %}
