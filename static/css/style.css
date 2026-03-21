@@ -196,7 +196,7 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .badge-sold     { background: #2a2020; color: #c08080; }
 .badge-traded   { background: #2a2510; color: #d0c060; }
 .badge-unicorn  { background: transparent; font-size: .85rem; }
-.badge-offcatalog{ background: transparent; font-size: .85rem; }
+.badge-off-catalog { background: transparent; font-size: .85rem; }
 .badge-new      { background: var(--success); color: #fff; }
 .chip {
   display: inline-block;
@@ -405,7 +405,7 @@ textarea { resize: vertical; }
 .hidden { display: none !important; }
 
 /* ── Sync preview ───────────────────────────────────────────────────────── */
-.sync-cat-header {
+.sync-category-header {
   display: flex;
   align-items: center;
   gap: .75rem;
@@ -416,4 +416,4 @@ textarea { resize: vertical; }
   text-transform: uppercase;
   letter-spacing: .04em;
 }
-.sync-toggle { font-size: .78rem; font-weight: 400; text-transform: none; }
+.sync-category-toggle { font-size: .78rem; font-weight: 400; text-transform: none; }

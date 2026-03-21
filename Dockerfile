@@ -10,7 +10,7 @@ LABEL org.opencontainers.image.version="${APP_VERSION}"
 ENV APP_VERSION=${APP_VERSION}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libxml2 libxslt1.1 && \
+    libxml2 libxslt1.1 gosu && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -23,9 +23,24 @@ RUN mkdir -p /data
 ENV FLASK_ENV=production
 ENV LOG_LEVEL=INFO
 
+# PUID/PGID let the container run as the host user so /data volume files
+# are owned correctly.  Defaults to root (0) if not set.
+ENV PUID=0
+ENV PGID=0
+
 EXPOSE 8095
 
 HEALTHCHECK --interval=5m --timeout=15s --start-period=30s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8095/health')" || exit 1
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8095", "--workers", "2", "--timeout", "60", "app:app"]
+# Create the app user with the requested UID/GID at container start, then
+# hand off to gunicorn running as that user.
+CMD ["sh", "-c", \
+  "if [ \"$PUID\" != \"0\" ]; then \
+     groupadd -g $PGID appgroup 2>/dev/null || true; \
+     useradd -u $PUID -g $PGID -M -s /sbin/nologin appuser 2>/dev/null || true; \
+     chown -R $PUID:$PGID /data /app; \
+     exec gosu appuser gunicorn --bind 0.0.0.0:8095 --workers 2 --timeout 60 app:app; \
+   else \
+     exec gunicorn --bind 0.0.0.0:8095 --workers 2 --timeout 60 app:app; \
+   fi"]

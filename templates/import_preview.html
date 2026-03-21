@@ -80,7 +80,7 @@
         <td>
           <select name="item_status_{{ loop.index0 }}" class="select-xs">
             {% for status_option in status_options %}
-              <option value="{{ s }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
+              <option value="{{ status_option }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
             {% endfor %}
           </select>
         </td>
@@ -151,7 +151,7 @@
         <td>
           <select name="item_status_{{ idx }}" class="select-xs">
             {% for status_option in status_options %}
-              <option value="{{ s }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
+              <option value="{{ status_option }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
             {% endfor %}
           </select>
         </td>
