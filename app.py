@@ -628,9 +628,12 @@ def catalog_sync_confirm():
     db.session.commit()
 
     parts = []
-    if added_items: parts.append(f"{added_items} item{'s' if added_items != 1 else ''}")
-    if added_sets:  parts.append(f"{added_sets} set{'s' if added_sets != 1 else ''}")
-    if linked_items: parts.append(f"{linked_items} set membership{'s' if linked_items != 1 else ''}")
+    if added_items:
+        parts.append(f"{added_items} item{'s' if added_items != 1 else ''}")
+    if added_sets:
+        parts.append(f"{added_sets} set{'s' if added_sets != 1 else ''}")
+    if linked_items:
+        parts.append(f"{linked_items} set membership{'s' if linked_items != 1 else ''}")
     flash("Sync complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
     return redirect(url_for("catalog"))
 
