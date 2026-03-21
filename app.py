@@ -3,6 +3,7 @@ import io
 import logging
 import os
 import time
+from logging.handlers import RotatingFileHandler
 
 import openpyxl
 import requests
@@ -13,10 +14,32 @@ from flask_sqlalchemy import SQLAlchemy
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
-LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO),
-                    format="%(asctime)s [%(levelname)s] %(message)s")
+LOG_LEVEL   = os.environ.get("LOG_LEVEL", "INFO").upper()
+LOG_DIR     = os.environ.get("LOG_DIR", "/data/logs")
+_log_level  = getattr(logging, LOG_LEVEL, logging.INFO)
+_log_format = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+
+# Console handler — always on
+_console_handler = logging.StreamHandler()
+_console_handler.setFormatter(_log_format)
+
+logging.basicConfig(level=_log_level, handlers=[_console_handler])
 logger = logging.getLogger(__name__)
+
+# Rotating file handler — writes to /data/logs/cutco.log
+# 5 MB per file, keep 5 rotated files (25 MB max)
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    _file_handler = RotatingFileHandler(
+        os.path.join(LOG_DIR, "cutco.log"),
+        maxBytes=5 * 1024 * 1024,
+        backupCount=5,
+    )
+    _file_handler.setFormatter(_log_format)
+    logging.getLogger().addHandler(_file_handler)
+    logger.info("File logging active: %s", LOG_DIR)
+except OSError as exc:
+    logger.warning("Could not set up file logging (%s) — console only", exc)
 
 # ── App / DB ──────────────────────────────────────────────────────────────────
 

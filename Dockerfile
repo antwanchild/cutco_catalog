@@ -10,7 +10,7 @@ LABEL org.opencontainers.image.version="${APP_VERSION}"
 ENV APP_VERSION=${APP_VERSION}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libxml2 libxslt1.1 gosu && \
+    libxml2 libxslt1.1 gosu tzdata && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -22,6 +22,7 @@ RUN mkdir -p /data
 
 ENV FLASK_ENV=production
 ENV LOG_LEVEL=INFO
+ENV TZ=UTC
 
 # PUID/PGID let the container run as the host user so /data volume files
 # are owned correctly.  Defaults to root (0) if not set.
