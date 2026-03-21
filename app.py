@@ -315,27 +315,52 @@ def _build_category_list() -> list[tuple[str, str]]:
 
 
 def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
-    """Fetch a product page and return (sku, name) from on-page text.
+    """Fetch a product page and return (sku, name) from on-page content.
 
     Used for pure-slug URLs like /p/fishermans-solution where no numeric SKU
-    appears in the URL itself.  SKU is identified by on-page text like "#1778".
+    appears in the URL itself.  Tries several extraction strategies in order:
+      1. Meta tag (product:retailer_item_id or similar)
+      2. On-page text matching "#XXXX" or "Model #XXXX"
+      3. Broader keyword context (Model/Item/SKU followed by a number)
     """
     try:
         resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         if resp.status_code != 200:
+            logger.info("SKU fetch: HTTP %d for %s", resp.status_code, url)
             return None, None
         soup = BeautifulSoup(resp.text, "html.parser")
         sku = None
-        sku_text = soup.find(string=re.compile(r"#\d{2,}"))
-        if sku_text:
-            m = re.search(r"#([0-9A-Z]+)", sku_text.strip(), re.IGNORECASE)
+
+        # Strategy 1: meta tags (Open Graph / Schema product SKU)
+        for attr in ("product:retailer_item_id", "product:sku"):
+            tag = soup.find("meta", property=attr) or soup.find("meta", attrs={"name": attr})
+            if tag and tag.get("content", "").strip():
+                sku = tag["content"].strip().upper()
+                break
+
+        # Strategy 2: on-page text containing "#XXXX"
+        if not sku:
+            sku_text = soup.find(string=re.compile(r"#\d{2,}"))
+            if sku_text:
+                m = re.search(r"#([0-9A-Z]{2,})", sku_text.strip(), re.IGNORECASE)
+                if m:
+                    sku = m.group(1).upper()
+
+        # Strategy 3: keyword context — "Model 1769", "Item No. 1769", etc.
+        if not sku:
+            page_text = soup.get_text(" ", strip=True)
+            m = re.search(
+                r"(?:model|item|sku|product)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{2,}[A-Z]{0,3})\b",
+                page_text, re.IGNORECASE)
             if m:
                 sku = m.group(1).upper()
+
         h1 = soup.find("h1")
         name = h1.get_text(strip=True) if h1 else None
+        logger.info("SKU fetch: %s → sku=%s name=%s", url, sku, name)
         return sku, name
     except Exception as exc:
-        logger.debug("Could not fetch product page %s: %s", url, exc)
+        logger.info("SKU fetch failed: %s — %s", url, exc)
         return None, None
 
 
@@ -417,6 +442,7 @@ def scrape_catalog():
     # Using a thread pool avoids serialising hundreds of HTTP round-trips.
     if slug_queue:
         logger.info("Fetching %d pure-slug product pages (parallel)", len(slug_queue))
+        added_from_slugs = 0
         with ThreadPoolExecutor(max_workers=6) as pool:
             future_map = {
                 pool.submit(_fetch_sku_from_page, prod_url): (prod_url, cat_name, cat_name_hint)
@@ -430,6 +456,8 @@ def scrape_catalog():
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
+                added_from_slugs += 1
+        logger.info("Slug queue: %d pages fetched, %d items added", len(slug_queue), added_from_slugs)
 
     # Individual product pages not listed under any category.
     # SKU is extracted from the page content (e.g. "#1778" text) since
