@@ -192,14 +192,30 @@ def is_admin():
 
 
 def _extract_sku_from_href(href: str) -> str | None:
-    """Pull a numeric SKU from a /p/ URL. Returns None if not a product link."""
+    """Pull a base SKU from a /p/ product URL.
+
+    Strips accessory and color suffixes so that bundle SKUs (e.g. 4135CSH —
+    the 4-inch vegetable knife with sheath) resolve to the base item SKU
+    (4135) rather than being treated as a separate catalog entry.
+
+    Suffix stripping order:
+      1. Remove trailing 'SH' (sheath bundle indicator)
+      2. Remove trailing color letter (C / W / R / B)
+
+    Returns None if the URL is not a product link.
+    """
     parts = href.rstrip("/").split("/")
-    candidate = parts[-1].split("?")[0].split("&")[0]
+    candidate = parts[-1].split("?")[0].split("&")[0].upper()
     if not candidate or len(candidate) > 12:
         return None
     if not any(c.isdigit() for c in candidate):
         return None
-    return candidate.upper()
+    # Strip sheath suffix, then optional color letter, to get the base SKU
+    if candidate.endswith("SH"):
+        candidate = candidate[:-2]
+    if candidate and candidate[-1] in "CWRB" and len(candidate) > 2:
+        candidate = candidate[:-1]
+    return candidate or None
 
 
 def scrape_catalog():
