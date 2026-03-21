@@ -348,22 +348,53 @@ def scrape_catalog():
                         cat_name, len(product_links),
                         [a.get("href", "") for a in product_links[:10]])
 
+            # Deduplicate: strip &view=product variants so each product is
+            # visited at most once.
+            seen_hrefs: set[str] = set()
+            unique_links = []
             for a in product_links:
-                href = a.get("href", "")
-                sku  = _extract_sku_from_href(href)
-                if not sku:
-                    logger.debug("%s: no SKU extracted from href=%s", cat_name, href)
-                if not sku or sku in seen_skus:
-                    continue
-                url = href if href.startswith("http") else f"https://www.cutco.com{href}"
+                base_href = a.get("href", "").split("&")[0]
+                if base_href not in seen_hrefs:
+                    seen_hrefs.add(base_href)
+                    unique_links.append((a, base_href))
+
+            for a, href in unique_links:
+                sku = _extract_sku_from_href(href)
+                prod_url = href if href.startswith("http") else f"https://www.cutco.com{href}"
+
+                # Try to grab the name from the link element on the category page
                 name_el = a.find(["h2", "h3"])
                 if not name_el and a.parent:
                     name_el = a.parent.find(["h2", "h3"])
                 name = name_el.get_text(strip=True) if name_el else None
+
+                if not sku:
+                    # Pure-slug URL (e.g. /p/fishermans-solution) — fetch the
+                    # product page to extract the SKU from on-page text like "#1778".
+                    try:
+                        prod_resp = requests.get(
+                            prod_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+                        if prod_resp.status_code == 200:
+                            prod_soup = BeautifulSoup(prod_resp.text, "html.parser")
+                            sku_text = prod_soup.find(string=re.compile(r"#\d"))
+                            if sku_text:
+                                sku_match = re.search(
+                                    r"#([0-9A-Z]+)", sku_text.strip(), re.IGNORECASE)
+                                if sku_match:
+                                    sku = sku_match.group(1).upper()
+                            if not name:
+                                h1 = prod_soup.find("h1")
+                                name = h1.get_text(strip=True) if h1 else None
+                        time.sleep(0.3)
+                    except Exception as exc:
+                        logger.debug("Could not fetch product page %s: %s", prod_url, exc)
+
+                if not sku or sku in seen_skus:
+                    continue
                 if not name:
                     continue
                 seen_skus.add(sku)
-                results.append(dict(name=name, sku=sku, category=cat_name, url=url))
+                results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
             time.sleep(0.4)
         except Exception as exc:
             logger.warning("Scrape failed for %s: %s", cat_url, exc)
