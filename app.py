@@ -303,7 +303,22 @@ def scrape_catalog():
             resp = requests.get(cat_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
+
+            # Find the position of any bundle/gift section header so we can
+            # ignore product links that appear after it on the page.
+            _bundle_keywords = {"gift", "set", "additional", "bundle", "collection"}
+            _bundle_cutoff = None
+            for heading in soup.find_all(["h2", "h3", "h4"]):
+                if any(kw in heading.get_text(strip=True).lower() for kw in _bundle_keywords):
+                    _bundle_cutoff = heading
+                    logger.debug("Bundle section detected on %s: '%s'",
+                                 cat_url, heading.get_text(strip=True))
+                    break
+
             for a in soup.select("a[href*='/p/']"):
+                # Skip links that appear after the bundle/gift section heading
+                if _bundle_cutoff and _bundle_cutoff in a.find_all_previous():
+                    continue
                 href = a.get("href", "")
                 sku  = _extract_sku_from_href(href)
                 if not sku or sku in seen_skus:
