@@ -1,8 +1,3 @@
-"""Cutco Catalog — Flask web application for tracking Cutco knife collections.
-
-Provides catalog browsing, collector management, ownership tracking, spreadsheet
-import/export, and an optional admin mode for catalog sync from cutco.com.
-"""
 import csv
 import io
 import logging
@@ -36,8 +31,6 @@ db = SQLAlchemy(app)
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 EDGE_TYPES = ["Straight", "Double-D", "Serrated", "Micro-D", "Tec Edge", "Unknown"]
-# Lookup map for case-insensitive normalization of imported edge type values
-EDGE_TYPE_LOOKUP = {et.lower(): et for et in EDGE_TYPES}
 STATUS_OPTIONS = ["Owned", "Wishlist", "Sold", "Traded"]
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "admin")
 UNKNOWN_COLOR = "Unknown / Unspecified"
@@ -50,11 +43,16 @@ SCRAPE_CATEGORIES = [
     ("Paring Knives",   "https://www.cutco.com/shop/paring-knives"),
     ("Outdoor Knives",  "https://www.cutco.com/shop/outdoor-knives"),
     ("Everyday Knives", "https://www.cutco.com/shop/everyday-knives"),
+    ("Accessories",     "https://www.cutco.com/shop/cooks-tools"),
+    ("Tableware",       "https://www.cutco.com/shop/tableware"),
 ]
-SCRAPE_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; CutcoVaultBot/1.0)"}
+SCRAPE_SETS_URL = "https://www.cutco.com/shop/knife-sets"
+SCRAPE_HEADERS  = {"User-Agent": "Mozilla/5.0 (compatible; CutcoVaultBot/1.0)"}
 
-SYNC_BLOCKED_CATEGORIES = {c.strip() for c in os.environ.get(
-    "SYNC_BLOCKED_CATEGORIES", "Knife Sets,Accessories,Tableware").split(",") if c.strip()}
+# Default: nothing blocked — all categories shown in preview before import.
+# Override via env: SYNC_BLOCKED_CATEGORIES="Tableware,Accessories"
+_blocked_env = os.environ.get("SYNC_BLOCKED_CATEGORIES", "")
+SYNC_BLOCKED_CATEGORIES = {c.strip() for c in _blocked_env.split(",") if c.strip()}
 
 # Set column names as they appear in the spreadsheet
 SPREADSHEET_SET_COLUMNS = [
@@ -143,11 +141,6 @@ class Ownership(db.Model):
 # ── DB init ───────────────────────────────────────────────────────────────────
 
 def ensure_unknown_variant(item):
-    """Guarantee every Item has at least one 'Unknown / Unspecified' variant.
-
-    Called after creating a new item so that ownership can always be recorded
-    even when the exact handle color is not known.
-    """
     if not any(v.color == UNKNOWN_COLOR for v in item.variants):
         db.session.add(ItemVariant(item_id=item.id, color=UNKNOWN_COLOR))
         db.session.flush()
@@ -162,51 +155,36 @@ with app.app_context():
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def normalize_text(value: str) -> str:
-    """Strip whitespace and apply title case for consistent storage.
-
-    Applied to item names, variant colors, person names, categories, and set
-    names so that entries from different sources (manual form, CSV, XLSX) are
-    stored with uniform casing and can be compared reliably.
-
-    Examples:
-        "classic brown"  → "Classic Brown"
-        "PEARL WHITE"    → "Pearl White"
-        "super shears"   → "Super Shears"
-    """
-    return value.strip().title() if value and value.strip() else ""
-
-
 def is_admin():
-    """Return True if the current request carries a valid admin cookie."""
     return request.cookies.get("admin_token") == ADMIN_TOKEN
 
 
-def scrape_catalog():
-    """Scrape CUTCO's public shop pages and return a list of product dicts.
+def _extract_sku_from_href(href: str) -> str | None:
+    """Pull a numeric SKU from a /p/ URL. Returns None if not a product link."""
+    parts = href.rstrip("/").split("/")
+    candidate = parts[-1].split("?")[0].split("&")[0]
+    if not candidate or len(candidate) > 12:
+        return None
+    if not any(c.isdigit() for c in candidate):
+        return None
+    return candidate.upper()
 
-    Each dict contains keys: name, sku, category, url.
-    SKUs are extracted from the product page URL path (e.g. /p/1720) and
-    must contain at least one digit to filter out non-product slugs.
-    Categories in SYNC_BLOCKED_CATEGORIES are excluded by the caller.
-    """
-    results = []
+
+def scrape_catalog():
+    """Scrape all item categories and return a list of item dicts."""
+    results  = []
     seen_skus = set()
     for cat_name, cat_url in SCRAPE_CATEGORIES:
+        if cat_name in SYNC_BLOCKED_CATEGORIES:
+            continue
         try:
             resp = requests.get(cat_url, headers=SCRAPE_HEADERS, timeout=12)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
             for a in soup.select("a[href*='/p/']"):
                 href = a.get("href", "")
-                parts = href.rstrip("/").split("/")
-                candidate = parts[-1].split("?")[0].split("&")[0]
-                if not candidate or len(candidate) > 10:
-                    continue
-                if not any(c.isdigit() for c in candidate):
-                    continue
-                sku = candidate.upper()
-                if sku in seen_skus:
+                sku  = _extract_sku_from_href(href)
+                if not sku or sku in seen_skus:
                     continue
                 url = href if href.startswith("http") else f"https://www.cutco.com{href}"
                 name_el = a.find(["h2", "h3"])
@@ -223,14 +201,98 @@ def scrape_catalog():
     return results
 
 
+def scrape_sets() -> list[dict]:
+    """
+    Scrape the sets listing page, then visit each set detail page to extract
+    member item SKUs from the Set Pieces section image URLs.
+
+    Returns a list of dicts:
+      { name, sku, url, member_skus: [str, ...] }
+    """
+    import re
+    results = []
+    seen_set_skus = set()
+
+    try:
+        resp = requests.get(SCRAPE_SETS_URL, headers=SCRAPE_HEADERS, timeout=12)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        set_links = []
+        for a in soup.select("a[href*='/p/']"):
+            href = a.get("href", "")
+            # Set URLs use slug-style paths like /p/ultimate-set, not numeric SKUs
+            if not href:
+                continue
+            name_el = a.find(["h2", "h3"])
+            if not name_el and a.parent:
+                name_el = a.parent.find(["h2", "h3"])
+            name = name_el.get_text(strip=True) if name_el else None
+            if not name:
+                continue
+            url = href if href.startswith("http") else f"https://www.cutco.com{href}"
+            # Dedupe by URL slug
+            slug = href.rstrip("/").split("/")[-1].split("&")[0]
+            if slug not in seen_set_skus:
+                seen_set_skus.add(slug)
+                set_links.append(dict(name=name, slug=slug, url=url))
+    except Exception as exc:
+        logger.warning("Scrape failed for sets listing: %s", exc)
+        return results
+
+    # Visit each set detail page and extract member SKUs
+    # Image URLs look like: /products/rolo/1720C-h.jpg — SKU is the numeric prefix
+    sku_pattern = re.compile(r"/rolo/([0-9]+[A-Z]?)-h\.", re.IGNORECASE)
+
+    for s in set_links:
+        time.sleep(0.4)
+        try:
+            resp = requests.get(s["url"], headers=SCRAPE_HEADERS, timeout=12)
+            resp.raise_for_status()
+            detail = BeautifulSoup(resp.text, "html.parser")
+
+            # Get set SKU from the page (e.g. #1813C)
+            set_sku = None
+            sku_el = detail.find(string=re.compile(r"^#\d"))
+            if sku_el:
+                set_sku = sku_el.strip().lstrip("#").upper()
+
+            # Extract member SKUs from rolo image URLs, strip color suffix
+            member_skus = []
+            seen_member = set()
+            for img in detail.select("img[src*='/rolo/']"):
+                src = img.get("src", "")
+                m = sku_pattern.search(src)
+                if m:
+                    raw = m.group(1).upper()
+                    # Strip trailing color letter (C, W, R, etc.) to get base SKU
+                    base_sku = raw.rstrip("CWRB") if len(raw) > 2 else raw
+                    if base_sku not in seen_member:
+                        seen_member.add(base_sku)
+                        member_skus.append(base_sku)
+
+            results.append(dict(
+                name=s["name"],
+                sku=set_sku or s["slug"].upper(),
+                url=s["url"],
+                member_skus=member_skus,
+            ))
+            logger.debug("Set '%s': %d members", s["name"], len(member_skus))
+
+        except Exception as exc:
+            logger.warning("Scrape failed for set %s: %s", s["url"], exc)
+
+    logger.info("Sets scraped: %d", len(results))
+    return results
+
+
 def get_or_create_set(name: str) -> "Set":
-    """Return existing Set by name (case-insensitive) or create a new one."""
-    existing_set = Set.query.filter(db.func.lower(Set.name) == name.lower()).first()
-    if not existing_set:
-        existing_set = Set(name=name)
-        db.session.add(existing_set)
+    """Return existing Set by name or create a new one."""
+    s = Set.query.filter(db.func.lower(Set.name) == name.lower()).first()
+    if not s:
+        s = Set(name=name)
+        db.session.add(s)
         db.session.flush()
-    return existing_set
+    return s
 
 # ── Template context ──────────────────────────────────────────────────────────
 
@@ -238,11 +300,16 @@ def get_or_create_set(name: str) -> "Set":
 def inject_globals():
     return dict(app_version=APP_VERSION, is_admin=is_admin)
 
-# ── Version ───────────────────────────────────────────────────────────────────
+# ── Health & Version ──────────────────────────────────────────────────────────
 
 @app.route("/health")
 def health():
-    return jsonify(status="ok")
+    try:
+        db.session.execute(db.text("SELECT 1"))
+        return jsonify(status="ok", version=APP_VERSION), 200
+    except Exception as exc:
+        logger.error("Health check failed: %s", exc)
+        return jsonify(status="error", detail=str(exc)), 500
 
 
 @app.route("/version")
@@ -270,23 +337,23 @@ def index():
 
 @app.route("/catalog")
 def catalog():
-    search_query   = request.args.get("q", "").strip()
-    cat_filter     = request.args.get("category", "")
-    unicorn_filter = request.args.get("unicorn", "")
-    sort_field     = request.args.get("sort", "name")
-    direction      = request.args.get("dir", "asc")
+    q          = request.args.get("q", "").strip()
+    cat_filter = request.args.get("category", "")
+    unicorn_f  = request.args.get("unicorn", "")
+    sort       = request.args.get("sort", "name")
+    direction  = request.args.get("dir", "asc")
 
     query = Item.query
-    if search_query:
+    if q:
         query = query.filter(
-            db.or_(Item.name.ilike(f"%{search_query}%"), Item.sku.ilike(f"%{search_query}%")))
+            db.or_(Item.name.ilike(f"%{q}%"), Item.sku.ilike(f"%{q}%")))
     if cat_filter:
         query = query.filter(Item.category == cat_filter)
-    if unicorn_filter == "1":
+    if unicorn_f == "1":
         query = query.filter(Item.is_unicorn)
 
-    sort_column = getattr(Item, sort_field, Item.name)
-    items = query.order_by(sort_column.desc() if direction == "desc" else sort_column).all()
+    col   = getattr(Item, sort, Item.name)
+    items = query.order_by(col.desc() if direction == "desc" else col).all()
 
     categories = [r[0] for r in
                   db.session.query(Item.category)
@@ -294,8 +361,8 @@ def catalog():
                   .distinct().order_by(Item.category).all()]
 
     return render_template("catalog.html", items=items, categories=categories,
-                           q=search_query, cat_filter=cat_filter, unicorn_f=unicorn_filter,
-                           sort=sort_field, direction=direction,
+                           q=q, cat_filter=cat_filter, unicorn_f=unicorn_f,
+                           sort=sort, direction=direction,
                            edge_types=EDGE_TYPES, is_admin=is_admin(),
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
@@ -304,9 +371,9 @@ def catalog():
 def catalog_add():
     if request.method == "POST":
         item = Item(
-            name       = normalize_text(request.form["name"]),
+            name       = request.form["name"].strip(),
             sku        = request.form.get("sku", "").strip().upper() or None,
-            category   = normalize_text(request.form.get("category", "")) or None,
+            category   = request.form.get("category", "").strip() or None,
             edge_type  = request.form.get("edge_type", "Unknown"),
             is_unicorn = request.form.get("is_unicorn") == "on",
             in_catalog = request.form.get("in_catalog") == "on",
@@ -316,7 +383,7 @@ def catalog_add():
         db.session.add(item)
         db.session.flush()
         ensure_unknown_variant(item)
-        colors = [normalize_text(c) for c in request.form.get("colors", "").split(",") if c.strip()]
+        colors = [c.strip() for c in request.form.get("colors", "").split(",") if c.strip()]
         for color in colors:
             if color != UNKNOWN_COLOR:
                 db.session.add(ItemVariant(item_id=item.id, color=color))
@@ -334,9 +401,9 @@ def catalog_add():
 def catalog_edit(iid):
     item = Item.query.get_or_404(iid)
     if request.method == "POST":
-        item.name       = normalize_text(request.form["name"])
+        item.name       = request.form["name"].strip()
         item.sku        = request.form.get("sku", "").strip().upper() or None
-        item.category   = normalize_text(request.form.get("category", "")) or None
+        item.category   = request.form.get("category", "").strip() or None
         item.edge_type  = request.form.get("edge_type", "Unknown")
         item.is_unicorn = request.form.get("is_unicorn") == "on"
         item.in_catalog = request.form.get("in_catalog") == "on"
@@ -377,7 +444,7 @@ def variants(iid):
 @app.route("/catalog/<int:iid>/variants/add", methods=["POST"])
 def variant_add(iid):
     item = Item.query.get_or_404(iid)
-    color = normalize_text(request.form.get("color", ""))
+    color = request.form.get("color", "").strip()
     if not color:
         flash("Color is required.", "error")
         return redirect(url_for("variants", iid=iid))
@@ -393,14 +460,14 @@ def variant_add(iid):
 
 @app.route("/variants/<int:vid>/edit", methods=["POST"])
 def variant_edit(vid):
-    variant = ItemVariant.query.get_or_404(vid)
-    iid = variant.item_id
-    color = normalize_text(request.form.get("color", ""))
+    v   = ItemVariant.query.get_or_404(vid)
+    iid = v.item_id
+    color = request.form.get("color", "").strip()
     if not color:
         flash("Color cannot be empty.", "error")
         return redirect(url_for("variants", iid=iid))
-    variant.color = color
-    variant.notes = request.form.get("notes", "").strip() or None
+    v.color = color
+    v.notes = request.form.get("notes", "").strip() or None
     db.session.commit()
     flash(f'Updated to "{color}".', "success")
     return redirect(url_for("variants", iid=iid))
@@ -408,12 +475,12 @@ def variant_edit(vid):
 
 @app.route("/variants/<int:vid>/delete", methods=["POST"])
 def variant_delete(vid):
-    variant = ItemVariant.query.get_or_404(vid)
-    if len(variant.item.variants) == 1:
+    v = ItemVariant.query.get_or_404(vid)
+    if len(v.item.variants) == 1:
         flash("Cannot delete the only variant. Add another first.", "error")
-        return redirect(url_for("variants", iid=variant.item_id))
-    iid = variant.item_id
-    db.session.delete(variant)
+        return redirect(url_for("variants", iid=v.item_id))
+    iid = v.item_id
+    db.session.delete(v)
     db.session.commit()
     flash("Variant removed.", "info")
     return redirect(url_for("variants", iid=iid))
@@ -429,12 +496,12 @@ def sets_list():
 @app.route("/sets/add", methods=["GET", "POST"])
 def set_add():
     if request.method == "POST":
-        name = normalize_text(request.form["name"])
+        name = request.form["name"].strip()
         if Set.query.filter(db.func.lower(Set.name) == name.lower()).first():
             flash(f'Set "{name}" already exists.', "error")
             return redirect(url_for("set_add"))
-        new_set = Set(name=name, notes=request.form.get("notes", "").strip() or None)
-        db.session.add(new_set)
+        s = Set(name=name, notes=request.form.get("notes", "").strip() or None)
+        db.session.add(s)
         db.session.commit()
         flash(f'Created set "{name}".', "success")
         return redirect(url_for("sets_list"))
@@ -443,21 +510,21 @@ def set_add():
 
 @app.route("/sets/<int:sid>/edit", methods=["GET", "POST"])
 def set_edit(sid):
-    item_set = Set.query.get_or_404(sid)
+    s = Set.query.get_or_404(sid)
     if request.method == "POST":
-        item_set.name  = normalize_text(request.form["name"])
-        item_set.notes = request.form.get("notes", "").strip() or None
+        s.name  = request.form["name"].strip()
+        s.notes = request.form.get("notes", "").strip() or None
         db.session.commit()
-        flash(f'Updated set "{item_set.name}".', "success")
+        flash(f'Updated set "{s.name}".', "success")
         return redirect(url_for("sets_list"))
-    return render_template("set_form.html", set=item_set, action="Edit")
+    return render_template("set_form.html", set=s, action="Edit")
 
 
 @app.route("/sets/<int:sid>/delete", methods=["POST"])
 def set_delete(sid):
-    item_set = Set.query.get_or_404(sid)
-    name = item_set.name
-    db.session.delete(item_set)
+    s = Set.query.get_or_404(sid)
+    name = s.name
+    db.session.delete(s)
     db.session.commit()
     flash(f'Deleted set "{name}".', "info")
     return redirect(url_for("sets_list"))
@@ -465,8 +532,8 @@ def set_delete(sid):
 
 @app.route("/sets/<int:sid>")
 def set_detail(sid):
-    item_set = Set.query.get_or_404(sid)
-    return render_template("set_detail.html", set=item_set, UNKNOWN_COLOR=UNKNOWN_COLOR)
+    s = Set.query.get_or_404(sid)
+    return render_template("set_detail.html", set=s, UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 # ── Catalog Sync ──────────────────────────────────────────────────────────────
 
@@ -478,21 +545,27 @@ def catalog_sync():
 
     scraped = scrape_catalog()
     existing_skus = {k.sku for k in Item.query.filter(Item.sku.isnot(None)).all()}
-    allowed   = [i for i in scraped if i["category"] not in SYNC_BLOCKED_CATEGORIES]
-    new_items = [i for i in allowed if i["sku"] not in existing_skus]
+    new_items = [i for i in scraped if i["sku"] not in existing_skus]
 
     from collections import OrderedDict
     grouped = OrderedDict()
     for item in new_items:
         grouped.setdefault(item["category"], []).append(item)
 
-    logger.info("Sync: %d scraped, %d blocked, %d new",
-                len(scraped), len(scraped) - len(allowed), len(new_items))
+    # Also scrape sets for preview
+    scraped_sets  = scrape_sets()
+    existing_sets = {s.name.lower() for s in Set.query.all()}
+    new_sets      = [s for s in scraped_sets if s["name"].lower() not in existing_sets]
+
+    logger.info("Sync: %d items scraped, %d new; %d sets scraped, %d new",
+                len(scraped), len(new_items), len(scraped_sets), len(new_sets))
 
     return render_template("sync_preview.html",
                            grouped=grouped,
                            new_items=new_items,
                            scraped_total=len(scraped),
+                           new_sets=new_sets,
+                           scraped_sets_total=len(scraped_sets),
                            blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES))
 
 
@@ -502,29 +575,63 @@ def catalog_sync_confirm():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog"))
 
+    # ── Items ──────────────────────────────────────────────────────────────
     selected = set(request.form.getlist("selected_skus"))
-    items = {}
+    item_data = {}
     for key, val in request.form.items():
         for prefix in ("name_", "category_", "url_"):
             if key.startswith(prefix):
                 sku = key[len(prefix):]
-                items.setdefault(sku, {})[prefix.rstrip("_")] = val
+                item_data.setdefault(sku, {})[prefix.rstrip("_")] = val
 
-    added = 0
+    added_items = 0
     for sku in selected:
         if Item.query.filter_by(sku=sku).first():
             continue
-        data = items.get(sku, {})
+        data = item_data.get(sku, {})
         item = Item(name=data.get("name", sku), sku=sku,
                     category=data.get("category"), cutco_url=data.get("url"),
                     in_catalog=True, is_unicorn=False, edge_type="Unknown")
         db.session.add(item)
         db.session.flush()
         ensure_unknown_variant(item)
-        added += 1
+        added_items += 1
+
+    db.session.flush()  # ensure all new items have IDs before set linkage
+
+    # ── Sets ───────────────────────────────────────────────────────────────
+    selected_sets = set(request.form.getlist("selected_sets"))
+    added_sets    = 0
+    linked_items  = 0
+
+    # Build fresh SKU→Item map including items just added above
+    sku_to_item = {k.sku.upper(): k for k in Item.query.filter(Item.sku.isnot(None)).all()}
+
+    set_count = int(request.form.get("set_count", 0))
+    for i in range(set_count):
+        set_name = request.form.get(f"set_name_{i}", "").strip()
+        if not set_name or set_name not in selected_sets:
+            continue
+        member_skus = [s.strip() for s in
+                       request.form.get(f"set_members_{i}", "").split("|") if s.strip()]
+
+        s = get_or_create_set(set_name)
+        if s.id is None:
+            added_sets += 1
+
+        for msku in member_skus:
+            item = sku_to_item.get(msku.upper())
+            if item and item not in s.items:
+                s.items.append(item)
+                linked_items += 1
 
     db.session.commit()
-    flash(f"Sync complete — added {added} new item{'s' if added != 1 else ''}.", "success")
+
+    parts = []
+    if added_items: parts.append(f"{added_items} item{'s' if added_items != 1 else ''}")
+    if added_sets:  parts.append(f"{added_sets} set{'s' if added_sets != 1 else ''}")
+    if linked_items: parts.append(f"{linked_items} set membership{'s' if linked_items != 1 else ''}")
+    flash("Sync complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
     return redirect(url_for("catalog"))
 
 # ── People ────────────────────────────────────────────────────────────────────
@@ -540,7 +647,7 @@ def people():
 @app.route("/people/add", methods=["GET", "POST"])
 def people_add():
     if request.method == "POST":
-        person = Person(name=normalize_text(request.form["name"]),
+        person = Person(name=request.form["name"].strip(),
                         notes=request.form.get("notes", "").strip() or None)
         db.session.add(person)
         db.session.commit()
@@ -553,7 +660,7 @@ def people_add():
 def people_edit(pid):
     person = Person.query.get_or_404(pid)
     if request.method == "POST":
-        person.name  = normalize_text(request.form["name"])
+        person.name  = request.form["name"].strip()
         person.notes = request.form.get("notes", "").strip() or None
         db.session.commit()
         flash(f"Updated {person.name}.", "success")
@@ -577,21 +684,20 @@ def person_collection(pid):
     ownerships = (Ownership.query.filter_by(person_id=pid)
                   .order_by(Ownership.status).all())
 
-    owned_item_ids = {ownership.variant.item_id for ownership in ownerships if ownership.status == "Owned"}
+    owned_item_ids = {o.variant.item_id for o in ownerships if o.status == "Owned"}
     all_items      = Item.query.order_by(Item.name).all()
-    item_gaps      = [item for item in all_items if item.id not in owned_item_ids]
+    item_gaps      = [k for k in all_items if k.id not in owned_item_ids]
 
-    # Find items where the person owns at least one variant but is missing others
     variant_gaps = []
-    for item in all_items:
-        real_variants = [variant for variant in item.variants if variant.color != UNKNOWN_COLOR]
+    for k in all_items:
+        real_variants = [v for v in k.variants if v.color != UNKNOWN_COLOR]
         if not real_variants:
             continue
-        owned_variant_ids = {ownership.variant_id for ownership in ownerships
-                             if ownership.variant.item_id == item.id and ownership.status == "Owned"}
-        missing = [variant for variant in real_variants if variant.id not in owned_variant_ids]
+        owned_variant_ids = {o.variant_id for o in ownerships
+                             if o.variant.item_id == k.id and o.status == "Owned"}
+        missing = [v for v in real_variants if v.id not in owned_variant_ids]
         if missing:
-            variant_gaps.append((item, missing))
+            variant_gaps.append((k, missing))
 
     return render_template("collection.html", person=person,
                            ownerships=ownerships,
@@ -639,31 +745,31 @@ def ownership_add():
 
 @app.route("/ownership/<int:oid>/edit", methods=["GET", "POST"])
 def ownership_edit(oid):
-    ownership = Ownership.query.get_or_404(oid)
+    o = Ownership.query.get_or_404(oid)
     if request.method == "POST":
-        ownership.status = request.form.get("status", "Owned")
-        ownership.notes  = request.form.get("notes", "").strip() or None
+        o.status = request.form.get("status", "Owned")
+        o.notes  = request.form.get("notes", "").strip() or None
         db.session.commit()
         flash("Updated.", "success")
-        return redirect(url_for("person_collection", pid=ownership.person_id))
+        return redirect(url_for("person_collection", pid=o.person_id))
 
-    return render_template("ownership_form.html", ownership=ownership,
+    return render_template("ownership_form.html", ownership=o,
                            people_list=Person.query.order_by(Person.name).all(),
                            items_list=Item.query.order_by(Item.name).all(),
                            status_options=STATUS_OPTIONS,
-                           sel_person_id=ownership.person_id,
-                           sel_item_id=ownership.variant.item_id,
-                           sel_variant_id=ownership.variant_id,
-                           sel_item=ownership.variant.item,
+                           sel_person_id=o.person_id,
+                           sel_item_id=o.variant.item_id,
+                           sel_variant_id=o.variant_id,
+                           sel_item=o.variant.item,
                            action="Edit",
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
 @app.route("/ownership/<int:oid>/delete", methods=["POST"])
 def ownership_delete(oid):
-    ownership = Ownership.query.get_or_404(oid)
-    pid = ownership.person_id
-    db.session.delete(ownership)
+    o   = Ownership.query.get_or_404(oid)
+    pid = o.person_id
+    db.session.delete(o)
     db.session.commit()
     flash("Entry removed.", "info")
     return redirect(url_for("person_collection", pid=pid))
@@ -692,21 +798,18 @@ def matrix():
     items_list  = Item.query.order_by(Item.name).all()
     STATUS_RANK = {"Owned": 0, "Wishlist": 1, "Traded": 2, "Sold": 3}
 
-    # Build item_lookup: (person_id, item_id) → best Ownership record by STATUS_RANK
     item_lookup = {}
-    for ownership_record in Ownership.query.all():
-        key     = (ownership_record.person_id, ownership_record.variant.item_id)
+    for o in Ownership.query.all():
+        key     = (o.person_id, o.variant.item_id)
         current = item_lookup.get(key)
-        if current is None or STATUS_RANK.get(ownership_record.status, 9) < STATUS_RANK.get(current.status, 9):
-            item_lookup[key] = ownership_record
+        if current is None or STATUS_RANK.get(o.status, 9) < STATUS_RANK.get(current.status, 9):
+            item_lookup[key] = o
 
-    # Build variant_lookup: (person_id, variant_id) → Ownership record
-    variant_lookup = {(rec.person_id, rec.variant_id): rec for rec in Ownership.query.all()}
+    variant_lookup = {(o.person_id, o.variant_id): o for o in Ownership.query.all()}
 
-    # For each item, prefer named variants; fall back to all variants if none are named
     variants_by_item = {
-        item.id: [variant for variant in item.variants if variant.color != UNKNOWN_COLOR] or item.variants
-        for item in items_list
+        k.id: [v for v in k.variants if v.color != UNKNOWN_COLOR] or k.variants
+        for k in items_list
     }
 
     return render_template("matrix.html",
@@ -728,13 +831,13 @@ def export_csv():
             .order_by(Person.name, Item.name, ItemVariant.color).all())
 
     out = io.StringIO()
-    writer = csv.writer(out)
-    writer.writerow(["person", "item_name", "sku", "category", "edge_type",
-                     "color", "status", "is_unicorn", "notes"])
-    for ownership, variant, item, person in rows:
-        writer.writerow([person.name, item.name, item.sku or "", item.category or "",
-                         item.edge_type, variant.color, ownership.status,
-                         "yes" if item.is_unicorn else "no", ownership.notes or ""])
+    w   = csv.writer(out)
+    w.writerow(["person", "item_name", "sku", "category", "edge_type",
+                "color", "status", "is_unicorn", "notes"])
+    for o, v, k, p in rows:
+        w.writerow([p.name, k.name, k.sku or "", k.category or "",
+                    k.edge_type, v.color, o.status,
+                    "yes" if k.is_unicorn else "no", o.notes or ""])
     out.seek(0)
     return Response(out.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
@@ -757,17 +860,17 @@ XLSX_COL_MAP = {
     # Ownership
     "owned?":                "owned_raw",
     # Notes fields (merged into notes column)
-    "price":                 "notes_price",
-    "gift box":              "notes_gift_box",
-    "sheath":                "notes_sheath",
-    "quantity purchased":    "notes_qty",
-    "given away":            "notes_given_away",
+    "price":                 "_notes_price",
+    "gift box":              "_notes_gift_box",
+    "sheath":                "_notes_sheath",
+    "quantity purchased":    "_notes_qty",
+    "given away":            "_notes_given_away",
 }
 # Set membership columns — key = lowercase spreadsheet header, value = canonical set name
 XLSX_SET_COLS = {s.lower(): s for s in SPREADSHEET_SET_COLUMNS}
 
 
-def parse_owned_raw(owned_raw: str, default_person: str | None):
+def _parse_owned_raw(owned_raw: str, default_person: str | None):
     """
     Parse 'Owned?' cell.
     - Truthy → status=Owned, person=default_person
@@ -784,37 +887,31 @@ def parse_owned_raw(owned_raw: str, default_person: str | None):
     return "Owned", val or default_person
 
 
-def build_notes(row: dict) -> str | None:
-    """Combine spreadsheet metadata columns into a single notes string.
-
-    Fields like price, gift box, and sheath info are concatenated as
-    'Label: value' pairs separated by '; '. Returns None if all fields
-    are empty or contain placeholder values (0, none, n/a, -).
-    """
+def _build_notes(row: dict) -> str | None:
     parts = []
     for key, label in [
-        ("notes_price",     "Price"),
-        ("notes_gift_box",  "Gift Box"),
-        ("notes_sheath",    "Sheath"),
-        ("notes_qty",       "Qty Purchased"),
-        ("notes_given_away","Given Away"),
+        ("_notes_price",     "Price"),
+        ("_notes_gift_box",  "Gift Box"),
+        ("_notes_sheath",    "Sheath"),
+        ("_notes_qty",       "Qty Purchased"),
+        ("_notes_given_away","Given Away"),
     ]:
-        field_value = row.get(key, "").strip()
-        if field_value and field_value not in ("0", "none", "n/a", "-"):
-            parts.append(f"{label}: {field_value}")
+        v = row.get(key, "").strip()
+        if v and v not in ("0", "none", "n/a", "-"):
+            parts.append(f"{label}: {v}")
     return "; ".join(parts) or None
 
 
 @app.route("/import/template")
 def import_template():
     out = io.StringIO()
-    writer = csv.writer(out)
-    writer.writerow(["name", "sku", "color", "edge_type", "is_unicorn",
-                     "person", "status", "category", "notes"])
-    writer.writerow(["2-3/4\" Paring Knife", "1720", "Classic Brown", "Double-D",
-                     "no", "Anthony", "Owned", "Kitchen Knives", ""])
-    writer.writerow(["Super Shears", "2137", "Pearl White", "Straight",
-                     "no", "Anthony", "Owned", "Kitchen Knives", ""])
+    w   = csv.writer(out)
+    w.writerow(["name", "sku", "color", "edge_type", "is_unicorn",
+                "person", "status", "category", "notes"])
+    w.writerow(["2-3/4\" Paring Knife", "1720", "Classic Brown", "Double-D",
+                "no", "Anthony", "Owned", "Kitchen Knives", ""])
+    w.writerow(["Super Shears", "2137", "Pearl White", "Straight",
+                "no", "Anthony", "Owned", "Kitchen Knives", ""])
     out.seek(0)
     return Response(out.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
@@ -827,18 +924,18 @@ def import_page():
         return render_template("import_page.html",
                                people=Person.query.order_by(Person.name).all())
 
-    uploaded_file = request.files.get("csvfile")
-    if not uploaded_file or not uploaded_file.filename:
+    f = request.files.get("csvfile")
+    if not f or not f.filename:
         flash("Please choose a file.", "error")
         return render_template("import_page.html",
                                people=Person.query.order_by(Person.name).all())
 
     person_override = request.form.get("person_override", "").strip() or None
-    file_extension = uploaded_file.filename.rsplit(".", 1)[-1].lower()
+    ext = f.filename.rsplit(".", 1)[-1].lower()
 
     try:
-        if file_extension == "xlsx":
-            wb = openpyxl.load_workbook(io.BytesIO(uploaded_file.stream.read()), data_only=True)
+        if ext == "xlsx":
+            wb = openpyxl.load_workbook(io.BytesIO(f.stream.read()), data_only=True)
             ws = wb.active
             raw_headers = [str(cell.value).strip() if cell.value is not None else ""
                            for cell in ws[1]]
@@ -863,16 +960,16 @@ def import_page():
                     else:
                         # Fallback: snake_case normalisation for CSV-style columns
                         out_row[lk.replace(" ", "_")] = val
-                out_row["set_memberships"] = set_memberships
+                out_row["_sets"] = set_memberships
                 parsed_rows.append(out_row)
         else:
-            stream = io.StringIO(uploaded_file.stream.read().decode("utf-8-sig"))
+            stream = io.StringIO(f.stream.read().decode("utf-8-sig"))
             reader = csv.DictReader(stream)
             parsed_rows = []
             for row in reader:
                 out_row = {k.strip().lower().replace(" ", "_"): v.strip()
                            for k, v in row.items()}
-                out_row["set_memberships"] = []
+                out_row["_sets"] = []
                 parsed_rows.append(out_row)
 
     except Exception as exc:
@@ -884,7 +981,7 @@ def import_page():
     if person_override:
         for row in parsed_rows:
             row["owned_raw"] = row.get("owned_raw", "yes")
-            row["person_override"] = person_override
+            row["_person_override"] = person_override
 
     existing_items   = {k.sku.upper(): k for k in Item.query.filter(Item.sku.isnot(None)).all()}
     existing_names   = {k.name.lower(): k for k in Item.query.all()}
@@ -899,23 +996,21 @@ def import_page():
     seen_skus          = set()
 
     for i, row in enumerate(parsed_rows, start=2):
-        name       = normalize_text(row.get("name", ""))
+        name       = row.get("name", "").strip()
         sku        = (row.get("sku", "") or "").strip().upper() or None
-        color      = normalize_text(row.get("color", "")) or UNKNOWN_COLOR
-        edge_type  = EDGE_TYPE_LOOKUP.get(row.get("edge_type", "").strip().lower(), "Unknown")
+        color      = row.get("color", "").strip() or UNKNOWN_COLOR
+        edge_type  = row.get("edge_type", "").strip() or "Unknown"
         is_unicorn = row.get("is_unicorn", "").strip().lower() in TRUTHY
-        category   = normalize_text(row.get("category", "")) or None
-        notes      = build_notes(row) or row.get("notes", "").strip() or None
-        set_names  = row.get("set_memberships", [])
+        category   = row.get("category", "").strip() or None
+        notes      = _build_notes(row) or row.get("notes", "").strip() or None
+        set_names  = row.get("_sets", [])
 
         # Resolve person + status from 'Owned?' column
         owned_raw = row.get("owned_raw", row.get("status", "yes"))
-        status, person_name = parse_owned_raw(owned_raw, row.get("person_override") or row.get("person", ""))
+        status, person_name = _parse_owned_raw(owned_raw, row.get("_person_override") or row.get("person", ""))
 
         if person_override:
             person_name = person_override
-        if person_name:
-            person_name = normalize_text(person_name)
 
         if not name:
             errors.append({"row": i, "reason": "Missing name", "data": row})
@@ -1003,14 +1098,14 @@ def import_confirm():
         if request.form.get(f"item_accept_{i}") != "on":
             continue
 
-        name        = normalize_text(request.form.get(f"item_name_{i}", ""))
+        name        = request.form.get(f"item_name_{i}", "").strip()
         sku         = request.form.get(f"item_sku_{i}", "").strip().upper() or None
-        color       = normalize_text(request.form.get(f"item_color_{i}", "")) or UNKNOWN_COLOR
+        color       = request.form.get(f"item_color_{i}", "").strip() or UNKNOWN_COLOR
         edge_type   = request.form.get(f"item_edge_{i}", "Unknown")
         is_unicorn  = request.form.get(f"item_unicorn_{i}") == "on"
-        category    = normalize_text(request.form.get(f"item_category_{i}", "")) or None
+        category    = request.form.get(f"item_category_{i}", "").strip() or None
         notes       = request.form.get(f"item_notes_{i}", "").strip() or None
-        person_name = normalize_text(request.form.get(f"item_person_{i}", ""))
+        person_name = request.form.get(f"item_person_{i}", "").strip()
         status      = request.form.get(f"item_status_{i}", "Owned")
         set_names   = [s for s in request.form.get(f"item_sets_{i}", "").split("|") if s]
 
@@ -1036,10 +1131,10 @@ def import_confirm():
             added_items += 1
 
         # Assign set memberships
-        for set_name in set_names:
-            item_set = get_or_create_set(set_name)
-            if item_set not in item.sets:
-                item.sets.append(item_set)
+        for sname in set_names:
+            s = get_or_create_set(sname)
+            if s not in item.sets:
+                item.sets.append(s)
 
         if color and color != UNKNOWN_COLOR:
             if not any(v.color.lower() == color.lower() for v in item.variants):
@@ -1063,14 +1158,14 @@ def import_confirm():
                                          variant_id=variant.id, status=status))
                 added_ownership += 1
 
-    ownership_count = int(request.form.get("own_count", 0))
-    for i in range(ownership_count):
+    own_count = int(request.form.get("own_count", 0))
+    for i in range(own_count):
         if request.form.get(f"own_accept_{i}") != "on":
             continue
 
         item_id     = int(request.form.get(f"own_item_id_{i}", 0))
-        person_name = normalize_text(request.form.get(f"own_person_{i}", ""))
-        color       = normalize_text(request.form.get(f"own_color_{i}", "")) or UNKNOWN_COLOR
+        person_name = request.form.get(f"own_person_{i}", "").strip()
+        color       = request.form.get(f"own_color_{i}", "").strip() or UNKNOWN_COLOR
         status      = request.form.get(f"own_status_{i}", "Owned")
         notes       = request.form.get(f"own_notes_{i}", "").strip() or None
 
@@ -1139,7 +1234,7 @@ def admin_logout():
 @app.route("/api/variants/<int:iid>")
 def api_variants(iid):
     item = Item.query.get_or_404(iid)
-    return jsonify([{"id": variant.id, "color": variant.color} for variant in item.variants])
+    return jsonify([{"id": v.id, "color": v.color} for v in item.variants])
 
 
 if __name__ == "__main__":

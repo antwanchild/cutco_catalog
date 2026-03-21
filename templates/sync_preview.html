@@ -6,51 +6,108 @@
   <a href="{{ url_for('catalog') }}" class="btn btn-ghost">← Cancel</a>
 </div>
 
-<p class="muted">Scraped <strong>{{ scraped_total }}</strong> items from Cutco.com.
-Blocked categories: {{ blocked_categories | join(', ') }}.</p>
+<p class="muted">
+  Scraped <strong>{{ scraped_total }}</strong> items
+  and <strong>{{ scraped_sets_total }}</strong> sets from Cutco.com.
+  {% if blocked_categories %}
+    Blocked categories: {{ blocked_categories | join(', ') }}.
+  {% endif %}
+</p>
 
-{% if not new_items %}
-  <p class="flash flash-success">✓ Catalog is up to date — no new items found.</p>
+{% if not new_items and not new_sets %}
+  <p class="flash flash-success">✓ Catalog is up to date — no new items or sets found.</p>
 {% else %}
+
 <form method="post" action="{{ url_for('catalog_sync_confirm') }}">
+  <input type="hidden" name="set_count" value="{{ new_sets | length }}">
+
+  {# ── New Items #}
+  {% if new_items %}
+  <h2>New Items <span class="muted">({{ new_items | length }})</span></h2>
 
   {% for category, items in grouped.items() %}
-  <h2>{{ category }} <span class="muted">({{ items | length }})</span></h2>
+  <h3 class="sync-cat-header">
+    {{ category }}
+    <label class="checkbox-label sync-toggle">
+      <input type="checkbox" class="cat-select-all" data-cat="{{ loop.index }}" checked>
+      select all
+    </label>
+  </h3>
   <table class="data-table">
-    <thead><tr><th><input type="checkbox" class="cat-toggle" data-cat="{{ loop.index }}"> All</th>
-      <th>Name</th><th>SKU</th><th>URL</th></tr></thead>
+    <thead>
+      <tr><th style="width:32px"></th><th>Name</th><th>SKU</th><th>Category</th><th></th></tr>
+    </thead>
     <tbody>
       {% for item in items %}
       <tr>
         <td><input type="checkbox" name="selected_skus" value="{{ item.sku }}"
-                   class="cat-{{ loop.index0 }}-{{ loop.index }}" checked></td>
+                   class="cat-cb cat-idx-{{ loop.index0 }}" checked></td>
         <td>{{ item.name }}</td>
         <td class="mono">{{ item.sku }}</td>
+        <td><input type="text" name="category_{{ item.sku }}" value="{{ item.category }}" class="input-xs"></td>
         <td><a href="{{ item.url }}" target="_blank" class="ext-link">↗</a></td>
         <input type="hidden" name="name_{{ item.sku }}" value="{{ item.name }}">
-        <input type="hidden" name="category_{{ item.sku }}" value="{{ item.category }}">
-        <input type="hidden" name="url_{{ item.sku }}" value="{{ item.url }}">
+        <input type="hidden" name="url_{{ item.sku }}"  value="{{ item.url }}">
       </tr>
       {% endfor %}
     </tbody>
   </table>
   {% endfor %}
+  {% endif %}
 
-  <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Add Selected ({{ new_items | length }} total)</button>
+  {# ── New Sets #}
+  {% if new_sets %}
+  <h2 style="margin-top:1.5rem">New Sets <span class="muted">({{ new_sets | length }})</span></h2>
+  <p class="muted">Member items are matched by SKU. Items not yet in your catalog will be linked once added.</p>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:32px"><input type="checkbox" id="sets-select-all" checked></th>
+        <th>Set Name</th><th>Members</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in new_sets %}
+      <tr>
+        <td>
+          <input type="checkbox" name="selected_sets" value="{{ s.name }}" class="set-cb" checked>
+          <input type="hidden" name="set_name_{{ loop.index0 }}"    value="{{ s.name }}">
+          <input type="hidden" name="set_members_{{ loop.index0 }}" value="{{ s.member_skus | join('|') }}">
+        </td>
+        <td>{{ s.name }}</td>
+        <td>
+          <span class="muted small">{{ s.member_skus | length }} item(s):</span>
+          <span class="mono small">{{ s.member_skus | join(', ') }}</span>
+        </td>
+        <td><a href="{{ s.url }}" target="_blank" class="ext-link">↗</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="form-actions" style="margin-top:1.25rem">
+    <button type="submit" class="btn btn-primary">Confirm Import</button>
     <a href="{{ url_for('catalog') }}" class="btn btn-ghost">Cancel</a>
   </div>
+
 </form>
 {% endif %}
 
 <script>
-document.querySelectorAll('.cat-toggle').forEach(function(tog) {
+document.querySelectorAll('.cat-select-all').forEach(function(tog) {
   tog.addEventListener('change', function() {
-    const cat = this.dataset.cat;
+    const idx = this.dataset.cat;
     document.querySelectorAll('input[name="selected_skus"]').forEach(function(cb) {
       cb.checked = tog.checked;
     });
   });
 });
+const setsAll = document.getElementById('sets-select-all');
+if (setsAll) {
+  setsAll.addEventListener('change', function() {
+    document.querySelectorAll('.set-cb').forEach(cb => cb.checked = setsAll.checked);
+  });
+}
 </script>
 {% endblock %}
