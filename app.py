@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging.handlers import RotatingFileHandler
 
 import openpyxl
@@ -313,10 +314,40 @@ def _build_category_list() -> list[tuple[str, str]]:
     return list(known.values())
 
 
+def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
+    """Fetch a product page and return (sku, name) from on-page text.
+
+    Used for pure-slug URLs like /p/fishermans-solution where no numeric SKU
+    appears in the URL itself.  SKU is identified by on-page text like "#1778".
+    """
+    try:
+        resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
+            return None, None
+        soup = BeautifulSoup(resp.text, "html.parser")
+        sku = None
+        sku_text = soup.find(string=re.compile(r"#\d"))
+        if sku_text:
+            m = re.search(r"#([0-9A-Z]+)", sku_text.strip(), re.IGNORECASE)
+            if m:
+                sku = m.group(1).upper()
+        h1 = soup.find("h1")
+        name = h1.get_text(strip=True) if h1 else None
+        return sku, name
+    except Exception as exc:
+        logger.debug("Could not fetch product page %s: %s", url, exc)
+        return None, None
+
+
 def scrape_catalog():
     """Scrape all item categories and return a list of item dicts."""
-    results   = []
-    seen_skus = set()
+    results    = []
+    seen_skus  = set()
+    # pure-slug items queued for a single parallel fetch pass at the end:
+    # list of (prod_url, cat_name, name_from_category_page)
+    slug_queue: list[tuple[str, str, str | None]] = []
+    seen_slug_urls: set[str] = set()
+
     categories = _build_category_list()
     logger.info("Scraping %d categories", len(categories))
     for cat_name, cat_url in categories:
@@ -349,7 +380,7 @@ def scrape_catalog():
                         [a.get("href", "") for a in product_links[:10]])
 
             # Deduplicate: strip &view=product variants so each product is
-            # visited at most once.
+            # processed at most once per category.
             seen_hrefs: set[str] = set()
             unique_links = []
             for a in product_links:
@@ -362,42 +393,43 @@ def scrape_catalog():
                 sku = _extract_sku_from_href(href)
                 prod_url = href if href.startswith("http") else f"https://www.cutco.com{href}"
 
-                # Try to grab the name from the link element on the category page
                 name_el = a.find(["h2", "h3"])
                 if not name_el and a.parent:
                     name_el = a.parent.find(["h2", "h3"])
                 name = name_el.get_text(strip=True) if name_el else None
 
                 if not sku:
-                    # Pure-slug URL (e.g. /p/fishermans-solution) — fetch the
-                    # product page to extract the SKU from on-page text like "#1778".
-                    try:
-                        prod_resp = requests.get(
-                            prod_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
-                        if prod_resp.status_code == 200:
-                            prod_soup = BeautifulSoup(prod_resp.text, "html.parser")
-                            sku_text = prod_soup.find(string=re.compile(r"#\d"))
-                            if sku_text:
-                                sku_match = re.search(
-                                    r"#([0-9A-Z]+)", sku_text.strip(), re.IGNORECASE)
-                                if sku_match:
-                                    sku = sku_match.group(1).upper()
-                            if not name:
-                                h1 = prod_soup.find("h1")
-                                name = h1.get_text(strip=True) if h1 else None
-                        time.sleep(0.3)
-                    except Exception as exc:
-                        logger.debug("Could not fetch product page %s: %s", prod_url, exc)
-
-                if not sku or sku in seen_skus:
+                    # Pure-slug URL — queue for parallel page fetch after this loop.
+                    if prod_url not in seen_slug_urls:
+                        seen_slug_urls.add(prod_url)
+                        slug_queue.append((prod_url, cat_name, name))
                     continue
-                if not name:
+
+                if sku in seen_skus or not name:
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
             time.sleep(0.4)
         except Exception as exc:
             logger.warning("Scrape failed for %s: %s", cat_url, exc)
+
+    # Parallel fetch for all pure-slug product pages collected above.
+    # Using a thread pool avoids serialising hundreds of HTTP round-trips.
+    if slug_queue:
+        logger.info("Fetching %d pure-slug product pages (parallel)", len(slug_queue))
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            future_map = {
+                pool.submit(_fetch_sku_from_page, prod_url): (prod_url, cat_name, cat_name_hint)
+                for prod_url, cat_name, cat_name_hint in slug_queue
+            }
+            for future in as_completed(future_map):
+                prod_url, cat_name, cat_page_name = future_map[future]
+                sku, page_name = future.result()
+                name = cat_page_name or page_name
+                if not sku or sku in seen_skus or not name:
+                    continue
+                seen_skus.add(sku)
+                results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
 
     # Individual product pages not listed under any category.
     # SKU is extracted from the page content (e.g. "#1778" text) since
