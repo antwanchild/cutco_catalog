@@ -6,7 +6,7 @@
   <div class="page-actions">
     {% if is_admin %}
       <a class="btn btn-primary" href="{{ url_for('catalog_add') }}">+ Add Item</a>
-      <a class="btn btn-secondary" href="{{ url_for('catalog_sync') }}">🔄 Sync</a>
+      <a class="btn btn-secondary" id="sync-btn" href="{{ url_for('catalog_sync') }}">🔄 Sync</a>
     {% endif %}
   </div>
 </div>
@@ -96,4 +96,20 @@
 </table>
 
 <p class="table-count">{{ items | length }} item{% if items | length != 1 %}s{% endif %}</p>
+
+<div id="sync-overlay" style="display:none">
+  <div class="sync-overlay-inner">
+    <div class="sync-spinner"></div>
+    <p>Syncing with Cutco.com — this may take a minute…</p>
+  </div>
+</div>
+
+<script>
+document.getElementById('sync-btn').addEventListener('click', function() {
+  this.textContent = 'Syncing…';
+  this.classList.add('btn-disabled');
+  this.style.pointerEvents = 'none';
+  document.getElementById('sync-overlay').style.display = 'flex';
+});
+</script>
 {% endblock %}
