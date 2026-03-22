@@ -169,6 +169,7 @@ class Set(db.Model):
 
     id    = db.Column(db.Integer, primary_key=True)
     name  = db.Column(db.String(120), nullable=False, unique=True)
+    sku   = db.Column(db.String(20),  nullable=True)
     notes = db.Column(db.Text, nullable=True)
 
     items = db.relationship("Item", secondary=item_sets,
@@ -214,6 +215,16 @@ def ensure_unknown_variant(item):
 
 with app.app_context():
     db.create_all()
+    # Incremental migrations for columns added after initial schema
+    with db.engine.connect() as _conn:
+        for _stmt in [
+            "ALTER TABLE sets ADD COLUMN sku VARCHAR(20)",
+        ]:
+            try:
+                _conn.execute(db.text(_stmt))
+                _conn.commit()
+            except Exception:
+                pass  # column already exists
     for it in Item.query.all():
         ensure_unknown_variant(it)
     db.session.commit()
@@ -615,15 +626,14 @@ def scrape_sets(
     for set_link in set_links:
         time.sleep(0.4)
         try:
-            resp = requests.get(set_link["url"], headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+            fetch_url = set_link["url"]
+            if "&view=product" not in fetch_url:
+                fetch_url = fetch_url + "&view=product"
+            set_sku, _ = _fetch_sku_from_page(fetch_url)
+
+            resp = requests.get(fetch_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
             detail = BeautifulSoup(resp.text, "html.parser")
-
-            # Get set SKU from the page (e.g. #1813C)
-            set_sku = None
-            sku_el = detail.find(string=re.compile(r"^#\d"))
-            if sku_el:
-                set_sku = sku_el.strip().lstrip("#").upper()
 
             # Extract member SKUs from rolo image URLs, strip color suffix
             member_skus = []
@@ -641,7 +651,7 @@ def scrape_sets(
 
             results.append(dict(
                 name=set_link["name"],
-                sku=set_sku or set_link["slug"].upper(),
+                sku=set_sku,
                 url=set_link["url"],
                 member_skus=member_skus,
             ))
@@ -995,10 +1005,13 @@ def catalog_sync_confirm():
             continue
         member_skus = [raw.strip() for raw in
                        request.form.get(f"set_members_{i}", "").split("|") if raw.strip()]
+        set_sku = request.form.get(f"set_sku_{i}", "").strip() or None
 
         item_set = get_or_create_set(set_name)
         if item_set.id is None:
             added_sets += 1
+        if set_sku and not item_set.sku:
+            item_set.sku = set_sku
 
         for msku in member_skus:
             item = sku_to_item.get(msku.upper())
