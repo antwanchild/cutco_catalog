@@ -225,6 +225,12 @@ with app.app_context():
                 _conn.commit()
             except Exception:
                 pass  # column already exists
+    # Remove items with single-digit SKUs — these were erroneously extracted
+    # from slug-prefixed URLs like /p/3-inch-gourmet-paring-knife (SKU "3").
+    _bad = Item.query.filter(Item.sku.op("GLOB")("[0-9]")).all()
+    for _item in _bad:
+        logger.info("Removing item with invalid single-digit SKU: %s (sku=%s)", _item.name, _item.sku)
+        db.session.delete(_item)
     for it in Item.query.all():
         ensure_unknown_variant(it)
     db.session.commit()
