@@ -105,9 +105,9 @@ def _resolve_category(sku: str, scraped_category: str, name: str = "") -> str:
     # SKUs ending in -N (e.g. "4135-2") are sheath/accessory variants
     if re.search(r"-\d+$", sku):
         return "Sheaths"
-    # Items whose name contains "sheath" belong with sheaths regardless of
-    # which category page they were discovered on
-    if "sheath" in name.lower():
+    # Items whose name contains "sheath" (but not "with sheath", e.g. "Cleaver with Sheath")
+    # belong with sheaths regardless of which category page they were discovered on
+    if "sheath" in name.lower() and "with sheath" not in name.lower():
         return "Sheaths"
     return scraped_category
 
@@ -555,7 +555,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                 # Force all sheath URLs through page fetch so prPageId gives the
                 # real sheath SKU (which includes the -2 suffix).
                 # Apply this even when sheaths appear in other categories (e.g. Storage).
-                if cat_name == "Sheaths" or (name and "sheath" in name.lower()):
+                if cat_name == "Sheaths" or (name and "sheath" in name.lower() and "with sheath" not in name.lower()):
                     sku = None
 
                 if not sku:
