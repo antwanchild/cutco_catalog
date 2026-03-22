@@ -992,8 +992,13 @@ def catalog_sync():
     _grouped_unsorted: dict = {}
     for item in new_items:
         _grouped_unsorted.setdefault(item["category"], []).append(item)
+    def _sku_sort_key(item):
+        sku = item.get("sku") or ""
+        m = re.match(r"(\d+)", sku)
+        return (0, int(m.group(1)), sku) if m else (1, 0, sku)
+
     grouped = OrderedDict(
-        (cat, sorted(items, key=lambda i: i["name"].lower()))
+        (cat, sorted(items, key=_sku_sort_key))
         for cat, items in sorted(_grouped_unsorted.items(), key=lambda kv: kv[0].lower())
     )
 
