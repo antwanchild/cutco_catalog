@@ -1005,7 +1005,10 @@ def catalog_sync():
     # Also scrape sets for preview — pass gift/bundle candidates from catalog scrape
     scraped_sets  = scrape_sets(extra_candidates=set_candidates)
     existing_sets = {existing_set.name.lower() for existing_set in Set.query.all()}
-    new_sets      = [scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() not in existing_sets]
+    new_sets      = sorted(
+        (s for s in scraped_sets if s["name"].lower() not in existing_sets),
+        key=_sku_sort_key,
+    )
 
     logger.info("Sync: %d items scraped, %d new; %d sets scraped, %d new",
                 len(scraped), len(new_items), len(scraped_sets), len(new_sets))
