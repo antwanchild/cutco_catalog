@@ -285,7 +285,7 @@ def _extract_sku_from_href(href: str) -> str | None:
         return None
     # If slug starts with digits, extract the leading numeric+letter portion.
     # This handles "1720-PETITE-CHEF" → "1720" as well as "4135CSH" → "4135C".
-    lead = re.match(r'^(\d{2,}[A-Z]{0,3})', slug)
+    lead = re.match(r'^(\d{3,}[A-Z]{0,3})', slug)
     if lead:
         candidate = lead.group(1)
     elif any(c.isdigit() for c in slug) and len(slug) <= 12:
@@ -296,7 +296,7 @@ def _extract_sku_from_href(href: str) -> str | None:
     # Strip sheath suffix, then optional color letter, to get the base SKU
     if candidate.endswith("SH"):
         candidate = candidate[:-2]
-    if candidate and candidate[-1] in "CWRB" and len(candidate) > 2:
+    if candidate and candidate[-1].isalpha() and len(candidate) > 2 and candidate[:-1].isdigit():
         candidate = candidate[:-1]
     return candidate or None
 
@@ -464,8 +464,8 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
             if m:
                 sku = m.group(1).upper()
 
-        # Normalise: strip trailing color letter so we store the base SKU
-        if sku and len(sku) > 2 and sku[-1] in "CWRB":
+        # Normalise: strip trailing variant letter so we store the base SKU
+        if sku and len(sku) > 2 and sku[-1].isalpha() and sku[:-1].isdigit():
             sku = sku[:-1]
 
         # Reject CSS hex colors — 6 hex chars like "0073A4" are never a SKU
