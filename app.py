@@ -90,6 +90,13 @@ SCRAPE_CATEGORIES = [
 
 _BUNDLE_KEYWORDS = {"gift", "additional"}
 
+# Override the scraped category for specific SKUs.
+# Useful when a product appears on a category page that doesn't reflect its
+# true type (e.g. the Shears Holster is on Accessories but belongs with sheaths).
+CATEGORY_OVERRIDES: dict[str, str] = {
+    "79": "Knife Sheaths",  # Shears Holster
+}
+
 # Words that indicate a product is a bundle/set, not a standalone catalog item.
 # Knife blocks (e.g. "Gourmet Set Block") are excluded from this check.
 _SET_NAME_PATTERN = re.compile(
@@ -553,7 +560,9 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                         set_candidates.append((name, prod_url))
                     continue
                 seen_skus.add(sku)
-                results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
+                results.append(dict(name=name, sku=sku,
+                                    category=CATEGORY_OVERRIDES.get(sku, cat_name),
+                                    url=prod_url))
             time.sleep(0.4)
         except Exception as exc:
             logger.warning("Scrape failed for %s: %s", cat_url, exc)
@@ -580,7 +589,9 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                         set_candidates.append((name, prod_url))
                     continue
                 seen_skus.add(sku)
-                results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
+                results.append(dict(name=name, sku=sku,
+                                    category=CATEGORY_OVERRIDES.get(sku, cat_name),
+                                    url=prod_url))
                 added_from_slugs += 1
         logger.info("Slug queue: %d pages fetched, %d items added", len(slug_queue), added_from_slugs)
 
