@@ -48,17 +48,19 @@ Then open `http://localhost:8095` in your browser.
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `SECRET_KEY` | `cutco-vault-dev-key` | Flask session secret — **change in production** |
-| `ADMIN_TOKEN` | `admin` | Token required to log in as admin — **change in production** |
-| `DATABASE_URL` | `sqlite:////data/cutco.db` | SQLAlchemy connection string |
-| `LOG_LEVEL` | `INFO` | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `LOG_DIR` | `/data/logs` | Directory for rotating log files |
-| `SYNC_BLOCKED_CATEGORIES` | *(empty)* | Comma-separated category names to exclude from catalog sync |
-| `PUID` | `0` | Run container as this user ID (for correct file ownership on the host) |
-| `PGID` | `0` | Run container as this group ID |
-| `TZ` | `UTC` | Container timezone |
+| Variable | Default | Required | Description |
+|---|---|:---:|---|
+| `SECRET_KEY` | `cutco-vault-dev-key` | ⚠️ | Flask session secret — **change in production** |
+| `ADMIN_TOKEN` | `admin` | ⚠️ | Token required to log in as admin — **change in production** |
+| `DATABASE_URL` | `sqlite:////data/cutco.db` | No | SQLAlchemy connection string |
+| `LOG_LEVEL` | `INFO` | No | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `LOG_DIR` | `/data/logs` | No | Directory for rotating log files |
+| `SYNC_BLOCKED_CATEGORIES` | *(empty)* | No | Comma-separated category names to exclude from catalog sync |
+| `PUID` | `0` | No | Run container as this user ID (for correct file ownership on the host) |
+| `PGID` | `0` | No | Run container as this group ID |
+| `TZ` | `UTC` | No | Container timezone |
+
+⚠️ = has a working default but must be changed before exposing to a network.
 
 ---
 
