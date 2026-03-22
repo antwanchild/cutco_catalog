@@ -44,7 +44,13 @@
       <col style="width:32px">
     </colgroup>
     <thead>
-      <tr><th></th><th>Name</th><th>SKU</th><th>Category</th><th></th></tr>
+      <tr>
+        <th></th>
+        <th><span class="sort-hdr" data-col="name" style="cursor:pointer">Name</span></th>
+        <th><span class="sort-hdr active" data-col="sku" style="cursor:pointer">SKU ▲</span></th>
+        <th>Category</th>
+        <th></th>
+      </tr>
     </thead>
     <tbody>
       {% for item in items %}
@@ -109,7 +115,7 @@
 {% endif %}
 
 <script>
-// "Select all" checkbox for each category — only toggles that category's item checkboxes
+// ── Category select-all toggles ──────────────────────────────────────────────
 document.querySelectorAll('.cat-select-all').forEach(function(categoryToggle) {
   categoryToggle.addEventListener('change', function() {
     const categoryIndex = this.dataset.cat;
@@ -124,5 +130,58 @@ if (setsSelectAll) {
     document.querySelectorAll('.set-cb').forEach(cb => cb.checked = setsSelectAll.checked);
   });
 }
+
+// ── Column sort for each category table ──────────────────────────────────────
+// State: { tableEl: { col: 'sku'|'name', dir: 'asc'|'desc' } }
+const tableSort = new WeakMap();
+
+function skuNum(val) {
+  const m = val.match(/^(\d+)/);
+  return m ? parseInt(m[1], 10) : Infinity;
+}
+
+function sortTable(table, col, dir) {
+  const tbody = table.querySelector('tbody');
+  const rows  = Array.from(tbody.querySelectorAll('tr'));
+
+  rows.sort(function(a, b) {
+    // col index: name=1, sku=2
+    const idx = col === 'name' ? 1 : 2;
+    const aVal = (a.cells[idx] ? a.cells[idx].textContent.trim() : '');
+    const bVal = (b.cells[idx] ? b.cells[idx].textContent.trim() : '');
+    let cmp;
+    if (col === 'sku') {
+      const an = skuNum(aVal), bn = skuNum(bVal);
+      cmp = an !== bn ? an - bn : aVal.localeCompare(bVal);
+    } else {
+      cmp = aVal.localeCompare(bVal);
+    }
+    return dir === 'asc' ? cmp : -cmp;
+  });
+
+  rows.forEach(function(r) { tbody.appendChild(r); });
+}
+
+document.querySelectorAll('.sort-hdr').forEach(function(hdr) {
+  hdr.addEventListener('click', function() {
+    const table = this.closest('table');
+    const col   = this.dataset.col;
+    const state = tableSort.get(table) || { col: 'sku', dir: 'asc' };
+
+    // Toggle dir if same column, otherwise default to asc
+    const newDir = (state.col === col && state.dir === 'asc') ? 'desc' : 'asc';
+    tableSort.set(table, { col, dir: newDir });
+
+    sortTable(table, col, newDir);
+
+    // Update header indicators in this table only
+    table.querySelectorAll('.sort-hdr').forEach(function(h) {
+      const isActive = h.dataset.col === col;
+      h.classList.toggle('active', isActive);
+      const label = h.dataset.col === 'name' ? 'Name' : 'SKU';
+      h.textContent = isActive ? label + (newDir === 'asc' ? ' ▲' : ' ▼') : label;
+    });
+  });
+});
 </script>
 {% endblock %}
