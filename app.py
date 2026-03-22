@@ -474,6 +474,10 @@ def scrape_catalog():
                     # not a distinct sheath SKU, so they'd create duplicate entries.
                     if "-sheath" in prod_url or cat_name == "Knife Sheaths":
                         continue
+                    # Always fetch with &view=product so the server returns the full
+                    # product page including JSON-LD structured data with the SKU.
+                    if "&view=product" not in prod_url:
+                        prod_url = prod_url + "&view=product"
                     if prod_url not in seen_slug_urls:
                         seen_slug_urls.add(prod_url)
                         slug_queue.append((prod_url, cat_name, name))
