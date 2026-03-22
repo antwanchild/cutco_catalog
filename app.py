@@ -360,6 +360,21 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
             if m:
                 sku = m.group(1).upper()
 
+        # Strategy 2b: Cutco-specific JS page variables, e.g.:
+        #   const prPageId = "1886BK";
+        #   const defaultWebItemSingle = "1886BK";
+        # Extract only the leading digits so we store the base model number.
+        if not sku:
+            for var in ("prPageId", "defaultWebItemSingle"):
+                m = re.search(
+                    rf"""(?:const|var|let)\s+{var}\s*=\s*["']([^"']+)["']""",
+                    raw_html)
+                if m:
+                    digits = re.match(r'^(\d+)', m.group(1).strip())
+                    if digits:
+                        sku = digits.group(1)
+                        break
+
         # Strategy 3: meta tags (Open Graph / Schema product SKU)
         if not sku:
             for attr in ("product:retailer_item_id", "product:sku"):
