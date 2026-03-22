@@ -976,9 +976,10 @@ def catalog_sync():
     new_items = [i for i in scraped if i["sku"] not in existing_skus]
 
     from collections import OrderedDict
-    grouped = OrderedDict()
+    _grouped_unsorted: dict = {}
     for item in new_items:
-        grouped.setdefault(item["category"], []).append(item)
+        _grouped_unsorted.setdefault(item["category"], []).append(item)
+    grouped = OrderedDict(sorted(_grouped_unsorted.items(), key=lambda kv: kv[0].lower()))
 
     # Also scrape sets for preview — pass gift/bundle candidates from catalog scrape
     scraped_sets  = scrape_sets(extra_candidates=set_candidates)
