@@ -97,6 +97,16 @@ CATEGORY_OVERRIDES: dict[str, str] = {
     "79": "Knife Sheaths",  # Shears Holster
 }
 
+
+def _resolve_category(sku: str, scraped_category: str) -> str:
+    """Return the effective category for an item, applying overrides."""
+    if sku in CATEGORY_OVERRIDES:
+        return CATEGORY_OVERRIDES[sku]
+    # SKUs ending in -N (e.g. "4135-2") are sheath/accessory variants
+    if re.search(r"-\d+$", sku):
+        return "Knife Sheaths"
+    return scraped_category
+
 # Words that indicate a product is a bundle/set, not a standalone catalog item.
 # Knife blocks (e.g. "Gourmet Set Block") are excluded from this check.
 _SET_NAME_PATTERN = re.compile(
@@ -563,7 +573,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku,
-                                    category=CATEGORY_OVERRIDES.get(sku, cat_name),
+                                    category=_resolve_category(sku, cat_name),
                                     url=prod_url))
             time.sleep(0.4)
         except Exception as exc:
@@ -592,7 +602,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku,
-                                    category=CATEGORY_OVERRIDES.get(sku, cat_name),
+                                    category=_resolve_category(sku, cat_name),
                                     url=prod_url))
                 added_from_slugs += 1
         logger.info("Slug queue: %d pages fetched, %d items added", len(slug_queue), added_from_slugs)
