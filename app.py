@@ -379,8 +379,8 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
 
     Used for pure-slug URLs like /p/fishermans-solution where no numeric SKU
     appears in the URL itself.  Tries several extraction strategies in order:
-      1. JSON-LD structured data (<script type="application/ld+json">)
-      2. Cutco JS page variables: prPageId / defaultWebItemSingle (most reliable)
+      1. Cutco JS page variables: prPageId / defaultWebItemSingle (most reliable)
+      2. JSON-LD structured data (<script type="application/ld+json">)
       3. Generic inline JS — "sku":"1769" in raw HTML
       4. Meta tag (product:retailer_item_id or similar)
       5. On-page visible text matching "#XXXX" (scripts/styles stripped first)
@@ -395,39 +395,40 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         soup = BeautifulSoup(raw_html, "html.parser")
         sku = None
 
-        # Strategy 1: JSON-LD structured data — checked before script tags stripped.
-        for ld in soup.find_all("script", type="application/ld+json"):
-            try:
-                data = json.loads(ld.string or "")
-                items = data if isinstance(data, list) else [data]
-                for entry in items:
-                    if isinstance(entry, dict) and entry.get("@type") == "Product":
-                        sku_val = entry.get("sku") or entry.get("productID")
-                        if sku_val:
-                            sku = str(sku_val).strip().upper()
-                            break
-            except (json.JSONDecodeError, AttributeError):
-                pass
-            if sku:
-                break
-
-        # Strategy 2: Cutco-specific JS page variables — most reliable source
-        # since prPageId is set to the SKU of the product being viewed.
+        # Strategy 1: Cutco-specific JS page variables — most reliable since
+        # prPageId uniquely identifies the product currently being viewed.
+        # Checked first because JSON-LD can include cross-sell/related products
+        # whose SKU would otherwise shadow the page's own SKU.
         #   const prPageId = "677";
         #   const defaultWebItemSingle = "1886BK";
-        # Extract only the leading digits so we store the base model number.
+        for js_var_name in ("prPageId", "defaultWebItemSingle"):
+            sku_match = re.search(
+                rf"""(?:const|var|let)\s+{js_var_name}\s*=\s*["']([^"']+)["']""",
+                raw_html)
+            if sku_match:
+                # Capture leading digits plus optional -N suffix so sheath
+                # SKUs like "4135-2" are preserved distinct from the knife "4135".
+                digits = re.match(r'^(\d{2,}(?:-\d+)?)', sku_match.group(1).strip())
+                if digits:
+                    sku = digits.group(1)
+                    break
+
+        # Strategy 2: JSON-LD structured data.
         if not sku:
-            for js_var_name in ("prPageId", "defaultWebItemSingle"):
-                sku_match = re.search(
-                    rf"""(?:const|var|let)\s+{js_var_name}\s*=\s*["']([^"']+)["']""",
-                    raw_html)
-                if sku_match:
-                    # Capture leading digits plus optional -N suffix so sheath
-                    # SKUs like "4135-2" are preserved distinct from the knife "4135".
-                    digits = re.match(r'^(\d{2,}(?:-\d+)?)', sku_match.group(1).strip())
-                    if digits:
-                        sku = digits.group(1)
-                        break
+            for ld in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json.loads(ld.string or "")
+                    entries = data if isinstance(data, list) else [data]
+                    for entry in entries:
+                        if isinstance(entry, dict) and entry.get("@type") == "Product":
+                            sku_val = entry.get("sku") or entry.get("productID")
+                            if sku_val:
+                                sku = str(sku_val).strip().upper()
+                                break
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+                if sku:
+                    break
 
         # Strategy 3: generic inline JS — catches patterns like:
         #   "sku":"1769"  |  'sku': '1769'  |  sku: 1769
