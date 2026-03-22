@@ -527,14 +527,17 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                     name_el = a.parent.find(["h2", "h3"])
                 name = name_el.get_text(strip=True) if name_el else None
 
+                # Knife Sheaths: URL-based extraction returns the parent knife's
+                # SKU (e.g. /p/4135-2 → 4135), not the sheath's own model number.
+                # Force all sheath URLs through page fetch so prPageId gives the
+                # real sheath SKU.
+                if cat_name == "Knife Sheaths":
+                    sku = None
+
                 if not sku:
                     # Pure-slug URL — queue for parallel page fetch after this loop.
-                    # Skip sheath pages: they report the parent knife's model number,
-                    # not a distinct sheath SKU, so they'd create duplicate entries.
-                    if "-sheath" in prod_url or cat_name == "Knife Sheaths":
-                        continue
                     # Always fetch with &view=product so the server returns the full
-                    # product page including JSON-LD structured data with the SKU.
+                    # product page with the prPageId JS variable.
                     if "&view=product" not in prod_url:
                         prod_url = prod_url + "&view=product"
                     if prod_url not in seen_slug_urls:
