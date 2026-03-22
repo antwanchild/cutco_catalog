@@ -175,14 +175,20 @@ class Item(db.Model):
     sets     = db.relationship("Set", secondary=item_sets,
                                back_populates="items", lazy="select")
 
+    @property
+    def any_unicorn(self) -> bool:
+        """True if the item itself is flagged unicorn OR any specific variant is."""
+        return self.is_unicorn or any(v.is_unicorn for v in self.variants)
+
 
 class ItemVariant(db.Model):
     __tablename__ = "item_variants"
 
-    id      = db.Column(db.Integer, primary_key=True)
-    item_id = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
-    color   = db.Column(db.String(80), nullable=False, default=UNKNOWN_COLOR)
-    notes   = db.Column(db.Text, nullable=True)
+    id         = db.Column(db.Integer, primary_key=True)
+    item_id    = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
+    color      = db.Column(db.String(80), nullable=False, default=UNKNOWN_COLOR)
+    is_unicorn = db.Column(db.Boolean,    nullable=False, default=False)
+    notes      = db.Column(db.Text, nullable=True)
 
     ownerships = db.relationship("Ownership", backref="variant",
                                  lazy=True, cascade="all, delete-orphan")
@@ -243,6 +249,7 @@ with app.app_context():
     with db.engine.connect() as _conn:
         for _stmt in [
             "ALTER TABLE sets ADD COLUMN sku VARCHAR(20)",
+            "ALTER TABLE item_variants ADD COLUMN is_unicorn BOOLEAN NOT NULL DEFAULT 0",
         ]:
             try:
                 _conn.execute(db.text(_stmt))
@@ -738,7 +745,10 @@ def version():
 def index():
     stats = dict(
         item_count = Item.query.count(),
-        unicorns = Item.query.filter_by(is_unicorn=True).count(),
+        unicorns = Item.query.filter(db.or_(
+                       Item.is_unicorn,
+                       Item.variants.any(ItemVariant.is_unicorn == True)  # noqa: E712
+                   )).count(),
         people   = Person.query.count(),
         owned    = Ownership.query.filter_by(status="Owned").count(),
         wishlist = Ownership.query.filter_by(status="Wishlist").count(),
@@ -766,7 +776,10 @@ def catalog():
     if cat_filter:
         query = query.filter(Item.category == cat_filter)
     if unicorn_f == "1":
-        query = query.filter(Item.is_unicorn)
+        query = query.filter(db.or_(
+            Item.is_unicorn,
+            Item.variants.any(ItemVariant.is_unicorn == True)  # noqa: E712
+        ))
 
     col   = getattr(Item, sort, Item.name)
     items = (query
@@ -1283,7 +1296,7 @@ def export_csv():
     for ownership, variant, item, person in rows:
         writer.writerow([person.name, item.name, item.sku or "", item.category or "",
                          item.edge_type, variant.color, ownership.status,
-                         "yes" if item.is_unicorn else "no", ownership.notes or ""])
+                         "yes" if (variant.is_unicorn or item.is_unicorn) else "no", ownership.notes or ""])
     out.seek(0)
     return Response(out.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
@@ -1579,8 +1592,8 @@ def import_confirm():
 
         if not item:
             item = Item(name=name, sku=sku, category=category,
-                        edge_type=edge_type, is_unicorn=is_unicorn,
-                        in_catalog=not is_unicorn, notes=notes)
+                        edge_type=edge_type, is_unicorn=False,
+                        in_catalog=bool(sku), notes=notes)
             db.session.add(item)
             db.session.flush()
             ensure_unknown_variant(item)
@@ -1595,11 +1608,17 @@ def import_confirm():
             if item_set not in item.sets:
                 item.sets.append(item_set)
 
-        if color and color != UNKNOWN_COLOR:
-            if not any(v.color.lower() == color.lower() for v in item.variants):
-                new_v = ItemVariant(item_id=item.id, color=color)
-                db.session.add(new_v)
-                db.session.flush()
+        # Find or create the specific color variant, then apply the unicorn flag
+        # to that variant only — not to the item (which would affect all colors).
+        target_color = color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR
+        variant = next((v for v in item.variants
+                        if v.color.lower() == target_color.lower()), None)
+        if not variant:
+            variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_unicorn)
+            db.session.add(variant)
+            db.session.flush()
+        elif is_unicorn and not variant.is_unicorn:
+            variant.is_unicorn = True
 
         if person_name:
             person = existing_persons.get(person_name.lower())
@@ -1609,8 +1628,6 @@ def import_confirm():
                 db.session.flush()
                 existing_persons[person_name.lower()] = person
                 added_persons += 1
-            variant = next((v for v in item.variants
-                            if v.color.lower() == color.lower()), item.variants[0])
             if not Ownership.query.filter_by(person_id=person.id,
                                              variant_id=variant.id).first():
                 db.session.add(Ownership(person_id=person.id,
