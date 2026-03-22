@@ -83,7 +83,7 @@ SCRAPE_CATEGORIES = [
     ("Cookware",         "https://www.cutco.com/shop/cookware"),
     ("Ake Cookware",     "https://www.cutco.com/shop/ake-cookware"),
     ("Storage",          "https://www.cutco.com/shop/storage"),
-    ("Knife Sheaths",    "https://www.cutco.com/shop/kitchen-knife-sheaths"),
+    ("Sheaths",    "https://www.cutco.com/shop/kitchen-knife-sheaths"),
     ("Garden Tools",     "https://www.cutco.com/shop/garden-tools"),
     ("Kitchen Knives",   "https://www.cutco.com/shop/kitchen-knives"),
 ]
@@ -94,17 +94,21 @@ _BUNDLE_KEYWORDS = {"gift", "additional"}
 # Useful when a product appears on a category page that doesn't reflect its
 # true type (e.g. the Shears Holster is on Accessories but belongs with sheaths).
 CATEGORY_OVERRIDES: dict[str, str] = {
-    "79": "Knife Sheaths",  # Shears Holster
+    "79": "Sheaths",  # Shears Holster
 }
 
 
-def _resolve_category(sku: str, scraped_category: str) -> str:
+def _resolve_category(sku: str, scraped_category: str, name: str = "") -> str:
     """Return the effective category for an item, applying overrides."""
     if sku in CATEGORY_OVERRIDES:
         return CATEGORY_OVERRIDES[sku]
     # SKUs ending in -N (e.g. "4135-2") are sheath/accessory variants
     if re.search(r"-\d+$", sku):
-        return "Knife Sheaths"
+        return "Sheaths"
+    # Items whose name contains "sheath" belong with sheaths regardless of
+    # which category page they were discovered on
+    if "sheath" in name.lower():
+        return "Sheaths"
     return scraped_category
 
 # Words that indicate a product is a bundle/set, not a standalone catalog item.
@@ -546,11 +550,11 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                     name_el = a.parent.find(["h2", "h3"])
                 name = name_el.get_text(strip=True) if name_el else None
 
-                # Knife Sheaths: URL-based extraction returns the parent knife's
+                # Sheaths: URL-based extraction returns the parent knife's
                 # SKU (e.g. /p/4135-2 → 4135), not the sheath's own model number.
                 # Force all sheath URLs through page fetch so prPageId gives the
                 # real sheath SKU.
-                if cat_name == "Knife Sheaths":
+                if cat_name == "Sheaths":
                     sku = None
 
                 if not sku:
@@ -573,7 +577,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku,
-                                    category=_resolve_category(sku, cat_name),
+                                    category=_resolve_category(sku, cat_name, name),
                                     url=prod_url))
             time.sleep(0.4)
         except Exception as exc:
@@ -602,7 +606,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku,
-                                    category=_resolve_category(sku, cat_name),
+                                    category=_resolve_category(sku, cat_name, name),
                                     url=prod_url))
                 added_from_slugs += 1
         logger.info("Slug queue: %d pages fetched, %d items added", len(slug_queue), added_from_slugs)
