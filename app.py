@@ -90,6 +90,22 @@ SCRAPE_CATEGORIES = [
 
 _BUNDLE_KEYWORDS = {"gift", "additional"}
 
+# Words that indicate a product is a bundle/set, not a standalone catalog item.
+# Knife blocks (e.g. "Gourmet Set Block") are excluded from this check.
+_SET_NAME_PATTERN = re.compile(
+    r"\b(set|pack|mates|classics|combo|collection|favorites|starters|bundle)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_set_product(name: str) -> bool:
+    """Return True if the name suggests a bundle/set rather than a single item."""
+    if not name or not _SET_NAME_PATTERN.search(name):
+        return False
+    # Knife blocks are standalone items even though their name contains "set"
+    return "block" not in name.lower()
+
+
 SCRAPE_SETS_URL = "https://www.cutco.com/shop/knife-sets"
 SCRAPE_HEADERS  = {"User-Agent": "Mozilla/5.0 (compatible; CutcoVaultBot/1.0)"}
 REQUEST_TIMEOUT = 12  # seconds for all outbound HTTP requests
@@ -365,7 +381,7 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                     rf"""(?:const|var|let)\s+{var}\s*=\s*["']([^"']+)["']""",
                     raw_html)
                 if m:
-                    digits = re.match(r'^(\d+)', m.group(1).strip())
+                    digits = re.match(r'^(\d{2,})', m.group(1).strip())
                     if digits:
                         sku = digits.group(1)
                         break
@@ -405,6 +421,10 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         # Normalise: strip trailing color letter so we store the base SKU
         if sku and len(sku) > 2 and sku[-1] in "CWRB":
             sku = sku[:-1]
+
+        # Reject CSS hex colors — 6 hex chars like "0073A4" are never a SKU
+        if sku and re.fullmatch(r"[0-9A-F]{6}", sku, re.IGNORECASE):
+            sku = None
 
         h1 = soup.find("h1")
         name = h1.get_text(strip=True) if h1 else None
@@ -492,7 +512,7 @@ def scrape_catalog():
                         slug_queue.append((prod_url, cat_name, name))
                     continue
 
-                if sku in seen_skus or not name:
+                if sku in seen_skus or not name or _is_set_product(name):
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
@@ -514,7 +534,7 @@ def scrape_catalog():
                 prod_url, cat_name, cat_page_name = future_map[future]
                 sku, page_name = future.result()
                 name = cat_page_name or page_name
-                if not sku or sku in seen_skus or not name:
+                if not sku or sku in seen_skus or not name or _is_set_product(name):
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
