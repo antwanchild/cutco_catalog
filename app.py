@@ -553,8 +553,9 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                 # Sheaths: URL-based extraction returns the parent knife's
                 # SKU (e.g. /p/4135-2 → 4135), not the sheath's own model number.
                 # Force all sheath URLs through page fetch so prPageId gives the
-                # real sheath SKU.
-                if cat_name == "Sheaths":
+                # real sheath SKU (which includes the -2 suffix).
+                # Apply this even when sheaths appear in other categories (e.g. Storage).
+                if cat_name == "Sheaths" or (name and "sheath" in name.lower()):
                     sku = None
 
                 if not sku:
