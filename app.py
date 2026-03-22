@@ -653,7 +653,7 @@ def scrape_sets(
                 match = sku_pattern.search(img.get("src", ""))
                 if match:
                     raw = match.group(1).upper()
-                    base_sku = raw.rstrip("CWRB") if len(raw) > 2 else raw
+                    base_sku = re.sub(r"[A-Z]+$", "", raw) if len(raw) > 2 else raw
                     if base_sku not in seen_member:
                         seen_member.add(base_sku)
                         member_skus.append(base_sku)
