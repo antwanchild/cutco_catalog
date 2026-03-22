@@ -394,28 +394,37 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         raw_html = resp.text
         soup = BeautifulSoup(raw_html, "html.parser")
         sku = None
+        strategy_log: list[str] = []
 
-        # Strategy 1: JSON-LD structured data — most reliable for the product
-        # being sold on the page (gift boxes have their own SKU here).
-        for ld in soup.find_all("script", type="application/ld+json"):
-            try:
-                data = json.loads(ld.string or "")
-                entries = data if isinstance(data, list) else [data]
-                for entry in entries:
-                    if isinstance(entry, dict) and entry.get("@type") == "Product":
-                        sku_val = entry.get("sku") or entry.get("productID")
-                        if sku_val:
-                            sku = str(sku_val).strip().upper()
-                            break
-            except (json.JSONDecodeError, AttributeError):
-                pass
+        # Strategy 0: SKU embedded in the URL slug (e.g. /p/677-super-shears-gift-box).
+        # Most unambiguous source — if the URL carries a numeric prefix we trust it.
+        url_slug_sku = _extract_sku_from_href(url)
+        if url_slug_sku:
+            sku = url_slug_sku
+            strategy_log.append(f"slug={sku}")
+
+        # Strategy 1: JSON-LD structured data.
+        if not sku:
+            for ld in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json.loads(ld.string or "")
+                    entries = data if isinstance(data, list) else [data]
+                    for entry in entries:
+                        if isinstance(entry, dict) and entry.get("@type") == "Product":
+                            sku_val = entry.get("sku") or entry.get("productID")
+                            if sku_val:
+                                sku = str(sku_val).strip().upper()
+                                break
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+                if sku:
+                    break
             if sku:
-                break
+                strategy_log.append(f"json-ld={sku}")
 
         # Strategy 2: Cutco-specific JS page variables.
         # prPageId is reliable for standalone products but on gift box pages
-        # it is set to the contained knife's SKU (for cross-sell purposes),
-        # so JSON-LD is checked first.
+        # it may reference the contained knife's SKU rather than the gift box.
         #   const prPageId = "677";
         #   const defaultWebItemSingle = "1886BK";
         if not sku:
@@ -430,16 +439,18 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                     if digits:
                         sku = digits.group(1)
                         break
+            if sku:
+                strategy_log.append(f"prPageId={sku}")
 
         # Strategy 3: generic inline JS — catches patterns like:
         #   "sku":"1769"  |  'sku': '1769'  |  sku: 1769
-        # Runs after prPageId so page-specific variables take precedence.
         if not sku:
             sku_match = re.search(
                 r"""["']?sku["']?\s*:\s*["']?(\d{2,4}[A-Z]{0,2})["']?""",
                 raw_html, re.IGNORECASE)
             if sku_match:
                 sku = sku_match.group(1).upper()
+                strategy_log.append(f"inline-js={sku}")
 
         # Strategy 4: meta tags (Open Graph / Schema product SKU)
         if not sku:
@@ -447,6 +458,7 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                 tag = soup.find("meta", property=attr) or soup.find("meta", attrs={"name": attr})
                 if tag and tag.get("content", "").strip():
                     sku = tag["content"].strip().upper()
+                    strategy_log.append(f"meta={sku}")
                     break
 
         # Remove script/style blocks before text search so CSS hex colors
@@ -455,14 +467,13 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
             noise.decompose()
 
         # Strategy 5: on-page visible text containing "#XXXX".
-        # Cutco SKUs are 2–4 digits with an optional single color letter.
-        # The word-boundary anchor prevents matching 6-char hex colors like 0073A4.
         if not sku:
             sku_text = soup.find(string=re.compile(r"#\d{2,4}[A-Z]?\b"))
             if sku_text:
                 sku_match = re.search(r"#(\d{2,4}[A-Z]?)\b", sku_text.strip(), re.IGNORECASE)
                 if sku_match:
                     sku = sku_match.group(1).upper()
+                    strategy_log.append(f"visible-text={sku}")
 
         # Strategy 6: keyword context — "Model 1769", "Item No. 1769", etc.
         if not sku:
@@ -472,6 +483,7 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                 page_text, re.IGNORECASE)
             if sku_match:
                 sku = sku_match.group(1).upper()
+                strategy_log.append(f"keyword={sku}")
 
         # Normalise: strip trailing variant letter so we store the base SKU
         if sku and len(sku) > 2 and sku[-1].isalpha() and sku[:-1].isdigit():
@@ -483,7 +495,8 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
 
         page_heading = soup.find("h1")
         name = page_heading.get_text(strip=True) if page_heading else None
-        logger.debug("SKU fetch: %s → sku=%s name=%s", url, sku, name)
+        logger.info("SKU fetch: %s → sku=%s [%s] name=%s",
+                    url, sku, ", ".join(strategy_log) or "none", name)
         return sku, name
     except Exception as exc:
         logger.warning("SKU fetch failed: %s — %s", url, exc)
