@@ -137,7 +137,7 @@ REQUEST_TIMEOUT = 12  # seconds for all outbound HTTP requests
 # Default: nothing blocked — all categories shown in preview before import.
 # Override via env: SYNC_BLOCKED_CATEGORIES="Tableware,Accessories"
 _blocked_env = os.environ.get("SYNC_BLOCKED_CATEGORIES", "")
-SYNC_BLOCKED_CATEGORIES = {c.strip() for c in _blocked_env.split(",") if c.strip()}
+SYNC_BLOCKED_CATEGORIES = {cat_name.strip() for cat_name in _blocked_env.split(",") if cat_name.strip()}
 
 # Set column names as they appear in the spreadsheet
 SPREADSHEET_SET_COLUMNS = [
@@ -178,7 +178,7 @@ class Item(db.Model):
     @property
     def any_unicorn(self) -> bool:
         """True if the item itself is flagged unicorn OR any specific variant is."""
-        return self.is_unicorn or any(v.is_unicorn for v in self.variants)
+        return self.is_unicorn or any(variant.is_unicorn for variant in self.variants)
 
 
 class ItemVariant(db.Model):
@@ -262,8 +262,8 @@ with app.app_context():
     for _item in _bad:
         logger.info("Removing item with invalid single-digit SKU: %s (sku=%s)", _item.name, _item.sku)
         db.session.delete(_item)
-    for it in Item.query.all():
-        ensure_unknown_variant(it)
+    for item in Item.query.all():
+        ensure_unknown_variant(item)
     db.session.commit()
     logger.info("Database ready")
 
@@ -295,7 +295,7 @@ def _extract_sku_from_href(href: str) -> str | None:
     lead = re.match(r'^(\d{3,}[A-Z]{0,3})', slug)
     if lead:
         candidate = lead.group(1)
-    elif any(c.isdigit() for c in slug) and len(slug) <= 12:
+    elif any(char.isdigit() for char in slug) and len(slug) <= 12:
         # Short slug with embedded digits (e.g. "ABC1234")
         candidate = slug
     else:
@@ -335,8 +335,8 @@ def _discover_categories() -> list[tuple[str, str]]:
             raise RuntimeError("No discovery URL returned 200")
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
-        for a in soup.select("a[href*='/shop/']"):
-            href = a.get("href", "").rstrip("/")
+        for anchor in soup.select("a[href*='/shop/']"):
+            href = anchor.get("href", "").rstrip("/")
             slug = href.split("/shop/")[-1].split("?")[0]
             # Skip empty slugs, set pages, and already-seen slugs
             if not slug or slug in seen_slugs or "knife-set" in slug or "set" == slug:
@@ -417,14 +417,14 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         #   const defaultWebItemSingle = "1886BK";
         # Extract only the leading digits so we store the base model number.
         if not sku:
-            for var in ("prPageId", "defaultWebItemSingle"):
-                m = re.search(
-                    rf"""(?:const|var|let)\s+{var}\s*=\s*["']([^"']+)["']""",
+            for js_var_name in ("prPageId", "defaultWebItemSingle"):
+                sku_match = re.search(
+                    rf"""(?:const|var|let)\s+{js_var_name}\s*=\s*["']([^"']+)["']""",
                     raw_html)
-                if m:
+                if sku_match:
                     # Capture leading digits plus optional -N suffix so sheath
                     # SKUs like "4135-2" are preserved distinct from the knife "4135".
-                    digits = re.match(r'^(\d{2,}(?:-\d+)?)', m.group(1).strip())
+                    digits = re.match(r'^(\d{2,}(?:-\d+)?)', sku_match.group(1).strip())
                     if digits:
                         sku = digits.group(1)
                         break
@@ -433,11 +433,11 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         #   "sku":"1769"  |  'sku': '1769'  |  sku: 1769
         # Runs after prPageId so page-specific variables take precedence.
         if not sku:
-            m = re.search(
+            sku_match = re.search(
                 r"""["']?sku["']?\s*:\s*["']?(\d{2,4}[A-Z]{0,2})["']?""",
                 raw_html, re.IGNORECASE)
-            if m:
-                sku = m.group(1).upper()
+            if sku_match:
+                sku = sku_match.group(1).upper()
 
         # Strategy 4: meta tags (Open Graph / Schema product SKU)
         if not sku:
@@ -458,18 +458,18 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         if not sku:
             sku_text = soup.find(string=re.compile(r"#\d{2,4}[A-Z]?\b"))
             if sku_text:
-                m = re.search(r"#(\d{2,4}[A-Z]?)\b", sku_text.strip(), re.IGNORECASE)
-                if m:
-                    sku = m.group(1).upper()
+                sku_match = re.search(r"#(\d{2,4}[A-Z]?)\b", sku_text.strip(), re.IGNORECASE)
+                if sku_match:
+                    sku = sku_match.group(1).upper()
 
         # Strategy 6: keyword context — "Model 1769", "Item No. 1769", etc.
         if not sku:
             page_text = soup.get_text(" ", strip=True)
-            m = re.search(
+            sku_match = re.search(
                 r"(?:model|item|sku|product)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{2,4}[A-Z]?)\b",
                 page_text, re.IGNORECASE)
-            if m:
-                sku = m.group(1).upper()
+            if sku_match:
+                sku = sku_match.group(1).upper()
 
         # Normalise: strip trailing variant letter so we store the base SKU
         if sku and len(sku) > 2 and sku[-1].isalpha() and sku[:-1].isdigit():
@@ -479,8 +479,8 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         if sku and re.fullmatch(r"[0-9A-F]{6}", sku, re.IGNORECASE):
             sku = None
 
-        h1 = soup.find("h1")
-        name = h1.get_text(strip=True) if h1 else None
+        page_heading = soup.find("h1")
+        name = page_heading.get_text(strip=True) if page_heading else None
         logger.debug("SKU fetch: %s → sku=%s name=%s", url, sku, name)
         return sku, name
     except Exception as exc:
@@ -540,21 +540,21 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
             # returns the full product page with JSON-LD.
             seen_hrefs: set[str] = set()
             unique_links = []
-            for a in product_links:
-                full_href = a.get("href", "")
+            for anchor in product_links:
+                full_href = anchor.get("href", "")
                 base_href = full_href.split("&")[0]
                 if base_href not in seen_hrefs:
                     seen_hrefs.add(base_href)
-                    unique_links.append((a, full_href))
+                    unique_links.append((anchor, full_href))
 
-            for a, href in unique_links:
+            for anchor, href in unique_links:
                 base_href = href.split("&")[0]
                 sku = _extract_sku_from_href(base_href)
                 prod_url = href if href.startswith("http") else f"https://www.cutco.com{href}"
 
-                name_el = a.find(["h2", "h3"])
-                if not name_el and a.parent:
-                    name_el = a.parent.find(["h2", "h3"])
+                name_el = anchor.find(["h2", "h3"])
+                if not name_el and anchor.parent:
+                    name_el = anchor.parent.find(["h2", "h3"])
                 name = name_el.get_text(strip=True) if name_el else None
 
                 # Sheaths: URL-based extraction returns the parent knife's
@@ -644,8 +644,8 @@ def scrape_sets(
         resp = requests.get(SCRAPE_SETS_URL, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
-        for a in soup.select("a[href*='/p/']"):
-            href = a.get("href", "")
+        for anchor in soup.select("a[href*='/p/']"):
+            href = anchor.get("href", "")
             if not href:
                 continue
             name_el = a.find(["h2", "h3"])
@@ -787,7 +787,7 @@ def catalog():
              .order_by(col.desc() if direction == "desc" else col)
              .all())
 
-    categories = [r[0] for r in
+    categories = [row[0] for row in
                   db.session.query(Item.category)
                   .filter(Item.category.isnot(None))
                   .distinct().order_by(Item.category).all()]
@@ -844,7 +844,7 @@ def catalog_edit(iid):
         item.notes      = request.form.get("notes", "").strip() or None
 
         # Update set memberships
-        selected_set_ids = set(int(x) for x in request.form.getlist("set_ids"))
+        selected_set_ids = set(int(set_id_str) for set_id_str in request.form.getlist("set_ids"))
         item.sets = Set.query.filter(Set.id.in_(selected_set_ids)).all()
 
         db.session.commit()
@@ -994,12 +994,12 @@ def catalog_sync():
         _grouped_unsorted.setdefault(item["category"], []).append(item)
     def _sku_sort_key(item):
         sku = item.get("sku") or ""
-        m = re.match(r"(\d+)", sku)
-        return (0, int(m.group(1)), sku) if m else (1, 0, sku)
+        sku_num_match = re.match(r"(\d+)", sku)
+        return (0, int(sku_num_match.group(1)), sku) if sku_num_match else (1, 0, sku)
 
     grouped = OrderedDict(
         (cat, sorted(items, key=_sku_sort_key))
-        for cat, items in sorted(_grouped_unsorted.items(), key=lambda kv: kv[0].lower())
+        for cat, items in sorted(_grouped_unsorted.items(), key=lambda cat_items_pair: cat_items_pair[0].lower())
     )
 
     # Also scrape sets for preview — pass gift/bundle candidates from catalog scrape
@@ -1177,14 +1177,14 @@ def ownership_add():
     variant_id = request.args.get("variant_id", type=int)
 
     if request.method == "POST":
-        pid = int(request.form["person_id"])
-        vid = int(request.form["variant_id"])
-        if Ownership.query.filter_by(person_id=pid, variant_id=vid).first():
+        person_id  = int(request.form["person_id"])
+        variant_id = int(request.form["variant_id"])
+        if Ownership.query.filter_by(person_id=person_id, variant_id=variant_id).first():
             flash("That person already has an entry for that variant.", "error")
-            return redirect(url_for("person_collection", pid=pid))
+            return redirect(url_for("person_collection", pid=person_id))
         db.session.add(Ownership(
-            person_id  = pid,
-            variant_id = vid,
+            person_id  = person_id,
+            variant_id = variant_id,
             status     = request.form.get("status", "Owned"),
             notes      = request.form.get("notes", "").strip() or None,
         ))
@@ -1297,16 +1297,16 @@ def export_csv():
             .order_by(Person.name, Item.name, ItemVariant.color).all())
 
     logger.info("CSV export requested: %d rows", len(rows))
-    out    = io.StringIO()
-    writer = csv.writer(out)
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
     writer.writerow(["person", "item_name", "sku", "category", "edge_type",
                      "color", "status", "is_unicorn", "notes"])
     for ownership, variant, item, person in rows:
         writer.writerow([person.name, item.name, item.sku or "", item.category or "",
                          item.edge_type, variant.color, ownership.status,
                          "yes" if (variant.is_unicorn or item.is_unicorn) else "no", ownership.notes or ""])
-    out.seek(0)
-    return Response(out.getvalue(), mimetype="text/csv",
+    csv_buffer.seek(0)
+    return Response(csv_buffer.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
                              "attachment; filename=cutco_collection.csv"})
 
@@ -1380,16 +1380,16 @@ def _build_notes(row: dict) -> str | None:
 
 @app.route("/import/template")
 def import_template():
-    out    = io.StringIO()
-    writer = csv.writer(out)
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
     writer.writerow(["name", "sku", "color", "edge_type", "is_unicorn",
                      "person", "status", "category", "notes"])
     writer.writerow(["2-3/4\" Paring Knife", "1720", "Classic Brown", "Double-D",
                      "no", "Anthony", "Owned", "Kitchen Knives", ""])
     writer.writerow(["Super Shears", "2137", "Pearl White", "Straight",
                      "no", "Anthony", "Owned", "Kitchen Knives", ""])
-    out.seek(0)
-    return Response(out.getvalue(), mimetype="text/csv",
+    csv_buffer.seek(0)
+    return Response(csv_buffer.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
                              "attachment; filename=cutco_import_template.csv"})
 
@@ -1400,43 +1400,43 @@ def import_page():
         return render_template("import_page.html",
                                people=Person.query.order_by(Person.name).all())
 
-    f = request.files.get("csvfile")
-    if not f or not f.filename:
+    uploaded_file = request.files.get("csvfile")
+    if not uploaded_file or not uploaded_file.filename:
         flash("Please choose a file.", "error")
         return render_template("import_page.html",
                                people=Person.query.order_by(Person.name).all())
 
     person_override = request.form.get("person_override", "").strip() or None
-    ext = f.filename.rsplit(".", 1)[-1].lower()
-    logger.info("Import file received: %s (person override: %s)", f.filename, person_override or "none")
+    ext = uploaded_file.filename.rsplit(".", 1)[-1].lower()
+    logger.info("Import file received: %s (person override: %s)", uploaded_file.filename, person_override or "none")
 
     try:
         if ext == "xlsx":
-            wb = openpyxl.load_workbook(io.BytesIO(f.stream.read()), data_only=True)
+            wb = openpyxl.load_workbook(io.BytesIO(uploaded_file.stream.read()), data_only=True)
             ws = wb.active
             raw_headers = [str(cell.value).strip() if cell.value is not None else ""
                            for cell in ws[1]]
             norm_rows = []
             for row in ws.iter_rows(min_row=2, values_only=True):
-                if all(v is None for v in row):
+                if all(cell_value is None for cell_value in row):
                     continue
-                norm_rows.append({raw_headers[i]: str(v).strip() if v is not None else ""
-                                  for i, v in enumerate(row)})
+                norm_rows.append({raw_headers[col_idx]: str(cell_value).strip() if cell_value is not None else ""
+                                  for col_idx, cell_value in enumerate(row)})
             # Keep original casing for set detection; build internal-key row
             parsed_rows = []
             for row in norm_rows:
                 out_row = {}
                 set_memberships = []
                 for orig_key, val in row.items():
-                    lk = orig_key.strip().lower()
-                    if lk in XLSX_COL_MAP:
-                        out_row[XLSX_COL_MAP[lk]] = val
-                    elif lk in XLSX_SET_COLS:
+                    normalized_key = orig_key.strip().lower()
+                    if normalized_key in XLSX_COL_MAP:
+                        out_row[XLSX_COL_MAP[normalized_key]] = val
+                    elif normalized_key in XLSX_SET_COLS:
                         if val.strip().lower() in TRUTHY:
-                            set_memberships.append(XLSX_SET_COLS[lk])
+                            set_memberships.append(XLSX_SET_COLS[normalized_key])
                     else:
                         # Fallback: snake_case normalisation for CSV-style columns
-                        out_row[lk.replace(" ", "_")] = val
+                        out_row[normalized_key.replace(" ", "_")] = val
                 out_row["_sets"] = set_memberships
                 parsed_rows.append(out_row)
         else:
@@ -1472,7 +1472,7 @@ def import_page():
     errors             = []
     seen_skus          = set()
 
-    for i, row in enumerate(parsed_rows, start=2):
+    for row_num, row in enumerate(parsed_rows, start=2):
         name       = row.get("name", "").strip()
         sku        = (row.get("sku", "") or "").strip().upper() or None
         color      = row.get("color", "").strip() or UNKNOWN_COLOR
@@ -1490,7 +1490,7 @@ def import_page():
             person_name = person_override
 
         if not name:
-            errors.append({"row": i, "reason": "Missing name", "data": row})
+            errors.append({"row": row_num, "reason": "Missing name", "data": row})
             continue
 
         if status not in STATUS_OPTIONS:
@@ -1519,7 +1519,7 @@ def import_page():
                 "edge_type": edge_type, "is_unicorn": is_unicorn,
                 "category": category, "notes": notes,
                 "person": person_name, "status": status,
-                "sets": set_names, "row": i,
+                "sets": set_names, "row": row_num,
             })
 
         if person_name and matched_item:

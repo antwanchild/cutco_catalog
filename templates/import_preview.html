@@ -117,46 +117,46 @@
     <tbody>
       {% set offset = new_items | length %}
       {% for item in likely_unicorns %}
-      {% set idx = offset + loop.index0 %}
+      {% set form_field_index = offset + loop.index0 %}
       <tr>
-        <td><input type="checkbox" name="item_accept_{{ idx }}" checked></td>
+        <td><input type="checkbox" name="item_accept_{{ form_field_index }}" checked></td>
         <td>
-          <input type="hidden" name="item_name_{{ idx }}" value="{{ item.name }}">
+          <input type="hidden" name="item_name_{{ form_field_index }}" value="{{ item.name }}">
           {{ item.name }}
         </td>
         <td>
-          <input type="hidden" name="item_sku_{{ idx }}" value="{{ item.sku or '' }}">
+          <input type="hidden" name="item_sku_{{ form_field_index }}" value="{{ item.sku or '' }}">
           <span class="mono">{{ item.sku or '—' }}</span>
         </td>
         <td>
-          <input type="hidden" name="item_color_{{ idx }}" value="{{ item.color }}">
+          <input type="hidden" name="item_color_{{ form_field_index }}" value="{{ item.color }}">
           {{ item.color }}
         </td>
         <td>
-          <select name="item_edge_{{ idx }}" class="select-xs">
+          <select name="item_edge_{{ form_field_index }}" class="select-xs">
             {% for et in edge_types %}
               <option value="{{ et }}" {% if et == item.edge_type %}selected{% endif %}>{{ et }}</option>
             {% endfor %}
           </select>
         </td>
         <td>
-          <input type="text" name="item_category_{{ idx }}" value="{{ item.category or '' }}" class="input-xs">
+          <input type="text" name="item_category_{{ form_field_index }}" value="{{ item.category or '' }}" class="input-xs">
         </td>
         <td>
-          <input type="checkbox" name="item_unicorn_{{ idx }}" {% if item.is_unicorn %}checked{% endif %}>
+          <input type="checkbox" name="item_unicorn_{{ form_field_index }}" {% if item.is_unicorn %}checked{% endif %}>
         </td>
         <td>
-          <input type="text" name="item_person_{{ idx }}" value="{{ item.person or '' }}" class="input-xs">
+          <input type="text" name="item_person_{{ form_field_index }}" value="{{ item.person or '' }}" class="input-xs">
         </td>
         <td>
-          <select name="item_status_{{ idx }}" class="select-xs">
+          <select name="item_status_{{ form_field_index }}" class="select-xs">
             {% for status_option in status_options %}
               <option value="{{ status_option }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
             {% endfor %}
           </select>
         </td>
         <td>
-          <input type="hidden" name="item_sets_{{ idx }}" value="{{ item.sets | join('|') }}">
+          <input type="hidden" name="item_sets_{{ form_field_index }}" value="{{ item.sets | join('|') }}">
           {% if item.sets %}
             <span class="set-chips">{% for set_name in item.sets %}<span class="chip">{{ set_name }}</span>{% endfor %}</span>
           {% else %}—{% endif %}
