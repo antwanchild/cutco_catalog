@@ -129,7 +129,7 @@ document.querySelectorAll('.cat-select-all').forEach(function(categoryToggle) {
 const setsSelectAll = document.getElementById('sets-select-all');
 if (setsSelectAll) {
   setsSelectAll.addEventListener('change', function() {
-    document.querySelectorAll('.set-cb').forEach(cb => cb.checked = setsSelectAll.checked);
+    document.querySelectorAll('.set-cb').forEach(checkbox => checkbox.checked = setsSelectAll.checked);
   });
 }
 
@@ -138,25 +138,25 @@ if (setsSelectAll) {
 const tableSort = new WeakMap();
 
 function skuNum(val) {
-  const m = val.match(/^(\d+)/);
-  return m ? parseInt(m[1], 10) : Infinity;
+  const skuMatch = val.match(/^(\d+)/);
+  return skuMatch ? parseInt(skuMatch[1], 10) : Infinity;
 }
 
 function sortTable(table, col, dir) {
   const tbody = table.querySelector('tbody');
   const rows  = Array.from(tbody.querySelectorAll('tr'));
 
-  rows.sort(function(a, b) {
+  rows.sort(function(rowA, rowB) {
     // col index: name=1, sku=2
-    const idx = col === 'name' ? 1 : 2;
-    const aVal = (a.cells[idx] ? a.cells[idx].textContent.trim() : '');
-    const bVal = (b.cells[idx] ? b.cells[idx].textContent.trim() : '');
+    const colIdx = col === 'name' ? 1 : 2;
+    const cellTextA = (rowA.cells[colIdx] ? rowA.cells[colIdx].textContent.trim() : '');
+    const cellTextB = (rowB.cells[colIdx] ? rowB.cells[colIdx].textContent.trim() : '');
     let cmp;
     if (col === 'sku') {
-      const an = skuNum(aVal), bn = skuNum(bVal);
-      cmp = an !== bn ? an - bn : aVal.localeCompare(bVal);
+      const skuA = skuNum(cellTextA), skuB = skuNum(cellTextB);
+      cmp = skuA !== skuB ? skuA - skuB : cellTextA.localeCompare(cellTextB);
     } else {
-      cmp = aVal.localeCompare(bVal);
+      cmp = cellTextA.localeCompare(cellTextB);
     }
     return dir === 'asc' ? cmp : -cmp;
   });
