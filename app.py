@@ -88,12 +88,7 @@ SCRAPE_CATEGORIES = [
     ("Kitchen Knives",   "https://www.cutco.com/shop/kitchen-knives"),
 ]
 
-# Individual product pages that don't appear under any category listing.
-# Each entry is (category, url) — scraped directly as a single-item page.
-SCRAPE_INDIVIDUAL_URLS = [
-    ("Accessories", "https://www.cutco.com/p/super-shears"),
-    ("Accessories", "https://www.cutco.com/p/knife-sharpener"),
-]
+_BUNDLE_KEYWORDS = {"gift", "additional"}
 
 SCRAPE_SETS_URL = "https://www.cutco.com/shop/knife-sets"
 SCRAPE_HEADERS  = {"User-Agent": "Mozilla/5.0 (compatible; CutcoVaultBot/1.0)"}
@@ -413,10 +408,10 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
 
         h1 = soup.find("h1")
         name = h1.get_text(strip=True) if h1 else None
-        logger.info("SKU fetch: %s → sku=%s name=%s", url, sku, name)
+        logger.debug("SKU fetch: %s → sku=%s name=%s", url, sku, name)
         return sku, name
     except Exception as exc:
-        logger.info("SKU fetch failed: %s — %s", url, exc)
+        logger.warning("SKU fetch failed: %s — %s", url, exc)
         return None, None
 
 
@@ -444,21 +439,20 @@ def scrape_catalog():
             # Only stop at sections that explicitly indicate gift bundles or
             # additional/accessory groupings — not generic headings like "set"
             # or "collection" which appear in normal product sections too.
-            _bundle_keywords = {"gift", "additional"}
             product_links = []
             for element in soup.descendants:
                 if element.name in ("h2", "h3", "h4") and product_links:
                     if any(kw in element.get_text(strip=True).lower()
-                           for kw in _bundle_keywords):
+                           for kw in _BUNDLE_KEYWORDS):
                         logger.debug("Bundle section detected on %s: '%s'",
                                      cat_url, element.get_text(strip=True))
                         break
                 if element.name == "a" and "/p/" in element.get("href", ""):
                     product_links.append(element)
 
-            logger.info("%s: found %d /p/ links — %s",
-                        cat_name, len(product_links),
-                        [a.get("href", "") for a in product_links[:10]])
+            logger.debug("%s: found %d /p/ links — %s",
+                         cat_name, len(product_links),
+                         [a.get("href", "") for a in product_links[:10]])
 
             # Deduplicate: strip &view=product variants so each product is
             # processed at most once per category, but keep the full href
@@ -526,37 +520,6 @@ def scrape_catalog():
                 results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
                 added_from_slugs += 1
         logger.info("Slug queue: %d pages fetched, %d items added", len(slug_queue), added_from_slugs)
-
-    # Individual product pages not listed under any category.
-    # SKU is extracted from the page content (e.g. "#1778" text) since
-    # these URLs use slug-style paths with no numeric SKU in the URL itself.
-    for cat_name, prod_url in SCRAPE_INDIVIDUAL_URLS:
-        if cat_name in SYNC_BLOCKED_CATEGORIES:
-            continue
-        try:
-            resp = requests.get(prod_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "html.parser")
-            # SKU appears on the page as text like "#1778" or "Model #1778"
-            sku_el = soup.find(string=re.compile(r"#\d{2,}"))
-            if not sku_el:
-                logger.warning("Could not find SKU on individual product page: %s", prod_url)
-                continue
-            sku = re.search(r"#([0-9A-Z]+)", sku_el.strip(), re.IGNORECASE)
-            if not sku:
-                continue
-            sku = sku.group(1).upper()
-            if sku in seen_skus:
-                continue
-            name_el = soup.find(["h1", "h2"])
-            name = name_el.get_text(strip=True) if name_el else None
-            if not name:
-                continue
-            seen_skus.add(sku)
-            results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
-            time.sleep(0.4)
-        except Exception as exc:
-            logger.warning("Scrape failed for individual product %s: %s", prod_url, exc)
 
     return results
 
