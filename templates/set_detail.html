@@ -25,7 +25,7 @@
     <tr>
       <td>
         <a href="{{ url_for('item_owners', iid=item.id) }}">{{ item.name }}</a>
-        {% if item.is_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+        {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
       </td>
       <td class="mono">{{ item.sku or '—' }}</td>
       <td>{{ item.category or '—' }}</td>

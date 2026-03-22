@@ -16,7 +16,7 @@
   {% if item.sku %}<span><strong>SKU:</strong> {{ item.sku }}</span>{% endif %}
   {% if item.category %}<span><strong>Category:</strong> {{ item.category }}</span>{% endif %}
   <span><strong>Edge:</strong> {{ item.edge_type }}</span>
-  {% if item.is_unicorn %}<span class="badge badge-unicorn">🦄 Unicorn</span>{% endif %}
+  {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄 Unicorn</span>{% endif %}
   {% if item.sets %}
     <span><strong>Sets:</strong>
       {% for item_set in item.sets %}
