@@ -93,7 +93,7 @@ _BUNDLE_KEYWORDS = {"gift", "additional"}
 # Words that indicate a product is a bundle/set, not a standalone catalog item.
 # Knife blocks (e.g. "Gourmet Set Block") are excluded from this check.
 _SET_NAME_PATTERN = re.compile(
-    r"\b(set|pack|mates|classics|combo|collection|favorites|starters|bundle|companions|gift\s+box)\b",
+    r"\b(set|setting|pack|mates|classics|combo|collection|favorites|starters|bundle|companions|gift\s+box)\b",
     re.IGNORECASE,
 )
 
@@ -102,8 +102,11 @@ def _is_set_product(name: str) -> bool:
     """Return True if the name suggests a bundle/set rather than a single item."""
     if not name or not _SET_NAME_PATTERN.search(name):
         return False
-    # Knife blocks are standalone items even though their name contains "set"
-    return "block" not in name.lower()
+    # Knife storage blocks are standalone items — their name contains "Set Block"
+    # as a phrase (e.g. "Gourmet Set Block"), not "Set with Block".
+    if "set block" in name.lower():
+        return False
+    return True
 
 
 SCRAPE_SETS_URL = "https://www.cutco.com/shop/knife-sets"
