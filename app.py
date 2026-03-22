@@ -349,10 +349,11 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
     Used for pure-slug URLs like /p/fishermans-solution where no numeric SKU
     appears in the URL itself.  Tries several extraction strategies in order:
       1. JSON-LD structured data (<script type="application/ld+json">)
-      2. Inline JS variable — "sku":"1769" in raw HTML
-      3. Meta tag (product:retailer_item_id or similar)
-      4. On-page visible text matching "#XXXX" (scripts/styles stripped first)
-      5. Broader keyword context (Model/Item/SKU followed by a number)
+      2. Cutco JS page variables: prPageId / defaultWebItemSingle (most reliable)
+      3. Generic inline JS — "sku":"1769" in raw HTML
+      4. Meta tag (product:retailer_item_id or similar)
+      5. On-page visible text matching "#XXXX" (scripts/styles stripped first)
+      6. Broader keyword context (Model/Item/SKU followed by a number)
     """
     try:
         resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
@@ -379,17 +380,9 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
             if sku:
                 break
 
-        # Strategy 2: inline JS variable — catches patterns like:
-        #   "sku":"1769"  |  'sku': '1769'  |  sku: 1769
-        if not sku:
-            m = re.search(
-                r"""["']?sku["']?\s*:\s*["']?(\d{2,4}[A-Z]{0,2})["']?""",
-                raw_html, re.IGNORECASE)
-            if m:
-                sku = m.group(1).upper()
-
-        # Strategy 2b: Cutco-specific JS page variables, e.g.:
-        #   const prPageId = "1886BK";
+        # Strategy 2: Cutco-specific JS page variables — most reliable source
+        # since prPageId is set to the SKU of the product being viewed.
+        #   const prPageId = "677";
         #   const defaultWebItemSingle = "1886BK";
         # Extract only the leading digits so we store the base model number.
         if not sku:
@@ -403,7 +396,17 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                         sku = digits.group(1)
                         break
 
-        # Strategy 3: meta tags (Open Graph / Schema product SKU)
+        # Strategy 3: generic inline JS — catches patterns like:
+        #   "sku":"1769"  |  'sku': '1769'  |  sku: 1769
+        # Runs after prPageId so page-specific variables take precedence.
+        if not sku:
+            m = re.search(
+                r"""["']?sku["']?\s*:\s*["']?(\d{2,4}[A-Z]{0,2})["']?""",
+                raw_html, re.IGNORECASE)
+            if m:
+                sku = m.group(1).upper()
+
+        # Strategy 4: meta tags (Open Graph / Schema product SKU)
         if not sku:
             for attr in ("product:retailer_item_id", "product:sku"):
                 tag = soup.find("meta", property=attr) or soup.find("meta", attrs={"name": attr})
@@ -416,7 +419,7 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         for noise in soup.find_all(["script", "style"]):
             noise.decompose()
 
-        # Strategy 4: on-page visible text containing "#XXXX".
+        # Strategy 5: on-page visible text containing "#XXXX".
         # Cutco SKUs are 2–4 digits with an optional single color letter.
         # The word-boundary anchor prevents matching 6-char hex colors like 0073A4.
         if not sku:
@@ -426,7 +429,7 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                 if m:
                     sku = m.group(1).upper()
 
-        # Strategy 5: keyword context — "Model 1769", "Item No. 1769", etc.
+        # Strategy 6: keyword context — "Model 1769", "Item No. 1769", etc.
         if not sku:
             page_text = soup.get_text(" ", strip=True)
             m = re.search(
