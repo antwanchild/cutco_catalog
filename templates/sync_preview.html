@@ -34,9 +34,16 @@
       select all
     </label>
   </h3>
-  <table class="data-table">
+  <table class="data-table" style="table-layout:fixed;width:100%">
+    <colgroup>
+      <col style="width:36px">
+      <col>
+      <col style="width:100px">
+      <col style="width:180px">
+      <col style="width:32px">
+    </colgroup>
     <thead>
-      <tr><th style="width:32px"></th><th>Name</th><th>SKU</th><th>Category</th><th></th></tr>
+      <tr><th></th><th>Name</th><th>SKU</th><th>Category</th><th></th></tr>
     </thead>
     <tbody>
       {% for item in items %}
