@@ -379,8 +379,8 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
 
     Used for pure-slug URLs like /p/fishermans-solution where no numeric SKU
     appears in the URL itself.  Tries several extraction strategies in order:
-      1. Cutco JS page variables: prPageId / defaultWebItemSingle (most reliable)
-      2. JSON-LD structured data (<script type="application/ld+json">)
+      1. JSON-LD structured data (<script type="application/ld+json">)
+      2. Cutco JS page variables: prPageId / defaultWebItemSingle
       3. Generic inline JS — "sku":"1769" in raw HTML
       4. Meta tag (product:retailer_item_id or similar)
       5. On-page visible text matching "#XXXX" (scripts/styles stripped first)
@@ -395,40 +395,41 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         soup = BeautifulSoup(raw_html, "html.parser")
         sku = None
 
-        # Strategy 1: Cutco-specific JS page variables — most reliable since
-        # prPageId uniquely identifies the product currently being viewed.
-        # Checked first because JSON-LD can include cross-sell/related products
-        # whose SKU would otherwise shadow the page's own SKU.
+        # Strategy 1: JSON-LD structured data — most reliable for the product
+        # being sold on the page (gift boxes have their own SKU here).
+        for ld in soup.find_all("script", type="application/ld+json"):
+            try:
+                data = json.loads(ld.string or "")
+                entries = data if isinstance(data, list) else [data]
+                for entry in entries:
+                    if isinstance(entry, dict) and entry.get("@type") == "Product":
+                        sku_val = entry.get("sku") or entry.get("productID")
+                        if sku_val:
+                            sku = str(sku_val).strip().upper()
+                            break
+            except (json.JSONDecodeError, AttributeError):
+                pass
+            if sku:
+                break
+
+        # Strategy 2: Cutco-specific JS page variables.
+        # prPageId is reliable for standalone products but on gift box pages
+        # it is set to the contained knife's SKU (for cross-sell purposes),
+        # so JSON-LD is checked first.
         #   const prPageId = "677";
         #   const defaultWebItemSingle = "1886BK";
-        for js_var_name in ("prPageId", "defaultWebItemSingle"):
-            sku_match = re.search(
-                rf"""(?:const|var|let)\s+{js_var_name}\s*=\s*["']([^"']+)["']""",
-                raw_html)
-            if sku_match:
-                # Capture leading digits plus optional -N suffix so sheath
-                # SKUs like "4135-2" are preserved distinct from the knife "4135".
-                digits = re.match(r'^(\d{2,}(?:-\d+)?)', sku_match.group(1).strip())
-                if digits:
-                    sku = digits.group(1)
-                    break
-
-        # Strategy 2: JSON-LD structured data.
         if not sku:
-            for ld in soup.find_all("script", type="application/ld+json"):
-                try:
-                    data = json.loads(ld.string or "")
-                    entries = data if isinstance(data, list) else [data]
-                    for entry in entries:
-                        if isinstance(entry, dict) and entry.get("@type") == "Product":
-                            sku_val = entry.get("sku") or entry.get("productID")
-                            if sku_val:
-                                sku = str(sku_val).strip().upper()
-                                break
-                except (json.JSONDecodeError, AttributeError):
-                    pass
-                if sku:
-                    break
+            for js_var_name in ("prPageId", "defaultWebItemSingle"):
+                sku_match = re.search(
+                    rf"""(?:const|var|let)\s+{js_var_name}\s*=\s*["']([^"']+)["']""",
+                    raw_html)
+                if sku_match:
+                    # Capture leading digits plus optional -N suffix so sheath
+                    # SKUs like "4135-2" are preserved distinct from the knife "4135".
+                    digits = re.match(r'^(\d{2,}(?:-\d+)?)', sku_match.group(1).strip())
+                    if digits:
+                        sku = digits.group(1)
+                        break
 
         # Strategy 3: generic inline JS — catches patterns like:
         #   "sku":"1769"  |  'sku': '1769'  |  sku: 1769
@@ -649,9 +650,9 @@ def scrape_sets(
             href = anchor.get("href", "")
             if not href:
                 continue
-            name_el = a.find(["h2", "h3"])
-            if not name_el and a.parent:
-                name_el = a.parent.find(["h2", "h3"])
+            name_el = anchor.find(["h2", "h3"])
+            if not name_el and anchor.parent:
+                name_el = anchor.parent.find(["h2", "h3"])
             name = name_el.get_text(strip=True) if name_el else None
             if not name:
                 continue
@@ -690,6 +691,10 @@ def scrape_sets(
                 if match:
                     raw = match.group(1).upper()
                     base_sku = re.sub(r"[A-Z]+$", "", raw) if len(raw) > 2 else raw
+                    # Skip year-like numbers (2000–2099) — these appear in
+                    # marketing/packaging image filenames, not product SKUs.
+                    if re.fullmatch(r"20\d{2}", base_sku):
+                        continue
                     if base_sku not in seen_member:
                         seen_member.add(base_sku)
                         member_skus.append(base_sku)
@@ -1190,9 +1195,9 @@ def ownership_add():
             notes      = request.form.get("notes", "").strip() or None,
         ))
         db.session.commit()
-        logger.info("Ownership added: person %d, variant %d", pid, vid)
+        logger.info("Ownership added: person %d, variant %d", person_id, variant_id)
         flash("Entry logged.", "success")
-        return redirect(url_for("person_collection", pid=pid))
+        return redirect(url_for("person_collection", pid=person_id))
 
     sel_item = Item.query.get(item_id) if item_id else None
     return render_template("ownership_form.html", ownership=None,
@@ -1441,7 +1446,7 @@ def import_page():
                 out_row["_sets"] = set_memberships
                 parsed_rows.append(out_row)
         else:
-            stream = io.StringIO(f.stream.read().decode("utf-8-sig"))
+            stream = io.StringIO(uploaded_file.stream.read().decode("utf-8-sig"))
             reader = csv.DictReader(stream)
             parsed_rows = []
             for row in reader:
