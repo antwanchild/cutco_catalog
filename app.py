@@ -300,11 +300,12 @@ def _extract_sku_from_href(href: str) -> str | None:
         candidate = slug
     else:
         return None
-    # Strip sheath suffix, then optional color letter, to get the base SKU
+    # Strip sheath suffix, then all trailing color letters, to get the base SKU
     if candidate.endswith("SH"):
         candidate = candidate[:-2]
-    if candidate and candidate[-1].isalpha() and len(candidate) > 2 and candidate[:-1].isdigit():
-        candidate = candidate[:-1]
+    stripped = re.sub(r"[A-Z]+$", "", candidate)
+    if stripped and stripped.isdigit() and len(stripped) >= 2:
+        candidate = stripped
     return candidate or None
 
 
@@ -485,9 +486,10 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                 sku = sku_match.group(1).upper()
                 strategy_log.append(f"keyword={sku}")
 
-        # Normalise: strip trailing variant letter so we store the base SKU
-        if sku and len(sku) > 2 and sku[-1].isalpha() and sku[:-1].isdigit():
-            sku = sku[:-1]
+        # Normalise: strip all trailing color/variant letters to get the base SKU
+        stripped = re.sub(r"[A-Z]+$", "", sku or "")
+        if stripped and stripped.isdigit() and len(stripped) >= 2:
+            sku = stripped
 
         # Reject CSS hex colors — 6 hex chars like "0073A4" are never a SKU
         if sku and re.fullmatch(r"[0-9A-F]{6}", sku, re.IGNORECASE):
