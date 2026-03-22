@@ -619,46 +619,40 @@ def scrape_sets(
             seen_slugs.add(slug)
             set_links.append(dict(name=name, slug=slug, url=url))
 
-    # Visit each set detail page and extract member SKUs
-    # Image URLs look like: /products/rolo/1720C-h.jpg — SKU is the numeric prefix
+    # Fetch each set detail page in parallel to extract SKU and member items.
+    # Image URLs look like: /products/rolo/1720C-h.jpg — SKU is the numeric prefix.
     sku_pattern = re.compile(r"/rolo/([0-9]+[A-Z]?)-h\.", re.IGNORECASE)
 
-    for set_link in set_links:
-        time.sleep(0.4)
+    def _fetch_set_detail(set_link: dict) -> dict | None:
+        fetch_url = set_link["url"]
+        if "&view=product" not in fetch_url:
+            fetch_url += "&view=product"
         try:
-            fetch_url = set_link["url"]
-            if "&view=product" not in fetch_url:
-                fetch_url = fetch_url + "&view=product"
             set_sku, _ = _fetch_sku_from_page(fetch_url)
-
             resp = requests.get(fetch_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
             detail = BeautifulSoup(resp.text, "html.parser")
-
-            # Extract member SKUs from rolo image URLs, strip color suffix
             member_skus = []
-            seen_member = set()
+            seen_member: set[str] = set()
             for img in detail.select("img[src*='/rolo/']"):
-                src = img.get("src", "")
-                match = sku_pattern.search(src)
+                match = sku_pattern.search(img.get("src", ""))
                 if match:
                     raw = match.group(1).upper()
-                    # Strip trailing color letter (C, W, R, etc.) to get base SKU
                     base_sku = raw.rstrip("CWRB") if len(raw) > 2 else raw
                     if base_sku not in seen_member:
                         seen_member.add(base_sku)
                         member_skus.append(base_sku)
-
-            results.append(dict(
-                name=set_link["name"],
-                sku=set_sku,
-                url=set_link["url"],
-                member_skus=member_skus,
-            ))
-            logger.debug("Set '%s': %d members", set_link["name"], len(member_skus))
-
+            logger.debug("Set '%s': sku=%s, %d members", set_link["name"], set_sku, len(member_skus))
+            return dict(name=set_link["name"], sku=set_sku, url=set_link["url"], member_skus=member_skus)
         except Exception as exc:
             logger.warning("Scrape failed for set %s: %s", set_link["url"], exc)
+            return None
+
+    logger.info("Fetching %d set detail pages (parallel)", len(set_links))
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for result in pool.map(_fetch_set_detail, set_links):
+            if result is not None:
+                results.append(result)
 
     logger.info("Sets scraped: %d", len(results))
     return results
