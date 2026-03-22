@@ -435,10 +435,17 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         return None, None
 
 
-def scrape_catalog():
-    """Scrape all item categories and return a list of item dicts."""
-    results    = []
-    seen_skus  = set()
+def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
+    """Scrape all item categories.
+
+    Returns (items, set_candidates) where set_candidates is a list of
+    (name, url) tuples for products filtered out as bundles/sets so that
+    scrape_sets() can visit their detail pages for member-SKU extraction.
+    """
+    results        = []
+    set_candidates: list[tuple[str, str]] = []
+    seen_skus      = set()
+    seen_set_urls: set[str] = set()
     # pure-slug items queued for a single parallel fetch pass at the end:
     # list of (prod_url, cat_name, name_from_category_page)
     slug_queue: list[tuple[str, str, str | None]] = []
@@ -512,7 +519,12 @@ def scrape_catalog():
                         slug_queue.append((prod_url, cat_name, name))
                     continue
 
-                if sku in seen_skus or not name or _is_set_product(name):
+                if sku in seen_skus or not name:
+                    continue
+                if _is_set_product(name):
+                    if prod_url not in seen_set_urls:
+                        seen_set_urls.add(prod_url)
+                        set_candidates.append((name, prod_url))
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
@@ -534,35 +546,45 @@ def scrape_catalog():
                 prod_url, cat_name, cat_page_name = future_map[future]
                 sku, page_name = future.result()
                 name = cat_page_name or page_name
-                if not sku or sku in seen_skus or not name or _is_set_product(name):
+                if not sku or sku in seen_skus or not name:
+                    continue
+                if _is_set_product(name):
+                    if prod_url not in seen_set_urls:
+                        seen_set_urls.add(prod_url)
+                        set_candidates.append((name, prod_url))
                     continue
                 seen_skus.add(sku)
                 results.append(dict(name=name, sku=sku, category=cat_name, url=prod_url))
                 added_from_slugs += 1
         logger.info("Slug queue: %d pages fetched, %d items added", len(slug_queue), added_from_slugs)
 
-    return results
+    return results, set_candidates
 
 
-def scrape_sets() -> list[dict]:
+def scrape_sets(
+    extra_candidates: list[tuple[str, str]] | None = None,
+) -> list[dict]:
     """
-    Scrape the sets listing page, then visit each set detail page to extract
-    member item SKUs from the Set Pieces section image URLs.
+    Scrape the knife-sets listing page, then visit each set detail page to
+    extract member item SKUs from the Set Pieces section image URLs.
+
+    extra_candidates is an optional list of (name, url) tuples for bundle/set
+    products discovered during the catalog scrape (e.g. gift boxes, combos)
+    that do not appear on the knife-sets listing page.
 
     Returns a list of dicts:
       { name, sku, url, member_skus: [str, ...] }
     """
     results = []
-    seen_set_skus = set()
+    seen_slugs: set[str] = set()
+    set_links = []
 
     try:
         resp = requests.get(SCRAPE_SETS_URL, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
-        set_links = []
         for a in soup.select("a[href*='/p/']"):
             href = a.get("href", "")
-            # Set URLs use slug-style paths like /p/ultimate-set, not numeric SKUs
             if not href:
                 continue
             name_el = a.find(["h2", "h3"])
@@ -572,14 +594,19 @@ def scrape_sets() -> list[dict]:
             if not name:
                 continue
             url = href if href.startswith("http") else f"https://www.cutco.com{href}"
-            # Dedupe by URL slug
             slug = href.rstrip("/").split("/")[-1].split("&")[0]
-            if slug not in seen_set_skus:
-                seen_set_skus.add(slug)
+            if slug not in seen_slugs:
+                seen_slugs.add(slug)
                 set_links.append(dict(name=name, slug=slug, url=url))
     except Exception as exc:
         logger.warning("Scrape failed for sets listing: %s", exc)
-        return results
+
+    # Merge in gift sets / bundles found during the catalog scrape
+    for name, url in (extra_candidates or []):
+        slug = url.rstrip("/").split("/")[-1].split("&")[0]
+        if slug not in seen_slugs:
+            seen_slugs.add(slug)
+            set_links.append(dict(name=name, slug=slug, url=url))
 
     # Visit each set detail page and extract member SKUs
     # Image URLs look like: /products/rolo/1720C-h.jpg — SKU is the numeric prefix
@@ -897,7 +924,7 @@ def catalog_sync():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog"))
 
-    scraped = scrape_catalog()
+    scraped, set_candidates = scrape_catalog()
     existing_skus = {item.sku for item in Item.query.filter(Item.sku.isnot(None)).all()}
     new_items = [i for i in scraped if i["sku"] not in existing_skus]
 
@@ -906,8 +933,8 @@ def catalog_sync():
     for item in new_items:
         grouped.setdefault(item["category"], []).append(item)
 
-    # Also scrape sets for preview
-    scraped_sets  = scrape_sets()
+    # Also scrape sets for preview — pass gift/bundle candidates from catalog scrape
+    scraped_sets  = scrape_sets(extra_candidates=set_candidates)
     existing_sets = {existing_set.name.lower() for existing_set in Set.query.all()}
     new_sets      = [scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() not in existing_sets]
 
