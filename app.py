@@ -401,7 +401,9 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                     rf"""(?:const|var|let)\s+{var}\s*=\s*["']([^"']+)["']""",
                     raw_html)
                 if m:
-                    digits = re.match(r'^(\d{2,})', m.group(1).strip())
+                    # Capture leading digits plus optional -N suffix so sheath
+                    # SKUs like "4135-2" are preserved distinct from the knife "4135".
+                    digits = re.match(r'^(\d{2,}(?:-\d+)?)', m.group(1).strip())
                     if digits:
                         sku = digits.group(1)
                         break
