@@ -93,7 +93,7 @@ _BUNDLE_KEYWORDS = {"gift", "additional"}
 # Words that indicate a product is a bundle/set, not a standalone catalog item.
 # Knife blocks (e.g. "Gourmet Set Block") are excluded from this check.
 _SET_NAME_PATTERN = re.compile(
-    r"\b(set|pack|mates|classics|combo|collection|favorites|starters|bundle)\b",
+    r"\b(set|pack|mates|classics|combo|collection|favorites|starters|bundle|companions|gift\s+box)\b",
     re.IGNORECASE,
 )
 
@@ -244,7 +244,7 @@ def _extract_sku_from_href(href: str) -> str | None:
         return None
     # If slug starts with digits, extract the leading numeric+letter portion.
     # This handles "1720-PETITE-CHEF" → "1720" as well as "4135CSH" → "4135C".
-    lead = re.match(r'^(\d+[A-Z]{0,3})', slug)
+    lead = re.match(r'^(\d{2,}[A-Z]{0,3})', slug)
     if lead:
         candidate = lead.group(1)
     elif any(c.isdigit() for c in slug) and len(slug) <= 12:
