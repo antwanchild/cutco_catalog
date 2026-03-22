@@ -9,9 +9,8 @@
   </div>
 </div>
 
-{% if set.notes %}
-<p class="set-notes">{{ set.notes }}</p>
-{% endif %}
+{% if set.sku %}<p class="muted">SKU: <span class="mono">{{ set.sku }}</span></p>{% endif %}
+{% if set.notes %}<p class="set-notes">{{ set.notes }}</p>{% endif %}
 
 <p class="table-count">{{ set.items | length }} item{% if set.items | length != 1 %}s{% endif %} in this set</p>
 

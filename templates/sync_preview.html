@@ -64,7 +64,7 @@
     <thead>
       <tr>
         <th style="width:32px"><input type="checkbox" id="sets-select-all" checked></th>
-        <th>Set Name</th><th>Members</th><th></th>
+        <th>Set Name</th><th>SKU</th><th>Members</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -73,9 +73,11 @@
         <td>
           <input type="checkbox" name="selected_sets" value="{{ item_set.name }}" class="set-cb" checked>
           <input type="hidden" name="set_name_{{ loop.index0 }}"    value="{{ item_set.name }}">
+          <input type="hidden" name="set_sku_{{ loop.index0 }}"     value="{{ item_set.sku or '' }}">
           <input type="hidden" name="set_members_{{ loop.index0 }}" value="{{ item_set.member_skus | join('|') }}">
         </td>
         <td>{{ item_set.name }}</td>
+        <td class="mono">{{ item_set.sku or '—' }}</td>
         <td>
           <span class="muted small">{{ item_set.member_skus | length }} item(s):</span>
           <span class="mono small">{{ item_set.member_skus | join(', ') }}</span>
