@@ -979,7 +979,10 @@ def catalog_sync():
     _grouped_unsorted: dict = {}
     for item in new_items:
         _grouped_unsorted.setdefault(item["category"], []).append(item)
-    grouped = OrderedDict(sorted(_grouped_unsorted.items(), key=lambda kv: kv[0].lower()))
+    grouped = OrderedDict(
+        (cat, sorted(items, key=lambda i: i["name"].lower()))
+        for cat, items in sorted(_grouped_unsorted.items(), key=lambda kv: kv[0].lower())
+    )
 
     # Also scrape sets for preview — pass gift/bundle candidates from catalog scrape
     scraped_sets  = scrape_sets(extra_candidates=set_candidates)
