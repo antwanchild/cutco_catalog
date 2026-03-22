@@ -15,6 +15,7 @@
 <p class="table-count">{{ set.items | length }} item{% if set.items | length != 1 %}s{% endif %} in this set</p>
 
 {% if set.items %}
+<div class="table-wrap">
 <table class="data-table">
   <thead>
     <tr><th>Name</th><th>SKU</th><th>Category</th><th>Edge</th><th>Variants</th></tr>
@@ -38,6 +39,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <p class="empty">No items in this set yet. Edit items from the catalog to assign them.</p>
 {% endif %}

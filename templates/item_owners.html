@@ -31,6 +31,7 @@
 
 {% if entries %}
 <h2>Collectors</h2>
+<div class="table-wrap">
 <table class="data-table">
   <thead><tr><th>Person</th><th>Color</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
   <tbody>
@@ -51,6 +52,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <p class="empty">No one owns this item yet.</p>
 {% endif %}

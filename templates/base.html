@@ -10,6 +10,7 @@
 
 <nav class="navbar">
   <a class="brand" href="{{ url_for('index') }}">⚔️ Cutco Vault</a>
+  <button class="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
   <div class="nav-links">
     <a href="{{ url_for('catalog') }}" {% if request.endpoint and request.endpoint.startswith('catalog') %}class="active"{% endif %}>Catalog</a>
     <a href="{{ url_for('sets_list') }}" {% if request.endpoint and 'set' in request.endpoint %}class="active"{% endif %}>Sets</a>
@@ -26,6 +27,14 @@
     {% endif %}
   </div>
 </nav>
+<script>
+  document.querySelector('.nav-toggle').addEventListener('click', function() {
+    var links = document.querySelector('.nav-links');
+    var open = links.classList.toggle('open');
+    this.setAttribute('aria-expanded', open);
+    this.textContent = open ? '✕' : '☰';
+  });
+</script>
 
 <main class="container">
   {% with messages = get_flashed_messages(with_categories=true) %}
