@@ -8,13 +8,14 @@
 
 <table class="data-table">
   <thead>
-    <tr><th>Color</th><th>Notes</th><th>Ownerships</th><th>Actions</th></tr>
+    <tr><th>Color</th><th>Notes</th><th>🦄</th><th>Ownerships</th><th>Actions</th></tr>
   </thead>
   <tbody>
     {% for variant in item.variants %}
     <tr>
       <td>{{ variant.color }}{% if variant.color == UNKNOWN_COLOR %} <span class="muted">(default)</span>{% endif %}</td>
       <td>{{ variant.notes or '—' }}</td>
+      <td>{% if variant.is_unicorn %}🦄{% endif %}</td>
       <td>{{ variant.ownerships | length }}</td>
       <td class="actions">
         <button class="btn btn-xs" onclick="toggleEdit({{ variant.id }})">Edit</button>
@@ -31,6 +32,9 @@
         <form method="post" action="{{ url_for('variant_edit', vid=variant.id) }}" class="inline-form">
           <input type="text" name="color" value="{{ variant.color }}" class="input-sm" required>
           <input type="text" name="notes" value="{{ variant.notes or '' }}" placeholder="Notes…" class="input-sm">
+          <label class="checkbox-label">
+            <input type="checkbox" name="is_unicorn"{% if variant.is_unicorn %} checked{% endif %}> Unicorn
+          </label>
           <button type="submit" class="btn btn-xs btn-primary">Save</button>
           <button type="button" class="btn btn-xs btn-ghost" onclick="toggleEdit({{ variant.id }})">Cancel</button>
         </form>

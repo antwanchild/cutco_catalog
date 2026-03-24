@@ -923,8 +923,9 @@ def variant_edit(vid):
     if not color:
         flash("Color cannot be empty.", "error")
         return redirect(url_for("variants", iid=iid))
-    variant.color = color
-    variant.notes = request.form.get("notes", "").strip() or None
+    variant.color      = color
+    variant.notes      = request.form.get("notes", "").strip() or None
+    variant.is_unicorn = request.form.get("is_unicorn") == "on"
     db.session.commit()
     logger.info("Variant updated: item %d → %s", iid, color)
     flash(f'Updated to "{color}".', "success")
