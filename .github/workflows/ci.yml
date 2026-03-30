@@ -41,6 +41,8 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Gitleaks – secret scan
         uses: gitleaks/gitleaks-action@v2.3.9
