@@ -6,6 +6,7 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    rebase-strategy: auto
     labels:
       - dependencies
       - python
@@ -16,6 +17,7 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 3
+    rebase-strategy: auto
     labels:
       - dependencies
       - docker
@@ -26,6 +28,7 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    rebase-strategy: auto
     labels:
       - dependencies
       - github-actions
