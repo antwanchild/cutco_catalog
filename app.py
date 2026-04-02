@@ -1822,7 +1822,6 @@ def stats():
     # Coverage: (owned, total) per category for stacked bar
     cov_cats   = sorted(cat_catalog.keys())
     cov_owned  = [cat_counts.get(cat, 0)   for cat in cov_cats]
-    cov_total  = [cat_catalog.get(cat, 0)  for cat in cov_cats]
     cov_gap    = [cat_catalog.get(cat, 0) - cat_counts.get(cat, 0) for cat in cov_cats]
 
     return render_template(
