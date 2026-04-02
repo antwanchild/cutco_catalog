@@ -4,7 +4,7 @@
 <div class="page-header">
   <h1 class="page-title">Collection Stats</h1>
   <div class="page-actions">
-    <form method="get" action="{{ url_for('stats') }}" class="inline-form">
+    <form method="get" action="{{ url_for('views.stats') }}" class="inline-form">
       <select name="person" class="select-sm" onchange="this.form.submit()">
         <option value="">All Collectors</option>
         {% for person in people %}
@@ -108,7 +108,7 @@
     <tbody>
       {% for row in collector_rows %}
       <tr>
-        <td><a href="{{ url_for('person_collection', pid=row.id) }}">{{ row.name }}</a></td>
+        <td><a href="{{ url_for('people.person_collection', pid=row.id) }}">{{ row.name }}</a></td>
         <td>{{ row.count }}</td>
         <td>
           {% if summary.catalog_total %}

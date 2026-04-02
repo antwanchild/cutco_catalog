@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Edit Sharpening Event</h1>
-  <a href="{{ url_for('sharpening') }}" class="btn btn-ghost">← Sharpening Log</a>
+  <a href="{{ url_for('logs.sharpening') }}" class="btn btn-ghost">← Sharpening Log</a>
 </div>
 
 <form method="post" class="form-card">
@@ -27,7 +27,7 @@
   </label>
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">Save</button>
-    <a href="{{ url_for('sharpening') }}" class="btn btn-ghost">Cancel</a>
+    <a href="{{ url_for('logs.sharpening') }}" class="btn btn-ghost">Cancel</a>
   </div>
 </form>
 {% endblock %}

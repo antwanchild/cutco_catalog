@@ -5,8 +5,8 @@
   <h1 class="page-title">Catalog</h1>
   <div class="page-actions">
     {% if is_admin %}
-      <a class="btn btn-primary" href="{{ url_for('catalog_add') }}">+ Add Item</a>
-      <a class="btn btn-secondary" id="sync-btn" href="{{ url_for('catalog_sync') }}">🔄 Sync</a>
+      <a class="btn btn-primary" href="{{ url_for('catalog.catalog_add') }}">+ Add Item</a>
+      <a class="btn btn-secondary" id="sync-btn" href="{{ url_for('catalog.catalog_sync') }}">🔄 Sync</a>
     {% endif %}
   </div>
 </div>
@@ -23,13 +23,13 @@
     <input type="checkbox" name="unicorn" value="1" {% if unicorn_f == '1' %}checked{% endif %}> Unicorns only
   </label>
   <button type="submit" class="btn btn-sm">Filter</button>
-  <a href="{{ url_for('catalog') }}" class="btn btn-sm btn-ghost">Clear</a>
+  <a href="{{ url_for('catalog.catalog') }}" class="btn btn-sm btn-ghost">Clear</a>
 </form>
 
 {% macro sort_link(column, label) %}
   {# Toggle direction if already sorted by this column, otherwise default to asc #}
   {% set new_dir = 'asc' if (sort == column and direction == 'desc') else 'desc' if sort == column else 'asc' %}
-  <a href="{{ url_for('catalog', q=q, category=cat_filter, unicorn=unicorn_f, sort=column, dir=new_dir) }}">
+  <a href="{{ url_for('catalog.catalog', q=q, category=cat_filter, unicorn=unicorn_f, sort=column, dir=new_dir) }}">
     {{ label }}{% if sort == column %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}
   </a>
 {% endmacro %}
@@ -52,7 +52,7 @@
     {% for item in items %}
     <tr>
       <td>
-        <a href="{{ url_for('item_owners', iid=item.id) }}">{{ item.name }}</a>
+        <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
         {% if item.cutco_url %}
           <a href="{{ item.cutco_url }}" target="_blank" class="ext-link" title="Cutco.com">↗</a>
         {% endif %}
@@ -61,7 +61,7 @@
       <td>{{ item.category or '—' }}</td>
       <td>{{ item.edge_type }}</td>
       <td>
-        <a href="{{ url_for('variants', iid=item.id) }}">
+        <a href="{{ url_for('catalog.variants', iid=item.id) }}">
           {{ item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length }}
           color{% if item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length != 1 %}s{% endif %}
         </a>
@@ -70,7 +70,7 @@
         {% if item.sets %}
           <span class="set-chips">
             {% for item_set in item.sets %}
-              <a href="{{ url_for('set_detail', sid=item_set.id) }}" class="chip">{{ item_set.name }}</a>
+              <a href="{{ url_for('catalog.set_detail', sid=item_set.id) }}" class="chip">{{ item_set.name }}</a>
             {% endfor %}
           </span>
         {% else %}—{% endif %}
@@ -81,13 +81,13 @@
       </td>
       <td class="actions">
         {% if is_admin %}
-          <a href="{{ url_for('catalog_edit', iid=item.id) }}" class="btn btn-xs">Edit</a>
-          <form method="post" action="{{ url_for('catalog_delete', iid=item.id) }}"
+          <a href="{{ url_for('catalog.catalog_edit', iid=item.id) }}" class="btn btn-xs">Edit</a>
+          <form method="post" action="{{ url_for('catalog.catalog_delete', iid=item.id) }}"
                 onsubmit="return confirm('Delete {{ item.name }}?')" style="display:inline">
             <button class="btn btn-xs btn-danger">Del</button>
           </form>
         {% endif %}
-        <a href="{{ url_for('ownership_add', item_id=item.id) }}" class="btn btn-xs btn-success">+ Own</a>
+        <a href="{{ url_for('people.ownership_add', item_id=item.id) }}" class="btn btn-xs btn-success">+ Own</a>
       </td>
     </tr>
     {% else %}

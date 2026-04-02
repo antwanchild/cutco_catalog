@@ -7,7 +7,7 @@
 
 {# ── Run form ─────────────────────────────────────────────────────────────── #}
 <div class="form-card compact" style="margin-bottom:1.5rem;max-width:560px">
-  <form method="post" action="{{ url_for('msrp_diff_run') }}" id="run-form">
+  <form method="post" action="{{ url_for('admin.msrp_diff_run') }}" id="run-form">
     <div class="inline-form" style="flex-wrap:wrap;gap:.75rem">
       <label class="checkbox-label">
         <input type="checkbox" name="update_db"{% if job.update_db %} checked{% endif %}>

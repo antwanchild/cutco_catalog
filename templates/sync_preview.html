@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Catalog Sync Preview</h1>
-  <a href="{{ url_for('catalog') }}" class="btn btn-ghost">← Cancel</a>
+  <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">← Cancel</a>
 </div>
 
 <p class="muted">
@@ -18,7 +18,7 @@
   <p class="flash flash-success">✓ Catalog is up to date — no new items or sets found.</p>
 {% else %}
 
-<form method="post" action="{{ url_for('catalog_sync_confirm') }}">
+<form method="post" action="{{ url_for('catalog.catalog_sync_confirm') }}">
   <input type="hidden" name="set_count" value="{{ new_sets | length }}">
 
   {# ── New Items #}
@@ -110,7 +110,7 @@
 
   <div class="form-actions" style="margin-top:1.25rem">
     <button type="submit" class="btn btn-primary">Confirm Import</button>
-    <a href="{{ url_for('catalog') }}" class="btn btn-ghost">Cancel</a>
+    <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">Cancel</a>
   </div>
 
 </form>

@@ -32,16 +32,11 @@ from bs4 import BeautifulSoup
 # Importing app.py triggers db.create_all() and the startup migrations, which
 # is fine — it's idempotent.  We get all models and scraping constants for free.
 sys.path.insert(0, os.path.dirname(__file__))
-from app import (  # noqa: E402
-    Item,
-    SCRAPE_HEADERS,
-    REQUEST_TIMEOUT,
-    app,
-    db,
-    scrape_catalog,
-    check_wishlist_targets,
-    _notify_discord,
-)
+from app import app, db  # noqa: E402
+from models import Item  # noqa: E402
+from constants import SCRAPE_HEADERS, REQUEST_TIMEOUT  # noqa: E402
+from scraping import scrape_catalog  # noqa: E402
+from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
 
 # ── Price scraping ─────────────────────────────────────────────────────────────
 

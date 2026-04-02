@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">{{ action }} Set</h1>
-  <a href="{{ url_for('sets_list') }}" class="btn btn-ghost">← Sets</a>
+  <a href="{{ url_for('catalog.sets_list') }}" class="btn btn-ghost">← Sets</a>
 </div>
 
 <form method="post" class="form-card">
@@ -15,7 +15,7 @@
   </label>
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">{{ action }} Set</button>
-    <a href="{{ url_for('sets_list') }}" class="btn btn-ghost">Cancel</a>
+    <a href="{{ url_for('catalog.sets_list') }}" class="btn btn-ghost">Cancel</a>
   </div>
 </form>
 {% endblock %}

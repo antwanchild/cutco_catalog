@@ -3,7 +3,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
 from extensions import db
 from helpers import _notify_discord, check_wishlist_targets, is_admin
-from models import Item, ItemVariant, Ownership, Person
+from models import Item, Ownership, Person
 
 people_bp = Blueprint("people", __name__)
 
