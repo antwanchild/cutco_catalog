@@ -6,6 +6,7 @@ import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date
 from logging.handlers import RotatingFileHandler
 
 import openpyxl
@@ -62,7 +63,13 @@ db = SQLAlchemy(app)
 
 EDGE_TYPES = ["Straight", "Double-D", "Serrated", "Micro-D", "Tec Edge", "Unknown"]
 STATUS_OPTIONS = ["Owned", "Wishlist", "Sold", "Traded"]
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "admin")
+ADMIN_TOKEN             = os.environ.get("ADMIN_TOKEN", "admin")
+DISCORD_WEBHOOK_URL     = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
+SHARPEN_METHODS         = ["Home Sharpener", "Whetstone", "Cutco Service", "Professional", "Other"]
+SHARPEN_THRESHOLD_DAYS  = int(os.environ.get("SHARPEN_THRESHOLD_DAYS", "180"))
+BAKEWARE_THRESHOLD_DAYS = int(os.environ.get("BAKEWARE_THRESHOLD_DAYS", "60"))
+_bakeware_env = os.environ.get("BAKEWARE_CATEGORIES", "Ake Cookware,Cookware,Bakeware")
+BAKEWARE_CATEGORIES     = {cat.strip() for cat in _bakeware_env.split(",") if cat.strip()}
 UNKNOWN_COLOR = "Unknown / Unspecified"
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
 
@@ -167,6 +174,7 @@ class Item(db.Model):
     is_unicorn = db.Column(db.Boolean,     nullable=False, default=False)
     in_catalog = db.Column(db.Boolean,     nullable=False, default=True)
     cutco_url  = db.Column(db.String(300), nullable=True)
+    msrp       = db.Column(db.Float,       nullable=True)
     notes      = db.Column(db.Text,        nullable=True)
 
     variants = db.relationship("ItemVariant", backref="item",
@@ -220,14 +228,46 @@ class Person(db.Model):
 class Ownership(db.Model):
     __tablename__ = "ownership"
 
-    id         = db.Column(db.Integer, primary_key=True)
-    variant_id = db.Column(db.Integer, db.ForeignKey("item_variants.id"), nullable=False)
-    person_id  = db.Column(db.Integer, db.ForeignKey("people.id"),        nullable=False)
-    status     = db.Column(db.String(20), nullable=False, default="Owned")
-    notes      = db.Column(db.Text, nullable=True)
+    id           = db.Column(db.Integer, primary_key=True)
+    variant_id   = db.Column(db.Integer, db.ForeignKey("item_variants.id"), nullable=False)
+    person_id    = db.Column(db.Integer, db.ForeignKey("people.id"),        nullable=False)
+    status       = db.Column(db.String(20), nullable=False, default="Owned")
+    target_price = db.Column(db.Float, nullable=True)
+    notes        = db.Column(db.Text, nullable=True)
 
     __table_args__ = (db.UniqueConstraint("variant_id", "person_id",
                                           name="uq_variant_person"),)
+
+
+class BakewareSession(db.Model):
+    __tablename__ = "bakeware_sessions"
+
+    id         = db.Column(db.Integer, primary_key=True)
+    item_id    = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
+    baked_on   = db.Column(db.String(10), nullable=False)   # ISO date YYYY-MM-DD
+    what_made  = db.Column(db.String(200), nullable=False)
+    rating     = db.Column(db.Integer, nullable=True)        # 1–5
+    notes      = db.Column(db.Text, nullable=True)
+
+    item = db.relationship("Item", backref=db.backref(
+        "bakeware_sessions", lazy=True,
+        order_by="BakewareSession.baked_on.desc()",
+    ))
+
+
+class SharpeningLog(db.Model):
+    __tablename__ = "sharpening_log"
+
+    id           = db.Column(db.Integer, primary_key=True)
+    item_id      = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
+    sharpened_on = db.Column(db.String(10), nullable=False)   # ISO date YYYY-MM-DD
+    method       = db.Column(db.String(60), nullable=False, default="Home Sharpener")
+    notes        = db.Column(db.Text, nullable=True)
+
+    item = db.relationship("Item", backref=db.backref(
+        "sharpening_log", lazy=True,
+        order_by="SharpeningLog.sharpened_on.desc()",
+    ))
 
 
 # ── DB init ───────────────────────────────────────────────────────────────────
@@ -250,6 +290,8 @@ with app.app_context():
         for _stmt in [
             "ALTER TABLE sets ADD COLUMN sku VARCHAR(20)",
             "ALTER TABLE item_variants ADD COLUMN is_unicorn BOOLEAN NOT NULL DEFAULT 0",
+            "ALTER TABLE items ADD COLUMN msrp REAL",
+            "ALTER TABLE ownership ADD COLUMN target_price REAL",
         ]:
             try:
                 _conn.execute(db.text(_stmt))
@@ -271,6 +313,41 @@ with app.app_context():
 
 def is_admin():
     return request.cookies.get("admin_token") == ADMIN_TOKEN
+
+
+def _notify_discord(message: str) -> bool:
+    """POST a message to the configured Discord webhook. Returns True on success."""
+    if not DISCORD_WEBHOOK_URL:
+        return False
+    try:
+        resp = requests.post(DISCORD_WEBHOOK_URL, json={"content": message}, timeout=10)
+        resp.raise_for_status()
+        logger.info("Discord notification sent (%d chars)", len(message))
+        return True
+    except Exception as exc:
+        logger.warning("Discord notification failed: %s", exc)
+        return False
+
+
+def check_wishlist_targets() -> list[dict]:
+    """Return wishlist entries where current MSRP is at or below the target price."""
+    hits = []
+    entries = (Ownership.query
+               .filter_by(status="Wishlist")
+               .filter(Ownership.target_price.isnot(None))
+               .all())
+    for entry in entries:
+        msrp = entry.variant.item.msrp
+        if msrp is not None and msrp <= entry.target_price:
+            hits.append(dict(
+                person  = entry.person.name,
+                item    = entry.variant.item.name,
+                sku     = entry.variant.item.sku,
+                target  = entry.target_price,
+                msrp    = msrp,
+                savings = entry.target_price - msrp,
+            ))
+    return hits
 
 
 def _extract_sku_from_href(href: str) -> str | None:
@@ -1204,11 +1281,17 @@ def ownership_add():
         if Ownership.query.filter_by(person_id=person_id, variant_id=variant_id).first():
             flash("That person already has an entry for that variant.", "error")
             return redirect(url_for("person_collection", pid=person_id))
+        raw_target = request.form.get("target_price", "").strip()
+        try:
+            target_price = float(raw_target) if raw_target else None
+        except ValueError:
+            target_price = None
         db.session.add(Ownership(
-            person_id  = person_id,
-            variant_id = variant_id,
-            status     = request.form.get("status", "Owned"),
-            notes      = request.form.get("notes", "").strip() or None,
+            person_id    = person_id,
+            variant_id   = variant_id,
+            status       = request.form.get("status", "Owned"),
+            target_price = target_price,
+            notes        = request.form.get("notes", "").strip() or None,
         ))
         db.session.commit()
         logger.info("Ownership added: person %d, variant %d", person_id, variant_id)
@@ -1233,6 +1316,11 @@ def ownership_edit(oid):
     ownership = Ownership.query.get_or_404(oid)
     if request.method == "POST":
         ownership.status = request.form.get("status", "Owned")
+        raw_target = request.form.get("target_price", "").strip()
+        try:
+            ownership.target_price = float(raw_target) if raw_target else None
+        except ValueError:
+            ownership.target_price = None
         ownership.notes  = request.form.get("notes", "").strip() or None
         db.session.commit()
         logger.info("Ownership updated: id %d → %s", oid, ownership.status)
@@ -1260,6 +1348,498 @@ def ownership_delete(oid):
     logger.info("Ownership deleted: id %d", oid)
     flash("Entry removed.", "info")
     return redirect(url_for("person_collection", pid=pid))
+
+# ── Wishlist ──────────────────────────────────────────────────────────────────
+
+@app.route("/wishlist")
+def wishlist():
+    person_id   = request.args.get("person", type=int)
+    people_list = Person.query.order_by(Person.name).all()
+
+    wl_q = Ownership.query.filter_by(status="Wishlist")
+    if person_id:
+        wl_q = wl_q.filter_by(person_id=person_id)
+    entries = wl_q.all()
+
+    rows = []
+    for entry in entries:
+        msrp   = entry.variant.item.msrp
+        target = entry.target_price
+        hit    = (msrp is not None and target is not None and msrp <= target)
+        delta  = (msrp - target) if (msrp is not None and target is not None) else None
+        rows.append(dict(
+            ownership = entry,
+            msrp      = msrp,
+            target    = target,
+            hit       = hit,
+            delta     = delta,
+        ))
+
+    # Sort: hits first → closest to target → no price data last
+    rows.sort(key=lambda row: (
+        0 if row["hit"] else (1 if row["delta"] is not None else 2),
+        row["delta"] if row["delta"] is not None else float("inf"),
+    ))
+
+    return render_template(
+        "wishlist.html",
+        rows        = rows,
+        people      = people_list,
+        person_id   = person_id,
+        has_discord = bool(DISCORD_WEBHOOK_URL),
+        hit_count   = sum(1 for row in rows if row["hit"]),
+    )
+
+
+@app.route("/wishlist/check", methods=["POST"])
+def wishlist_check():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("wishlist"))
+    hits = check_wishlist_targets()
+    if not hits:
+        flash("No wishlist targets met at current MSRP prices.", "info")
+        return redirect(url_for("wishlist"))
+    if DISCORD_WEBHOOK_URL:
+        lines = ["**🎯 Cutco Wishlist — Price Targets Met**"]
+        for hit in hits:
+            lines.append(
+                f"• **{hit['person']}** — {hit['item']} (#{hit['sku']}): "
+                f"MSRP ${hit['msrp']:.2f} ≤ target ${hit['target']:.2f} "
+                f"(saves ${hit['savings']:.2f})"
+            )
+        _notify_discord("\n".join(lines))
+        flash(f"Sent {len(hits)} price alert(s) to Discord.", "success")
+    else:
+        flash(
+            f"{len(hits)} target(s) met — set DISCORD_WEBHOOK_URL to enable notifications.",
+            "info",
+        )
+    return redirect(url_for("wishlist"))
+
+
+# ── Sharpening Log ────────────────────────────────────────────────────────────
+
+@app.route("/sharpening")
+def sharpening():
+    today       = date.today()
+    all_entries = (SharpeningLog.query
+                   .order_by(SharpeningLog.sharpened_on.desc())
+                   .all())
+
+    # Last sharpening date per item
+    last_by_item: dict[int, str] = {}
+    count_by_item: dict[int, int] = {}
+    for entry in all_entries:
+        count_by_item[entry.item_id] = count_by_item.get(entry.item_id, 0) + 1
+        if entry.item_id not in last_by_item:
+            last_by_item[entry.item_id] = entry.sharpened_on
+
+    # Build tracked-items summary
+    tracked: list[dict] = []
+    for item_id, last_str in last_by_item.items():
+        item = Item.query.get(item_id)
+        if not item:
+            continue
+        days_since = (today - date.fromisoformat(last_str)).days
+        tracked.append(dict(
+            item       = item,
+            last_date  = last_str,
+            days_since = days_since,
+            overdue    = days_since > SHARPEN_THRESHOLD_DAYS,
+            event_count= count_by_item[item_id],
+        ))
+
+    # Overdue first, then by days desc
+    tracked.sort(key=lambda row: (0 if row["overdue"] else 1, -row["days_since"]))
+
+    return render_template(
+        "sharpening.html",
+        tracked         = tracked,
+        recent_entries  = all_entries[:25],
+        overdue_count   = sum(1 for row in tracked if row["overdue"]),
+        threshold_days  = SHARPEN_THRESHOLD_DAYS,
+        today           = today.isoformat(),
+        items_list      = Item.query.order_by(Item.name).all(),
+        methods         = SHARPEN_METHODS,
+        has_discord     = bool(DISCORD_WEBHOOK_URL),
+    )
+
+
+@app.route("/sharpening/add", methods=["POST"])
+def sharpening_add():
+    item_id      = request.form.get("item_id", type=int)
+    sharpened_on = request.form.get("sharpened_on", "").strip()
+    method       = request.form.get("method", "Home Sharpener").strip()
+    notes        = request.form.get("notes", "").strip() or None
+
+    if not item_id or not sharpened_on:
+        flash("Item and date are required.", "error")
+        return redirect(url_for("sharpening"))
+
+    if not Item.query.get(item_id):
+        flash("Item not found.", "error")
+        return redirect(url_for("sharpening"))
+
+    db.session.add(SharpeningLog(
+        item_id      = item_id,
+        sharpened_on = sharpened_on,
+        method       = method,
+        notes        = notes,
+    ))
+    db.session.commit()
+    logger.info("Sharpening logged: item %d on %s (%s)", item_id, sharpened_on, method)
+    flash("Sharpening event logged.", "success")
+    return redirect(url_for("sharpening"))
+
+
+@app.route("/sharpening/<int:lid>/edit", methods=["GET", "POST"])
+def sharpening_edit(lid):
+    entry = SharpeningLog.query.get_or_404(lid)
+    if request.method == "POST":
+        entry.sharpened_on = request.form.get("sharpened_on", entry.sharpened_on).strip()
+        entry.method       = request.form.get("method", entry.method).strip()
+        entry.notes        = request.form.get("notes", "").strip() or None
+        db.session.commit()
+        logger.info("Sharpening entry %d updated", lid)
+        flash("Event updated.", "success")
+        return redirect(url_for("sharpening"))
+    return render_template("sharpening_edit.html", entry=entry, methods=SHARPEN_METHODS)
+
+
+@app.route("/sharpening/<int:lid>/delete", methods=["POST"])
+def sharpening_delete(lid):
+    entry = SharpeningLog.query.get_or_404(lid)
+    db.session.delete(entry)
+    db.session.commit()
+    logger.info("Sharpening entry %d deleted", lid)
+    flash("Event removed.", "info")
+    return redirect(url_for("sharpening"))
+
+
+@app.route("/sharpening/notify", methods=["POST"])
+def sharpening_notify():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("sharpening"))
+
+    today       = date.today()
+    all_entries = SharpeningLog.query.order_by(SharpeningLog.sharpened_on.desc()).all()
+    last_by_item: dict[int, str] = {}
+    for entry in all_entries:
+        if entry.item_id not in last_by_item:
+            last_by_item[entry.item_id] = entry.sharpened_on
+
+    overdue = []
+    for item_id, last_str in last_by_item.items():
+        days_since = (today - date.fromisoformat(last_str)).days
+        if days_since > SHARPEN_THRESHOLD_DAYS:
+            item = Item.query.get(item_id)
+            if item:
+                overdue.append((item, days_since))
+    overdue.sort(key=lambda pair: pair[1], reverse=True)
+
+    if not overdue:
+        flash(f"No knives overdue for sharpening (threshold: {SHARPEN_THRESHOLD_DAYS} days).", "info")
+        return redirect(url_for("sharpening"))
+
+    if DISCORD_WEBHOOK_URL:
+        lines = [f"**🔪 Cutco Sharpening Reminder — {len(overdue)} overdue**"]
+        for item, days in overdue:
+            lines.append(f"• {item.name} — {days} days since last sharpening")
+        _notify_discord("\n".join(lines))
+        flash(f"Sent reminder for {len(overdue)} overdue knife(s) to Discord.", "success")
+    else:
+        flash(
+            f"{len(overdue)} overdue — set DISCORD_WEBHOOK_URL to enable notifications.",
+            "info",
+        )
+    return redirect(url_for("sharpening"))
+
+
+# ── Bakeware ──────────────────────────────────────────────────────────────────
+
+@app.route("/bakeware")
+def bakeware():
+    today       = date.today()
+    all_sessions = (BakewareSession.query
+                    .order_by(BakewareSession.baked_on.desc())
+                    .all())
+
+    # Aggregate per item
+    last_by_item:   dict[int, str]   = {}
+    count_by_item:  dict[int, int]   = {}
+    rating_by_item: dict[int, list]  = {}
+    for session in all_sessions:
+        iid = session.item_id
+        count_by_item[iid] = count_by_item.get(iid, 0) + 1
+        if iid not in last_by_item:
+            last_by_item[iid] = session.baked_on
+        if session.rating is not None:
+            rating_by_item.setdefault(iid, []).append(session.rating)
+
+    tracked: list[dict] = []
+    for iid, last_str in last_by_item.items():
+        item = Item.query.get(iid)
+        if not item:
+            continue
+        days_since = (today - date.fromisoformat(last_str)).days
+        ratings    = rating_by_item.get(iid, [])
+        tracked.append(dict(
+            item       = item,
+            last_date  = last_str,
+            days_since = days_since,
+            stale      = days_since > BAKEWARE_THRESHOLD_DAYS,
+            session_count = count_by_item[iid],
+            avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None,
+        ))
+
+    # Stale items first, then by days desc
+    tracked.sort(key=lambda row: (0 if row["stale"] else 1, -row["days_since"]))
+
+    # Bakeware items from catalog that have never been used
+    used_ids = set(last_by_item.keys())
+    never_used = (Item.query
+                  .filter(Item.category.in_(BAKEWARE_CATEGORIES))
+                  .filter(Item.id.notin_(used_ids))
+                  .order_by(Item.name)
+                  .all()) if BAKEWARE_CATEGORIES else []
+
+    # Item selector: bakeware category items first, then rest
+    bakeware_items = (Item.query
+                      .filter(Item.category.in_(BAKEWARE_CATEGORIES))
+                      .order_by(Item.name).all()) if BAKEWARE_CATEGORIES else []
+    other_items    = (Item.query
+                      .filter(Item.category.notin_(BAKEWARE_CATEGORIES))
+                      .order_by(Item.name).all()) if BAKEWARE_CATEGORIES else Item.query.order_by(Item.name).all()
+
+    return render_template(
+        "bakeware.html",
+        tracked          = tracked,
+        recent_sessions  = all_sessions[:25],
+        stale_count      = sum(1 for row in tracked if row["stale"]),
+        never_used       = never_used,
+        threshold_days   = BAKEWARE_THRESHOLD_DAYS,
+        today            = today.isoformat(),
+        bakeware_items   = bakeware_items,
+        other_items      = other_items,
+        has_discord      = bool(DISCORD_WEBHOOK_URL),
+    )
+
+
+@app.route("/bakeware/add", methods=["POST"])
+def bakeware_add():
+    item_id   = request.form.get("item_id", type=int)
+    baked_on  = request.form.get("baked_on", "").strip()
+    what_made = request.form.get("what_made", "").strip()
+    raw_rating = request.form.get("rating", "").strip()
+    notes     = request.form.get("notes", "").strip() or None
+
+    if not item_id or not baked_on or not what_made:
+        flash("Item, date, and what you made are required.", "error")
+        return redirect(url_for("bakeware"))
+    if not Item.query.get(item_id):
+        flash("Item not found.", "error")
+        return redirect(url_for("bakeware"))
+
+    try:
+        rating = int(raw_rating) if raw_rating else None
+        if rating is not None and not (1 <= rating <= 5):
+            rating = None
+    except ValueError:
+        rating = None
+
+    db.session.add(BakewareSession(
+        item_id  = item_id,
+        baked_on = baked_on,
+        what_made = what_made,
+        rating   = rating,
+        notes    = notes,
+    ))
+    db.session.commit()
+    logger.info("Bakeware session logged: item %d on %s — %s", item_id, baked_on, what_made)
+    flash("Baking session logged.", "success")
+    return redirect(url_for("bakeware"))
+
+
+@app.route("/bakeware/<int:sid>/edit", methods=["GET", "POST"])
+def bakeware_edit(sid):
+    session = BakewareSession.query.get_or_404(sid)
+    if request.method == "POST":
+        session.baked_on  = request.form.get("baked_on", session.baked_on).strip()
+        session.what_made = request.form.get("what_made", "").strip() or session.what_made
+        session.notes     = request.form.get("notes", "").strip() or None
+        raw_rating = request.form.get("rating", "").strip()
+        try:
+            rating = int(raw_rating) if raw_rating else None
+            session.rating = rating if (rating is None or 1 <= rating <= 5) else session.rating
+        except ValueError:
+            pass
+        db.session.commit()
+        logger.info("Bakeware session %d updated", sid)
+        flash("Session updated.", "success")
+        return redirect(url_for("bakeware"))
+    return render_template("bakeware_edit.html", session=session)
+
+
+@app.route("/bakeware/<int:sid>/delete", methods=["POST"])
+def bakeware_delete(sid):
+    session = BakewareSession.query.get_or_404(sid)
+    db.session.delete(session)
+    db.session.commit()
+    logger.info("Bakeware session %d deleted", sid)
+    flash("Session removed.", "info")
+    return redirect(url_for("bakeware"))
+
+
+@app.route("/bakeware/notify", methods=["POST"])
+def bakeware_notify():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("bakeware"))
+
+    today        = date.today()
+    all_sessions = BakewareSession.query.order_by(BakewareSession.baked_on.desc()).all()
+    last_by_item: dict[int, str] = {}
+    for session in all_sessions:
+        if session.item_id not in last_by_item:
+            last_by_item[session.item_id] = session.baked_on
+
+    stale = []
+    for iid, last_str in last_by_item.items():
+        days_since = (today - date.fromisoformat(last_str)).days
+        if days_since > BAKEWARE_THRESHOLD_DAYS:
+            item = Item.query.get(iid)
+            if item:
+                stale.append((item, days_since))
+    stale.sort(key=lambda pair: pair[1], reverse=True)
+
+    if not stale:
+        flash(f"No bakeware unused for >{BAKEWARE_THRESHOLD_DAYS} days.", "info")
+        return redirect(url_for("bakeware"))
+
+    if DISCORD_WEBHOOK_URL:
+        lines = [f"**🍰 Bakeware Reminder — {len(stale)} item(s) unused**"]
+        for item, days in stale:
+            lines.append(f"• {item.name} — {days} days since last use")
+        _notify_discord("\n".join(lines))
+        flash(f"Sent reminder for {len(stale)} idle bakeware item(s) to Discord.", "success")
+    else:
+        flash(
+            f"{len(stale)} item(s) idle — set DISCORD_WEBHOOK_URL to enable notifications.",
+            "info",
+        )
+    return redirect(url_for("bakeware"))
+
+
+# ── Stats ─────────────────────────────────────────────────────────────────────
+
+@app.route("/stats")
+def stats():
+    person_id   = request.args.get("person", type=int)
+    people_list = Person.query.order_by(Person.name).all()
+
+    # Owned ownerships, optionally filtered to one collector
+    owned_q = (
+        db.session.query(Ownership)
+        .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
+        .join(Item, ItemVariant.item_id == Item.id)
+        .filter(Ownership.status == "Owned")
+    )
+    if person_id:
+        owned_q = owned_q.filter(Ownership.person_id == person_id)
+    owned = owned_q.all()
+
+    # Deduplicate to unique items (one row per Item even if owned in multiple variants)
+    owned_item_map: dict[int, Item] = {}
+    for ownership in owned:
+        item = ownership.variant.item
+        if item.id not in owned_item_map:
+            owned_item_map[item.id] = item
+    owned_items = list(owned_item_map.values())
+
+    # By category — item count and MSRP total
+    cat_counts: dict[str, int]   = {}
+    cat_values: dict[str, float] = {}
+    cat_catalog: dict[str, int]  = {}  # total catalog items per category
+
+    for item in Item.query.all():
+        cat = item.category or "Uncategorized"
+        cat_catalog[cat] = cat_catalog.get(cat, 0) + 1
+
+    for item in owned_items:
+        cat = item.category or "Uncategorized"
+        cat_counts[cat] = cat_counts.get(cat, 0) + 1
+        if item.msrp:
+            cat_values[cat] = cat_values.get(cat, 0.0) + item.msrp
+
+    # By handle color (from variant)
+    color_counts: dict[str, int] = {}
+    for ownership in owned:
+        color = ownership.variant.color
+        if color == UNKNOWN_COLOR:
+            color = "Unknown"
+        color_counts[color] = color_counts.get(color, 0) + 1
+
+    # By edge type
+    edge_counts: dict[str, int] = {}
+    for item in owned_items:
+        edge = item.edge_type or "Unknown"
+        edge_counts[edge] = edge_counts.get(edge, 0) + 1
+
+    # Per-collector summary
+    collector_rows = []
+    for person in people_list:
+        p_owned = Ownership.query.filter_by(person_id=person.id, status="Owned").all()
+        p_item_ids = {o.variant.item_id for o in p_owned}
+        p_items    = Item.query.filter(Item.id.in_(p_item_ids)).all() if p_item_ids else []
+        p_value    = sum(i.msrp for i in p_items if i.msrp)
+        collector_rows.append(dict(
+            id=person.id, name=person.name,
+            count=len(p_item_ids), value=p_value,
+        ))
+    collector_rows.sort(key=lambda row: row["count"], reverse=True)
+
+    total_value  = sum(i.msrp for i in owned_items if i.msrp)
+    priced_count = sum(1 for i in owned_items if i.msrp)
+    catalog_total = Item.query.count()
+
+    summary = dict(
+        owned_items   = len(owned_items),
+        owned_entries = len(owned),
+        total_value   = total_value,
+        priced_count  = priced_count,
+        catalog_total = catalog_total,
+        coverage_pct  = round(100 * len(owned_items) / catalog_total, 1) if catalog_total else 0,
+    )
+
+    # Sort for charts (descending by count/value)
+    cat_data   = sorted(cat_counts.items(),  key=lambda kv: kv[1], reverse=True)
+    val_data   = sorted(cat_values.items(),  key=lambda kv: kv[1], reverse=True)
+    color_data = sorted(color_counts.items(), key=lambda kv: kv[1], reverse=True)[:15]
+    edge_data  = sorted(edge_counts.items(), key=lambda kv: kv[1], reverse=True)
+
+    # Coverage: (owned, total) per category for stacked bar
+    cov_cats   = sorted(cat_catalog.keys())
+    cov_owned  = [cat_counts.get(cat, 0)   for cat in cov_cats]
+    cov_total  = [cat_catalog.get(cat, 0)  for cat in cov_cats]
+    cov_gap    = [cat_catalog.get(cat, 0) - cat_counts.get(cat, 0) for cat in cov_cats]
+
+    return render_template(
+        "stats.html",
+        people=people_list,
+        person_id=person_id,
+        summary=summary,
+        cat_data=cat_data,
+        val_data=val_data,
+        color_data=color_data,
+        edge_data=edge_data,
+        collector_rows=collector_rows,
+        cov_cats=cov_cats,
+        cov_owned=cov_owned,
+        cov_gap=cov_gap,
+    )
+
 
 # ── Views ─────────────────────────────────────────────────────────────────────
 

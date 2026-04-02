@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Edit Baking Session – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Edit Baking Session</h1>
+  <a href="{{ url_for('bakeware') }}" class="btn btn-ghost">← Bakeware Tracker</a>
+</div>
+
+<form method="post" class="form-card">
+  <label>Piece
+    <input type="text" value="{{ session.item.name }}" disabled class="input-full">
+  </label>
+  <div class="form-row">
+    <label>Date *
+      <input type="date" name="baked_on" value="{{ session.baked_on }}" required class="input-full">
+    </label>
+    <label>Rating
+      <select name="rating" class="input-full">
+        <option value="">— none —</option>
+        <option value="5"{% if session.rating == 5 %} selected{% endif %}>⭐⭐⭐⭐⭐ — Excellent</option>
+        <option value="4"{% if session.rating == 4 %} selected{% endif %}>⭐⭐⭐⭐ — Good</option>
+        <option value="3"{% if session.rating == 3 %} selected{% endif %}>⭐⭐⭐ — OK</option>
+        <option value="2"{% if session.rating == 2 %} selected{% endif %}>⭐⭐ — Meh</option>
+        <option value="1"{% if session.rating == 1 %} selected{% endif %}>⭐ — Poor</option>
+      </select>
+    </label>
+  </div>
+  <label>What did you make? *
+    <input type="text" name="what_made" value="{{ session.what_made }}" required class="input-full">
+  </label>
+  <label>Notes
+    <textarea name="notes" rows="2" class="input-full">{{ session.notes or '' }}</textarea>
+  </label>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{{ url_for('bakeware') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}Collection Stats – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Collection Stats</h1>
+  <div class="page-actions">
+    <form method="get" action="{{ url_for('stats') }}" class="inline-form">
+      <select name="person" class="select-sm" onchange="this.form.submit()">
+        <option value="">All Collectors</option>
+        {% for person in people %}
+          <option value="{{ person.id }}"{% if person_id == person.id %} selected{% endif %}>{{ person.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+</div>
+
+{# ── Summary cards ────────────────────────────────────────────────────────── #}
+<div class="stat-grid" style="margin-bottom:1.75rem">
+  <div class="stat-card">
+    <div class="stat-number">{{ summary.owned_items }}</div>
+    <div class="stat-label">Unique Items Owned</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ summary.owned_entries }}</div>
+    <div class="stat-label">Ownership Records</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ summary.catalog_total }}</div>
+    <div class="stat-label">Catalog Items</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ summary.coverage_pct }}%</div>
+    <div class="stat-label">Catalog Coverage</div>
+  </div>
+  {% if summary.total_value %}
+  <div class="stat-card">
+    <div class="stat-number">${{ "{:,.0f}".format(summary.total_value) }}</div>
+    <div class="stat-label">Est. Collection Value</div>
+  </div>
+  {% endif %}
+  {% if summary.priced_count and summary.owned_items %}
+  <div class="stat-card">
+    <div class="stat-number">{{ summary.priced_count }}/{{ summary.owned_items }}</div>
+    <div class="stat-label">Items with MSRP</div>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Charts grid ──────────────────────────────────────────────────────────── #}
+<div class="stats-grid">
+
+  {# Owned by category #}
+  {% if cat_data %}
+  <div class="stats-panel stats-panel-wide">
+    <h2 class="stats-panel-title">Owned Items by Category</h2>
+    <div class="chart-wrap"><canvas id="catChart"></canvas></div>
+  </div>
+  {% endif %}
+
+  {# Catalog coverage #}
+  {% if cov_cats %}
+  <div class="stats-panel stats-panel-wide">
+    <h2 class="stats-panel-title">Catalog Coverage by Category</h2>
+    <div class="chart-wrap"><canvas id="covChart"></canvas></div>
+  </div>
+  {% endif %}
+
+  {# Handle color distribution #}
+  {% if color_data %}
+  <div class="stats-panel">
+    <h2 class="stats-panel-title">Handle Colors</h2>
+    <div class="chart-wrap chart-wrap-sq"><canvas id="colorChart"></canvas></div>
+  </div>
+  {% endif %}
+
+  {# Edge type breakdown #}
+  {% if edge_data %}
+  <div class="stats-panel">
+    <h2 class="stats-panel-title">Edge Types</h2>
+    <div class="chart-wrap chart-wrap-sq"><canvas id="edgeChart"></canvas></div>
+  </div>
+  {% endif %}
+
+  {# Estimated value by category #}
+  {% if val_data %}
+  <div class="stats-panel stats-panel-wide">
+    <h2 class="stats-panel-title">Estimated Value by Category</h2>
+    <div class="chart-wrap"><canvas id="valChart"></canvas></div>
+  </div>
+  {% endif %}
+
+</div>
+
+{# ── Collector breakdown table ─────────────────────────────────────────────── #}
+{% if collector_rows %}
+<h2 class="stats-section-title">By Collector</h2>
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Collector</th>
+        <th>Unique Items</th>
+        <th>Catalog Coverage</th>
+        {% if summary.total_value %}<th>Est. Value</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in collector_rows %}
+      <tr>
+        <td><a href="{{ url_for('person_collection', pid=row.id) }}">{{ row.name }}</a></td>
+        <td>{{ row.count }}</td>
+        <td>
+          {% if summary.catalog_total %}
+            {% set pct = (100 * row.count / summary.catalog_total) | round(1) %}
+            <div class="cov-bar-wrap">
+              <div class="cov-bar" style="width:{{ [pct,100]|min }}%"></div>
+              <span class="cov-pct">{{ pct }}%</span>
+            </div>
+          {% endif %}
+        </td>
+        {% if summary.total_value %}
+        <td>{% if row.value %}${{ "{:,.2f}".format(row.value) }}{% else %}—{% endif %}</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Chart.js ─────────────────────────────────────────────────────────────── #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.color           = '#7a8099';
+Chart.defaults.borderColor     = '#2a2f3d';
+Chart.defaults.font.family     = "'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size       = 12;
+
+const PALETTE = [
+  '#4f8ef7','#7c5cbf','#3aad6e','#e09c3a','#4fc6e0',
+  '#e07caa','#3aad9e','#d95252','#d0c060','#a07cf7',
+  '#5ce89a','#f09060','#60a8f0','#c060d0','#80c880',
+];
+
+function palette(n) {
+  return Array.from({length: n}, (_, i) => PALETTE[i % PALETTE.length]);
+}
+
+function hBar(id, labels, values, label) {
+  new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label, data: values, backgroundColor: palette(labels.length),
+                   borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#2a2f3d' }, ticks: { precision: 0 } },
+        y: { grid: { display: false } },
+      }
+    }
+  });
+}
+
+function doughnut(id, labels, values) {
+  new Chart(document.getElementById(id), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: palette(labels.length),
+                   borderColor: '#181c25', borderWidth: 2 }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 12, padding: 10 } }
+      }
+    }
+  });
+}
+
+{% if cat_data %}
+hBar('catChart',
+  {{ cat_data | map(attribute=0) | list | tojson }},
+  {{ cat_data | map(attribute=1) | list | tojson }},
+  'Owned Items'
+);
+{% endif %}
+
+{% if cov_cats %}
+new Chart(document.getElementById('covChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ cov_cats | tojson }},
+    datasets: [
+      { label: 'Owned',   data: {{ cov_owned | tojson }}, backgroundColor: '#3aad6e', borderRadius: 4, borderSkipped: false },
+      { label: 'Not owned', data: {{ cov_gap | tojson }},  backgroundColor: '#2a2f3d', borderRadius: 4, borderSkipped: false },
+    ]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      x: { stacked: true, grid: { color: '#2a2f3d' }, ticks: { precision: 0 } },
+      y: { stacked: true, grid: { display: false } },
+    }
+  }
+});
+{% endif %}
+
+{% if color_data %}
+doughnut('colorChart',
+  {{ color_data | map(attribute=0) | list | tojson }},
+  {{ color_data | map(attribute=1) | list | tojson }}
+);
+{% endif %}
+
+{% if edge_data %}
+doughnut('edgeChart',
+  {{ edge_data | map(attribute=0) | list | tojson }},
+  {{ edge_data | map(attribute=1) | list | tojson }}
+);
+{% endif %}
+
+{% if val_data %}
+new Chart(document.getElementById('valChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ val_data | map(attribute=0) | list | tojson }},
+    datasets: [{
+      label: 'Est. Value ($)',
+      data:  {{ val_data | map(attribute=1) | list | tojson }},
+      backgroundColor: palette({{ val_data | length }}),
+      borderRadius: 4,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        grid: { color: '#2a2f3d' },
+        ticks: { callback: v => '$' + v.toLocaleString() }
+      },
+      y: { grid: { display: false } },
+    }
+  }
+});
+{% endif %}
+</script>
+{% endblock %}
