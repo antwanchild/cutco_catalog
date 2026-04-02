@@ -472,6 +472,38 @@ textarea { resize: vertical; }
   cursor: not-allowed;
 }
 
+/* ── MSRP diff UI ────────────────────────────────────────────────────────── */
+.msrp-log {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+  font-family: var(--mono);
+  font-size: .82rem;
+  color: var(--muted);
+  max-height: 240px;
+  overflow-y: auto;
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+.diff-section {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: .75rem;
+}
+.diff-section summary {
+  padding: .65rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: .875rem;
+  list-style: none;
+}
+.diff-section summary::-webkit-details-marker { display: none; }
+.diff-section[open] summary { border-bottom: 1px solid var(--border); }
+.muted-summary { color: var(--muted); font-weight: 400; }
+.diff-section .table-wrap { border-radius: 0 0 var(--radius) var(--radius); }
+
 /* ── Sharpening log ──────────────────────────────────────────────────────── */
 .sharpen-add-panel {
   background: var(--bg2);

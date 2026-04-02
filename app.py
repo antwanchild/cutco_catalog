@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
@@ -64,6 +65,7 @@ db = SQLAlchemy(app)
 EDGE_TYPES = ["Straight", "Double-D", "Serrated", "Micro-D", "Tec Edge", "Unknown"]
 STATUS_OPTIONS = ["Owned", "Wishlist", "Sold", "Traded"]
 ADMIN_TOKEN             = os.environ.get("ADMIN_TOKEN", "admin")
+DATA_DIR                = os.environ.get("DATA_DIR", "/data")
 DISCORD_WEBHOOK_URL     = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
 SHARPEN_METHODS         = ["Home Sharpener", "Whetstone", "Cutco Service", "Professional", "Other"]
 SHARPEN_THRESHOLD_DAYS  = int(os.environ.get("SHARPEN_THRESHOLD_DAYS", "180"))
@@ -348,6 +350,207 @@ def check_wishlist_targets() -> list[dict]:
                 savings = entry.target_price - msrp,
             ))
     return hits
+
+
+# ── MSRP diff (web UI) ────────────────────────────────────────────────────────
+
+_MSRP_JOB_FILE  = os.path.join(DATA_DIR, "msrp_job.json")
+_msrp_write_lock = threading.Lock()
+
+
+def _read_msrp_job() -> dict:
+    try:
+        with open(_MSRP_JOB_FILE) as fh:
+            return json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {"status": "idle", "progress": [], "results": None,
+                "error": None, "started_at": None, "finished_at": None,
+                "update_db": False}
+
+
+def _write_msrp_job(data: dict) -> None:
+    with _msrp_write_lock:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        tmp = _MSRP_JOB_FILE + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(data, fh)
+        os.replace(tmp, _MSRP_JOB_FILE)
+
+
+def _scrape_price_from_page(url: str) -> float | None:
+    """Return the price from a Cutco product page, or None if not found."""
+    try:
+        resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
+            return None
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        for ld_tag in soup.find_all("script", type="application/ld+json"):
+            try:
+                data = json.loads(ld_tag.string or "")
+                entries = data if isinstance(data, list) else [data]
+                for entry in entries:
+                    if not isinstance(entry, dict) or entry.get("@type") != "Product":
+                        continue
+                    offers = entry.get("offers", {})
+                    if isinstance(offers, list):
+                        offers = offers[0] if offers else {}
+                    price_val = offers.get("price") if isinstance(offers, dict) else None
+                    if price_val is not None:
+                        return float(price_val)
+            except (json.JSONDecodeError, ValueError, AttributeError):
+                pass
+
+        og_tag = soup.find("meta", property="og:price:amount")
+        if og_tag and og_tag.get("content", "").strip():
+            try:
+                return float(og_tag["content"].replace(",", ""))
+            except ValueError:
+                pass
+
+        price_el = soup.find(attrs={"itemprop": "price"})
+        if price_el:
+            raw = price_el.get("content") or price_el.get_text(strip=True)
+            price_match = re.search(r"[\d,]+\.?\d*", raw)
+            if price_match:
+                try:
+                    return float(price_match.group().replace(",", ""))
+                except ValueError:
+                    pass
+
+        for noise in soup.find_all(["script", "style"]):
+            noise.decompose()
+        dollar_match = re.search(r"\$\s*([\d,]+\.\d{2})", soup.get_text(" ", strip=True))
+        if dollar_match:
+            try:
+                return float(dollar_match.group(1).replace(",", ""))
+            except ValueError:
+                pass
+        return None
+    except Exception:
+        return None
+
+
+def _build_msrp_diff(db_items: list, live: dict) -> dict:
+    """Diff DB MSRP prices against live scraped prices."""
+    db_by_sku = {item.sku: item for item in db_items if item.sku}
+    live_skus  = set(live.keys())
+    db_skus    = set(db_by_sku.keys())
+    result: dict[str, list] = {
+        "new": [], "removed": [], "increased": [],
+        "decreased": [], "unchanged": [], "no_price": [],
+    }
+    for sku in sorted(live_skus - db_skus):
+        info = live[sku]
+        result["new"].append({"sku": sku, "name": info["name"],
+                               "db_price": None, "live_price": info["price"]})
+    for sku in sorted(db_skus - live_skus):
+        item = db_by_sku[sku]
+        result["removed"].append({"sku": sku, "name": item.name,
+                                   "db_price": item.msrp, "live_price": None})
+    for sku in sorted(db_skus & live_skus):
+        item       = db_by_sku[sku]
+        db_price   = item.msrp
+        live_price = live[sku]["price"]
+        if live_price is None:
+            result["no_price"].append({"sku": sku, "name": item.name,
+                                        "db_price": db_price, "live_price": None})
+        elif db_price is None:
+            result["unchanged"].append({"sku": sku, "name": item.name,
+                                         "db_price": None, "live_price": live_price})
+        elif live_price > db_price + 0.005:
+            result["increased"].append({"sku": sku, "name": item.name,
+                                         "db_price": db_price, "live_price": live_price,
+                                         "delta": live_price - db_price})
+        elif live_price < db_price - 0.005:
+            result["decreased"].append({"sku": sku, "name": item.name,
+                                         "db_price": db_price, "live_price": live_price,
+                                         "delta": live_price - db_price})
+        else:
+            result["unchanged"].append({"sku": sku, "name": item.name,
+                                         "db_price": db_price, "live_price": live_price})
+    return result
+
+
+def _run_msrp_diff_job(update_db: bool) -> None:
+    """Background thread: scrape prices, diff against DB, optionally update."""
+
+    def log(msg: str) -> None:
+        job = _read_msrp_job()
+        job["progress"].append(msg)
+        _write_msrp_job(job)
+
+    try:
+        with app.app_context():
+            log("Scraping live catalog…")
+            live_items, _ = scrape_catalog()
+            log(f"Found {len(live_items)} items on cutco.com")
+
+            by_sku: dict[str, dict] = {}
+            for live_item in live_items:
+                sku = live_item.get("sku")
+                if sku and sku not in by_sku:
+                    by_sku[sku] = {"name": live_item["name"],
+                                   "url": live_item["url"], "price": None}
+
+            log(f"Fetching prices for {len(by_sku)} unique SKUs…")
+            fetched = 0
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                future_map = {
+                    pool.submit(_scrape_price_from_page, info["url"]): sku
+                    for sku, info in by_sku.items() if info.get("url")
+                }
+                for future in as_completed(future_map):
+                    sku = future_map[future]
+                    by_sku[sku]["price"] = future.result()
+                    fetched += 1
+                    if fetched % 20 == 0:
+                        log(f"  …{fetched}/{len(future_map)} prices fetched")
+
+            priced = sum(1 for info in by_sku.values() if info["price"] is not None)
+            log(f"Prices found: {priced}/{len(by_sku)}")
+
+            db_items = Item.query.filter(Item.sku.isnot(None)).all()
+            log(f"Loaded {len(db_items)} DB items — building diff…")
+            diff = _build_msrp_diff(db_items, by_sku)
+
+            changes = len(diff["increased"]) + len(diff["decreased"])
+            log(f"Done — {changes} price change(s), {len(diff['new'])} new, "
+                f"{len(diff['removed'])} removed")
+
+            if update_db:
+                db_by_sku = {item.sku: item for item in db_items}
+                updated = sum(
+                    1 for sku, info in by_sku.items()
+                    if info["price"] is not None and sku in db_by_sku
+                    and not setattr(db_by_sku[sku], "msrp", info["price"])  # side-effect
+                )
+                db.session.commit()
+                log(f"Updated {updated} MSRP prices in database")
+
+                hits = check_wishlist_targets()
+                if hits:
+                    log(f"Wishlist targets met: {len(hits)}")
+                    if DISCORD_WEBHOOK_URL:
+                        lines = ["**🎯 Cutco Wishlist — Price Targets Met**"]
+                        for hit in hits:
+                            lines.append(
+                                f"• **{hit['person']}** — {hit['item']} (#{hit['sku']}): "
+                                f"MSRP ${hit['msrp']:.2f} ≤ target ${hit['target']:.2f}"
+                            )
+                        _notify_discord("\n".join(lines))
+
+            job = _read_msrp_job()
+            job.update({"status": "done", "results": diff,
+                        "finished_at": date.today().isoformat()})
+            _write_msrp_job(job)
+
+    except Exception as exc:
+        logger.error("MSRP diff job failed: %s", exc)
+        job = _read_msrp_job()
+        job.update({"status": "error", "error": str(exc),
+                    "finished_at": date.today().isoformat()})
+        _write_msrp_job(job)
 
 
 def _extract_sku_from_href(href: str) -> str | None:
@@ -2293,6 +2496,40 @@ def import_confirm():
         parts.append(f"{added_ownership} ownership entr{'ies' if added_ownership != 1 else 'y'}")
     flash("Import complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
     return redirect(url_for("catalog"))
+
+# ── MSRP Diff UI ─────────────────────────────────────────────────────────────
+
+@app.route("/admin/msrp-diff")
+def msrp_diff_page():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("index"))
+    return render_template("msrp_diff_ui.html", job=_read_msrp_job())
+
+
+@app.route("/admin/msrp-diff/run", methods=["POST"])
+def msrp_diff_run():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("index"))
+    job = _read_msrp_job()
+    if job["status"] == "running":
+        flash("A diff is already running.", "warning")
+        return redirect(url_for("msrp_diff_page"))
+    update_db = request.form.get("update_db") == "on"
+    _write_msrp_job({"status": "running", "progress": [], "results": None,
+                     "error": None, "update_db": update_db,
+                     "started_at": date.today().isoformat(), "finished_at": None})
+    threading.Thread(target=_run_msrp_diff_job, args=(update_db,), daemon=True).start()
+    return redirect(url_for("msrp_diff_page"))
+
+
+@app.route("/admin/msrp-diff/status")
+def msrp_diff_status():
+    if not is_admin():
+        return jsonify(error="Unauthorized"), 403
+    return jsonify(_read_msrp_job())
+
 
 # ── Admin auth ────────────────────────────────────────────────────────────────
 
