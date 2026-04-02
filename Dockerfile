@@ -39,9 +39,9 @@ HEALTHCHECK --interval=5m --timeout=15s --start-period=30s --retries=3 \
 CMD ["sh", "-c", \
   "if [ \"$PUID\" != \"0\" ]; then \
      groupadd -g $PGID appgroup 2>/dev/null || true; \
-     useradd -u $PUID -g $PGID -M -s /sbin/nologin appuser 2>/dev/null || true; \
+     useradd -u $PUID -g $PGID -M -d /data -s /sbin/nologin appuser 2>/dev/null || true; \
      chown -R $PUID:$PGID /data /app; \
-     exec gosu appuser gunicorn --bind 0.0.0.0:8095 --workers 4 --timeout 120 app:app; \
+     exec gosu appuser env HOME=/data gunicorn --bind 0.0.0.0:8095 --workers 4 --timeout 120 app:app; \
    else \
      exec gunicorn --bind 0.0.0.0:8095 --workers 4 --timeout 120 app:app; \
    fi"]
