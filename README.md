@@ -189,6 +189,82 @@ Set membership columns (mark `yes` to assign): `Beast`, `Fanatic`, `Signature`, 
 
 ---
 
+## Navigation
+
+| Page | URL | Access |
+|---|---|---|
+| Dashboard | `/` | Public |
+| Catalog | `/catalog` | Public |
+| Sets | `/sets` | Public |
+| People | `/people` | Public |
+| Ownership Matrix | `/views/matrix` | Public |
+| Wishlist | `/wishlist` | Public |
+| Collection Stats | `/stats` | Public |
+| Sharpening Log | `/sharpening` | Public |
+| Bakeware Tracker | `/bakeware` | Public |
+| Import | `/import` | Public |
+| Export CSV | `/export/csv` | Public |
+| Catalog Sync | `/catalog/sync` | Admin |
+| MSRP Diff | `/admin/msrp-diff` | Admin |
+| Admin Login | `/admin/login` | Public |
+
+---
+
+## Database Schema
+
+Six tables backed by SQLite. All migrations run automatically at startup.
+
+| Table | Key Columns | Notes |
+|---|---|---|
+| `items` | `id`, `name`, `sku`, `category`, `edge_type`, `is_unicorn`, `in_catalog`, `cutco_url`, `msrp` | One row per catalog item |
+| `item_variants` | `id`, `item_id`, `color`, `is_unicorn` | One row per handle color; every item has at least an "Unknown" variant |
+| `ownership` | `id`, `variant_id`, `person_id`, `status`, `target_price` | Links a person to a variant; status is `Owned`, `Wishlist`, `Sold`, or `Traded` |
+| `people` | `id`, `name` | Collectors |
+| `sets` | `id`, `name`, `sku` | Named Cutco sets |
+| `item_sets` | `item_id`, `set_id` | Many-to-many join between items and sets |
+| `sharpening_log` | `id`, `item_id`, `sharpened_on`, `method`, `notes` | One row per sharpening event |
+| `bakeware_sessions` | `id`, `item_id`, `baked_on`, `what_made`, `rating`, `notes` | One row per baking session |
+
+---
+
+## Unicorn Tracking
+
+A **unicorn** is any item or variant that is rare, discontinued, or otherwise hard to find. Unicorns can be flagged at two levels:
+
+- **Item level** — marks the entire item as a unicorn regardless of color (set via the catalog Edit form)
+- **Variant level** — marks a specific color or edge variant as a unicorn (set via the variant Edit form or during import via the `is_unicorn` column)
+
+The `any_unicorn` property on an item returns `true` if either the item itself or any of its variants is flagged. The catalog filter and stats page both use this property, so a variant-level unicorn surfaces the item in unicorn searches.
+
+---
+
+## Backup
+
+The entire database is a single SQLite file. To back it up, copy it while the container is running (SQLite supports concurrent reads):
+
+```bash
+cp ./data/cutco.db ./data/cutco.db.bak
+```
+
+Or with Docker:
+
+```bash
+docker exec cutco-vault sqlite3 /data/cutco.db ".backup /data/cutco.db.bak"
+```
+
+Restore by replacing the file and restarting the container.
+
+---
+
+## Known Limitations
+
+- **MSRP scraping** — Price extraction relies on Cutco.com's current page structure (JSON-LD, Open Graph meta tags, and DOM patterns). A site redesign may reduce scraping success rates until extraction strategies are updated.
+- **Catalog sync accuracy** — SKU extraction uses a six-strategy heuristic. Gift sets and bundle pages occasionally return incorrect SKUs; the `CATEGORY_OVERRIDES` dict in `app.py` handles known exceptions.
+- **Single-file architecture** — All routes and models live in `app.py`. At current scale this is manageable; a Flask Blueprint split would be the natural next step if the file grows significantly.
+- **No authentication beyond admin token** — All non-admin pages are publicly accessible to anyone who can reach the host. Do not expose this service directly to the internet without a reverse proxy or VPN.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
