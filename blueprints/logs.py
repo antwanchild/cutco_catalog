@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
@@ -11,6 +12,7 @@ from helpers import _notify_discord, is_admin
 from models import BakewareSession, Item, SharpeningLog
 
 logs_bp = Blueprint("logs", __name__)
+logger = logging.getLogger(__name__)
 
 
 # ── Sharpening Log ────────────────────────────────────────────────────────────
@@ -80,6 +82,7 @@ def sharpening_add():
         notes        = notes,
     ))
     db.session.commit()
+    logger.info("Sharpening logged: item %d on %s (%s)", item_id, sharpened_on, method)
     flash("Sharpening event logged.", "success")
     return redirect(url_for("logs.sharpening"))
 
@@ -92,6 +95,7 @@ def sharpening_edit(lid):
         entry.method       = request.form.get("method", entry.method).strip()
         entry.notes        = request.form.get("notes", "").strip() or None
         db.session.commit()
+        logger.info("Sharpening entry %d updated", lid)
         flash("Event updated.", "success")
         return redirect(url_for("logs.sharpening"))
     return render_template("sharpening_edit.html", entry=entry, methods=SHARPEN_METHODS)
@@ -102,6 +106,7 @@ def sharpening_delete(lid):
     entry = SharpeningLog.query.get_or_404(lid)
     db.session.delete(entry)
     db.session.commit()
+    logger.info("Sharpening entry %d deleted", lid)
     flash("Event removed.", "info")
     return redirect(url_for("logs.sharpening"))
 
@@ -242,6 +247,7 @@ def bakeware_add():
         notes    = notes,
     ))
     db.session.commit()
+    logger.info("Bakeware session logged: item %d on %s — %s", item_id, baked_on, what_made)
     flash("Baking session logged.", "success")
     return redirect(url_for("logs.bakeware"))
 
@@ -260,6 +266,7 @@ def bakeware_edit(sid):
         except ValueError:
             pass
         db.session.commit()
+        logger.info("Bakeware session %d updated", sid)
         flash("Session updated.", "success")
         return redirect(url_for("logs.bakeware"))
     return render_template("bakeware_edit.html", session=session)
@@ -270,6 +277,7 @@ def bakeware_delete(sid):
     session = BakewareSession.query.get_or_404(sid)
     db.session.delete(session)
     db.session.commit()
+    logger.info("Bakeware session %d deleted", sid)
     flash("Session removed.", "info")
     return redirect(url_for("logs.bakeware"))
 

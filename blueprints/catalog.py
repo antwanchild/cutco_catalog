@@ -1,3 +1,4 @@
+import logging
 import re
 from collections import OrderedDict
 
@@ -10,6 +11,7 @@ from models import Item, ItemVariant, Set, ensure_unknown_variant, get_or_create
 from scraping import scrape_catalog, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
+logger = logging.getLogger(__name__)
 
 
 @catalog_bp.route("/catalog")
@@ -72,6 +74,7 @@ def catalog_add():
             if color != UNKNOWN_COLOR:
                 db.session.add(ItemVariant(item_id=item.id, color=color))
         db.session.commit()
+        logger.info("Item added: %s (SKU: %s)", item.name, item.sku or "none")
         flash(f'Added "{item.name}" to catalog.', "success")
         return redirect(url_for("catalog.catalog"))
 
@@ -98,6 +101,7 @@ def catalog_edit(iid):
         item.sets = Set.query.filter(Set.id.in_(selected_set_ids)).all()
 
         db.session.commit()
+        logger.info("Item updated: %s (SKU: %s)", item.name, item.sku or "none")
         flash(f'Updated "{item.name}".', "success")
         return redirect(url_for("catalog.catalog"))
 
@@ -113,6 +117,7 @@ def catalog_delete(iid):
     name = item.name
     db.session.delete(item)
     db.session.commit()
+    logger.info("Item deleted: %s", name)
     flash(f'Deleted "{name}".', "info")
     return redirect(url_for("catalog.catalog"))
 
@@ -138,6 +143,7 @@ def variant_add(iid):
     db.session.add(ItemVariant(item_id=iid, color=color,
                                notes=request.form.get("notes", "").strip() or None))
     db.session.commit()
+    logger.info("Variant added: %s → %s", item.name, color)
     flash(f'Added variant "{color}".', "success")
     return redirect(url_for("catalog.variants", iid=iid))
 
@@ -154,6 +160,7 @@ def variant_edit(vid):
     variant.notes      = request.form.get("notes", "").strip() or None
     variant.is_unicorn = request.form.get("is_unicorn") == "on"
     db.session.commit()
+    logger.info("Variant updated: item %d → %s", iid, color)
     flash(f'Updated to "{color}".', "success")
     return redirect(url_for("catalog.variants", iid=iid))
 
@@ -167,6 +174,7 @@ def variant_delete(vid):
     iid = variant.item_id
     db.session.delete(variant)
     db.session.commit()
+    logger.info("Variant deleted: item %d", iid)
     flash("Variant removed.", "info")
     return redirect(url_for("catalog.variants", iid=iid))
 
@@ -189,6 +197,7 @@ def set_add():
         item_set = Set(name=name, notes=request.form.get("notes", "").strip() or None)
         db.session.add(item_set)
         db.session.commit()
+        logger.info("Set created: %s", name)
         flash(f'Created set "{name}".', "success")
         return redirect(url_for("catalog.sets_list"))
     return render_template("set_form.html", set=None, action="Add")
@@ -201,6 +210,7 @@ def set_edit(sid):
         item_set.name  = request.form["name"].strip()
         item_set.notes = request.form.get("notes", "").strip() or None
         db.session.commit()
+        logger.info("Set updated: %s", item_set.name)
         flash(f'Updated set "{item_set.name}".', "success")
         return redirect(url_for("catalog.sets_list"))
     return render_template("set_form.html", set=item_set, action="Edit")
@@ -212,6 +222,7 @@ def set_delete(sid):
     name = item_set.name
     db.session.delete(item_set)
     db.session.commit()
+    logger.info("Set deleted: %s", name)
     flash(f'Deleted set "{name}".', "info")
     return redirect(url_for("catalog.sets_list"))
 
@@ -321,6 +332,7 @@ def catalog_sync_confirm():
                 linked_items += 1
 
     db.session.commit()
+    logger.info("Sync complete: %d items, %d sets, %d memberships", added_items, added_sets, linked_items)
 
     parts = []
     if added_items:
