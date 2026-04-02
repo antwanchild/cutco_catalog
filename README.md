@@ -66,7 +66,7 @@ Then open `http://localhost:8095` in your browser.
 | `DISCORD_WEBHOOK_URL` | *(empty)* | No | Incoming webhook URL for Discord notifications |
 | `SHARPEN_THRESHOLD_DAYS` | `180` | No | Days before a knife is flagged overdue for sharpening |
 | `BAKEWARE_THRESHOLD_DAYS` | `60` | No | Days before a bakeware piece is flagged as idle |
-| `BAKEWARE_CATEGORIES` | `Ake Cookware,Cookware,Bakeware` | No | Catalog categories treated as bakeware |
+| `BAKEWARE_CATEGORIES` | `Cookware,Bakeware` | No | Catalog categories treated as bakeware |
 | `PUID` | `0` | No | Run container as this user ID (for correct file ownership on the host) |
 | `PGID` | `0` | No | Run container as this group ID |
 | `TZ` | `UTC` | No | Container timezone |
