@@ -46,6 +46,7 @@
       <li><a href="{{ url_for('export_csv') }}">📤 Export CSV</a></li>
       {% if is_admin() %}
       <li><a href="{{ url_for('catalog_sync') }}">🔄 Sync Catalog</a></li>
+      <li><a href="{{ url_for('msrp_diff_page') }}">💲 MSRP Diff</a></li>
       {% endif %}
     </ul>
   </section>

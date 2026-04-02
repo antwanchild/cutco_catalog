@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}MSRP Diff – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">MSRP Diff</h1>
+</div>
+
+{# ── Run form ─────────────────────────────────────────────────────────────── #}
+<div class="form-card compact" style="margin-bottom:1.5rem;max-width:560px">
+  <form method="post" action="{{ url_for('msrp_diff_run') }}" id="run-form">
+    <div class="inline-form" style="flex-wrap:wrap;gap:.75rem">
+      <label class="checkbox-label">
+        <input type="checkbox" name="update_db"{% if job.update_db %} checked{% endif %}>
+        Write prices to DB after scrape
+      </label>
+      <button type="submit" class="btn btn-primary"
+              id="run-btn"{% if job.status == 'running' %} disabled{% endif %}>
+        {% if job.status == 'running' %}Running…{% else %}Run Diff{% endif %}
+      </button>
+      {% if job.started_at %}
+      <span class="muted small">Last run: {{ job.started_at }}
+        {% if job.finished_at %}→ {{ job.finished_at }}{% endif %}
+      </span>
+      {% endif %}
+    </div>
+    <p class="hint" style="margin-top:.5rem">
+      Scrapes live prices from cutco.com and compares them to the values stored in your database.
+      The scrape takes 1–3 minutes.
+      {% if not job.update_db and job.status != 'running' %}
+        <strong>Write prices to DB</strong> is off — results are read-only.
+      {% endif %}
+    </p>
+  </form>
+</div>
+
+{# ── Progress log (shown while running) ──────────────────────────────────── #}
+<div id="progress-panel" style="{% if job.status != 'running' and not job.progress %}display:none{% endif %}">
+  <h2 class="stats-section-title">Progress</h2>
+  <div class="msrp-log" id="progress-log">
+    {% for line in job.progress %}
+      <div>{{ line }}</div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── Error ────────────────────────────────────────────────────────────────── #}
+{% if job.status == 'error' %}
+<div class="flash flash-error">Diff failed: {{ job.error }}</div>
+{% endif %}
+
+{# ── Results ──────────────────────────────────────────────────────────────── #}
+{% if job.results %}
+{% set r = job.results %}
+{% set changes = r.increased | length + r.decreased | length %}
+
+<div class="stat-grid" style="margin:1.5rem 0 1rem">
+  <div class="stat-card{% if r.increased %} stat-card-warn{% endif %}">
+    <div class="stat-number">{{ r.increased | length }}</div>
+    <div class="stat-label">Price Increases</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ r.decreased | length }}</div>
+    <div class="stat-label">Price Decreases</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ r.new | length }}</div>
+    <div class="stat-label">New on Site</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ r.removed | length }}</div>
+    <div class="stat-label">Removed from Site</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ r.unchanged | length }}</div>
+    <div class="stat-label">Unchanged</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ r.no_price | length }}</div>
+    <div class="stat-label">Price Unavailable</div>
+  </div>
+</div>
+
+{% for section_rows, title, show_delta in [
+    (r.increased, "Price Increases", true),
+    (r.decreased, "Price Decreases", true),
+    (r.new,       "New on Site",     false),
+    (r.removed,   "Removed from Site", false),
+    (r.no_price,  "Price Unavailable", false),
+] %}
+{% if section_rows %}
+<details class="diff-section" open>
+  <summary>{{ title }} ({{ section_rows | length }})</summary>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>SKU</th><th>Name</th>
+          <th>DB Price</th><th>Live Price</th>
+          {% if show_delta %}<th>Δ</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in section_rows %}
+        <tr>
+          <td class="mono">{{ row.sku }}</td>
+          <td>{{ row.name }}</td>
+          <td>{% if row.db_price is not none %}${{ "%.2f"|format(row.db_price) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if row.live_price is not none %}${{ "%.2f"|format(row.live_price) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          {% if show_delta %}
+          <td>
+            {% if row.delta is defined %}
+              {% if row.delta > 0 %}<span class="price-over">+${{ "%.2f"|format(row.delta) }}</span>
+              {% else %}<span class="price-met">−${{ "%.2f"|format(row.delta | abs) }}</span>{% endif %}
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+{% endfor %}
+
+{% if r.unchanged %}
+<details class="diff-section">
+  <summary class="muted-summary">Unchanged ({{ r.unchanged | length }})</summary>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>SKU</th><th>Name</th><th>DB Price</th><th>Live Price</th></tr></thead>
+      <tbody>
+        {% for row in r.unchanged %}
+        <tr>
+          <td class="mono">{{ row.sku }}</td>
+          <td>{{ row.name }}</td>
+          <td>{% if row.db_price is not none %}${{ "%.2f"|format(row.db_price) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if row.live_price is not none %}${{ "%.2f"|format(row.live_price) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+
+{% elif job.status == 'idle' %}
+<p class="empty">No results yet — click <strong>Run Diff</strong> to start.</p>
+{% endif %}
+
+{# ── Polling script ───────────────────────────────────────────────────────── #}
+<script>
+(function () {
+  const isRunning = {{ ('true' if job.status == 'running' else 'false') }};
+  if (!isRunning) return;
+
+  const logEl  = document.getElementById('progress-log');
+  const panel  = document.getElementById('progress-panel');
+  const runBtn = document.getElementById('run-btn');
+  panel.style.display = '';
+
+  function poll() {
+    fetch('{{ url_for("msrp_diff_status") }}')
+      .then(r => r.json())
+      .then(data => {
+        logEl.innerHTML = data.progress.map(l => `<div>${l}</div>`).join('');
+        logEl.scrollTop = logEl.scrollHeight;
+
+        if (data.status === 'running') {
+          setTimeout(poll, 2000);
+        } else {
+          // Reload to show final results
+          window.location.reload();
+        }
+      })
+      .catch(() => setTimeout(poll, 4000));
+  }
+  setTimeout(poll, 2000);
+})();
+</script>
+{% endblock %}
