@@ -5,7 +5,7 @@
   <h1 class="page-title">Sharpening Log</h1>
   <div class="page-actions">
     {% if is_admin() and tracked %}
-    <form method="post" action="{{ url_for('sharpening_notify') }}">
+    <form method="post" action="{{ url_for('logs.sharpening_notify') }}">
       <button class="btn btn-secondary btn-sm"
               title="Send overdue reminders to Discord">
         {% if has_discord %}🔔{% else %}🔍{% endif %} Check Overdue
@@ -34,7 +34,7 @@
 {# ── Quick add form ───────────────────────────────────────────────────────── #}
 <details class="sharpen-add-panel" {% if not tracked %}open{% endif %}>
   <summary>+ Log Sharpening Event</summary>
-  <form method="post" action="{{ url_for('sharpening_add') }}" class="inline-form sharpen-add-form">
+  <form method="post" action="{{ url_for('logs.sharpening_add') }}" class="inline-form sharpen-add-form">
     <select name="item_id" required class="select-sm" style="min-width:200px">
       <option value="">— select item —</option>
       {% for item in items_list %}
@@ -71,7 +71,7 @@
       {% for row in tracked %}
       <tr>
         <td>
-          <a href="{{ url_for('item_owners', iid=row.item.id) }}">{{ row.item.name }}</a>
+          <a href="{{ url_for('views.item_owners', iid=row.item.id) }}">{{ row.item.name }}</a>
           {% if row.overdue %}<span class="overdue-badge">overdue</span>{% endif %}
         </td>
         <td class="muted">{{ row.item.category or '—' }}</td>
@@ -110,12 +110,12 @@
       {% for entry in recent_entries %}
       <tr>
         <td class="mono">{{ entry.sharpened_on }}</td>
-        <td><a href="{{ url_for('item_owners', iid=entry.item_id) }}">{{ entry.item.name }}</a></td>
+        <td><a href="{{ url_for('views.item_owners', iid=entry.item_id) }}">{{ entry.item.name }}</a></td>
         <td>{{ entry.method }}</td>
         <td>{{ entry.notes or '—' }}</td>
         <td class="actions">
-          <a href="{{ url_for('sharpening_edit', lid=entry.id) }}" class="btn btn-xs">Edit</a>
-          <form method="post" action="{{ url_for('sharpening_delete', lid=entry.id) }}"
+          <a href="{{ url_for('logs.sharpening_edit', lid=entry.id) }}" class="btn btn-xs">Edit</a>
+          <form method="post" action="{{ url_for('logs.sharpening_delete', lid=entry.id) }}"
                 onsubmit="return confirm('Remove this event?')" style="display:inline">
             <button class="btn btn-xs btn-danger">Del</button>
           </form>

@@ -4,8 +4,8 @@
 <div class="page-header">
   <h1 class="page-title">{{ person.name }}'s Collection</h1>
   <div class="page-actions">
-    <a href="{{ url_for('ownership_add', person_id=person.id) }}" class="btn btn-primary">+ Add Entry</a>
-    <a href="{{ url_for('people') }}" class="btn btn-ghost">← People</a>
+    <a href="{{ url_for('people.ownership_add', person_id=person.id) }}" class="btn btn-primary">+ Add Entry</a>
+    <a href="{{ url_for('people.people') }}" class="btn btn-ghost">← People</a>
   </div>
 </div>
 
@@ -16,7 +16,7 @@
   <tbody>
     {% for ownership in ownerships %}
     <tr>
-      <td><a href="{{ url_for('item_owners', iid=ownership.variant.item_id) }}">{{ ownership.variant.item.name }}</a></td>
+      <td><a href="{{ url_for('views.item_owners', iid=ownership.variant.item_id) }}">{{ ownership.variant.item.name }}</a></td>
       <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
       <td>
@@ -28,8 +28,8 @@
       </td>
       <td>{{ ownership.notes or '—' }}</td>
       <td class="actions">
-        <a href="{{ url_for('ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
-        <form method="post" action="{{ url_for('ownership_delete', oid=ownership.id) }}"
+        <a href="{{ url_for('people.ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
+        <form method="post" action="{{ url_for('people.ownership_delete', oid=ownership.id) }}"
               onsubmit="return confirm('Remove this entry?')" style="display:inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
@@ -48,8 +48,8 @@
   <ul class="gap-list">
     {% for item in item_gaps %}
       <li>
-        <a href="{{ url_for('item_owners', iid=item.id) }}">{{ item.name }}</a>
-        <a href="{{ url_for('ownership_add', person_id=person.id, item_id=item.id) }}"
+        <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
+        <a href="{{ url_for('people.ownership_add', person_id=person.id, item_id=item.id) }}"
            class="btn btn-xs btn-success">+ Add</a>
       </li>
     {% endfor %}
@@ -66,7 +66,7 @@
         <strong>{{ item.name }}</strong> — missing:
         {% for variant in missing %}
           <span class="chip">{{ variant.color }}</span>
-          <a href="{{ url_for('ownership_add', person_id=person.id, item_id=item.id, variant_id=variant.id) }}"
+          <a href="{{ url_for('people.ownership_add', person_id=person.id, item_id=item.id, variant_id=variant.id) }}"
              class="btn btn-xs btn-success">+ Add</a>
         {% endfor %}
       </li>

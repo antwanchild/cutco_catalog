@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Variants — {{ item.name }}</h1>
-  <a href="{{ url_for('catalog') }}" class="btn btn-ghost">← Catalog</a>
+  <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">← Catalog</a>
 </div>
 
 <table class="data-table">
@@ -20,7 +20,7 @@
       <td class="actions">
         <button class="btn btn-xs" onclick="toggleEdit({{ variant.id }})">Edit</button>
         {% if item.variants | length > 1 %}
-        <form method="post" action="{{ url_for('variant_delete', vid=variant.id) }}"
+        <form method="post" action="{{ url_for('catalog.variant_delete', vid=variant.id) }}"
               onsubmit="return confirm('Remove this variant?')" style="display:inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
@@ -29,7 +29,7 @@
     </tr>
     <tr id="edit-{{ variant.id }}" class="edit-row hidden">
       <td colspan="4">
-        <form method="post" action="{{ url_for('variant_edit', vid=variant.id) }}" class="inline-form">
+        <form method="post" action="{{ url_for('catalog.variant_edit', vid=variant.id) }}" class="inline-form">
           <input type="text" name="color" value="{{ variant.color }}" class="input-sm" required>
           <input type="text" name="notes" value="{{ variant.notes or '' }}" placeholder="Notes…" class="input-sm">
           <label class="checkbox-label">
@@ -46,7 +46,7 @@
 
 <div class="form-card compact">
   <h3>Add Variant</h3>
-  <form method="post" action="{{ url_for('variant_add', iid=item.id) }}" class="inline-form">
+  <form method="post" action="{{ url_for('catalog.variant_add', iid=item.id) }}" class="inline-form">
     <input type="text" name="color" placeholder="Color name *" class="input-sm" required>
     <input type="text" name="notes" placeholder="Notes (optional)" class="input-sm">
     <button type="submit" class="btn btn-primary btn-sm">Add</button>

@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Import Preview</h1>
-  <a href="{{ url_for('import_page') }}" class="btn btn-ghost">← Back</a>
+  <a href="{{ url_for('data.import_page') }}" class="btn btn-ghost">← Back</a>
 </div>
 
 {% if errors %}
@@ -31,7 +31,7 @@
 </p>
 {% endif %}
 
-<form method="post" action="{{ url_for('import_confirm') }}">
+<form method="post" action="{{ url_for('data.import_confirm') }}">
 
   {# ── New Items ──────────────────────────────────────────────────────── #}
   {% if new_items %}
@@ -215,7 +215,7 @@
   {% else %}
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">Confirm Import</button>
-    <a href="{{ url_for('import_page') }}" class="btn btn-ghost">Cancel</a>
+    <a href="{{ url_for('data.import_page') }}" class="btn btn-ghost">Cancel</a>
   </div>
   {% endif %}
 

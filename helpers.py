@@ -4,7 +4,6 @@ import requests
 from flask import request
 
 from constants import ADMIN_TOKEN, DISCORD_WEBHOOK_URL
-from extensions import db
 from models import Ownership
 
 logger = logging.getLogger(__name__)

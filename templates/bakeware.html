@@ -5,7 +5,7 @@
   <h1 class="page-title">Bakeware Usage Tracker</h1>
   <div class="page-actions">
     {% if is_admin() and tracked %}
-    <form method="post" action="{{ url_for('bakeware_notify') }}">
+    <form method="post" action="{{ url_for('logs.bakeware_notify') }}">
       <button class="btn btn-secondary btn-sm">
         {% if has_discord %}🔔{% else %}🔍{% endif %} Check Idle
       </button>
@@ -39,7 +39,7 @@
 {# ── Quick add form ───────────────────────────────────────────────────────── #}
 <details class="sharpen-add-panel" {% if not tracked %}open{% endif %}>
   <summary>+ Log Baking Session</summary>
-  <form method="post" action="{{ url_for('bakeware_add') }}" class="sharpen-add-form">
+  <form method="post" action="{{ url_for('logs.bakeware_add') }}" class="sharpen-add-form">
     <div class="form-row" style="max-width:760px">
       <label>Item *
         <select name="item_id" required class="input-full">
@@ -98,7 +98,7 @@
     <ul class="link-list">
       {% for item in never_used %}
         <li>
-          <a href="{{ url_for('item_owners', iid=item.id) }}">{{ item.name }}</a>
+          <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
           <span class="muted">{{ item.category }}</span>
         </li>
       {% endfor %}
@@ -126,7 +126,7 @@
       {% for row in tracked %}
       <tr>
         <td>
-          <a href="{{ url_for('item_owners', iid=row.item.id) }}">{{ row.item.name }}</a>
+          <a href="{{ url_for('views.item_owners', iid=row.item.id) }}">{{ row.item.name }}</a>
           {% if row.stale %}<span class="overdue-badge">idle</span>{% endif %}
         </td>
         <td class="muted">{{ row.item.category or '—' }}</td>
@@ -173,13 +173,13 @@
       {% for s in recent_sessions %}
       <tr>
         <td class="mono">{{ s.baked_on }}</td>
-        <td><a href="{{ url_for('item_owners', iid=s.item_id) }}">{{ s.item.name }}</a></td>
+        <td><a href="{{ url_for('views.item_owners', iid=s.item_id) }}">{{ s.item.name }}</a></td>
         <td>{{ s.what_made }}</td>
         <td>{% if s.rating %}{{ '⭐' * s.rating }}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{{ s.notes or '—' }}</td>
         <td class="actions">
-          <a href="{{ url_for('bakeware_edit', sid=s.id) }}" class="btn btn-xs">Edit</a>
-          <form method="post" action="{{ url_for('bakeware_delete', sid=s.id) }}"
+          <a href="{{ url_for('logs.bakeware_edit', sid=s.id) }}" class="btn btn-xs">Edit</a>
+          <form method="post" action="{{ url_for('logs.bakeware_delete', sid=s.id) }}"
                 onsubmit="return confirm('Remove this session?')" style="display:inline">
             <button class="btn btn-xs btn-danger">Del</button>
           </form>
