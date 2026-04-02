@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Sharpening Log – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Sharpening Log</h1>
+  <div class="page-actions">
+    {% if is_admin() and tracked %}
+    <form method="post" action="{{ url_for('sharpening_notify') }}">
+      <button class="btn btn-secondary btn-sm"
+              title="Send overdue reminders to Discord">
+        {% if has_discord %}🔔{% else %}🔍{% endif %} Check Overdue
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Summary cards ────────────────────────────────────────────────────────── #}
+<div class="stat-grid" style="margin-bottom:1.5rem">
+  <div class="stat-card">
+    <div class="stat-number">{{ tracked | length }}</div>
+    <div class="stat-label">Knives Tracked</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ recent_entries | length }}</div>
+    <div class="stat-label">Total Events</div>
+  </div>
+  <div class="stat-card{% if overdue_count %} stat-card-warn{% endif %}">
+    <div class="stat-number">{{ overdue_count }}</div>
+    <div class="stat-label">Overdue (&gt;{{ threshold_days }}d)</div>
+  </div>
+</div>
+
+{# ── Quick add form ───────────────────────────────────────────────────────── #}
+<details class="sharpen-add-panel" {% if not tracked %}open{% endif %}>
+  <summary>+ Log Sharpening Event</summary>
+  <form method="post" action="{{ url_for('sharpening_add') }}" class="inline-form sharpen-add-form">
+    <select name="item_id" required class="select-sm" style="min-width:200px">
+      <option value="">— select item —</option>
+      {% for item in items_list %}
+        <option value="{{ item.id }}">{{ item.name }}{% if item.sku %} (#{{ item.sku }}){% endif %}</option>
+      {% endfor %}
+    </select>
+    <input type="date" name="sharpened_on" value="{{ today }}" required class="input-sm">
+    <select name="method" class="select-sm">
+      {% for m in methods %}
+        <option value="{{ m }}">{{ m }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="notes" placeholder="Notes (optional)" class="input-sm">
+    <button type="submit" class="btn btn-primary btn-sm">Log</button>
+  </form>
+</details>
+
+{# ── Tracked items dashboard ──────────────────────────────────────────────── #}
+{% if tracked %}
+<h2 class="stats-section-title" style="margin-top:1.5rem">Tracked Items</h2>
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Category</th>
+        <th>Last Sharpened</th>
+        <th>Days Since</th>
+        <th>Method</th>
+        <th>Events</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in tracked %}
+      <tr>
+        <td>
+          <a href="{{ url_for('item_owners', iid=row.item.id) }}">{{ row.item.name }}</a>
+          {% if row.overdue %}<span class="overdue-badge">overdue</span>{% endif %}
+        </td>
+        <td class="muted">{{ row.item.category or '—' }}</td>
+        <td>{{ row.last_date }}</td>
+        <td>
+          <div class="days-bar-wrap">
+            {% set pct = [100, (row.days_since / threshold_days * 100) | int] | min %}
+            <div class="days-bar{% if row.overdue %} days-bar-over{% endif %}" style="width:{{ pct }}%"></div>
+            <span class="{% if row.overdue %}overdue-text{% else %}muted{% endif %}">{{ row.days_since }}d</span>
+          </div>
+        </td>
+        <td class="muted">{{ row.item.sharpening_log[0].method if row.item.sharpening_log else '—' }}</td>
+        <td class="muted">{{ row.event_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Recent events log ────────────────────────────────────────────────────── #}
+{% if recent_entries %}
+<h2 class="stats-section-title" style="margin-top:1.5rem">Recent Events</h2>
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Item</th>
+        <th>Method</th>
+        <th>Notes</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in recent_entries %}
+      <tr>
+        <td class="mono">{{ entry.sharpened_on }}</td>
+        <td><a href="{{ url_for('item_owners', iid=entry.item_id) }}">{{ entry.item.name }}</a></td>
+        <td>{{ entry.method }}</td>
+        <td>{{ entry.notes or '—' }}</td>
+        <td class="actions">
+          <a href="{{ url_for('sharpening_edit', lid=entry.id) }}" class="btn btn-xs">Edit</a>
+          <form method="post" action="{{ url_for('sharpening_delete', lid=entry.id) }}"
+                onsubmit="return confirm('Remove this event?')" style="display:inline">
+            <button class="btn btn-xs btn-danger">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty" style="margin-top:1.5rem">No sharpening events logged yet. Use the form above to add one.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Bakeware Tracker – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Bakeware Usage Tracker</h1>
+  <div class="page-actions">
+    {% if is_admin() and tracked %}
+    <form method="post" action="{{ url_for('bakeware_notify') }}">
+      <button class="btn btn-secondary btn-sm">
+        {% if has_discord %}🔔{% else %}🔍{% endif %} Check Idle
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Summary cards ────────────────────────────────────────────────────────── #}
+<div class="stat-grid" style="margin-bottom:1.5rem">
+  <div class="stat-card">
+    <div class="stat-number">{{ tracked | length }}</div>
+    <div class="stat-label">Pieces Tracked</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ recent_sessions | length }}</div>
+    <div class="stat-label">Total Sessions</div>
+  </div>
+  <div class="stat-card{% if stale_count %} stat-card-warn{% endif %}">
+    <div class="stat-number">{{ stale_count }}</div>
+    <div class="stat-label">Idle (&gt;{{ threshold_days }}d)</div>
+  </div>
+  {% if never_used %}
+  <div class="stat-card">
+    <div class="stat-number">{{ never_used | length }}</div>
+    <div class="stat-label">Never Used</div>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Quick add form ───────────────────────────────────────────────────────── #}
+<details class="sharpen-add-panel" {% if not tracked %}open{% endif %}>
+  <summary>+ Log Baking Session</summary>
+  <form method="post" action="{{ url_for('bakeware_add') }}" class="sharpen-add-form">
+    <div class="form-row" style="max-width:760px">
+      <label>Item *
+        <select name="item_id" required class="input-full">
+          <option value="">— select piece —</option>
+          {% if bakeware_items %}
+            <optgroup label="Bakeware">
+              {% for item in bakeware_items %}
+                <option value="{{ item.id }}">{{ item.name }}{% if item.sku %} (#{{ item.sku }}){% endif %}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="Other Catalog Items">
+              {% for item in other_items %}
+                <option value="{{ item.id }}">{{ item.name }}{% if item.sku %} (#{{ item.sku }}){% endif %}</option>
+              {% endfor %}
+            </optgroup>
+          {% else %}
+            {% for item in other_items %}
+              <option value="{{ item.id }}">{{ item.name }}{% if item.sku %} (#{{ item.sku }}){% endif %}</option>
+            {% endfor %}
+          {% endif %}
+        </select>
+      </label>
+      <label>Date *
+        <input type="date" name="baked_on" value="{{ today }}" required class="input-full">
+      </label>
+    </div>
+    <div class="form-row" style="max-width:760px">
+      <label>What did you make? *
+        <input type="text" name="what_made" placeholder="e.g. Banana bread" required class="input-full">
+      </label>
+      <label>Rating
+        <select name="rating" class="input-full">
+          <option value="">— optional —</option>
+          <option value="5">⭐⭐⭐⭐⭐ — Excellent</option>
+          <option value="4">⭐⭐⭐⭐ — Good</option>
+          <option value="3">⭐⭐⭐ — OK</option>
+          <option value="2">⭐⭐ — Meh</option>
+          <option value="1">⭐ — Poor</option>
+        </select>
+      </label>
+    </div>
+    <label style="max-width:760px">Notes
+      <textarea name="notes" rows="2" class="input-full" placeholder="Optional notes…"></textarea>
+    </label>
+    <div style="margin-top:.75rem">
+      <button type="submit" class="btn btn-primary">Log Session</button>
+    </div>
+  </form>
+</details>
+
+{# ── Never-used bakeware ──────────────────────────────────────────────────── #}
+{% if never_used %}
+<details class="sharpen-add-panel" style="margin-top:.75rem">
+  <summary>Never Used ({{ never_used | length }} catalog item{{ 's' if never_used | length != 1 }})</summary>
+  <div style="padding:.75rem 1rem 1rem">
+    <ul class="link-list">
+      {% for item in never_used %}
+        <li>
+          <a href="{{ url_for('item_owners', iid=item.id) }}">{{ item.name }}</a>
+          <span class="muted">{{ item.category }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</details>
+{% endif %}
+
+{# ── Tracked items table ──────────────────────────────────────────────────── #}
+{% if tracked %}
+<h2 class="stats-section-title" style="margin-top:1.5rem">Usage by Piece</h2>
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Piece</th>
+        <th>Category</th>
+        <th>Last Used</th>
+        <th>Days Since</th>
+        <th>Sessions</th>
+        <th>Avg Rating</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in tracked %}
+      <tr>
+        <td>
+          <a href="{{ url_for('item_owners', iid=row.item.id) }}">{{ row.item.name }}</a>
+          {% if row.stale %}<span class="overdue-badge">idle</span>{% endif %}
+        </td>
+        <td class="muted">{{ row.item.category or '—' }}</td>
+        <td>{{ row.last_date }}</td>
+        <td>
+          <div class="days-bar-wrap">
+            {% set pct = [100, (row.days_since / threshold_days * 100) | int] | min %}
+            <div class="days-bar{% if row.stale %} days-bar-over{% endif %}" style="width:{{ pct }}%"></div>
+            <span class="{% if row.stale %}overdue-text{% else %}muted{% endif %}">{{ row.days_since }}d</span>
+          </div>
+        </td>
+        <td class="muted">{{ row.session_count }}</td>
+        <td>
+          {% if row.avg_rating %}
+            <span class="rating-stars">{{ '⭐' * row.avg_rating | int }}</span>
+            <span class="muted">{{ row.avg_rating }}</span>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Recent sessions log ──────────────────────────────────────────────────── #}
+{% if recent_sessions %}
+<h2 class="stats-section-title" style="margin-top:1.5rem">Recent Sessions</h2>
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Piece</th>
+        <th>What Made</th>
+        <th>Rating</th>
+        <th>Notes</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in recent_sessions %}
+      <tr>
+        <td class="mono">{{ s.baked_on }}</td>
+        <td><a href="{{ url_for('item_owners', iid=s.item_id) }}">{{ s.item.name }}</a></td>
+        <td>{{ s.what_made }}</td>
+        <td>{% if s.rating %}{{ '⭐' * s.rating }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{{ s.notes or '—' }}</td>
+        <td class="actions">
+          <a href="{{ url_for('bakeware_edit', sid=s.id) }}" class="btn btn-xs">Edit</a>
+          <form method="post" action="{{ url_for('bakeware_delete', sid=s.id) }}"
+                onsubmit="return confirm('Remove this session?')" style="display:inline">
+            <button class="btn btn-xs btn-danger">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty" style="margin-top:1.5rem">No sessions logged yet. Use the form above to add one.</p>
+{% endif %}
+{% endblock %}

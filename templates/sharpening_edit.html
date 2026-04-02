@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Edit Sharpening Event – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Edit Sharpening Event</h1>
+  <a href="{{ url_for('sharpening') }}" class="btn btn-ghost">← Sharpening Log</a>
+</div>
+
+<form method="post" class="form-card">
+  <label>Item
+    <input type="text" value="{{ entry.item.name }}" disabled class="input-full">
+  </label>
+  <div class="form-row">
+    <label>Date *
+      <input type="date" name="sharpened_on" value="{{ entry.sharpened_on }}" required class="input-full">
+    </label>
+    <label>Method *
+      <select name="method" required class="input-full">
+        {% for m in methods %}
+          <option value="{{ m }}"{% if m == entry.method %} selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <label>Notes
+    <textarea name="notes" rows="2" class="input-full">{{ entry.notes or '' }}</textarea>
+  </label>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{{ url_for('sharpening') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

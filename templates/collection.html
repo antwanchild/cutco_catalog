@@ -12,13 +12,20 @@
 {% if ownerships %}
 <h2>Owned / Tracked</h2>
 <table class="data-table">
-  <thead><tr><th>Item</th><th>Color</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+  <thead><tr><th>Item</th><th>Color</th><th>Status</th><th>Target</th><th>Notes</th><th>Actions</th></tr></thead>
   <tbody>
     {% for ownership in ownerships %}
     <tr>
       <td><a href="{{ url_for('item_owners', iid=ownership.variant.item_id) }}">{{ ownership.variant.item.name }}</a></td>
       <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
+      <td>
+        {% if ownership.status == 'Wishlist' and ownership.target_price %}
+          ${{ "%.2f"|format(ownership.target_price) }}
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
+      </td>
       <td>{{ ownership.notes or '—' }}</td>
       <td class="actions">
         <a href="{{ url_for('ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>

@@ -17,6 +17,14 @@
     <a href="{{ url_for('people') }}" {% if request.endpoint and 'people' in request.endpoint or request.endpoint == 'person_collection' %}class="active"{% endif %}>People</a>
     <a href="{{ url_for('matrix') }}"
        {% if request.endpoint == 'matrix' %}class="active"{% endif %}>Matrix</a>
+    <a href="{{ url_for('wishlist') }}"
+       {% if request.endpoint and 'wishlist' in request.endpoint %}class="active"{% endif %}>Wishlist</a>
+    <a href="{{ url_for('sharpening') }}"
+       {% if request.endpoint and 'sharpening' in request.endpoint %}class="active"{% endif %}>Sharpening</a>
+    <a href="{{ url_for('bakeware') }}"
+       {% if request.endpoint and 'bakeware' in request.endpoint %}class="active"{% endif %}>Bakeware</a>
+    <a href="{{ url_for('stats') }}"
+       {% if request.endpoint == 'stats' %}class="active"{% endif %}>Stats</a>
     <a href="{{ url_for('import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
     <a href="{{ url_for('export_csv') }}">Export CSV</a>
     {% if is_admin() %}

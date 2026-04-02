@@ -64,11 +64,17 @@
 
   <div class="form-row">
     <label>Status *
-      <select name="status" required class="input-full">
+      <select name="status" id="status-select" required class="input-full" onchange="toggleTarget(this.value)">
         {% for status_option in status_options %}
           <option value="{{ status_option }}" {% if (ownership and ownership.status == status_option) or (not ownership and status_option == 'Owned') %}selected{% endif %}>{{ status_option }}</option>
         {% endfor %}
       </select>
+    </label>
+    <label id="target-price-row" style="display:none">Target Price
+      <input type="number" name="target_price" min="0" step="0.01" placeholder="e.g. 89.00"
+             class="input-full"
+             value="{{ '%.2f'|format(ownership.target_price) if ownership and ownership.target_price else '' }}">
+      <span class="hint">Notify via Discord when MSRP meets or beats this price.</span>
     </label>
   </div>
 
@@ -85,6 +91,13 @@
 </form>
 
 <script>
+function toggleTarget(status) {
+  document.getElementById('target-price-row').style.display =
+    status === 'Wishlist' ? '' : 'none';
+}
+// Run on page load to handle edit mode where status may already be Wishlist
+toggleTarget(document.getElementById('status-select').value);
+
 function loadVariants(itemId) {
   const sel = document.getElementById('variant-select');
   sel.innerHTML = '<option value="">Loading…</option>';

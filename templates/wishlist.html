@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Wishlist – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Wishlist</h1>
+  <div class="page-actions">
+    <form method="get" action="{{ url_for('wishlist') }}" class="inline-form">
+      <select name="person" class="select-sm" onchange="this.form.submit()">
+        <option value="">All Collectors</option>
+        {% for person in people %}
+          <option value="{{ person.id }}"{% if person_id == person.id %} selected{% endif %}>{{ person.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% if is_admin() and rows %}
+    <form method="post" action="{{ url_for('wishlist_check') }}">
+      <button class="btn btn-secondary btn-sm"
+              title="{% if has_discord %}Check targets and notify Discord{% else %}Check targets (set DISCORD_WEBHOOK_URL to enable notifications){% endif %}">
+        {% if has_discord %}🔔{% else %}🔍{% endif %} Check Targets
+      </button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('ownership_add') }}" class="btn btn-primary btn-sm">+ Add Entry</a>
+  </div>
+</div>
+
+{% if hit_count %}
+<div class="flash flash-success" style="margin-bottom:1rem">
+  🎯 {{ hit_count }} item{{ 's' if hit_count != 1 }} at or below target price.
+  {% if not has_discord %}<span class="muted">Set DISCORD_WEBHOOK_URL to get notified automatically.</span>{% endif %}
+</div>
+{% endif %}
+
+{% if rows %}
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Person</th>
+        <th>Color</th>
+        <th>Target Price</th>
+        <th>Current MSRP</th>
+        <th>Δ</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      {% set o = row.ownership %}
+      <tr{% if row.hit %} class="row-hit"{% endif %}>
+        <td>
+          <a href="{{ url_for('item_owners', iid=o.variant.item_id) }}">{{ o.variant.item.name }}</a>
+          {% if o.variant.item.sku %}<span class="muted mono">#{{ o.variant.item.sku }}</span>{% endif %}
+          {% if row.hit %}<span class="hit-badge">🎯 target met</span>{% endif %}
+        </td>
+        <td><a href="{{ url_for('person_collection', pid=o.person_id) }}">{{ o.person.name }}</a></td>
+        <td>{% if o.variant.color != UNKNOWN_COLOR %}{{ o.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if row.target %}${{ "%.2f"|format(row.target) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if row.msrp %}${{ "%.2f"|format(row.msrp) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>
+          {% if row.delta is not none %}
+            {% if row.delta <= 0 %}
+              <span class="price-met">▼ ${{ "%.2f"|format(row.delta | abs) }}</span>
+            {% else %}
+              <span class="price-over">+${{ "%.2f"|format(row.delta) }}</span>
+            {% endif %}
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td class="actions">
+          <a href="{{ url_for('ownership_edit', oid=o.id) }}" class="btn btn-xs">Edit</a>
+          <form method="post" action="{{ url_for('ownership_delete', oid=o.id) }}"
+                onsubmit="return confirm('Remove this entry?')" style="display:inline">
+            <button class="btn btn-xs btn-danger">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="table-count">{{ rows | length }} wishlist item{{ 's' if rows | length != 1 }}</p>
+{% else %}
+<p class="empty">No wishlist entries{% if person_id %} for this collector{% endif %}.
+  <a href="{{ url_for('ownership_add') }}">Add one</a>.</p>
+{% endif %}
+{% endblock %}
