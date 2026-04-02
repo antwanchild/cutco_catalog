@@ -1,3 +1,4 @@
+import logging
 import threading
 from datetime import date
 
@@ -9,6 +10,7 @@ from models import Item
 from msrp_helpers import _read_msrp_job, _run_msrp_diff_job, _write_msrp_job
 
 admin_bp = Blueprint("admin", __name__)
+logger = logging.getLogger(__name__)
 
 
 @admin_bp.route("/admin/msrp-diff")
@@ -34,6 +36,7 @@ def msrp_diff_run():
                      "started_at": date.today().isoformat(), "finished_at": None})
     from flask import current_app
     app = current_app._get_current_object()
+    logger.info("MSRP diff job started (update_db=%s)", update_db)
     threading.Thread(target=_run_msrp_diff_job, args=(app, update_db,), daemon=True).start()
     return redirect(url_for("admin.msrp_diff_page"))
 
@@ -51,15 +54,18 @@ def admin_login():
         if request.form.get("token") == ADMIN_TOKEN:
             resp = redirect(url_for("catalog.catalog"))
             resp.set_cookie("admin_token", ADMIN_TOKEN, httponly=True, samesite="Lax")
+            logger.info("Admin login successful")
             flash("Admin access granted.", "success")
             return resp
+        logger.warning("Admin login failed — wrong token")
         flash("Wrong token.", "error")
     return render_template("admin_login.html")
 
 
 @admin_bp.route("/admin/logout")
 def admin_logout():
-    resp = redirect(url_for("main.index"))
+    logger.info("Admin logged out")
+    resp = redirect(url_for("index"))
     resp.delete_cookie("admin_token")
     return resp
 

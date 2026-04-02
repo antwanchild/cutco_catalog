@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
@@ -6,6 +8,7 @@ from helpers import _notify_discord, check_wishlist_targets, is_admin
 from models import Item, Ownership, Person
 
 people_bp = Blueprint("people", __name__)
+logger = logging.getLogger(__name__)
 
 
 @people_bp.route("/people")
@@ -23,6 +26,7 @@ def people_add():
                         notes=request.form.get("notes", "").strip() or None)
         db.session.add(person)
         db.session.commit()
+        logger.info("Person added: %s", person.name)
         flash(f"Added {person.name}.", "success")
         return redirect(url_for("people.people"))
     return render_template("person_form.html", person=None, action="Add")
@@ -35,6 +39,7 @@ def people_edit(pid):
         person.name  = request.form["name"].strip()
         person.notes = request.form.get("notes", "").strip() or None
         db.session.commit()
+        logger.info("Person updated: %s", person.name)
         flash(f"Updated {person.name}.", "success")
         return redirect(url_for("people.people"))
     return render_template("person_form.html", person=person, action="Edit")
@@ -46,6 +51,7 @@ def people_delete(pid):
     name   = person.name
     db.session.delete(person)
     db.session.commit()
+    logger.info("Person deleted: %s", name)
     flash(f"Removed {name}.", "info")
     return redirect(url_for("people.people"))
 
@@ -106,6 +112,7 @@ def ownership_add():
             notes        = request.form.get("notes", "").strip() or None,
         ))
         db.session.commit()
+        logger.info("Ownership added: person %d, variant %d", person_id, variant_id)
         flash("Entry logged.", "success")
         return redirect(url_for("people.person_collection", pid=person_id))
 
@@ -134,6 +141,7 @@ def ownership_edit(oid):
             ownership.target_price = None
         ownership.notes  = request.form.get("notes", "").strip() or None
         db.session.commit()
+        logger.info("Ownership updated: id %d → %s", oid, ownership.status)
         flash("Updated.", "success")
         return redirect(url_for("people.person_collection", pid=ownership.person_id))
 
@@ -155,6 +163,7 @@ def ownership_delete(oid):
     pid       = ownership.person_id
     db.session.delete(ownership)
     db.session.commit()
+    logger.info("Ownership deleted: id %d", oid)
     flash("Entry removed.", "info")
     return redirect(url_for("people.person_collection", pid=pid))
 

@@ -1,5 +1,6 @@
 import csv
 import io
+import logging
 
 import openpyxl
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
@@ -12,6 +13,7 @@ from extensions import db
 from models import Item, ItemVariant, Ownership, Person, ensure_unknown_variant, get_or_create_set
 
 data_bp = Blueprint("data", __name__)
+logger = logging.getLogger(__name__)
 
 
 def _parse_owned_raw(owned_raw: str, default_person: str | None):
@@ -57,6 +59,7 @@ def export_csv():
                          item.edge_type, variant.color, ownership.status,
                          "yes" if (variant.is_unicorn or item.is_unicorn) else "no", ownership.notes or ""])
     csv_buffer.seek(0)
+    logger.info("CSV export requested: %d rows", len(rows))
     return Response(csv_buffer.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
                              "attachment; filename=cutco_collection.csv"})
@@ -92,6 +95,7 @@ def import_page():
 
     person_override = request.form.get("person_override", "").strip() or None
     ext = uploaded_file.filename.rsplit(".", 1)[-1].lower()
+    logger.info("Import file received: %s (person override: %s)", uploaded_file.filename, person_override or "none")
 
     try:
         if ext == "xlsx":
@@ -353,6 +357,7 @@ def import_confirm():
             added_ownership += 1
 
     db.session.commit()
+    logger.info("Import complete: %d items, %d ownership, %d persons", added_items, added_ownership, added_persons)
 
     parts = []
     if added_items:
