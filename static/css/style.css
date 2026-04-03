@@ -319,7 +319,11 @@ label {
   font-family: var(--font);
   transition: border-color .15s;
   width: 100%;
+  box-sizing: border-box;
+  height: 2.1rem;
+  line-height: 1.2;
 }
+textarea.input-full { height: auto; }
 .input-sm  { width: auto; }
 .input-xs  { width: 120px; padding: .25rem .45rem; font-size: .8rem; }
 .input-full:focus, .input-sm:focus, .input-xs:focus {
