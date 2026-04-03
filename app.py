@@ -102,9 +102,12 @@ with app.app_context():
 
 # ── CSRF validation ───────────────────────────────────────────────────────────
 
+CSRF_EXEMPT = {"/admin/login", "/admin/logout"}
+
 @app.before_request
 def csrf_protect():
-    if request.method == "POST" and not request.path.startswith("/api/"):
+    if request.method == "POST" and not request.path.startswith("/api/") \
+            and request.path not in CSRF_EXEMPT:
         validate_csrf()
 
 
