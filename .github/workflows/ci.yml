@@ -94,7 +94,8 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add VERSION
+          sed -i "s|version-[0-9]*\.[0-9]*\.[0-9]*-blue|version-${{ steps.version_bump.outputs.version }}-blue|" README.md
+          git add VERSION README.md
           git commit -m "chore: bump version to ${{ steps.version_bump.outputs.version }} [skip ci]" || true
           git push
 
