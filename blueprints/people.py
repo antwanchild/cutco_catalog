@@ -170,6 +170,27 @@ def ownership_delete(oid):
     return redirect(url_for("people.person_collection", pid=pid))
 
 
+# ── Bulk status update ────────────────────────────────────────────────────────
+
+@people_bp.route("/people/<int:pid>/bulk-status", methods=["POST"])
+def bulk_status_update(pid):
+    Person.query.get_or_404(pid)
+    selected = request.form.getlist("ownership_ids", type=int)
+    new_status = request.form.get("bulk_status", "").strip()
+    if not selected or new_status not in STATUS_OPTIONS:
+        flash("Select at least one entry and a valid status.", "error")
+        return redirect(url_for("people.person_collection", pid=pid))
+    updated = (Ownership.query
+               .filter(Ownership.id.in_(selected), Ownership.person_id == pid)
+               .all())
+    for ownership in updated:
+        ownership.status = new_status
+    db.session.commit()
+    logger.info("Bulk status update: person %d, %d entries → %s", pid, len(updated), new_status)
+    flash(f"Updated {len(updated)} entr{'y' if len(updated) == 1 else 'ies'} to {new_status}.", "success")
+    return redirect(url_for("people.person_collection", pid=pid))
+
+
 # ── Wishlist ──────────────────────────────────────────────────────────────────
 
 @people_bp.route("/wishlist")

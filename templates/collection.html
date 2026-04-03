@@ -10,12 +10,22 @@
 </div>
 
 {% if ownerships %}
+<form method="post" action="{{ url_for('people.bulk_status_update', pid=person.id) }}" id="bulk-form">
 <h2>Owned / Tracked</h2>
+<div class="table-wrap">
 <table class="data-table">
-  <thead><tr><th>Item</th><th>Color</th><th>Status</th><th>Target</th><th>Notes</th><th>Actions</th></tr></thead>
+  <thead>
+    <tr>
+      <th style="width:2rem">
+        <input type="checkbox" id="select-all" title="Select all">
+      </th>
+      <th>Item</th><th>Color</th><th>Status</th><th>Target</th><th>Notes</th><th>Actions</th>
+    </tr>
+  </thead>
   <tbody>
     {% for ownership in ownerships %}
     <tr>
+      <td><input type="checkbox" name="ownership_ids" value="{{ ownership.id }}" class="row-check"></td>
       <td><a href="{{ url_for('views.item_owners', iid=ownership.variant.item_id) }}">{{ ownership.variant.item.name }}</a></td>
       <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
@@ -38,6 +48,53 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
+
+{# ── Bulk action bar ───────────────────────────────────────────────────────── #}
+<div class="bulk-bar" id="bulk-bar">
+  <span class="bulk-count" id="bulk-count">0 selected</span>
+  <label style="display:flex;align-items:center;gap:.5rem">
+    Change status to:
+    <select name="bulk_status" class="input-sm">
+      {% for status_option in status_options %}
+        <option value="{{ status_option }}">{{ status_option }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+  <button type="button" class="btn btn-ghost btn-sm" id="bulk-cancel">Cancel</button>
+</div>
+</form>
+
+<script>
+(function() {
+  var selectAll = document.getElementById('select-all');
+  var checks    = document.querySelectorAll('.row-check');
+  var bar       = document.getElementById('bulk-bar');
+  var countEl   = document.getElementById('bulk-count');
+
+  function updateBar() {
+    var n = document.querySelectorAll('.row-check:checked').length;
+    countEl.textContent = n + ' selected';
+    bar.classList.toggle('bulk-bar-visible', n > 0);
+    selectAll.indeterminate = n > 0 && n < checks.length;
+    selectAll.checked = n === checks.length;
+  }
+
+  selectAll.addEventListener('change', function() {
+    checks.forEach(function(c) { c.checked = selectAll.checked; });
+    updateBar();
+  });
+  checks.forEach(function(c) { c.addEventListener('change', updateBar); });
+
+  document.getElementById('bulk-cancel').addEventListener('click', function() {
+    checks.forEach(function(c) { c.checked = false; });
+    selectAll.checked = false;
+    updateBar();
+  });
+})();
+</script>
+
 {% else %}
 <p class="empty">No entries yet for {{ person.name }}.</p>
 {% endif %}
