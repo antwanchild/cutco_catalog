@@ -5,11 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Cutco Vault{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script>
+    /* Apply saved theme before paint to avoid flash */
+    (function() {
+      var t = localStorage.getItem('theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
 </head>
 <body>
 
 <nav class="navbar">
   <a class="brand" href="{{ url_for('index') }}">⚔️ Cutco Vault</a>
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">🌙</button>
   <button class="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
   <div class="nav-links">
     <a href="{{ url_for('catalog.catalog') }}" {% if request.endpoint and request.endpoint.startswith('catalog.') %}class="active"{% endif %}>Catalog</a>
@@ -46,6 +54,21 @@
     this.setAttribute('aria-expanded', open);
     this.textContent = open ? '✕' : '☰';
   });
+
+  (function() {
+    var btn = document.getElementById('theme-toggle');
+    function applyTheme(t) {
+      document.documentElement.setAttribute('data-theme', t);
+      btn.textContent = t === 'light' ? '🌙' : '☀️';
+      btn.title = t === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+      localStorage.setItem('theme', t);
+    }
+    var saved = localStorage.getItem('theme') || 'dark';
+    applyTheme(saved);
+    btn.addEventListener('click', function() {
+      applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    });
+  })();
 </script>
 
 <main class="container">
