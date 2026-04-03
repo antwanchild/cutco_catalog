@@ -1,3 +1,4 @@
+{% from "help_modal.html" import help_btn %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -64,6 +65,11 @@
     var open = links.classList.toggle('open');
     this.setAttribute('aria-expanded', open);
     this.textContent = open ? '✕' : '☰';
+  });
+
+  /* Close help dialogs when clicking outside (backdrop) */
+  document.addEventListener('click', function(e) {
+    if (e.target.tagName === 'DIALOG') e.target.close();
   });
 
   (function() {

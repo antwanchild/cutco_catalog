@@ -1,0 +1,139 @@
+{% macro help_btn(page) %}
+<button class="help-btn" onclick="document.getElementById('help-{{ page }}').showModal()" aria-label="Help" title="Help">?</button>
+
+<dialog class="help-dialog" id="help-{{ page }}">
+  <div class="help-header">
+    <strong>
+      {% if page == 'catalog' %}📋 Catalog
+      {% elif page == 'sets' %}🗂️ Sets
+      {% elif page == 'set_detail' %}🗂️ Set Detail
+      {% elif page == 'collection' %}🏠 Collection
+      {% elif page == 'sharpening' %}🔪 Sharpening Log
+      {% elif page == 'bakeware' %}🍰 Bakeware Tracker
+      {% elif page == 'tasks' %}🔪 Knife Tasks
+      {% elif page == 'wishlist' %}🎯 Wishlist
+      {% elif page == 'matrix' %}📊 Matrix
+      {% elif page == 'stats' %}📈 Stats
+      {% elif page == 'item_detail' %}📋 Item Detail
+      {% elif page == 'sync' %}🔄 Catalog Sync
+      {% elif page == 'import' %}📥 Import
+      {% endif %}
+    </strong>
+    <button class="help-close" onclick="document.getElementById('help-{{ page }}').close()" aria-label="Close">✕</button>
+  </div>
+  <div class="help-body">
+    {% if page == 'catalog' %}
+      <p>The catalog lists every Cutco item known to the vault.</p>
+      <ul>
+        <li><strong>Search</strong> by name or SKU using the search box.</li>
+        <li><strong>Filter</strong> by category or show only 🦄 unicorn items.</li>
+        <li><strong>Sort</strong> any column by clicking its header.</li>
+        <li>Click an item name to see its full detail page.</li>
+        <li>Admin users can add, edit, or delete items.</li>
+      </ul>
+
+    {% elif page == 'sets' %}
+      <p>Sets are curated groupings of Cutco items (e.g. a knife block set).</p>
+      <ul>
+        <li>Select a <strong>person</strong> from the dropdown to see their personal completion percentage for each set.</li>
+        <li>Click a set name to see which items are owned vs. missing.</li>
+        <li>Sets are created automatically during a Catalog Sync, or manually with the + New Set button.</li>
+      </ul>
+
+    {% elif page == 'set_detail' %}
+      <p>Shows which items in this set are owned and which are still missing.</p>
+      <ul>
+        <li>Select a <strong>person</strong> to filter completion to their collection.</li>
+        <li>Click <strong>+ Wishlist</strong> on any missing item to add it to that person's wishlist.</li>
+        <li>Click <strong>🎁 Share Gift List</strong> (when a person is selected) to generate a shareable link showing only the missing items — great for gifting.</li>
+      </ul>
+
+    {% elif page == 'collection' %}
+      <p>Shows everything a person owns, wants, or has sold/traded.</p>
+      <ul>
+        <li>Use the <strong>checkboxes</strong> to select multiple entries, then use the bulk action bar to change their status at once.</li>
+        <li><strong>Missing Items</strong> lists catalog items this person doesn't have yet — click + Add to log them.</li>
+        <li><strong>Variant Gaps</strong> shows items they own but are missing specific color variants of.</li>
+        <li>Click <strong>🃏 Share Card</strong> to generate a public shareable link of their collection.</li>
+      </ul>
+
+    {% elif page == 'sharpening' %}
+      <p>Tracks when each knife was last sharpened.</p>
+      <ul>
+        <li>Knives past the threshold (default 180 days) are marked <strong>overdue</strong>.</li>
+        <li>Log a new sharpening event with the form — pick the knife, date, and method.</li>
+        <li>Admin users can send overdue reminders to Discord.</li>
+        <li>The threshold is configurable via the <code>SHARPEN_THRESHOLD_DAYS</code> environment variable.</li>
+      </ul>
+
+    {% elif page == 'bakeware' %}
+      <p>Tracks baking sessions for Cutco bakeware and cookware.</p>
+      <ul>
+        <li>Log what you made, a rating (1–5), and optional notes.</li>
+        <li>Items unused past the threshold (default 60 days) are flagged as <strong>stale</strong>.</li>
+        <li>The threshold is configurable via <code>BAKEWARE_THRESHOLD_DAYS</code>.</li>
+        <li>Admin users can send stale reminders to Discord.</li>
+      </ul>
+
+    {% elif page == 'tasks' %}
+      <p>Log which knife you use for which kitchen task to track usage patterns.</p>
+      <ul>
+        <li>Only <strong>owned knives</strong> appear in the log form.</li>
+        <li>The <strong>Usage Patterns</strong> table shows each knife's most-used task.</li>
+        <li>10 preset tasks are included — add your own via <strong>Manage Tasks</strong>.</li>
+        <li>Custom tasks can be deleted if they have no logged usage.</li>
+      </ul>
+
+    {% elif page == 'wishlist' %}
+      <p>Tracks items people want to own, optionally with a target price.</p>
+      <ul>
+        <li>Set a <strong>target price</strong> on a wishlist entry — when the item's MSRP drops to or below that price, it's highlighted as a 🎯 hit.</li>
+        <li>Filter by person using the dropdown.</li>
+        <li>Admin users can trigger a <strong>price check</strong> that sends Discord alerts for any hits.</li>
+      </ul>
+
+    {% elif page == 'matrix' %}
+      <p>A cross-tab view showing who owns what at a glance.</p>
+      <ul>
+        <li>Rows are items, columns are people.</li>
+        <li>Each cell shows ownership status color-coded by badge.</li>
+        <li>Useful for spotting gaps or duplicates across your group.</li>
+      </ul>
+
+    {% elif page == 'stats' %}
+      <p>Charts and summaries of the collection.</p>
+      <ul>
+        <li>Filter to a specific <strong>person</strong> to see their individual stats.</li>
+        <li>Charts show owned items by category, handle color distribution, edge type breakdown, catalog coverage, and estimated collection value.</li>
+        <li>The <strong>Collectors</strong> table ranks people by item count and estimated value.</li>
+      </ul>
+
+    {% elif page == 'item_detail' %}
+      <p>Full detail view for a single catalog item.</p>
+      <ul>
+        <li><strong>Left column</strong> — color variants, sets this item belongs to, and top tasks it's been used for.</li>
+        <li><strong>Right column</strong> — who owns it, with quick-add buttons for people who don't.</li>
+        <li><strong>Sharpening history</strong> and <strong>task log</strong> appear below if any events have been logged.</li>
+      </ul>
+
+    {% elif page == 'sync' %}
+      <p>Scrapes Cutco.com to discover new items and sets.</p>
+      <ul>
+        <li>New items are grouped by category — check the ones you want to import.</li>
+        <li>New sets are listed separately — check any you want to add.</li>
+        <li>Items in blocked categories (e.g. Accessories) are hidden by default.</li>
+        <li>Only items with SKUs not already in the database are shown.</li>
+      </ul>
+
+    {% elif page == 'import' %}
+      <p>Bulk-import ownership data from a CSV or XLSX file.</p>
+      <ul>
+        <li>Required columns: <code>person</code>, <code>item_name</code> or <code>sku</code>, <code>status</code>.</li>
+        <li>Optional columns: <code>color</code>, <code>notes</code>, <code>is_unicorn</code>.</li>
+        <li>A preview is shown before any data is written — you can deselect rows.</li>
+        <li>Existing ownership entries are skipped (no duplicates created).</li>
+      </ul>
+    {% endif %}
+  </div>
+</dialog>
+{% endmacro %}
