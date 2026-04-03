@@ -5,12 +5,25 @@
   <h1 class="page-title">🗂️ {{ set.name }}</h1>
   <div class="page-actions">
     <a href="{{ url_for('catalog.set_edit', sid=set.id) }}" class="btn btn-secondary">Edit</a>
-    <a href="{{ url_for('catalog.sets_list') }}" class="btn btn-ghost">← Sets</a>
+    <a href="{{ url_for('catalog.sets_list') }}{% if person_id %}?person={{ person_id }}{% endif %}" class="btn btn-ghost">← Sets</a>
   </div>
 </div>
 
 {% if set.sku %}<p class="muted">SKU: <span class="mono">{{ set.sku }}</span></p>{% endif %}
 {% if set.notes %}<p class="set-notes">{{ set.notes }}</p>{% endif %}
+
+{# ── Person filter ─────────────────────────────────────────────────────────── #}
+<form method="get" style="margin-bottom:1rem">
+  <label style="display:flex;align-items:center;gap:.5rem;font-size:.9rem">
+    Completion for:
+    <select name="person" onchange="this.form.submit()" class="input-sm">
+      <option value="">— everyone —</option>
+      {% for p in all_persons %}
+        <option value="{{ p.id }}" {% if p.id == person_id %}selected{% endif %}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
 
 {% if total > 0 %}
 <div class="set-detail-progress">
@@ -20,9 +33,10 @@
   </div>
   <div class="set-detail-progress-label">
     {% if pct == 100 %}
-      <span class="set-complete-text">✓ Complete — all {{ total }} item{% if total != 1 %}s{% endif %} owned</span>
+      <span class="set-complete-text">✓ Complete — all {{ total }} item{% if total != 1 %}s{% endif %} owned{% if person %} by {{ person.name }}{% endif %}</span>
     {% else %}
       <strong>{{ owned_count }}</strong> of <strong>{{ total }}</strong> owned
+      {% if person %}<span class="muted">by {{ person.name }}</span>{% endif %}
       <span class="muted">({{ pct }}%)</span>
     {% endif %}
   </div>
@@ -77,7 +91,7 @@
       <td>{{ item.edge_type }}</td>
       <td>{% if item.msrp %}${{ "%.2f"|format(item.msrp) }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>
-        <a href="{{ url_for('people.ownership_add', item_id=item.id) }}?status=Wishlist"
+        <a href="{{ url_for('people.ownership_add', item_id=item.id{% if person_id %}, person_id=person_id{% endif %}) }}?status=Wishlist"
            class="btn btn-xs btn-ghost">+ Wishlist</a>
       </td>
     </tr>
