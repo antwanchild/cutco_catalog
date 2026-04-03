@@ -1,69 +1,169 @@
 {% extends "base.html" %}
-{% block title %}{{ item.name }} Owners – Cutco Vault{% endblock %}
+{% block title %}{{ item.name }} – Cutco Vault{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">{{ item.name }}</h1>
+  <h1 class="page-title">
+    {{ item.name }}
+    {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+    {% if not item.in_catalog %}<span class="badge badge-off-catalog" title="Not in current catalog">discontinued</span>{% endif %}
+  </h1>
   <div class="page-actions">
-    <a href="{{ url_for('catalog.variants', iid=item.id) }}" class="btn btn-secondary">Variants</a>
     {% if is_admin() %}
-    <a href="{{ url_for('catalog.catalog_edit', iid=item.id) }}" class="btn btn-secondary">Edit</a>
+      <a href="{{ url_for('catalog.catalog_edit', iid=item.id) }}" class="btn btn-secondary">Edit</a>
     {% endif %}
+    <a href="{{ url_for('catalog.variants', iid=item.id) }}" class="btn btn-secondary">Variants</a>
     <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">← Catalog</a>
   </div>
 </div>
 
-<div class="item-meta">
-  {% if item.sku %}<span><strong>SKU:</strong> {{ item.sku }}</span>{% endif %}
+{# ── Meta strip ───────────────────────────────────────────────────────────── #}
+<div class="item-meta" style="margin-bottom:1.5rem">
+  {% if item.sku %}<span><strong>SKU:</strong> <span class="mono">{{ item.sku }}</span></span>{% endif %}
   {% if item.category %}<span><strong>Category:</strong> {{ item.category }}</span>{% endif %}
   <span><strong>Edge:</strong> {{ item.edge_type }}</span>
-  {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄 Unicorn</span>{% endif %}
-  {% if item.sets %}
-    <span><strong>Sets:</strong>
-      {% for item_set in item.sets %}
-        <a href="{{ url_for('catalog.set_detail', sid=item_set.id) }}" class="chip">{{ item_set.name }}</a>
+  {% if item.msrp %}<span><strong>MSRP:</strong> ${{ "%.2f"|format(item.msrp) }}</span>{% endif %}
+  {% if item.cutco_url %}<a href="{{ item.cutco_url }}" target="_blank" rel="noopener" class="btn btn-xs">Cutco.com ↗</a>{% endif %}
+</div>
+
+{% if item.notes %}<p class="item-notes" style="margin-bottom:1.5rem">{{ item.notes }}</p>{% endif %}
+
+{# ── Two-column layout ────────────────────────────────────────────────────── #}
+<div class="detail-grid">
+
+  {# ── Left column ────────────────────────────────────────────────────────── #}
+  <div class="detail-col">
+
+    {# Variants #}
+    <section class="detail-section">
+      <h2 class="section-heading">Variants ({{ item.variants | length }})</h2>
+      <div class="chip-list">
+        {% for v in item.variants %}
+          {% if v.color != UNKNOWN_COLOR %}
+            <span class="chip {% if v.is_unicorn %}chip-unicorn{% endif %}">
+              {{ v.color }}{% if v.is_unicorn %} 🦄{% endif %}
+            </span>
+          {% endif %}
+        {% endfor %}
+        {% if item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length == 0 %}
+          <span class="muted">No color variants recorded.</span>
+        {% endif %}
+      </div>
+    </section>
+
+    {# Sets #}
+    {% if item.sets %}
+    <section class="detail-section">
+      <h2 class="section-heading">Sets</h2>
+      <div class="chip-list">
+        {% for item_set in item.sets %}
+          <a href="{{ url_for('catalog.set_detail', sid=item_set.id) }}" class="chip chip-link">{{ item_set.name }}</a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {# Task usage #}
+    {% if top_tasks %}
+    <section class="detail-section">
+      <h2 class="section-heading">Top Uses</h2>
+      <div class="top-tasks-list">
+        {% for task_name, count in top_tasks %}
+        <div class="top-task-row">
+          <span>{{ task_name }}</span>
+          <span class="badge badge-info">{{ count }}×</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+  </div>
+
+  {# ── Right column ───────────────────────────────────────────────────────── #}
+  <div class="detail-col">
+
+    {# Collectors #}
+    <section class="detail-section">
+      <h2 class="section-heading">Collectors ({{ entries | length }})</h2>
+      {% if entries %}
+      <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Person</th><th>Color</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+        <tbody>
+          {% for ownership in entries %}
+          <tr>
+            <td><a href="{{ url_for('people.person_collection', pid=ownership.person_id) }}">{{ ownership.person.name }}</a></td>
+            <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
+            <td class="muted">{{ ownership.notes or '' }}</td>
+            <td class="actions">
+              <a href="{{ url_for('people.ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
+              <form method="post" action="{{ url_for('people.ownership_delete', oid=ownership.id) }}"
+                    onsubmit="return confirm('Remove this entry?')" style="display:inline">
+                <button class="btn btn-xs btn-danger">Del</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}
+      <p class="empty">No one owns this item yet.</p>
+      {% endif %}
+      {% if people_without %}
+      <div class="quick-add-list" style="margin-top:.75rem">
+        {% for person in people_without %}
+          <a href="{{ url_for('people.ownership_add', item_id=item.id, person_id=person.id) }}"
+             class="btn btn-sm btn-outline">+ {{ person.name }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+  </div>
+</div>
+
+{# ── Sharpening history ───────────────────────────────────────────────────── #}
+{% if sharpening %}
+<section class="detail-section" style="margin-top:1.5rem">
+  <h2 class="section-heading">Sharpening History ({{ sharpening | length }})</h2>
+  <div class="table-wrap">
+  <table class="data-table">
+    <thead><tr><th>Date</th><th>Method</th><th>Notes</th></tr></thead>
+    <tbody>
+      {% for entry in sharpening %}
+      <tr>
+        <td class="mono">{{ entry.sharpened_on }}</td>
+        <td>{{ entry.method }}</td>
+        <td class="muted">{{ entry.notes or '' }}</td>
+      </tr>
       {% endfor %}
-    </span>
-  {% endif %}
-  {% if item.cutco_url %}<a href="{{ item.cutco_url }}" target="_blank" class="btn btn-xs">Cutco.com ↗</a>{% endif %}
-</div>
-
-{% if item.notes %}<p class="item-notes">{{ item.notes }}</p>{% endif %}
-
-{% if entries %}
-<h2>Collectors</h2>
-<div class="table-wrap">
-<table class="data-table">
-  <thead><tr><th>Person</th><th>Color</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
-  <tbody>
-    {% for ownership in entries %}
-    <tr>
-      <td><a href="{{ url_for('people.person_collection', pid=ownership.person_id) }}">{{ ownership.person.name }}</a></td>
-      <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
-      <td>{{ ownership.notes or '—' }}</td>
-      <td class="actions">
-        <a href="{{ url_for('people.ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
-        <form method="post" action="{{ url_for('people.ownership_delete', oid=ownership.id) }}"
-              onsubmit="return confirm('Remove this entry?')" style="display:inline">
-          <button class="btn btn-xs btn-danger">Del</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
-{% else %}
-<p class="empty">No one owns this item yet.</p>
+    </tbody>
+  </table>
+  </div>
+</section>
 {% endif %}
 
-{% if people_without %}
-<h2>Add Collector</h2>
-<div class="quick-add-list">
-  {% for person in people_without %}
-    <a href="{{ url_for('people.ownership_add', item_id=item.id, person_id=person.id) }}"
-       class="btn btn-sm btn-outline">+ {{ person.name }}</a>
-  {% endfor %}
-</div>
+{# ── Task log ─────────────────────────────────────────────────────────────── #}
+{% if task_log %}
+<section class="detail-section" style="margin-top:1.5rem">
+  <h2 class="section-heading">Task Log ({{ task_log | length }})</h2>
+  <div class="table-wrap">
+  <table class="data-table">
+    <thead><tr><th>Date</th><th>Task</th><th>Notes</th></tr></thead>
+    <tbody>
+      {% for entry in task_log %}
+      <tr>
+        <td class="mono">{{ entry.logged_on }}</td>
+        <td>{{ entry.task.name }}</td>
+        <td class="muted">{{ entry.notes or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
 {% endif %}
+
 {% endblock %}
