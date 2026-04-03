@@ -828,3 +828,65 @@ textarea { resize: vertical; }
 }
 .bulk-bar-visible { display: flex; }
 .bulk-count { font-size: .875rem; font-weight: 600; color: var(--accent); min-width: 6rem; }
+
+/* ── Help modals ─────────────────────────────────────────────────────────── */
+.help-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 50%;
+  width: 1.4rem;
+  height: 1.4rem;
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.help-btn:hover { background: var(--bg3); color: var(--text); }
+.help-dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg2);
+  color: var(--text);
+  padding: 0;
+  max-width: 480px;
+  width: 90vw;
+  box-shadow: var(--shadow);
+}
+.help-dialog::backdrop { background: rgba(0,0,0,.5); }
+.help-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: .95rem;
+}
+.help-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: .1rem .3rem;
+  border-radius: var(--radius);
+}
+.help-close:hover { background: var(--bg3); color: var(--text); }
+.help-body {
+  padding: 1rem;
+  font-size: .875rem;
+  line-height: 1.6;
+}
+.help-body p { margin-bottom: .6rem; }
+.help-body ul { padding-left: 1.2rem; }
+.help-body li { margin-bottom: .35rem; }
+.help-body code {
+  background: var(--bg3);
+  border-radius: 3px;
+  padding: .1rem .35rem;
+  font-family: var(--mono);
+  font-size: .8rem;
+}

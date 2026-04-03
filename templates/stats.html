@@ -2,7 +2,7 @@
 {% block title %}Collection Stats – Cutco Vault{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">Collection Stats</h1>
+  <h1 class="page-title">Collection Stats {{ help_btn("stats") }}</h1>
   <div class="page-actions">
     <form method="get" action="{{ url_for('views.stats') }}" class="inline-form">
       <select name="person" class="select-sm" onchange="this.form.submit()">

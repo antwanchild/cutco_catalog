@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">
-    {{ item.name }}
+    {{ item.name }} {{ help_btn("item_detail") }}
     {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
     {% if not item.in_catalog %}<span class="badge badge-off-catalog" title="Not in current catalog">discontinued</span>{% endif %}
   </h1>
