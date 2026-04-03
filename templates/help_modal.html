@@ -17,6 +17,11 @@
       {% elif page == 'item_detail' %}📋 Item Detail
       {% elif page == 'sync' %}🔄 Catalog Sync
       {% elif page == 'import' %}📥 Import
+      {% elif page == 'dashboard' %}⚔️ Dashboard
+      {% elif page == 'msrp_diff' %}💲 MSRP Diff
+      {% elif page == 'variants' %}🎨 Variants
+      {% elif page == 'people' %}👥 Collectors
+      {% elif page == 'tasks_manage' %}🔪 Manage Tasks
       {% endif %}
     </strong>
     <button class="help-close" onclick="document.getElementById('help-{{ page }}').close()" aria-label="Close">✕</button>
@@ -132,6 +137,55 @@
         <li>Optional columns: <code>color</code>, <code>notes</code>, <code>is_unicorn</code>.</li>
         <li>A preview is shown before any data is written — you can deselect rows.</li>
         <li>Existing ownership entries are skipped (no duplicates created).</li>
+      </ul>
+
+    {% elif page == 'dashboard' %}
+      <p>Welcome to Cutco Vault — a self-hosted tracker for Cutco knife and kitchen product collections.</p>
+      <ul>
+        <li><strong>Catalog</strong> — browse and manage every known Cutco item.</li>
+        <li><strong>People</strong> — track what each collector owns, wants, or has sold.</li>
+        <li><strong>Sets</strong> — see progress toward completing curated Cutco sets.</li>
+        <li><strong>Sharpening / Bakeware / Tasks</strong> — log usage and maintenance events.</li>
+        <li><strong>Wishlist</strong> — set target prices and get alerted when MSRP drops.</li>
+        <li><strong>Stats</strong> — visual charts of the full collection.</li>
+        <li>Use the <strong>Admin</strong> link to unlock catalog editing, syncing, and MSRP diffs.</li>
+      </ul>
+
+    {% elif page == 'msrp_diff' %}
+      <p>Compares the stored MSRP prices in the database against live prices scraped from Cutco.com.</p>
+      <ul>
+        <li>Click <strong>Run Diff</strong> to start a background scrape — progress updates live.</li>
+        <li>Enable <strong>Write to DB</strong> to save the updated prices after the diff completes.</li>
+        <li>Results show items where the price has increased, decreased, or gone missing.</li>
+        <li>A Discord summary can be sent if a webhook is configured.</li>
+        <li>Can also be run from the CLI via <code>python msrp_diff.py</code>.</li>
+      </ul>
+
+    {% elif page == 'variants' %}
+      <p>Variants represent the different handle colors or editions available for an item.</p>
+      <ul>
+        <li>Every item always has at least one variant — <strong>Unknown / Unspecified</strong> — used when color doesn't matter.</li>
+        <li>Add named color variants (e.g. "Classic Brown", "Camo") to track color-specific ownership.</li>
+        <li>A variant can be flagged as a 🦄 <strong>unicorn</strong> if that specific color is rare or discontinued.</li>
+        <li>Ownership entries are linked to a specific variant, not just the item.</li>
+      </ul>
+
+    {% elif page == 'people' %}
+      <p>Collectors are the people whose Cutco ownership is tracked in the vault.</p>
+      <ul>
+        <li>Click a person's name to view their full collection.</li>
+        <li>The <strong>Owned</strong> count shows items with status "Owned" only.</li>
+        <li>Each person can have a <strong>shareable collection card</strong> generated from their collection page.</li>
+        <li>Add as many collectors as you like — the vault is designed for groups and families.</li>
+      </ul>
+
+    {% elif page == 'tasks_manage' %}
+      <p>Manage the list of kitchen tasks used in the Knife Task Log.</p>
+      <ul>
+        <li><strong>Preset tasks</strong> are built in and cannot be deleted.</li>
+        <li><strong>Custom tasks</strong> can be added freely and deleted if they have no logged usage.</li>
+        <li>Tasks with logged usage cannot be deleted — remove the log entries first if needed.</li>
+        <li>Task names are case-insensitive and must be unique.</li>
       </ul>
     {% endif %}
   </div>
