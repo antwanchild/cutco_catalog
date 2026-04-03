@@ -10,6 +10,7 @@ from constants import (
     XLSX_COL_MAP, XLSX_SET_COLS,
 )
 from extensions import db
+from helpers import db_commit
 from models import Item, ItemVariant, Ownership, Person, ensure_unknown_variant, get_or_create_set
 
 data_bp = Blueprint("data", __name__)
@@ -356,15 +357,14 @@ def import_confirm():
                                      status=status, notes=notes))
             added_ownership += 1
 
-    db.session.commit()
-    logger.info("Import complete: %d items, %d ownership, %d persons", added_items, added_ownership, added_persons)
-
-    parts = []
-    if added_items:
-        parts.append(f"{added_items} item{'s' if added_items != 1 else ''}")
-    if added_persons:
-        parts.append(f"{added_persons} collector{'s' if added_persons != 1 else ''}")
-    if added_ownership:
-        parts.append(f"{added_ownership} ownership entr{'ies' if added_ownership != 1 else 'y'}")
-    flash("Import complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
+    if db_commit(db.session):
+        logger.info("Import complete: %d items, %d ownership, %d persons", added_items, added_ownership, added_persons)
+        parts = []
+        if added_items:
+            parts.append(f"{added_items} item{'s' if added_items != 1 else ''}")
+        if added_persons:
+            parts.append(f"{added_persons} collector{'s' if added_persons != 1 else ''}")
+        if added_ownership:
+            parts.append(f"{added_ownership} ownership entr{'ies' if added_ownership != 1 else 'y'}")
+        flash("Import complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
     return redirect(url_for("catalog.catalog"))
