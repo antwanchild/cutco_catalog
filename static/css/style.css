@@ -156,7 +156,7 @@ a:hover { text-decoration: underline; }
   right: 0;
   z-index: 99;
 }
-.version { opacity: .6; }
+.version { color: var(--text); }
 
 /* ── Page header ────────────────────────────────────────────────────────── */
 .page-header {
