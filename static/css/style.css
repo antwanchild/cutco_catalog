@@ -218,6 +218,7 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .badge-unicorn  { background: transparent; font-size: .85rem; }
 .badge-off-catalog { background: transparent; font-size: .85rem; }
 .badge-new      { background: var(--success); color: #fff; }
+.badge-info     { background: #1a2540; color: #7ab4ff; }
 .chip {
   display: inline-block;
   background: var(--bg3);

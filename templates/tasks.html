@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Knife Tasks – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Knife Task Log</h1>
+  <div class="page-actions">
+    <a href="{{ url_for('logs.tasks_manage') }}" class="btn btn-secondary btn-sm">Manage Tasks</a>
+  </div>
+</div>
+
+{# ── Summary cards ─────────────────────────────────────────────────────────── #}
+<div class="stat-grid" style="margin-bottom:1.5rem">
+  <div class="stat-card">
+    <div class="stat-number">{{ recent_entries | length }}</div>
+    <div class="stat-label">Total Logs</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ all_tasks | length }}</div>
+    <div class="stat-label">Tasks Defined</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ item_top_task | length }}</div>
+    <div class="stat-label">Knives Used</div>
+  </div>
+</div>
+
+{# ── Log entry form ────────────────────────────────────────────────────────── #}
+<details class="form-card" style="margin-bottom:1.5rem">
+  <summary style="cursor:pointer;font-weight:600;padding:.5rem 0">+ Log Usage</summary>
+  <form method="post" action="{{ url_for('logs.task_log_add') }}" style="margin-top:1rem">
+    <div class="form-row">
+      <label>Knife *
+        <select name="item_id" required class="input-full">
+          <option value="">— select owned knife —</option>
+          {% for item in owned_items %}
+            <option value="{{ item.id }}">{{ item.name }}{% if item.sku %} ({{ item.sku }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Task *
+        <select name="task_id" required class="input-full">
+          <option value="">— select task —</option>
+          {% for task in all_tasks %}
+            <option value="{{ task.id }}">{{ task.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="form-row">
+      <label>Date *
+        <input type="date" name="logged_on" value="{{ today }}" required class="input-full">
+      </label>
+      <label>Notes
+        <input type="text" name="notes" placeholder="optional" class="input-full">
+      </label>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Log</button>
+    </div>
+  </form>
+</details>
+
+{# ── Usage patterns ────────────────────────────────────────────────────────── #}
+{% if item_top_task %}
+<h2 class="section-heading">Usage Patterns</h2>
+<div class="table-wrap" style="margin-bottom:1.5rem">
+<table class="data-table">
+  <thead>
+    <tr><th>Knife</th><th>Top Task</th><th>Total Uses</th></tr>
+  </thead>
+  <tbody>
+    {% for item in owned_items %}
+      {% set uses = namespace(count=0) %}
+      {% for entry in recent_entries %}
+        {% if entry.item_id == item.id %}{% set uses.count = uses.count + 1 %}{% endif %}
+      {% endfor %}
+      {% if item.id in item_top_task %}
+      <tr>
+        <td><a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a></td>
+        <td>{{ item_top_task[item.id] }}</td>
+        <td>{{ uses.count }}</td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+{# ── Recent log ────────────────────────────────────────────────────────────── #}
+{% if recent_entries %}
+<h2 class="section-heading">Recent Entries</h2>
+<div class="table-wrap">
+<table class="data-table">
+  <thead>
+    <tr><th>Date</th><th>Knife</th><th>Task</th><th>Notes</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for entry in recent_entries %}
+    <tr>
+      <td class="mono">{{ entry.logged_on }}</td>
+      <td><a href="{{ url_for('views.item_owners', iid=entry.item.id) }}">{{ entry.item.name }}</a></td>
+      <td>{{ entry.task.name }}</td>
+      <td class="muted">{{ entry.notes or '' }}</td>
+      <td>
+        <form method="post" action="{{ url_for('logs.task_log_delete', lid=entry.id) }}"
+              onsubmit="return confirm('Remove this entry?')">
+          <button class="btn btn-xs btn-danger">✕</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="empty">No usage logged yet. Use the form above to get started.</p>
+{% endif %}
+{% endblock %}

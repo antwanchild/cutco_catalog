@@ -13,6 +13,11 @@ SHARPEN_THRESHOLD_DAYS  = int(os.environ.get("SHARPEN_THRESHOLD_DAYS", "180"))
 BAKEWARE_THRESHOLD_DAYS = int(os.environ.get("BAKEWARE_THRESHOLD_DAYS", "60"))
 _bakeware_env = os.environ.get("BAKEWARE_CATEGORIES", "Cookware,Bakeware")
 BAKEWARE_CATEGORIES     = {cat.strip() for cat in _bakeware_env.split(",") if cat.strip()}
+KNIFE_TASK_PRESETS = [
+    "Slicing bread", "Dicing vegetables", "Mincing herbs", "Carving meat",
+    "Peeling fruit", "Filleting fish", "Chopping nuts", "Slicing cheese",
+    "Trimming fat", "General prep",
+]
 UNKNOWN_COLOR = "Unknown / Unspecified"
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
 

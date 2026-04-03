@@ -9,7 +9,7 @@ from constants import (
 )
 from extensions import db
 from helpers import _notify_discord, is_admin
-from models import BakewareSession, Item, SharpeningLog
+from models import BakewareSession, Item, KnifeTask, KnifeTaskLog, Ownership, SharpeningLog
 
 logs_bp = Blueprint("logs", __name__)
 logger = logging.getLogger(__name__)
@@ -320,3 +320,125 @@ def bakeware_notify():
             "info",
         )
     return redirect(url_for("logs.bakeware"))
+
+
+# ── Knife Task Pairing ────────────────────────────────────────────────────────
+
+@logs_bp.route("/tasks")
+def tasks():
+    today = date.today()
+
+    # Only items that are owned by anyone
+    owned_item_ids = {
+        o.variant.item_id
+        for o in Ownership.query.filter_by(status="Owned").all()
+    }
+    owned_items = (Item.query
+                   .filter(Item.id.in_(owned_item_ids))
+                   .order_by(Item.name).all()) if owned_item_ids else []
+
+    all_tasks = KnifeTask.query.order_by(KnifeTask.name).all()
+    recent_entries = (KnifeTaskLog.query
+                      .order_by(KnifeTaskLog.logged_on.desc(), KnifeTaskLog.id.desc())
+                      .limit(50).all())
+
+    # Build per-item task usage summary: item_id → task_id → count
+    all_log = KnifeTaskLog.query.all()
+    usage: dict[int, dict[int, int]] = {}
+    for entry in all_log:
+        usage.setdefault(entry.item_id, {})
+        usage[entry.item_id][entry.task_id] = usage[entry.item_id].get(entry.task_id, 0) + 1
+
+    # Top task per owned item
+    item_top_task: dict[int, str] = {}
+    for iid, task_counts in usage.items():
+        top_tid = max(task_counts, key=task_counts.get)
+        top_task = KnifeTask.query.get(top_tid)
+        if top_task:
+            item_top_task[iid] = top_task.name
+
+    return render_template(
+        "tasks.html",
+        owned_items    = owned_items,
+        all_tasks      = all_tasks,
+        recent_entries = recent_entries,
+        item_top_task  = item_top_task,
+        today          = today.isoformat(),
+    )
+
+
+@logs_bp.route("/tasks/add", methods=["POST"])
+def task_log_add():
+    item_id   = request.form.get("item_id", type=int)
+    task_id   = request.form.get("task_id", type=int)
+    logged_on = request.form.get("logged_on", "").strip()
+    notes     = request.form.get("notes", "").strip() or None
+
+    if not item_id or not task_id or not logged_on:
+        flash("Item, task, and date are required.", "error")
+        return redirect(url_for("logs.tasks"))
+    if not Item.query.get(item_id):
+        flash("Item not found.", "error")
+        return redirect(url_for("logs.tasks"))
+    if not KnifeTask.query.get(task_id):
+        flash("Task not found.", "error")
+        return redirect(url_for("logs.tasks"))
+
+    db.session.add(KnifeTaskLog(
+        item_id   = item_id,
+        task_id   = task_id,
+        logged_on = logged_on,
+        notes     = notes,
+    ))
+    db.session.commit()
+    item = Item.query.get(item_id)
+    task = KnifeTask.query.get(task_id)
+    logger.info("Task logged: %s → %s on %s", item.name, task.name, logged_on)
+    flash("Usage logged.", "success")
+    return redirect(url_for("logs.tasks"))
+
+
+@logs_bp.route("/tasks/log/<int:lid>/delete", methods=["POST"])
+def task_log_delete(lid):
+    entry = KnifeTaskLog.query.get_or_404(lid)
+    db.session.delete(entry)
+    db.session.commit()
+    logger.info("Task log entry %d deleted", lid)
+    flash("Entry removed.", "info")
+    return redirect(url_for("logs.tasks"))
+
+
+@logs_bp.route("/tasks/manage")
+def tasks_manage():
+    all_tasks = KnifeTask.query.order_by(KnifeTask.is_preset.desc(), KnifeTask.name).all()
+    return render_template("tasks_manage.html", all_tasks=all_tasks)
+
+
+@logs_bp.route("/tasks/manage/add", methods=["POST"])
+def task_add():
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Task name is required.", "error")
+        return redirect(url_for("logs.tasks_manage"))
+    if KnifeTask.query.filter(db.func.lower(KnifeTask.name) == name.lower()).first():
+        flash(f'Task "{name}" already exists.', "error")
+        return redirect(url_for("logs.tasks_manage"))
+    db.session.add(KnifeTask(name=name, is_preset=False))
+    db.session.commit()
+    logger.info("Knife task added: %s", name)
+    flash(f'Task "{name}" added.', "success")
+    return redirect(url_for("logs.tasks_manage"))
+
+
+@logs_bp.route("/tasks/manage/<int:tid>/delete", methods=["POST"])
+def task_delete(tid):
+    task = KnifeTask.query.get_or_404(tid)
+    if task.log_entries:
+        flash(f'Cannot delete "{task.name}" — it has logged usage. Remove logs first.', "error")
+        return redirect(url_for("logs.tasks_manage"))
+    name = task.name
+    db.session.delete(task)
+    db.session.commit()
+    logger.info("Knife task deleted: %s", name)
+    flash(f'Task "{name}" deleted.', "info")
+    return redirect(url_for("logs.tasks_manage"))

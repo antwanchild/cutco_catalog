@@ -23,6 +23,8 @@
        {% if request.endpoint and 'sharpening' in request.endpoint %}class="active"{% endif %}>Sharpening</a>
     <a href="{{ url_for('logs.bakeware') }}"
        {% if request.endpoint and 'bakeware' in request.endpoint %}class="active"{% endif %}>Bakeware</a>
+    <a href="{{ url_for('logs.tasks') }}"
+       {% if request.endpoint and 'task' in request.endpoint %}class="active"{% endif %}>Tasks</a>
     <a href="{{ url_for('views.stats') }}"
        {% if request.endpoint == 'views.stats' %}class="active"{% endif %}>Stats</a>
     <a href="{{ url_for('data.import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>

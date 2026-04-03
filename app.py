@@ -4,10 +4,10 @@ from logging.handlers import RotatingFileHandler
 
 from flask import Flask, jsonify, render_template
 
-from constants import APP_VERSION, UNKNOWN_COLOR
+from constants import APP_VERSION, KNIFE_TASK_PRESETS, UNKNOWN_COLOR
 from extensions import db
 from helpers import is_admin
-from models import Item, ensure_unknown_variant
+from models import Item, KnifeTask, ensure_unknown_variant
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -74,12 +74,20 @@ with app.app_context():
             "ALTER TABLE item_variants ADD COLUMN is_unicorn BOOLEAN NOT NULL DEFAULT 0",
             "ALTER TABLE items ADD COLUMN msrp REAL",
             "ALTER TABLE ownership ADD COLUMN target_price REAL",
+            "CREATE TABLE IF NOT EXISTS knife_tasks (id INTEGER PRIMARY KEY, name VARCHAR(120) NOT NULL UNIQUE, is_preset BOOLEAN NOT NULL DEFAULT 0)",
+            "CREATE TABLE IF NOT EXISTS knife_task_log (id INTEGER PRIMARY KEY, item_id INTEGER NOT NULL REFERENCES items(id), task_id INTEGER NOT NULL REFERENCES knife_tasks(id), notes TEXT, logged_on VARCHAR(10) NOT NULL)",
         ]:
             try:
                 _conn.execute(db.text(_stmt))
                 _conn.commit()
             except Exception:
                 pass
+    existing_task_names = {t.name for t in KnifeTask.query.all()}
+    for preset in KNIFE_TASK_PRESETS:
+        if preset not in existing_task_names:
+            db.session.add(KnifeTask(name=preset, is_preset=True))
+    db.session.flush()
+
     _bad = Item.query.filter(Item.sku.op("GLOB")("[0-9]")).all()
     for _item in _bad:
         logger.info("Removing item with invalid single-digit SKU: %s (sku=%s)", _item.name, _item.sku)
