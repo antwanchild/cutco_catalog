@@ -2,7 +2,7 @@
 
 A self-hosted web application for Cutco collectors to catalog, track, and manage their Cutco knife and kitchen product collections.
 
-![Version](https://img.shields.io/badge/version-1.4.2-blue)
+![Version](https://img.shields.io/badge/version-1.5.2-blue)
 ![Python](https://img.shields.io/badge/python-3.14-blue)
 ![Flask](https://img.shields.io/badge/flask-3.1-lightgrey)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED)
@@ -21,11 +21,14 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 💲 **MSRP Diff** — Compare stored prices against live Cutco.com prices; run from the admin UI or CLI. Supports writing updated prices to the database and optional Discord summary
 - 🔪 **Sharpening Log** — Track sharpening events per knife (date, method, notes); surface overdue reminders in the UI or via Discord
 - 🍰 **Bakeware Tracker** — Log baking sessions per piece (what you made, rating, notes); flag pieces unused for a configurable number of days
+- 🔪 **Knife-to-Task Pairing** — Log which knife you use for which kitchen task; view usage patterns and top tasks per knife (only owned knives shown)
+- 🗂️ **Set Completion** — Track progress through Cutco sets with per-person completion bars and owned/missing panels; one-click wishlist from missing items
 - 🔄 **Catalog Sync** — Scrape Cutco.com to discover new items and sets automatically
 - 📥 **Import / Export** — Bulk import ownership data via CSV or XLSX; export full collection as CSV
 - 📊 **Matrix View** — Cross-tabulate items vs. collectors at a glance
 - 🔒 **Admin Controls** — Token-protected admin mode for catalog edits, syncing, and MSRP diffs
 - 🔔 **Discord Notifications** — Optional webhook integration for wishlist price alerts, sharpening reminders, and bakeware reminders
+- 🌙 **Dark / Light Mode** — Toggle between dark (default) and light themes; preference saved in localStorage
 - 📱 **Mobile Friendly** — Responsive layout works on phones and tablets
 
 ---
@@ -212,7 +215,7 @@ Set membership columns (mark `yes` to assign): `Beast`, `Fanatic`, `Signature`, 
 
 ## 🗄️ Database Schema
 
-Eight tables backed by SQLite. All migrations run automatically at startup.
+Ten tables backed by SQLite. All migrations run automatically at startup.
 
 | Table | Key Columns | Notes |
 |---|---|---|
@@ -224,6 +227,8 @@ Eight tables backed by SQLite. All migrations run automatically at startup.
 | `item_sets` | `item_id`, `set_id` | Many-to-many join between items and sets |
 | `sharpening_log` | `id`, `item_id`, `sharpened_on`, `method`, `notes` | One row per sharpening event |
 | `bakeware_sessions` | `id`, `item_id`, `baked_on`, `what_made`, `rating`, `notes` | One row per baking session |
+| `knife_tasks` | `id`, `name`, `is_preset` | Task definitions (e.g. "Slicing bread"); 10 presets seeded on startup |
+| `knife_task_log` | `id`, `item_id`, `task_id`, `logged_on`, `notes` | One row per knife-task usage event |
 
 ---
 
