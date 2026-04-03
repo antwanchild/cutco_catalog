@@ -47,7 +47,18 @@
     {% endif %}
   </div>
 </nav>
+<template id="csrf-field">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</template>
 <script>
+  /* Inject CSRF token into every form on the page */
+  (function() {
+    var tpl = document.getElementById('csrf-field');
+    document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(function(f) {
+      f.appendChild(tpl.content.cloneNode(true));
+    });
+  })();
+
   document.querySelector('.nav-toggle').addEventListener('click', function() {
     var links = document.querySelector('.nav-links');
     var open = links.classList.toggle('open');

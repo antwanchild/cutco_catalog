@@ -5,8 +5,8 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify, render_template
 
 from constants import APP_VERSION, KNIFE_TASK_PRESETS, UNKNOWN_COLOR
-from extensions import db
-from helpers import is_admin
+from extensions import db, limiter
+from helpers import _csrf_token, is_admin, validate_csrf
 from models import Item, KnifeTask, ensure_unknown_variant
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -47,6 +47,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
+limiter.init_app(app)
 
 # ── Blueprints ────────────────────────────────────────────────────────────────
 
@@ -99,9 +100,34 @@ with app.app_context():
 
 # ── Template context ──────────────────────────────────────────────────────────
 
+# ── CSRF validation ───────────────────────────────────────────────────────────
+
+@app.before_request
+def csrf_protect():
+    if request.method == "POST" and not request.path.startswith("/api/"):
+        validate_csrf()
+
+
+# ── Security headers ──────────────────────────────────────────────────────────
+
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Frame-Options"]        = "SAMEORIGIN"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Robots-Tag"]           = "noindex, nofollow"
+    return response
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    from flask import Response
+    return Response("User-agent: *\nDisallow: /\n", mimetype="text/plain")
+
+
 @app.context_processor
 def inject_globals():
-    return dict(app_version=APP_VERSION, is_admin=is_admin, UNKNOWN_COLOR=UNKNOWN_COLOR)
+    return dict(app_version=APP_VERSION, is_admin=is_admin,
+                UNKNOWN_COLOR=UNKNOWN_COLOR, csrf_token=_csrf_token)
 
 # ── Core routes ───────────────────────────────────────────────────────────────
 

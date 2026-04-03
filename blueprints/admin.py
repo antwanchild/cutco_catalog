@@ -5,6 +5,7 @@ from datetime import date
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
 from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN
+from extensions import limiter
 from helpers import is_admin
 from models import Item
 from msrp_helpers import _read_msrp_job, _run_msrp_diff_job, _write_msrp_job
@@ -49,6 +50,7 @@ def msrp_diff_status():
 
 
 @admin_bp.route("/admin/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute; 30 per hour")
 def admin_login():
     if request.method == "POST":
         if request.form.get("token") == ADMIN_TOKEN:
