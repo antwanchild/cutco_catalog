@@ -132,6 +132,32 @@ def inject_globals():
     return dict(app_version=APP_VERSION, is_admin=is_admin,
                 UNKNOWN_COLOR=UNKNOWN_COLOR, csrf_token=_csrf_token)
 
+
+# ── Error handlers ────────────────────────────────────────────────────────────
+
+@app.errorhandler(403)
+def err_403(e):
+    return render_template("error.html", code=403,
+                           icon="🚫", message="Access denied."), 403
+
+@app.errorhandler(404)
+def err_404(e):
+    return render_template("error.html", code=404,
+                           icon="🔍", message="Page not found."), 404
+
+@app.errorhandler(429)
+def err_429(e):
+    return render_template("error.html", code=429,
+                           icon="⏱️", message="Too many requests — slow down and try again shortly."), 429
+
+@app.errorhandler(500)
+def err_500(e):
+    db.session.rollback()
+    logger.error("Unhandled 500: %s", e)
+    return render_template("error.html", code=500,
+                           icon="💥", message="Something went wrong on our end. Try again or check the logs."), 500
+
+
 # ── Core routes ───────────────────────────────────────────────────────────────
 
 @app.route("/")

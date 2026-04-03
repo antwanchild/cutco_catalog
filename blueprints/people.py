@@ -4,7 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
 from extensions import db
-from helpers import _notify_discord, check_wishlist_targets, is_admin
+from helpers import _notify_discord, check_wishlist_targets, db_commit, is_admin
 from models import Item, Ownership, Person
 
 people_bp = Blueprint("people", __name__)
@@ -25,9 +25,9 @@ def people_add():
         person = Person(name=request.form["name"].strip(),
                         notes=request.form.get("notes", "").strip() or None)
         db.session.add(person)
-        db.session.commit()
-        logger.info("Person added: %s", person.name)
-        flash(f"Added {person.name}.", "success")
+        if db_commit(db.session):
+            logger.info("Person added: %s", person.name)
+            flash(f"Added {person.name}.", "success")
         return redirect(url_for("people.people"))
     return render_template("person_form.html", person=None, action="Add")
 
@@ -38,9 +38,9 @@ def people_edit(pid):
     if request.method == "POST":
         person.name  = request.form["name"].strip()
         person.notes = request.form.get("notes", "").strip() or None
-        db.session.commit()
-        logger.info("Person updated: %s", person.name)
-        flash(f"Updated {person.name}.", "success")
+        if db_commit(db.session):
+            logger.info("Person updated: %s", person.name)
+            flash(f"Updated {person.name}.", "success")
         return redirect(url_for("people.people"))
     return render_template("person_form.html", person=person, action="Edit")
 
@@ -50,9 +50,9 @@ def people_delete(pid):
     person = Person.query.get_or_404(pid)
     name   = person.name
     db.session.delete(person)
-    db.session.commit()
-    logger.info("Person deleted: %s", name)
-    flash(f"Removed {name}.", "info")
+    if db_commit(db.session):
+        logger.info("Person deleted: %s", name)
+        flash(f"Removed {name}.", "info")
     return redirect(url_for("people.people"))
 
 
@@ -112,9 +112,9 @@ def ownership_add():
             target_price = target_price,
             notes        = request.form.get("notes", "").strip() or None,
         ))
-        db.session.commit()
-        logger.info("Ownership added: person %d, variant %d", person_id, variant_id)
-        flash("Entry logged.", "success")
+        if db_commit(db.session):
+            logger.info("Ownership added: person %d, variant %d", person_id, variant_id)
+            flash("Entry logged.", "success")
         return redirect(url_for("people.person_collection", pid=person_id))
 
     sel_item = Item.query.get(item_id) if item_id else None
@@ -142,9 +142,9 @@ def ownership_edit(oid):
         except ValueError:
             ownership.target_price = None
         ownership.notes  = request.form.get("notes", "").strip() or None
-        db.session.commit()
-        logger.info("Ownership updated: id %d → %s", oid, ownership.status)
-        flash("Updated.", "success")
+        if db_commit(db.session):
+            logger.info("Ownership updated: id %d → %s", oid, ownership.status)
+            flash("Updated.", "success")
         return redirect(url_for("people.person_collection", pid=ownership.person_id))
 
     return render_template("ownership_form.html", ownership=ownership,
@@ -164,9 +164,9 @@ def ownership_delete(oid):
     ownership = Ownership.query.get_or_404(oid)
     pid       = ownership.person_id
     db.session.delete(ownership)
-    db.session.commit()
-    logger.info("Ownership deleted: id %d", oid)
-    flash("Entry removed.", "info")
+    if db_commit(db.session):
+        logger.info("Ownership deleted: id %d", oid)
+        flash("Entry removed.", "info")
     return redirect(url_for("people.person_collection", pid=pid))
 
 
@@ -185,9 +185,9 @@ def bulk_status_update(pid):
                .all())
     for ownership in updated:
         ownership.status = new_status
-    db.session.commit()
-    logger.info("Bulk status update: person %d, %d entries → %s", pid, len(updated), new_status)
-    flash(f"Updated {len(updated)} entr{'y' if len(updated) == 1 else 'ies'} to {new_status}.", "success")
+    if db_commit(db.session):
+        logger.info("Bulk status update: person %d, %d entries → %s", pid, len(updated), new_status)
+        flash(f"Updated {len(updated)} entr{'y' if len(updated) == 1 else 'ies'} to {new_status}.", "success")
     return redirect(url_for("people.person_collection", pid=pid))
 
 
