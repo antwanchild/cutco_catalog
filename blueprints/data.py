@@ -246,6 +246,8 @@ def import_page():
 
 @data_bp.route("/import/confirm", methods=["POST"])
 def import_confirm():
+    from sqlalchemy.exc import SQLAlchemyError
+
     added_items     = 0
     added_ownership = 0
     added_persons   = 0
@@ -254,59 +256,89 @@ def import_confirm():
     existing_names   = {item.name.lower(): item for item in Item.query.all()}
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
 
-    item_count = int(request.form.get("item_count", 0))
-    for i in range(item_count):
-        if request.form.get(f"item_accept_{i}") != "on":
-            continue
+    item_count = int(request.form.get("item_count", 0) or 0)
+    own_count  = int(request.form.get("own_count",  0) or 0)
 
-        name        = request.form.get(f"item_name_{i}", "").strip()
-        sku         = request.form.get(f"item_sku_{i}", "").strip().upper() or None
-        color       = request.form.get(f"item_color_{i}", "").strip() or UNKNOWN_COLOR
-        edge_type   = request.form.get(f"item_edge_{i}", "Unknown")
-        is_unicorn  = request.form.get(f"item_unicorn_{i}") == "on"
-        category    = request.form.get(f"item_category_{i}", "").strip() or None
-        notes       = request.form.get(f"item_notes_{i}", "").strip() or None
-        person_name = request.form.get(f"item_person_{i}", "").strip()
-        status      = request.form.get(f"item_status_{i}", "Owned")
-        set_names   = [sname for sname in request.form.get(f"item_sets_{i}", "").split("|") if sname]
+    try:
+        for i in range(item_count):
+            if request.form.get(f"item_accept_{i}") != "on":
+                continue
 
-        if not name:
-            continue
+            name        = request.form.get(f"item_name_{i}", "").strip()
+            sku         = request.form.get(f"item_sku_{i}", "").strip().upper() or None
+            color       = request.form.get(f"item_color_{i}", "").strip() or UNKNOWN_COLOR
+            edge_type   = request.form.get(f"item_edge_{i}", "Unknown")
+            is_unicorn  = request.form.get(f"item_unicorn_{i}") == "on"
+            category    = request.form.get(f"item_category_{i}", "").strip() or None
+            notes       = request.form.get(f"item_notes_{i}", "").strip() or None
+            person_name = request.form.get(f"item_person_{i}", "").strip()
+            status      = request.form.get(f"item_status_{i}", "Owned")
+            set_names   = [sname for sname in request.form.get(f"item_sets_{i}", "").split("|") if sname]
 
-        item = None
-        if sku and sku in existing_items:
-            item = existing_items[sku]
-        elif name.lower() in existing_names:
-            item = existing_names[name.lower()]
+            if not name:
+                continue
 
-        if not item:
-            item = Item(name=name, sku=sku, category=category,
-                        edge_type=edge_type, is_unicorn=False,
-                        in_catalog=bool(sku), notes=notes)
-            db.session.add(item)
-            db.session.flush()
-            ensure_unknown_variant(item)
-            if sku:
-                existing_items[sku] = item
-            existing_names[name.lower()] = item
-            added_items += 1
+            item = None
+            if sku and sku in existing_items:
+                item = existing_items[sku]
+            elif name.lower() in existing_names:
+                item = existing_names[name.lower()]
 
-        for sname in set_names:
-            item_set = get_or_create_set(sname)
-            if item_set not in item.sets:
-                item.sets.append(item_set)
+            if not item:
+                item = Item(name=name, sku=sku, category=category,
+                            edge_type=edge_type, is_unicorn=False,
+                            in_catalog=bool(sku), notes=notes)
+                db.session.add(item)
+                db.session.flush()
+                ensure_unknown_variant(item)
+                if sku:
+                    existing_items[sku] = item
+                existing_names[name.lower()] = item
+                added_items += 1
 
-        target_color = color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR
-        variant = next((v for v in item.variants
-                        if v.color.lower() == target_color.lower()), None)
-        if not variant:
-            variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_unicorn)
-            db.session.add(variant)
-            db.session.flush()
-        elif is_unicorn and not variant.is_unicorn:
-            variant.is_unicorn = True
+            for sname in set_names:
+                item_set = get_or_create_set(sname)
+                if item_set not in item.sets:
+                    item.sets.append(item_set)
 
-        if person_name:
+            target_color = color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR
+            variant = next((v for v in item.variants
+                            if v.color.lower() == target_color.lower()), None)
+            if not variant:
+                variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_unicorn)
+                db.session.add(variant)
+                db.session.flush()
+            elif is_unicorn and not variant.is_unicorn:
+                variant.is_unicorn = True
+
+            if person_name:
+                person = existing_persons.get(person_name.lower())
+                if not person:
+                    person = Person(name=person_name)
+                    db.session.add(person)
+                    db.session.flush()
+                    existing_persons[person_name.lower()] = person
+                    added_persons += 1
+                if not Ownership.query.filter_by(person_id=person.id,
+                                                 variant_id=variant.id).first():
+                    db.session.add(Ownership(person_id=person.id,
+                                             variant_id=variant.id, status=status))
+                    added_ownership += 1
+
+        for i in range(own_count):
+            if request.form.get(f"own_accept_{i}") != "on":
+                continue
+
+            item_id     = int(request.form.get(f"own_item_id_{i}", 0))
+            person_name = request.form.get(f"own_person_{i}", "").strip()
+            color       = request.form.get(f"own_color_{i}", "").strip() or UNKNOWN_COLOR
+            status      = request.form.get(f"own_status_{i}", "Owned")
+            notes       = request.form.get(f"own_notes_{i}", "").strip() or None
+
+            item = Item.query.get(item_id)
+            if not item or not person_name:
+                continue
+
             person = existing_persons.get(person_name.lower())
             if not person:
                 person = Person(name=person_name)
@@ -314,48 +346,26 @@ def import_confirm():
                 db.session.flush()
                 existing_persons[person_name.lower()] = person
                 added_persons += 1
+
+            variant = next((v for v in item.variants
+                            if v.color.lower() == color.lower()), None)
+            if not variant:
+                variant = ItemVariant(item_id=item.id, color=color)
+                db.session.add(variant)
+                db.session.flush()
+
             if not Ownership.query.filter_by(person_id=person.id,
-                                             variant_id=variant.id).first():
+                                              variant_id=variant.id).first():
                 db.session.add(Ownership(person_id=person.id,
-                                         variant_id=variant.id, status=status))
+                                         variant_id=variant.id,
+                                         status=status, notes=notes))
                 added_ownership += 1
 
-    own_count = int(request.form.get("own_count", 0))
-    for i in range(own_count):
-        if request.form.get(f"own_accept_{i}") != "on":
-            continue
-
-        item_id     = int(request.form.get(f"own_item_id_{i}", 0))
-        person_name = request.form.get(f"own_person_{i}", "").strip()
-        color       = request.form.get(f"own_color_{i}", "").strip() or UNKNOWN_COLOR
-        status      = request.form.get(f"own_status_{i}", "Owned")
-        notes       = request.form.get(f"own_notes_{i}", "").strip() or None
-
-        item = Item.query.get(item_id)
-        if not item or not person_name:
-            continue
-
-        person = existing_persons.get(person_name.lower())
-        if not person:
-            person = Person(name=person_name)
-            db.session.add(person)
-            db.session.flush()
-            existing_persons[person_name.lower()] = person
-            added_persons += 1
-
-        variant = next((v for v in item.variants
-                        if v.color.lower() == color.lower()), None)
-        if not variant:
-            variant = ItemVariant(item_id=item.id, color=color)
-            db.session.add(variant)
-            db.session.flush()
-
-        if not Ownership.query.filter_by(person_id=person.id,
-                                          variant_id=variant.id).first():
-            db.session.add(Ownership(person_id=person.id,
-                                     variant_id=variant.id,
-                                     status=status, notes=notes))
-            added_ownership += 1
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("Import flush failed: %s", exc)
+        flash("Import failed — database error during processing. No changes were saved.", "error")
+        return redirect(url_for("catalog.catalog"))
 
     if db_commit(db.session):
         logger.info("Import complete: %d items, %d ownership, %d persons", added_items, added_ownership, added_persons)
