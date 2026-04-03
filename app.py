@@ -2,7 +2,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 from constants import APP_VERSION, KNIFE_TASK_PRESETS, UNKNOWN_COLOR
 from extensions import db, limiter
