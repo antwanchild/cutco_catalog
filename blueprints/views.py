@@ -2,7 +2,8 @@ from flask import Blueprint, abort, render_template, request
 
 from constants import STATUS_RANK, UNKNOWN_COLOR
 from extensions import db
-from helpers import _gift_token, _verify_gift_token
+from helpers import (_collection_token, _gift_token,
+                     _verify_collection_token, _verify_gift_token)
 from models import Item, ItemVariant, KnifeTaskLog, Ownership, Person, Set, SharpeningLog
 
 views_bp = Blueprint("views", __name__)
@@ -214,3 +215,57 @@ def gift_list(token):
                            item_set=item_set, person=person,
                            missing_items=missing_items,
                            owned_count=owned_count, total=total, pct=pct)
+
+
+# ── Collection card ───────────────────────────────────────────────────────────
+
+@views_bp.route("/people/<int:pid>/collection-token")
+def collection_token(pid):
+    """Generate a shareable collection card token for a person."""
+    person = Person.query.get_or_404(pid)
+    token  = _collection_token(pid)
+    card_url = request.host_url.rstrip("/") + f"/collection-card/{token}"
+    return render_template("collection_card_share.html", person=person,
+                           card_url=card_url, pid=pid)
+
+
+@views_bp.route("/collection-card/<token>")
+def collection_card(token):
+    """Public read-only collection card — no login required."""
+    person_id = _verify_collection_token(token)
+    if person_id is None:
+        abort(404)
+    person     = Person.query.get_or_404(person_id)
+    ownerships = (Ownership.query
+                  .filter_by(person_id=person_id, status="Owned")
+                  .order_by(Ownership.id).all())
+
+    # Group by category
+    by_category: dict[str, list] = {}
+    total_value = 0.0
+    priced      = 0
+    seen_items: set[int] = set()
+    for o in ownerships:
+        item = o.variant.item
+        if item.id in seen_items:
+            continue
+        seen_items.add(item.id)
+        cat = item.category or "Uncategorized"
+        by_category.setdefault(cat, []).append(item)
+        if item.msrp:
+            total_value += item.msrp
+            priced += 1
+
+    by_category = dict(sorted(by_category.items()))
+    catalog_total = Item.query.count()
+    owned_count   = len(seen_items)
+    coverage_pct  = round(100 * owned_count / catalog_total) if catalog_total else 0
+
+    return render_template("collection_card.html",
+                           person=person,
+                           by_category=by_category,
+                           owned_count=owned_count,
+                           catalog_total=catalog_total,
+                           coverage_pct=coverage_pct,
+                           total_value=total_value,
+                           priced=priced)

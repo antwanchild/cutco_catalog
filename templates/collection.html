@@ -5,6 +5,7 @@
   <h1 class="page-title">{{ person.name }}'s Collection</h1>
   <div class="page-actions">
     <a href="{{ url_for('people.ownership_add', person_id=person.id) }}" class="btn btn-primary">+ Add Entry</a>
+    <a href="{{ url_for('views.collection_token', pid=person.id) }}" class="btn btn-secondary">🃏 Share Card</a>
     <a href="{{ url_for('people.people') }}" class="btn btn-ghost">← People</a>
   </div>
 </div>

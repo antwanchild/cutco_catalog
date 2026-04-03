@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Share Collection Card – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🃏 Share Collection Card</h1>
+  <a href="{{ url_for('people.person_collection', pid=pid) }}" class="btn btn-ghost">← Collection</a>
+</div>
+
+<div class="form-card" style="max-width:640px">
+  <p style="margin-bottom:1rem">
+    Anyone with this link can view {{ person.name }}'s collection — no login required.
+    The link is permanent and always reflects the latest owned items.
+  </p>
+
+  <label style="font-weight:600;display:block;margin-bottom:.4rem">Shareable link</label>
+  <div style="display:flex;gap:.5rem;align-items:center">
+    <input type="text" id="card-url" value="{{ card_url }}" readonly class="input-full"
+           style="font-family:var(--mono);font-size:.82rem">
+    <button class="btn btn-primary" onclick="copyLink()" id="copy-btn">Copy</button>
+  </div>
+  <p class="hint" style="margin-top:.5rem">
+    Share with other collectors, post in a group chat, or bookmark for easy reference.
+  </p>
+
+  <div class="form-actions" style="margin-top:1.5rem">
+    <a href="{{ card_url }}" target="_blank" class="btn btn-secondary">Preview ↗</a>
+  </div>
+</div>
+
+<script>
+function copyLink() {
+  navigator.clipboard.writeText(document.getElementById('card-url').value).then(function() {
+    var btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+</script>
+{% endblock %}
