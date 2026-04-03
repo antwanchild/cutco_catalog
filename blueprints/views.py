@@ -1,8 +1,9 @@
-from flask import Blueprint, render_template, request
+from flask import Blueprint, abort, render_template, request
 
 from constants import STATUS_RANK, UNKNOWN_COLOR
 from extensions import db
-from models import Item, ItemVariant, KnifeTaskLog, Ownership, Person, SharpeningLog
+from helpers import _gift_token, _verify_gift_token
+from models import Item, ItemVariant, KnifeTaskLog, Ownership, Person, Set, SharpeningLog
 
 views_bp = Blueprint("views", __name__)
 
@@ -168,3 +169,48 @@ def stats():
         cov_owned=cov_owned,
         cov_gap=cov_gap,
     )
+
+
+# ── Gift list ─────────────────────────────────────────────────────────────────
+
+@views_bp.route("/sets/<int:sid>/gift-token")
+def gift_token(sid):
+    """Generate a shareable gift list token for a set + person combination."""
+    person_id = request.args.get("person", type=int)
+    if not person_id:
+        abort(400)
+    # Validate both exist
+    Set.query.get_or_404(sid)
+    Person.query.get_or_404(person_id)
+    token = _gift_token(sid, person_id)
+    gift_url = request.host_url.rstrip("/") + f"/gifts/{token}"
+    return render_template("gift_share.html", gift_url=gift_url,
+                           sid=sid, person_id=person_id)
+
+
+@views_bp.route("/gifts/<token>")
+def gift_list(token):
+    """Public read-only gift list page — no login required."""
+    ids = _verify_gift_token(token)
+    if ids is None:
+        abort(404)
+    set_id, person_id = ids
+    item_set = Set.query.get_or_404(set_id)
+    person   = Person.query.get_or_404(person_id)
+
+    owned_item_ids = {
+        o.variant.item_id
+        for o in Ownership.query.filter_by(person_id=person_id, status="Owned").all()
+    }
+    missing_items = sorted(
+        [i for i in item_set.items if i.id not in owned_item_ids],
+        key=lambda i: i.name,
+    )
+    owned_count = len(item_set.items) - len(missing_items)
+    total       = len(item_set.items)
+    pct         = round(100 * owned_count / total) if total else 0
+
+    return render_template("gift_list.html",
+                           item_set=item_set, person=person,
+                           missing_items=missing_items,
+                           owned_count=owned_count, total=total, pct=pct)
