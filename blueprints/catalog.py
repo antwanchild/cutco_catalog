@@ -289,7 +289,13 @@ def catalog_sync():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))
 
-    scraped, set_candidates = scrape_catalog()
+    try:
+        scraped, set_candidates = scrape_catalog()
+    except Exception as exc:
+        logger.error("Catalog scrape failed: %s", exc)
+        flash("Could not reach cutco.com — try again later.", "error")
+        return redirect(url_for("catalog.catalog"))
+
     existing_skus = {item.sku for item in Item.query.filter(Item.sku.isnot(None)).all()}
     new_items = [i for i in scraped if i["sku"] not in existing_skus]
 
@@ -307,7 +313,12 @@ def catalog_sync():
         for cat, items in sorted(_grouped_unsorted.items(), key=lambda kv: kv[0].lower())
     )
 
-    scraped_sets  = scrape_sets(extra_candidates=set_candidates)
+    try:
+        scraped_sets = scrape_sets(extra_candidates=set_candidates)
+    except Exception as exc:
+        logger.error("Sets scrape failed: %s", exc)
+        scraped_sets = []
+
     existing_sets = {s.name.lower() for s in Set.query.all()}
     new_sets      = sorted(
         (s for s in scraped_sets if s["name"].lower() not in existing_sets),
