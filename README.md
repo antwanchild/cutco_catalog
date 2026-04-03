@@ -33,6 +33,7 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 🃏 **Collection Card** — Shareable public page showing a person's full owned collection grouped by category, with stats and estimated value
 - 📊 **Bulk Status Update** — Select multiple ownership entries and change status in one action from the collection page
 - 🔒 **Bot Protection** — Rate-limited admin login, CSRF tokens on all forms, security headers, and robots.txt
+- 🛡️ **Error Handling** — Friendly 403/404/429/500 error pages; all database writes roll back cleanly on failure
 - ❓ **Contextual Help** — ? button on every major page opens an inline help modal explaining the page's features
 - 📱 **Mobile Friendly** — Responsive layout works on phones and tablets
 
@@ -211,6 +212,7 @@ Set membership columns (mark `yes` to assign): `Beast`, `Fanatic`, `Signature`, 
 | 📈 Collection Stats | `/stats` | Public |
 | 🔪 Sharpening Log | `/sharpening` | Public |
 | 🍰 Bakeware Tracker | `/bakeware` | Public |
+| 🔪 Knife Task Log | `/tasks` | Public |
 | 📥 Import | `/import` | Public |
 | 📤 Export CSV | `/export/csv` | Public |
 | 🔄 Catalog Sync | `/catalog/sync` | 🔒 Admin |
@@ -339,8 +341,8 @@ All persistent data lives in `/data/` inside the container — mount this as a v
 ## 🏥 Health Check
 
 ```
-GET /health   → 200 OK  {"status": "ok", "version": "1.4.2"}
-GET /version  → {"version": "1.4.2"}
+GET /health   → 200 OK  {"status": "ok", "version": "x.y.z"}
+GET /version  → {"version": "x.y.z"}
 ```
 
 ---
