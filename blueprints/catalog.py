@@ -183,14 +183,16 @@ def variant_delete(vid):
 
 @catalog_bp.route("/sets")
 def sets_list():
-    from models import Ownership
-    all_sets = Set.query.order_by(Set.name).all()
+    from models import Ownership, Person
+    all_sets    = Set.query.order_by(Set.name).all()
+    all_persons = Person.query.order_by(Person.name).all()
+    person_id   = request.args.get("person", type=int)
 
-    # Compute completion stats: how many items in each set are owned by anyone
-    owned_item_ids = {
-        o.variant.item_id
-        for o in Ownership.query.filter_by(status="Owned").all()
-    }
+    # Completion relative to selected person, or globally if none selected
+    owned_q = Ownership.query.filter_by(status="Owned")
+    if person_id:
+        owned_q = owned_q.filter_by(person_id=person_id)
+    owned_item_ids = {o.variant.item_id for o in owned_q.all()}
 
     completion = {}
     for s in all_sets:
@@ -199,7 +201,8 @@ def sets_list():
         completion[s.id] = dict(total=total, owned=owned,
                                 pct=round(100 * owned / total) if total else 0)
 
-    return render_template("sets.html", sets=all_sets, completion=completion)
+    return render_template("sets.html", sets=all_sets, completion=completion,
+                           all_persons=all_persons, person_id=person_id)
 
 
 @catalog_bp.route("/sets/add", methods=["GET", "POST"])
@@ -244,14 +247,17 @@ def set_delete(sid):
 
 @catalog_bp.route("/sets/<int:sid>")
 def set_detail(sid):
-    from models import Ownership
-    item_set = Set.query.get_or_404(sid)
+    from models import Ownership, Person
+    item_set    = Set.query.get_or_404(sid)
+    all_persons = Person.query.order_by(Person.name).all()
+    person_id   = request.args.get("person", type=int)
+    person      = Person.query.get(person_id) if person_id else None
 
-    # Split items into owned (by anyone) vs. missing
-    owned_item_ids = {
-        o.variant.item_id
-        for o in Ownership.query.filter_by(status="Owned").all()
-    }
+    # Split items into owned vs. missing for the selected person (or globally)
+    owned_q = Ownership.query.filter_by(status="Owned")
+    if person_id:
+        owned_q = owned_q.filter_by(person_id=person_id)
+    owned_item_ids = {o.variant.item_id for o in owned_q.all()}
 
     owned_items   = sorted([i for i in item_set.items if i.id in owned_item_ids],
                            key=lambda i: i.name)
@@ -269,6 +275,9 @@ def set_detail(sid):
                            owned_count=owned_count,
                            total=total,
                            pct=pct,
+                           all_persons=all_persons,
+                           person_id=person_id,
+                           person=person,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 

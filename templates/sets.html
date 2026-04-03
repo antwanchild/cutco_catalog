@@ -6,6 +6,19 @@
   <a class="btn btn-primary" href="{{ url_for('catalog.set_add') }}">+ New Set</a>
 </div>
 
+{# ── Person filter ─────────────────────────────────────────────────────────── #}
+<form method="get" class="filter-bar" style="margin-bottom:1rem">
+  <label style="display:flex;align-items:center;gap:.5rem;font-size:.9rem">
+    Completion for:
+    <select name="person" onchange="this.form.submit()" class="input-sm">
+      <option value="">— everyone —</option>
+      {% for p in all_persons %}
+        <option value="{{ p.id }}" {% if p.id == person_id %}selected{% endif %}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
 {% if sets %}
 <div class="table-wrap">
 <table class="data-table">
@@ -16,7 +29,11 @@
     {% for item_set in sets %}
     {% set c = completion[item_set.id] %}
     <tr>
-      <td><a href="{{ url_for('catalog.set_detail', sid=item_set.id) }}">{{ item_set.name }}</a></td>
+      <td>
+        <a href="{{ url_for('catalog.set_detail', sid=item_set.id) }}{% if person_id %}?person={{ person_id }}{% endif %}">
+          {{ item_set.name }}
+        </a>
+      </td>
       <td>{{ c.total }}</td>
       <td>
         {% if c.total > 0 %}
