@@ -1,7 +1,9 @@
+import hmac
 import logging
+import secrets
 
 import requests
-from flask import request
+from flask import abort, request, session
 
 from constants import ADMIN_TOKEN, DISCORD_WEBHOOK_URL
 from models import Ownership
@@ -11,6 +13,23 @@ logger = logging.getLogger(__name__)
 
 def is_admin() -> bool:
     return request.cookies.get("admin_token") == ADMIN_TOKEN
+
+
+# ── CSRF ──────────────────────────────────────────────────────────────────────
+
+def _csrf_token() -> str:
+    """Return (and lazily create) a per-session CSRF token."""
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_hex(32)
+    return session["csrf_token"]
+
+
+def validate_csrf() -> None:
+    """Abort 403 if the submitted CSRF token doesn't match the session token."""
+    token = request.form.get("csrf_token", "")
+    expected = session.get("csrf_token", "")
+    if not expected or not hmac.compare_digest(token, expected):
+        abort(403)
 
 
 def _notify_discord(message: str) -> bool:
