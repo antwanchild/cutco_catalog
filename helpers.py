@@ -66,6 +66,40 @@ def _verify_gift_token(token: str) -> tuple[int, int] | None:
         return None
 
 
+# ── Collection card tokens ────────────────────────────────────────────────────
+
+def _collection_token(person_id: int) -> str:
+    """Generate a signed URL-safe token encoding person_id."""
+    payload = base64.urlsafe_b64encode(f"c:{person_id}".encode()).decode().rstrip("=")
+    sig = hmac.new(
+        current_app.secret_key.encode(),
+        payload.encode(),
+        hashlib.sha256,
+    ).hexdigest()[:24]
+    return f"{payload}.{sig}"
+
+
+def _verify_collection_token(token: str) -> int | None:
+    """Verify token and return person_id, or None if invalid."""
+    try:
+        payload, sig = token.rsplit(".", 1)
+        expected_sig = hmac.new(
+            current_app.secret_key.encode(),
+            payload.encode(),
+            hashlib.sha256,
+        ).hexdigest()[:24]
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        padding = "=" * (-len(payload) % 4)
+        decoded = base64.urlsafe_b64decode(payload + padding).decode()
+        prefix, person_id = decoded.split(":", 1)
+        if prefix != "c":
+            return None
+        return int(person_id)
+    except Exception:
+        return None
+
+
 def _notify_discord(message: str) -> bool:
     """POST a message to the configured Discord webhook. Returns True on success."""
     if not DISCORD_WEBHOOK_URL:
