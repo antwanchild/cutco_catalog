@@ -4,7 +4,7 @@ from datetime import date
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
-from constants import ADMIN_TOKEN
+from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN
 from helpers import is_admin
 from models import Item
 from msrp_helpers import _read_msrp_job, _run_msrp_diff_job, _write_msrp_job
@@ -53,7 +53,8 @@ def admin_login():
     if request.method == "POST":
         if request.form.get("token") == ADMIN_TOKEN:
             resp = redirect(url_for("catalog.catalog"))
-            resp.set_cookie("admin_token", ADMIN_TOKEN, httponly=True, samesite="Lax")
+            resp.set_cookie("admin_token", ADMIN_TOKEN, httponly=True, samesite="Lax",
+                            max_age=ADMIN_SESSION_SECONDS)
             logger.info("Admin login successful")
             flash("Admin access granted.", "success")
             return resp
