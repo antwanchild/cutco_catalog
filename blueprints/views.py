@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request
 
 from constants import STATUS_RANK, UNKNOWN_COLOR
 from extensions import db
-from models import Item, ItemVariant, Ownership, Person
+from models import Item, ItemVariant, KnifeTaskLog, Ownership, Person, SharpeningLog
 
 views_bp = Blueprint("views", __name__)
 
@@ -10,6 +10,7 @@ views_bp = Blueprint("views", __name__)
 @views_bp.route("/views/item/<int:iid>")
 def item_owners(iid):
     item = Item.query.get_or_404(iid)
+
     entries = (Ownership.query
                .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
                .filter(ItemVariant.item_id == iid)
@@ -18,8 +19,27 @@ def item_owners(iid):
     people_without = (Person.query
                       .filter(~Person.id.in_(owner_ids))
                       .order_by(Person.name).all())
+
+    sharpening = (SharpeningLog.query
+                  .filter_by(item_id=iid)
+                  .order_by(SharpeningLog.sharpened_on.desc())
+                  .all())
+
+    task_log = (KnifeTaskLog.query
+                .filter_by(item_id=iid)
+                .order_by(KnifeTaskLog.logged_on.desc())
+                .all())
+
+    # Task usage summary: task name → count
+    task_counts: dict[str, int] = {}
+    for entry in task_log:
+        task_counts[entry.task.name] = task_counts.get(entry.task.name, 0) + 1
+    top_tasks = sorted(task_counts.items(), key=lambda kv: kv[1], reverse=True)
+
     return render_template("item_owners.html", item=item,
                            entries=entries, people_without=people_without,
+                           sharpening=sharpening, task_log=task_log,
+                           top_tasks=top_tasks,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
