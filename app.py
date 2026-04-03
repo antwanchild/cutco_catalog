@@ -67,7 +67,7 @@ app.register_blueprint(admin_bp)
 # ── DB init ───────────────────────────────────────────────────────────────────
 
 with app.app_context():
-    db.create_all()
+    db.Model.metadata.create_all(db.engine, checkfirst=True)
     with db.engine.connect() as _conn:
         for _stmt in [
             "ALTER TABLE sets ADD COLUMN sku VARCHAR(20)",
