@@ -2,7 +2,7 @@
 {% block title %}Sets – Cutco Vault{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">Sets</h1>
+  <h1 class="page-title">🗂️ Sets</h1>
   <a class="btn btn-primary" href="{{ url_for('catalog.set_add') }}">+ New Set</a>
 </div>
 
@@ -10,13 +10,29 @@
 <div class="table-wrap">
 <table class="data-table">
   <thead>
-    <tr><th>Set Name</th><th>Items</th><th>Notes</th><th>Actions</th></tr>
+    <tr><th>Set Name</th><th>Items</th><th>Completion</th><th>Notes</th><th>Actions</th></tr>
   </thead>
   <tbody>
     {% for item_set in sets %}
+    {% set c = completion[item_set.id] %}
     <tr>
       <td><a href="{{ url_for('catalog.set_detail', sid=item_set.id) }}">{{ item_set.name }}</a></td>
-      <td>{{ item_set.items | length }}</td>
+      <td>{{ c.total }}</td>
+      <td>
+        {% if c.total > 0 %}
+        <div class="set-progress-wrap">
+          <div class="set-progress-bar">
+            <div class="set-progress-fill {% if c.pct == 100 %}set-progress-complete{% endif %}"
+                 style="width: {{ c.pct }}%"></div>
+          </div>
+          <span class="set-progress-label {% if c.pct == 100 %}set-complete-text{% endif %}">
+            {% if c.pct == 100 %}✓ Complete{% else %}{{ c.owned }} / {{ c.total }}{% endif %}
+          </span>
+        </div>
+        {% else %}
+        <span class="muted">—</span>
+        {% endif %}
+      </td>
       <td>{{ item_set.notes or '—' }}</td>
       <td class="actions">
         <a href="{{ url_for('catalog.set_edit', sid=item_set.id) }}" class="btn btn-xs">Edit</a>

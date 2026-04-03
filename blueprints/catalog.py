@@ -183,8 +183,23 @@ def variant_delete(vid):
 
 @catalog_bp.route("/sets")
 def sets_list():
+    from models import Ownership
     all_sets = Set.query.order_by(Set.name).all()
-    return render_template("sets.html", sets=all_sets)
+
+    # Compute completion stats: how many items in each set are owned by anyone
+    owned_item_ids = {
+        o.variant.item_id
+        for o in Ownership.query.filter_by(status="Owned").all()
+    }
+
+    completion = {}
+    for s in all_sets:
+        total = len(s.items)
+        owned = sum(1 for item in s.items if item.id in owned_item_ids)
+        completion[s.id] = dict(total=total, owned=owned,
+                                pct=round(100 * owned / total) if total else 0)
+
+    return render_template("sets.html", sets=all_sets, completion=completion)
 
 
 @catalog_bp.route("/sets/add", methods=["GET", "POST"])
@@ -229,8 +244,32 @@ def set_delete(sid):
 
 @catalog_bp.route("/sets/<int:sid>")
 def set_detail(sid):
+    from models import Ownership
     item_set = Set.query.get_or_404(sid)
-    return render_template("set_detail.html", set=item_set, UNKNOWN_COLOR=UNKNOWN_COLOR)
+
+    # Split items into owned (by anyone) vs. missing
+    owned_item_ids = {
+        o.variant.item_id
+        for o in Ownership.query.filter_by(status="Owned").all()
+    }
+
+    owned_items   = sorted([i for i in item_set.items if i.id in owned_item_ids],
+                           key=lambda i: i.name)
+    missing_items = sorted([i for i in item_set.items if i.id not in owned_item_ids],
+                           key=lambda i: i.name)
+
+    total = len(item_set.items)
+    owned_count = len(owned_items)
+    pct = round(100 * owned_count / total) if total else 0
+
+    return render_template("set_detail.html",
+                           set=item_set,
+                           owned_items=owned_items,
+                           missing_items=missing_items,
+                           owned_count=owned_count,
+                           total=total,
+                           pct=pct,
+                           UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
 # ── Catalog Sync ──────────────────────────────────────────────────────────────

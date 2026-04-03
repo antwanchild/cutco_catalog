@@ -12,17 +12,33 @@
 {% if set.sku %}<p class="muted">SKU: <span class="mono">{{ set.sku }}</span></p>{% endif %}
 {% if set.notes %}<p class="set-notes">{{ set.notes }}</p>{% endif %}
 
-<p class="table-count">{{ set.items | length }} item{% if set.items | length != 1 %}s{% endif %} in this set</p>
+{% if total > 0 %}
+<div class="set-detail-progress">
+  <div class="set-progress-bar set-progress-bar-lg">
+    <div class="set-progress-fill {% if pct == 100 %}set-progress-complete{% endif %}"
+         style="width: {{ pct }}%"></div>
+  </div>
+  <div class="set-detail-progress-label">
+    {% if pct == 100 %}
+      <span class="set-complete-text">✓ Complete — all {{ total }} item{% if total != 1 %}s{% endif %} owned</span>
+    {% else %}
+      <strong>{{ owned_count }}</strong> of <strong>{{ total }}</strong> owned
+      <span class="muted">({{ pct }}%)</span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
-{% if set.items %}
+{% if owned_items %}
+<h2 class="section-heading">✅ Owned ({{ owned_items | length }})</h2>
 <div class="table-wrap">
 <table class="data-table">
   <thead>
     <tr><th>Name</th><th>SKU</th><th>Category</th><th>Edge</th><th>Variants</th></tr>
   </thead>
   <tbody>
-    {% for item in set.items | sort(attribute='name') %}
-    <tr>
+    {% for item in owned_items %}
+    <tr class="row-owned">
       <td>
         <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
         {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
@@ -40,7 +56,38 @@
   </tbody>
 </table>
 </div>
-{% else %}
+{% endif %}
+
+{% if missing_items %}
+<h2 class="section-heading">❌ Missing ({{ missing_items | length }})</h2>
+<div class="table-wrap">
+<table class="data-table">
+  <thead>
+    <tr><th>Name</th><th>SKU</th><th>Category</th><th>Edge</th><th>MSRP</th><th>Wishlist</th></tr>
+  </thead>
+  <tbody>
+    {% for item in missing_items %}
+    <tr class="row-missing">
+      <td>
+        <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
+        {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+      </td>
+      <td class="mono">{{ item.sku or '—' }}</td>
+      <td>{{ item.category or '—' }}</td>
+      <td>{{ item.edge_type }}</td>
+      <td>{% if item.msrp %}${{ "%.2f"|format(item.msrp) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>
+        <a href="{{ url_for('people.ownership_add', item_id=item.id) }}?status=Wishlist"
+           class="btn btn-xs btn-ghost">+ Wishlist</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+{% if not owned_items and not missing_items %}
 <p class="empty">No items in this set yet. Edit items from the catalog to assign them.</p>
 {% endif %}
 {% endblock %}

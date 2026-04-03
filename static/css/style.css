@@ -681,3 +681,50 @@ textarea { resize: vertical; }
   /* Sync preview — category input takes full width */
   .sync-category-header { flex-wrap: wrap; }
 }
+
+/* ── Set Completion ──────────────────────────────────────────────────────── */
+.set-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+.set-progress-bar {
+  width: 100px;
+  height: 8px;
+  background: var(--bg3);
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.set-progress-bar-lg {
+  width: 260px;
+  height: 10px;
+}
+.set-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width .3s ease;
+}
+.set-progress-complete { background: var(--success); }
+.set-progress-label { font-size: .8rem; color: var(--muted); white-space: nowrap; }
+.set-complete-text { color: var(--success); font-weight: 600; }
+.set-detail-progress {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  margin-bottom: 1.5rem;
+  padding: .85rem 1.1rem;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.set-detail-progress-label { font-size: .95rem; }
+.section-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 .6rem;
+  color: var(--text);
+}
+.row-owned td:first-child { border-left: 3px solid var(--success); }
+.row-missing td:first-child { border-left: 3px solid var(--bg3); }
