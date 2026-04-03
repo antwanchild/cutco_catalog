@@ -2,7 +2,7 @@
 
 A self-hosted web application for Cutco collectors to catalog, track, and manage their Cutco knife and kitchen product collections.
 
-![Version](https://img.shields.io/badge/version-1.7.9-blue)
+![Version](https://img.shields.io/badge/version-1.7.10-blue)
 ![Python](https://img.shields.io/badge/python-3.14-blue)
 ![Flask](https://img.shields.io/badge/flask-3.1-lightgrey)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED)
