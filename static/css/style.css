@@ -138,7 +138,7 @@ a:hover { text-decoration: underline; }
 .container {
   max-width: 1600px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem;
+  padding: 1.5rem 1.25rem 3.5rem;
   flex: 1;
 }
 .site-footer {
@@ -150,6 +150,11 @@ a:hover { text-decoration: underline; }
   display: flex;
   gap: 1rem;
   align-items: center;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 99;
 }
 .version { opacity: .6; }
 
