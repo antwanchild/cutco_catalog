@@ -5,7 +5,8 @@ import logging
 import secrets
 
 import requests
-from flask import abort, current_app, request, session
+from flask import abort, current_app, flash, request, session
+from sqlalchemy.exc import SQLAlchemyError
 
 from constants import ADMIN_TOKEN, DISCORD_WEBHOOK_URL
 from models import Ownership
@@ -15,6 +16,20 @@ logger = logging.getLogger(__name__)
 
 def is_admin() -> bool:
     return request.cookies.get("admin_token") == ADMIN_TOKEN
+
+
+# ── DB helpers ────────────────────────────────────────────────────────────────
+
+def db_commit(session, *, error_msg: str = "Could not save changes — please try again.") -> bool:
+    """Commit the session. On failure, roll back and flash an error. Returns True on success."""
+    try:
+        session.commit()
+        return True
+    except SQLAlchemyError as exc:
+        session.rollback()
+        logger.error("DB commit failed: %s", exc)
+        flash(error_msg, "error")
+        return False
 
 
 # ── CSRF ──────────────────────────────────────────────────────────────────────

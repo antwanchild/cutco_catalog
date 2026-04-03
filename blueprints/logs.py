@@ -8,7 +8,7 @@ from constants import (
     DISCORD_WEBHOOK_URL, SHARPEN_METHODS, SHARPEN_THRESHOLD_DAYS,
 )
 from extensions import db
-from helpers import _notify_discord, is_admin
+from helpers import _notify_discord, db_commit, is_admin
 from models import BakewareSession, Item, KnifeTask, KnifeTaskLog, Ownership, SharpeningLog
 
 logs_bp = Blueprint("logs", __name__)
@@ -81,9 +81,9 @@ def sharpening_add():
         method       = method,
         notes        = notes,
     ))
-    db.session.commit()
-    logger.info("Sharpening logged: item %d on %s (%s)", item_id, sharpened_on, method)
-    flash("Sharpening event logged.", "success")
+    if db_commit(db.session):
+        logger.info("Sharpening logged: item %d on %s (%s)", item_id, sharpened_on, method)
+        flash("Sharpening event logged.", "success")
     return redirect(url_for("logs.sharpening"))
 
 
@@ -94,9 +94,9 @@ def sharpening_edit(lid):
         entry.sharpened_on = request.form.get("sharpened_on", entry.sharpened_on).strip()
         entry.method       = request.form.get("method", entry.method).strip()
         entry.notes        = request.form.get("notes", "").strip() or None
-        db.session.commit()
-        logger.info("Sharpening entry %d updated", lid)
-        flash("Event updated.", "success")
+        if db_commit(db.session):
+            logger.info("Sharpening entry %d updated", lid)
+            flash("Event updated.", "success")
         return redirect(url_for("logs.sharpening"))
     return render_template("sharpening_edit.html", entry=entry, methods=SHARPEN_METHODS)
 
@@ -105,9 +105,9 @@ def sharpening_edit(lid):
 def sharpening_delete(lid):
     entry = SharpeningLog.query.get_or_404(lid)
     db.session.delete(entry)
-    db.session.commit()
-    logger.info("Sharpening entry %d deleted", lid)
-    flash("Event removed.", "info")
+    if db_commit(db.session):
+        logger.info("Sharpening entry %d deleted", lid)
+        flash("Event removed.", "info")
     return redirect(url_for("logs.sharpening"))
 
 
@@ -246,9 +246,9 @@ def bakeware_add():
         rating   = rating,
         notes    = notes,
     ))
-    db.session.commit()
-    logger.info("Bakeware session logged: item %d on %s — %s", item_id, baked_on, what_made)
-    flash("Baking session logged.", "success")
+    if db_commit(db.session):
+        logger.info("Bakeware session logged: item %d on %s — %s", item_id, baked_on, what_made)
+        flash("Baking session logged.", "success")
     return redirect(url_for("logs.bakeware"))
 
 
@@ -265,9 +265,9 @@ def bakeware_edit(sid):
             session.rating = rating if (rating is None or 1 <= rating <= 5) else session.rating
         except ValueError:
             pass
-        db.session.commit()
-        logger.info("Bakeware session %d updated", sid)
-        flash("Session updated.", "success")
+        if db_commit(db.session):
+            logger.info("Bakeware session %d updated", sid)
+            flash("Session updated.", "success")
         return redirect(url_for("logs.bakeware"))
     return render_template("bakeware_edit.html", session=session)
 
@@ -276,9 +276,9 @@ def bakeware_edit(sid):
 def bakeware_delete(sid):
     session = BakewareSession.query.get_or_404(sid)
     db.session.delete(session)
-    db.session.commit()
-    logger.info("Bakeware session %d deleted", sid)
-    flash("Session removed.", "info")
+    if db_commit(db.session):
+        logger.info("Bakeware session %d deleted", sid)
+        flash("Session removed.", "info")
     return redirect(url_for("logs.bakeware"))
 
 
@@ -390,11 +390,11 @@ def task_log_add():
         logged_on = logged_on,
         notes     = notes,
     ))
-    db.session.commit()
-    item = Item.query.get(item_id)
-    task = KnifeTask.query.get(task_id)
-    logger.info("Task logged: %s → %s on %s", item.name, task.name, logged_on)
-    flash("Usage logged.", "success")
+    if db_commit(db.session):
+        item = Item.query.get(item_id)
+        task = KnifeTask.query.get(task_id)
+        logger.info("Task logged: %s → %s on %s", item.name, task.name, logged_on)
+        flash("Usage logged.", "success")
     return redirect(url_for("logs.tasks"))
 
 
@@ -402,9 +402,9 @@ def task_log_add():
 def task_log_delete(lid):
     entry = KnifeTaskLog.query.get_or_404(lid)
     db.session.delete(entry)
-    db.session.commit()
-    logger.info("Task log entry %d deleted", lid)
-    flash("Entry removed.", "info")
+    if db_commit(db.session):
+        logger.info("Task log entry %d deleted", lid)
+        flash("Entry removed.", "info")
     return redirect(url_for("logs.tasks"))
 
 
@@ -424,9 +424,9 @@ def task_add():
         flash(f'Task "{name}" already exists.', "error")
         return redirect(url_for("logs.tasks_manage"))
     db.session.add(KnifeTask(name=name, is_preset=False))
-    db.session.commit()
-    logger.info("Knife task added: %s", name)
-    flash(f'Task "{name}" added.', "success")
+    if db_commit(db.session):
+        logger.info("Knife task added: %s", name)
+        flash(f'Task "{name}" added.', "success")
     return redirect(url_for("logs.tasks_manage"))
 
 
@@ -438,7 +438,7 @@ def task_delete(tid):
         return redirect(url_for("logs.tasks_manage"))
     name = task.name
     db.session.delete(task)
-    db.session.commit()
-    logger.info("Knife task deleted: %s", name)
-    flash(f'Task "{name}" deleted.', "info")
+    if db_commit(db.session):
+        logger.info("Knife task deleted: %s", name)
+        flash(f'Task "{name}" deleted.', "info")
     return redirect(url_for("logs.tasks_manage"))
