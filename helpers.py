@@ -1,9 +1,11 @@
+import base64
+import hashlib
 import hmac
 import logging
 import secrets
 
 import requests
-from flask import abort, request, session
+from flask import abort, current_app, request, session
 
 from constants import ADMIN_TOKEN, DISCORD_WEBHOOK_URL
 from models import Ownership
@@ -30,6 +32,38 @@ def validate_csrf() -> None:
     expected = session.get("csrf_token", "")
     if not expected or not hmac.compare_digest(token, expected):
         abort(403)
+
+
+# ── Gift list tokens ──────────────────────────────────────────────────────────
+
+def _gift_token(set_id: int, person_id: int) -> str:
+    """Generate a signed URL-safe token encoding set_id and person_id."""
+    payload = base64.urlsafe_b64encode(f"{set_id}:{person_id}".encode()).decode().rstrip("=")
+    sig = hmac.new(
+        current_app.secret_key.encode(),
+        payload.encode(),
+        hashlib.sha256,
+    ).hexdigest()[:24]
+    return f"{payload}.{sig}"
+
+
+def _verify_gift_token(token: str) -> tuple[int, int] | None:
+    """Verify token and return (set_id, person_id), or None if invalid."""
+    try:
+        payload, sig = token.rsplit(".", 1)
+        expected_sig = hmac.new(
+            current_app.secret_key.encode(),
+            payload.encode(),
+            hashlib.sha256,
+        ).hexdigest()[:24]
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        padding = "=" * (-len(payload) % 4)
+        decoded = base64.urlsafe_b64decode(payload + padding).decode()
+        set_id, person_id = decoded.split(":", 1)
+        return int(set_id), int(person_id)
+    except Exception:
+        return None
 
 
 def _notify_discord(message: str) -> bool:

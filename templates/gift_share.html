@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Share Gift List – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🎁 Share Gift List</h1>
+  <a href="{{ url_for('catalog.set_detail', sid=sid) }}?person={{ person_id }}" class="btn btn-ghost">← Back</a>
+</div>
+
+<div class="form-card" style="max-width:640px">
+  <p style="margin-bottom:1rem">
+    Anyone with this link can view the gift list — no login required.
+    The link is permanent and tied to this set and person.
+  </p>
+
+  <label style="font-weight:600;display:block;margin-bottom:.4rem">Shareable link</label>
+  <div style="display:flex;gap:.5rem;align-items:center">
+    <input type="text" id="gift-url" value="{{ gift_url }}" readonly class="input-full"
+           style="font-family:var(--mono);font-size:.82rem">
+    <button class="btn btn-primary" onclick="copyLink()" id="copy-btn">Copy</button>
+  </div>
+  <p class="hint" style="margin-top:.5rem">
+    Share via text, email, or any messaging app. The recipient will see what's missing from the set.
+  </p>
+
+  <div class="form-actions" style="margin-top:1.5rem">
+    <a href="{{ gift_url }}" target="_blank" class="btn btn-secondary">Preview ↗</a>
+  </div>
+</div>
+
+<script>
+function copyLink() {
+  var input = document.getElementById('gift-url');
+  navigator.clipboard.writeText(input.value).then(function() {
+    var btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+</script>
+{% endblock %}
