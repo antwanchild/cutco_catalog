@@ -160,7 +160,7 @@
   panel.style.display = '';
 
   function poll() {
-    fetch('{{ url_for("msrp_diff_status") }}')
+    fetch('{{ url_for("admin.msrp_diff_status") }}')
       .then(r => r.json())
       .then(data => {
         logEl.innerHTML = data.progress.map(l => `<div>${l}</div>`).join('');

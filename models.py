@@ -117,6 +117,30 @@ class SharpeningLog(db.Model):
     ))
 
 
+class KnifeTask(db.Model):
+    __tablename__ = "knife_tasks"
+
+    id        = db.Column(db.Integer, primary_key=True)
+    name      = db.Column(db.String(120), nullable=False, unique=True)
+    is_preset = db.Column(db.Boolean, nullable=False, default=False)
+
+
+class KnifeTaskLog(db.Model):
+    __tablename__ = "knife_task_log"
+
+    id        = db.Column(db.Integer, primary_key=True)
+    item_id   = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
+    task_id   = db.Column(db.Integer, db.ForeignKey("knife_tasks.id"), nullable=False)
+    notes     = db.Column(db.Text, nullable=True)
+    logged_on = db.Column(db.String(10), nullable=False)   # ISO date YYYY-MM-DD
+
+    item = db.relationship("Item", backref=db.backref(
+        "task_log", lazy=True,
+        order_by="KnifeTaskLog.logged_on.desc()",
+    ))
+    task = db.relationship("KnifeTask", backref=db.backref("log_entries", lazy=True))
+
+
 def ensure_unknown_variant(item: Item) -> None:
     """Guarantee every item has an 'Unknown / Unspecified' color variant."""
     if not any(v.color == UNKNOWN_COLOR for v in item.variants):
