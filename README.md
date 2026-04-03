@@ -29,6 +29,11 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 🔒 **Admin Controls** — Token-protected admin mode for catalog edits, syncing, and MSRP diffs
 - 🔔 **Discord Notifications** — Optional webhook integration for wishlist price alerts, sharpening reminders, and bakeware reminders
 - 🌙 **Dark / Light Mode** — Toggle between dark (default) and light themes; preference saved in localStorage
+- 🎁 **Gift List Sharing** — Generate a signed shareable link showing missing set items for a person; no login required, print-friendly
+- 🃏 **Collection Card** — Shareable public page showing a person's full owned collection grouped by category, with stats and estimated value
+- 📊 **Bulk Status Update** — Select multiple ownership entries and change status in one action from the collection page
+- 🔒 **Bot Protection** — Rate-limited admin login, CSRF tokens on all forms, security headers, and robots.txt
+- ❓ **Contextual Help** — ? button on every major page opens an inline help modal explaining the page's features
 - 📱 **Mobile Friendly** — Responsive layout works on phones and tablets
 
 ---
