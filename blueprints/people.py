@@ -89,9 +89,10 @@ def person_collection(pid):
 
 @people_bp.route("/ownership/add", methods=["GET", "POST"])
 def ownership_add():
-    person_id  = request.args.get("person_id", type=int)
-    item_id    = request.args.get("item_id", type=int)
-    variant_id = request.args.get("variant_id", type=int)
+    person_id   = request.args.get("person_id", type=int)
+    item_id     = request.args.get("item_id", type=int)
+    variant_id  = request.args.get("variant_id", type=int)
+    sel_status  = request.args.get("status", "Owned")
 
     if request.method == "POST":
         person_id  = int(request.form["person_id"])
@@ -125,6 +126,7 @@ def ownership_add():
                            sel_item_id=item_id,
                            sel_variant_id=variant_id,
                            sel_item=sel_item,
+                           sel_status=sel_status,
                            action="Add",
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
