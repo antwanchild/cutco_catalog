@@ -21,7 +21,7 @@
       <td class="actions">
         <a href="{{ url_for('people.people_edit', pid=person.id) }}" class="btn btn-xs">Edit</a>
         <form method="post" action="{{ url_for('people.people_delete', pid=person.id) }}"
-              onsubmit="return confirm('Remove {{ person.name }}?')" style="display:inline">
+              onsubmit="return confirm('Remove {{ person.name }}?')" class="form-inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
       </td>

@@ -14,15 +14,14 @@
 
   <label style="font-weight:600;display:block;margin-bottom:.4rem">Shareable link</label>
   <div style="display:flex;gap:.5rem;align-items:center">
-    <input type="text" id="gift-url" value="{{ gift_url }}" readonly class="input-full"
-           style="font-family:var(--mono);font-size:.82rem">
+    <input type="text" id="gift-url" value="{{ gift_url }}" readonly class="input-full mono-sm">
     <button class="btn btn-primary" onclick="copyLink()" id="copy-btn">Copy</button>
   </div>
   <p class="hint" style="margin-top:.5rem">
     Share via text, email, or any messaging app. The recipient will see what's missing from the set.
   </p>
 
-  <div class="form-actions" style="margin-top:1.5rem">
+  <div class="form-actions mt-section">
     <a href="{{ gift_url }}" target="_blank" class="btn btn-secondary">Preview ↗</a>
   </div>
 </div>

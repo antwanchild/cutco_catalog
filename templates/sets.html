@@ -8,7 +8,7 @@
 
 {# ── Person filter ─────────────────────────────────────────────────────────── #}
 <form method="get" class="filter-bar" style="margin-bottom:1rem">
-  <label style="display:flex;align-items:center;gap:.5rem;font-size:.9rem">
+  <label class="flex-center" style="font-size:.9rem">
     Completion for:
     <select name="person" onchange="this.form.submit()" class="input-sm">
       <option value="">— everyone —</option>
@@ -54,7 +54,7 @@
       <td class="actions">
         <a href="{{ url_for('catalog.set_edit', sid=item_set.id) }}" class="btn btn-xs">Edit</a>
         <form method="post" action="{{ url_for('catalog.set_delete', sid=item_set.id) }}"
-              onsubmit="return confirm('Delete set {{ item_set.name }}?')" style="display:inline">
+              onsubmit="return confirm('Delete set {{ item_set.name }}?')" class="form-inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
       </td>

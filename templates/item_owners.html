@@ -17,7 +17,7 @@
 </div>
 
 {# ── Meta strip ───────────────────────────────────────────────────────────── #}
-<div class="item-meta" style="margin-bottom:1.5rem">
+<div class="item-meta mb-section">
   {% if item.sku %}<span><strong>SKU:</strong> <span class="mono">{{ item.sku }}</span></span>{% endif %}
   {% if item.category %}<span><strong>Category:</strong> {{ item.category }}</span>{% endif %}
   <span><strong>Edge:</strong> {{ item.edge_type }}</span>
@@ -25,7 +25,7 @@
   {% if item.cutco_url %}<a href="{{ item.cutco_url }}" target="_blank" rel="noopener" class="btn btn-xs">Cutco.com ↗</a>{% endif %}
 </div>
 
-{% if item.notes %}<p class="item-notes" style="margin-bottom:1.5rem">{{ item.notes }}</p>{% endif %}
+{% if item.notes %}<p class="item-notes mb-section">{{ item.notes }}</p>{% endif %}
 
 {# ── Two-column layout ────────────────────────────────────────────────────── #}
 <div class="detail-grid">
@@ -99,7 +99,7 @@
             <td class="actions">
               <a href="{{ url_for('people.ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
               <form method="post" action="{{ url_for('people.ownership_delete', oid=ownership.id) }}"
-                    onsubmit="return confirm('Remove this entry?')" style="display:inline">
+                    onsubmit="return confirm('Remove this entry?')" class="form-inline">
                 <button class="btn btn-xs btn-danger">Del</button>
               </form>
             </td>
@@ -112,7 +112,7 @@
       <p class="empty">No one owns this item yet.</p>
       {% endif %}
       {% if people_without %}
-      <div class="quick-add-list" style="margin-top:.75rem">
+      <div class="quick-add-list mt-sm">
         {% for person in people_without %}
           <a href="{{ url_for('people.ownership_add', item_id=item.id, person_id=person.id) }}"
              class="btn btn-sm btn-outline">+ {{ person.name }}</a>
@@ -126,11 +126,11 @@
 
 {# ── Sharpening history ───────────────────────────────────────────────────── #}
 {% if sharpening %}
-<section class="detail-section" style="margin-top:1.5rem">
-  <h2 class="section-heading" style="display:flex;justify-content:space-between;align-items:center">
+<section class="detail-section mt-section">
+  <h2 class="section-heading section-heading-actions">
     Sharpening History ({{ sharpening | length }})
     {% if is_admin() %}
-    <form method="post" action="{{ url_for('logs.sharpening_purge_item', iid=item.id) }}" style="display:inline"
+    <form method="post" action="{{ url_for('logs.sharpening_purge_item', iid=item.id) }}" class="form-inline"
           onsubmit="return confirm('Remove all sharpening history for {{ item.name }}?')">
       <button type="submit" class="btn btn-xs btn-danger">🗑 Purge</button>
     </form>
@@ -155,11 +155,11 @@
 
 {# ── Task log ─────────────────────────────────────────────────────────────── #}
 {% if task_log %}
-<section class="detail-section" style="margin-top:1.5rem">
-  <h2 class="section-heading" style="display:flex;justify-content:space-between;align-items:center">
+<section class="detail-section mt-section">
+  <h2 class="section-heading section-heading-actions">
     Task Log ({{ task_log | length }})
     {% if is_admin() %}
-    <form method="post" action="{{ url_for('logs.task_log_purge_item', iid=item.id) }}" style="display:inline"
+    <form method="post" action="{{ url_for('logs.task_log_purge_item', iid=item.id) }}" class="form-inline"
           onsubmit="return confirm('Remove all task log entries for {{ item.name }}?')">
       <button type="submit" class="btn btn-xs btn-danger">🗑 Purge</button>
     </form>

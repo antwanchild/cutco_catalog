@@ -69,21 +69,24 @@ app.register_blueprint(admin_bp)
 # ── DB init ───────────────────────────────────────────────────────────────────
 
 with app.app_context():
+    from sqlalchemy import inspect as _sa_inspect
     db.Model.metadata.create_all(db.engine, checkfirst=True)
+
+    # Backfill columns added after initial schema deployment
+    _inspector = _sa_inspect(db.engine)
+    _col_migrations = [
+        ("sets",          "sku",          "ALTER TABLE sets ADD COLUMN sku VARCHAR(20)"),
+        ("item_variants", "is_unicorn",   "ALTER TABLE item_variants ADD COLUMN is_unicorn BOOLEAN NOT NULL DEFAULT 0"),
+        ("items",         "msrp",         "ALTER TABLE items ADD COLUMN msrp REAL"),
+        ("ownership",     "target_price", "ALTER TABLE ownership ADD COLUMN target_price REAL"),
+    ]
     with db.engine.connect() as _conn:
-        for _stmt in [
-            "ALTER TABLE sets ADD COLUMN sku VARCHAR(20)",
-            "ALTER TABLE item_variants ADD COLUMN is_unicorn BOOLEAN NOT NULL DEFAULT 0",
-            "ALTER TABLE items ADD COLUMN msrp REAL",
-            "ALTER TABLE ownership ADD COLUMN target_price REAL",
-            "CREATE TABLE IF NOT EXISTS knife_tasks (id INTEGER PRIMARY KEY, name VARCHAR(120) NOT NULL UNIQUE, is_preset BOOLEAN NOT NULL DEFAULT 0)",
-            "CREATE TABLE IF NOT EXISTS knife_task_log (id INTEGER PRIMARY KEY, item_id INTEGER NOT NULL REFERENCES items(id), task_id INTEGER NOT NULL REFERENCES knife_tasks(id), notes TEXT, logged_on VARCHAR(10) NOT NULL)",
-        ]:
-            try:
+        for _table, _col, _stmt in _col_migrations:
+            _existing = {c["name"] for c in _inspector.get_columns(_table)}
+            if _col not in _existing:
                 _conn.execute(db.text(_stmt))
                 _conn.commit()
-            except Exception:
-                pass
+                logger.info("Schema migration: added %s.%s", _table, _col)
     existing_task_names = {t.name for t in KnifeTask.query.all()}
     for preset in KNIFE_TASK_PRESETS:
         if preset not in existing_task_names:

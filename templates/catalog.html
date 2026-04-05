@@ -4,7 +4,7 @@
 <div class="page-header">
   <h1 class="page-title">📋 Catalog {{ help_btn("catalog") }}</h1>
   <div class="page-actions">
-    {% if is_admin %}
+    {% if is_admin() %}
       <a class="btn btn-primary" href="{{ url_for('catalog.catalog_add') }}">+ Add Item</a>
       <a class="btn btn-secondary" id="sync-btn" href="{{ url_for('catalog.catalog_sync') }}">🔄 Sync</a>
       <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('purge-dialog').showModal()">🗑 Purge</button>
@@ -81,10 +81,10 @@
         {% if not item.in_catalog %}<span class="badge badge-off-catalog" title="Off-catalog">⬛</span>{% endif %}
       </td>
       <td class="actions">
-        {% if is_admin %}
+        {% if is_admin() %}
           <a href="{{ url_for('catalog.catalog_edit', iid=item.id) }}" class="btn btn-xs">Edit</a>
           <form method="post" action="{{ url_for('catalog.catalog_delete', iid=item.id) }}"
-                onsubmit="return confirm('Delete {{ item.name }}?')" style="display:inline">
+                onsubmit="return confirm('Delete {{ item.name }}?')" class="form-inline">
             <button class="btn btn-xs btn-danger">Del</button>
           </form>
         {% endif %}
@@ -136,7 +136,7 @@ document.getElementById('sync-btn').addEventListener('click', function(e) {
 });
 </script>
 
-{% if is_admin %}
+{% if is_admin() %}
 <dialog id="purge-dialog" class="help-dialog" style="max-width:420px">
   <div class="help-header">
     <span>🗑 Purge Catalog</span>

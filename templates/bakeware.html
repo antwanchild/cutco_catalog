@@ -15,7 +15,7 @@
 </div>
 
 {# ── Summary cards ────────────────────────────────────────────────────────── #}
-<div class="stat-grid" style="margin-bottom:1.5rem">
+<div class="stat-grid">
   <div class="stat-card">
     <div class="stat-number">{{ tracked | length }}</div>
     <div class="stat-label">Pieces Tracked</div>
@@ -84,7 +84,7 @@
     <label style="max-width:760px">Notes
       <textarea name="notes" rows="2" class="input-full" placeholder="Optional notes…"></textarea>
     </label>
-    <div style="margin-top:.75rem">
+    <div class="mt-sm">
       <button type="submit" class="btn btn-primary">Log Session</button>
     </div>
   </form>
@@ -92,7 +92,7 @@
 
 {# ── Never-used bakeware ──────────────────────────────────────────────────── #}
 {% if never_used %}
-<details class="sharpen-add-panel" style="margin-top:.75rem">
+<details class="sharpen-add-panel mt-sm">
   <summary>Never Used ({{ never_used | length }} catalog item{{ 's' if never_used | length != 1 }})</summary>
   <div style="padding:.75rem 1rem 1rem">
     <ul class="link-list">
@@ -109,7 +109,7 @@
 
 {# ── Tracked items table ──────────────────────────────────────────────────── #}
 {% if tracked %}
-<h2 class="stats-section-title" style="margin-top:1.5rem">Usage by Piece</h2>
+<h2 class="stats-section-title mt-section">Usage by Piece</h2>
 <div class="table-wrap">
   <table class="data-table">
     <thead>
@@ -151,7 +151,7 @@
         {% if is_admin() %}
         <td class="actions">
           <form method="post" action="{{ url_for('logs.bakeware_purge_item', iid=row.item.id) }}"
-                onsubmit="return confirm('Remove all sessions for {{ row.item.name }}?')" style="display:inline">
+                onsubmit="return confirm('Remove all sessions for {{ row.item.name }}?')" class="form-inline">
             <button class="btn btn-xs btn-danger">🗑 Purge</button>
           </form>
         </td>
@@ -165,7 +165,7 @@
 
 {# ── Recent sessions log ──────────────────────────────────────────────────── #}
 {% if recent_sessions %}
-<h2 class="stats-section-title" style="margin-top:1.5rem">Recent Sessions</h2>
+<h2 class="stats-section-title mt-section">Recent Sessions</h2>
 <div class="table-wrap">
   <table class="data-table">
     <thead>
@@ -189,7 +189,7 @@
         <td class="actions">
           <a href="{{ url_for('logs.bakeware_edit', sid=s.id) }}" class="btn btn-xs">Edit</a>
           <form method="post" action="{{ url_for('logs.bakeware_delete', sid=s.id) }}"
-                onsubmit="return confirm('Remove this session?')" style="display:inline">
+                onsubmit="return confirm('Remove this session?')" class="form-inline">
             <button class="btn btn-xs btn-danger">Del</button>
           </form>
         </td>
@@ -199,6 +199,6 @@
   </table>
 </div>
 {% else %}
-<p class="empty" style="margin-top:1.5rem">No sessions logged yet. Use the form above to add one.</p>
+<p class="empty mt-section">No sessions logged yet. Use the form above to add one.</p>
 {% endif %}
 {% endblock %}

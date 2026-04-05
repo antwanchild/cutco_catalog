@@ -894,3 +894,12 @@ textarea { resize: vertical; }
   font-family: var(--mono);
   font-size: .8rem;
 }
+
+/* ── Utility classes ────────────────────────────────────────────────────── */
+.mt-section { margin-top: 1.5rem; }
+.mb-section { margin-bottom: 1.5rem; }
+.mt-sm      { margin-top: .75rem; }
+.form-inline { display: inline; }
+.flex-center { display: flex; align-items: center; gap: .5rem; }
+.section-heading-actions { display: flex; justify-content: space-between; align-items: center; }
+.mono-sm { font-family: var(--mono); font-size: .82rem; }

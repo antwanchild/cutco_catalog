@@ -6,7 +6,7 @@
   <a href="{{ url_for('logs.tasks') }}" class="btn btn-ghost">← Task Log</a>
 </div>
 
-<form method="post" action="{{ url_for('logs.task_add') }}" class="form-card" style="margin-bottom:1.5rem">
+<form method="post" action="{{ url_for('logs.task_add') }}" class="form-card mb-section">
   <div class="form-row">
     <label>New Task Name *
       <input type="text" name="name" required placeholder="e.g. Julienning carrots" class="input-full">
