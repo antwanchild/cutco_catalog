@@ -347,6 +347,12 @@ GET /version  → {"version": "x.y.z"}
 
 ---
 
+## 🔐 Security
+
+See [SECURITY.md](SECURITY.md) for the vulnerability disclosure policy and hardening checklist.
+
+---
+
 ## 📄 License
 
 MIT
