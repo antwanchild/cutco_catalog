@@ -6,6 +6,12 @@
   <div class="page-actions">
     <a href="{{ url_for('people.ownership_add', person_id=person.id) }}" class="btn btn-primary">+ Add Entry</a>
     <a href="{{ url_for('views.collection_token', pid=person.id) }}" class="btn btn-secondary">🃏 Share Card</a>
+    {% if is_admin() %}
+    <form method="post" action="{{ url_for('people.purge_collection', pid=person.id) }}" style="display:inline"
+          onsubmit="return confirm('Delete ALL ownership entries for {{ person.name }}? This cannot be undone.')">
+      <button type="submit" class="btn btn-danger btn-sm">🗑 Purge Collection</button>
+    </form>
+    {% endif %}
     <a href="{{ url_for('people.people') }}" class="btn btn-ghost">← People</a>
   </div>
 </div>
