@@ -35,7 +35,8 @@ def catalog():
         ))
 
     from sqlalchemy.orm import selectinload
-    col   = getattr(Item, sort, Item.name)
+    _SORT_COLS = {"name": Item.name, "sku": Item.sku, "category": Item.category, "edge_type": Item.edge_type}
+    col   = _SORT_COLS.get(sort, Item.name)
     items = (query
              .options(selectinload(Item.variants), selectinload(Item.sets))
              .order_by(col.desc() if direction == "desc" else col)
@@ -113,6 +114,9 @@ def catalog_edit(iid):
 
 @catalog_bp.route("/catalog/<int:iid>/delete", methods=["POST"])
 def catalog_delete(iid):
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("catalog.catalog"))
     item = Item.query.get_or_404(iid)
     name = item.name
     db.session.delete(item)
@@ -132,6 +136,9 @@ def variants(iid):
 
 @catalog_bp.route("/catalog/<int:iid>/variants/add", methods=["POST"])
 def variant_add(iid):
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("catalog.variants", iid=iid))
     item = Item.query.get_or_404(iid)
     color = request.form.get("color", "").strip()
     if not color:
@@ -150,6 +157,9 @@ def variant_add(iid):
 
 @catalog_bp.route("/variants/<int:vid>/edit", methods=["POST"])
 def variant_edit(vid):
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("catalog.catalog"))
     variant = ItemVariant.query.get_or_404(vid)
     iid     = variant.item_id
     color   = request.form.get("color", "").strip()
@@ -167,6 +177,9 @@ def variant_edit(vid):
 
 @catalog_bp.route("/variants/<int:vid>/delete", methods=["POST"])
 def variant_delete(vid):
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("catalog.catalog"))
     variant = ItemVariant.query.get_or_404(vid)
     if len(variant.item.variants) == 1:
         flash("Cannot delete the only variant. Add another first.", "error")
@@ -236,6 +249,9 @@ def set_edit(sid):
 
 @catalog_bp.route("/sets/<int:sid>/delete", methods=["POST"])
 def set_delete(sid):
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("catalog.sets_list"))
     item_set = Set.query.get_or_404(sid)
     name = item_set.name
     db.session.delete(item_set)

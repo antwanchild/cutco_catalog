@@ -6,6 +6,13 @@ STATUS_OPTIONS = ["Owned", "Wishlist", "Sold", "Traded"]
 STATUS_RANK = {"Owned": 0, "Wishlist": 1, "Traded": 2, "Sold": 3}
 
 ADMIN_TOKEN             = os.environ.get("ADMIN_TOKEN", "admin")
+if ADMIN_TOKEN == "admin":
+    import warnings
+    warnings.warn(
+        "ADMIN_TOKEN is set to the default value 'admin'. "
+        "Set the ADMIN_TOKEN environment variable to a strong secret before exposing this service.",
+        stacklevel=2,
+    )
 ADMIN_SESSION_SECONDS   = int(os.environ.get("ADMIN_SESSION_SECONDS", str(2 * 60 * 60)))  # default 2 h
 DATA_DIR                = os.environ.get("DATA_DIR", "/data")
 DISCORD_WEBHOOK_URL     = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
