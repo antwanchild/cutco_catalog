@@ -65,6 +65,9 @@ desktop.ini
 htmlcov/
 .tox/
 
+# Linting
+.ruff_cache/
+
 # Uploads / temp
 uploads/
 tmp/
