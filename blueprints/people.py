@@ -56,6 +56,17 @@ def people_delete(pid):
     return redirect(url_for("people.people"))
 
 
+@people_bp.route("/people/<int:pid>/purge-collection", methods=["POST"])
+def purge_collection(pid):
+    person = Person.query.get_or_404(pid)
+    count  = Ownership.query.filter_by(person_id=pid).count()
+    Ownership.query.filter_by(person_id=pid).delete()
+    if db_commit(db.session):
+        logger.info("Collection purged: %s (%d entries)", person.name, count)
+        flash(f"Removed all {count} ownership entr{'ies' if count != 1 else 'y'} for {person.name}.", "info")
+    return redirect(url_for("people.person_collection", pid=pid))
+
+
 @people_bp.route("/people/<int:pid>/collection")
 def person_collection(pid):
     person     = Person.query.get_or_404(pid)
