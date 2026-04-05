@@ -7,7 +7,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from constants import EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR
 from extensions import db
 from helpers import db_commit, is_admin
-from models import Item, ItemVariant, Set, ensure_unknown_variant, get_or_create_set
+from models import Item, ItemVariant, Ownership, Set, ensure_unknown_variant, get_or_create_set
 from scraping import scrape_catalog, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
@@ -110,6 +110,37 @@ def catalog_edit(iid):
                            edge_types=EDGE_TYPES, action="Edit",
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            all_sets=Set.query.order_by(Set.name).all())
+
+
+@catalog_bp.route("/catalog/purge-unreferenced", methods=["POST"])
+def catalog_purge_unreferenced():
+    """Delete catalog items that have no ownership records."""
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("catalog.catalog"))
+    referenced_item_ids = {o.variant.item_id for o in Ownership.query.all()}
+    items = Item.query.filter(~Item.id.in_(referenced_item_ids)).all() if referenced_item_ids else Item.query.all()
+    count = len(items)
+    for item in items:
+        db.session.delete(item)
+    if db_commit(db.session):
+        logger.info("Purged %d unreferenced catalog items", count)
+        flash(f"Removed {count} item{'s' if count != 1 else ''} with no ownership records.", "info")
+    return redirect(url_for("catalog.catalog"))
+
+
+@catalog_bp.route("/catalog/purge-all", methods=["POST"])
+def catalog_purge_all():
+    """Delete the entire catalog including all ownership, logs, and variants."""
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("catalog.catalog"))
+    count = Item.query.count()
+    Item.query.delete()
+    if db_commit(db.session):
+        logger.info("Full catalog purge: %d items deleted", count)
+        flash(f"Catalog purged — {count} item{'s' if count != 1 else ''} and all related records deleted.", "info")
+    return redirect(url_for("catalog.catalog"))
 
 
 @catalog_bp.route("/catalog/<int:iid>/delete", methods=["POST"])
