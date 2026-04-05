@@ -3,3 +3,6 @@ contact_links:
   - name: Questions & Discussion
     url: https://github.com/antwanchild/cutco_catalog/discussions
     about: Ask questions or share ideas in Discussions rather than opening an issue
+  - name: Report a Security Vulnerability
+    url: https://github.com/antwanchild/cutco_catalog/security/advisories/new
+    about: Please report security issues privately — do not open a public issue
