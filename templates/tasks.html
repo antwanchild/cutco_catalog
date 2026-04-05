@@ -15,7 +15,7 @@
 </div>
 
 {# ── Summary cards ─────────────────────────────────────────────────────────── #}
-<div class="stat-grid" style="margin-bottom:1.5rem">
+<div class="stat-grid">
   <div class="stat-card">
     <div class="stat-number">{{ recent_entries | length }}</div>
     <div class="stat-label">Total Logs</div>
@@ -31,7 +31,7 @@
 </div>
 
 {# ── Log entry form ────────────────────────────────────────────────────────── #}
-<details class="form-card" style="margin-bottom:1.5rem">
+<details class="form-card mb-section">
   <summary style="cursor:pointer;font-weight:600;padding:.5rem 0">+ Log Usage</summary>
   <form method="post" action="{{ url_for('logs.task_log_add') }}" style="margin-top:1rem">
     <div class="form-row">
@@ -69,7 +69,7 @@
 {# ── Usage patterns ────────────────────────────────────────────────────────── #}
 {% if item_top_task %}
 <h2 class="section-heading">Usage Patterns</h2>
-<div class="table-wrap" style="margin-bottom:1.5rem">
+<div class="table-wrap mb-section">
 <table class="data-table">
   <thead>
     <tr><th>Knife</th><th>Top Task</th><th>Total Uses</th></tr>

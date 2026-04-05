@@ -20,7 +20,7 @@
 </div>
 
 {# ── Summary cards ────────────────────────────────────────────────────────── #}
-<div class="stat-grid" style="margin-bottom:1.5rem">
+<div class="stat-grid">
   <div class="stat-card">
     <div class="stat-number">{{ tracked | length }}</div>
     <div class="stat-label">Knives Tracked</div>
@@ -58,7 +58,7 @@
 
 {# ── Tracked items dashboard ──────────────────────────────────────────────── #}
 {% if tracked %}
-<h2 class="stats-section-title" style="margin-top:1.5rem">Tracked Items</h2>
+<h2 class="stats-section-title mt-section">Tracked Items</h2>
 <div class="table-wrap">
   <table class="data-table">
     <thead>
@@ -98,7 +98,7 @@
 
 {# ── Recent events log ────────────────────────────────────────────────────── #}
 {% if recent_entries %}
-<h2 class="stats-section-title" style="margin-top:1.5rem">Recent Events</h2>
+<h2 class="stats-section-title mt-section">Recent Events</h2>
 <div class="table-wrap">
   <table class="data-table">
     <thead>
@@ -120,7 +120,7 @@
         <td class="actions">
           <a href="{{ url_for('logs.sharpening_edit', lid=entry.id) }}" class="btn btn-xs">Edit</a>
           <form method="post" action="{{ url_for('logs.sharpening_delete', lid=entry.id) }}"
-                onsubmit="return confirm('Remove this event?')" style="display:inline">
+                onsubmit="return confirm('Remove this event?')" class="form-inline">
             <button class="btn btn-xs btn-danger">Del</button>
           </form>
         </td>
@@ -130,6 +130,6 @@
   </table>
 </div>
 {% else %}
-<p class="empty" style="margin-top:1.5rem">No sharpening events logged yet. Use the form above to add one.</p>
+<p class="empty mt-section">No sharpening events logged yet. Use the form above to add one.</p>
 {% endif %}
 {% endblock %}

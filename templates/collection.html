@@ -7,7 +7,7 @@
     <a href="{{ url_for('people.ownership_add', person_id=person.id) }}" class="btn btn-primary">+ Add Entry</a>
     <a href="{{ url_for('views.collection_token', pid=person.id) }}" class="btn btn-secondary">🃏 Share Card</a>
     {% if is_admin() %}
-    <form method="post" action="{{ url_for('people.purge_collection', pid=person.id) }}" style="display:inline"
+    <form method="post" action="{{ url_for('people.purge_collection', pid=person.id) }}" class="form-inline"
           onsubmit="return confirm('Delete ALL ownership entries for {{ person.name }}? This cannot be undone.')">
       <button type="submit" class="btn btn-danger btn-sm">🗑 Purge Collection</button>
     </form>
@@ -47,7 +47,7 @@
       <td class="actions">
         <a href="{{ url_for('people.ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
         <form method="post" action="{{ url_for('people.ownership_delete', oid=ownership.id) }}"
-              onsubmit="return confirm('Remove this entry?')" style="display:inline">
+              onsubmit="return confirm('Remove this entry?')" class="form-inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
       </td>
@@ -60,7 +60,7 @@
 {# ── Bulk action bar ───────────────────────────────────────────────────────── #}
 <div class="bulk-bar" id="bulk-bar">
   <span class="bulk-count" id="bulk-count">0 selected</span>
-  <label style="display:flex;align-items:center;gap:.5rem">
+  <label class="flex-center">
     Change status to:
     <select name="bulk_status" class="input-sm">
       {% for status_option in status_options %}
