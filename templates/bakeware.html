@@ -120,6 +120,7 @@
         <th>Days Since</th>
         <th>Sessions</th>
         <th>Avg Rating</th>
+        {% if is_admin() %}<th></th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -147,6 +148,14 @@
             <span class="muted">—</span>
           {% endif %}
         </td>
+        {% if is_admin() %}
+        <td class="actions">
+          <form method="post" action="{{ url_for('logs.bakeware_purge_item', iid=row.item.id) }}"
+                onsubmit="return confirm('Remove all sessions for {{ row.item.name }}?')" style="display:inline">
+            <button class="btn btn-xs btn-danger">🗑 Purge</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>

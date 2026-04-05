@@ -127,7 +127,15 @@
 {# ── Sharpening history ───────────────────────────────────────────────────── #}
 {% if sharpening %}
 <section class="detail-section" style="margin-top:1.5rem">
-  <h2 class="section-heading">Sharpening History ({{ sharpening | length }})</h2>
+  <h2 class="section-heading" style="display:flex;justify-content:space-between;align-items:center">
+    Sharpening History ({{ sharpening | length }})
+    {% if is_admin() %}
+    <form method="post" action="{{ url_for('logs.sharpening_purge_item', iid=item.id) }}" style="display:inline"
+          onsubmit="return confirm('Remove all sharpening history for {{ item.name }}?')">
+      <button type="submit" class="btn btn-xs btn-danger">🗑 Purge</button>
+    </form>
+    {% endif %}
+  </h2>
   <div class="table-wrap">
   <table class="data-table">
     <thead><tr><th>Date</th><th>Method</th><th>Notes</th></tr></thead>
@@ -148,7 +156,15 @@
 {# ── Task log ─────────────────────────────────────────────────────────────── #}
 {% if task_log %}
 <section class="detail-section" style="margin-top:1.5rem">
-  <h2 class="section-heading">Task Log ({{ task_log | length }})</h2>
+  <h2 class="section-heading" style="display:flex;justify-content:space-between;align-items:center">
+    Task Log ({{ task_log | length }})
+    {% if is_admin() %}
+    <form method="post" action="{{ url_for('logs.task_log_purge_item', iid=item.id) }}" style="display:inline"
+          onsubmit="return confirm('Remove all task log entries for {{ item.name }}?')">
+      <button type="submit" class="btn btn-xs btn-danger">🗑 Purge</button>
+    </form>
+    {% endif %}
+  </h2>
   <div class="table-wrap">
   <table class="data-table">
     <thead><tr><th>Date</th><th>Task</th><th>Notes</th></tr></thead>

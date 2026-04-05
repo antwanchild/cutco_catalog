@@ -11,6 +11,10 @@
         {% if has_discord %}🔔{% else %}🔍{% endif %} Check Overdue
       </button>
     </form>
+    <form method="post" action="{{ url_for('logs.sharpening_purge_all') }}"
+          onsubmit="return confirm('Delete ALL sharpening logs? This cannot be undone.')">
+      <button class="btn btn-danger btn-sm">🗑 Purge All</button>
+    </form>
     {% endif %}
   </div>
 </div>
