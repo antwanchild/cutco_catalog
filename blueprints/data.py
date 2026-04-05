@@ -136,7 +136,8 @@ def import_page():
                 parsed_rows.append(out_row)
 
     except Exception as exc:
-        flash(f"Could not parse file: {exc}", "error")
+        logger.error("Import file parse failed: %s", exc)
+        flash("Could not parse the uploaded file — check that it is a valid CSV or XLSX.", "error")
         return render_template("import_page.html",
                                people=Person.query.order_by(Person.name).all())
 

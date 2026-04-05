@@ -45,6 +45,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "cutco-vault-dev-key")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "DATABASE_URL", "sqlite:////data/cutco.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
 
 db.init_app(app)
 limiter.init_app(app)
@@ -150,6 +151,11 @@ def err_429(e):
     return render_template("error.html", code=429,
                            icon="⏱️", message="Too many requests — slow down and try again shortly."), 429
 
+@app.errorhandler(413)
+def err_413(e):
+    return render_template("error.html", code=413,
+                           icon="📦", message="File too large — maximum upload size is 10 MB."), 413
+
 @app.errorhandler(500)
 def err_500(e):
     db.session.rollback()
@@ -187,7 +193,7 @@ def health():
         return jsonify(status="ok", version=APP_VERSION), 200
     except Exception as exc:
         logger.error("Health check failed: %s", exc)
-        return jsonify(status="error", detail=str(exc)), 500
+        return jsonify(status="error"), 500
 
 
 @app.route("/version")
