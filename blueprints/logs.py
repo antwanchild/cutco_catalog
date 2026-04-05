@@ -111,6 +111,30 @@ def sharpening_delete(lid):
     return redirect(url_for("logs.sharpening"))
 
 
+@logs_bp.route("/sharpening/item/<int:iid>/purge", methods=["POST"])
+def sharpening_purge_item(iid):
+    item = Item.query.get_or_404(iid)
+    count = SharpeningLog.query.filter_by(item_id=iid).count()
+    SharpeningLog.query.filter_by(item_id=iid).delete()
+    if db_commit(db.session):
+        logger.info("Sharpening logs purged for item %d (%d entries)", iid, count)
+        flash(f"Removed all {count} sharpening event{'s' if count != 1 else ''} for {item.name}.", "info")
+    return redirect(url_for("logs.sharpening"))
+
+
+@logs_bp.route("/sharpening/purge-all", methods=["POST"])
+def sharpening_purge_all():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("logs.sharpening"))
+    count = SharpeningLog.query.count()
+    SharpeningLog.query.delete()
+    if db_commit(db.session):
+        logger.info("All sharpening logs purged (%d entries)", count)
+        flash(f"Removed all {count} sharpening event{'s' if count != 1 else ''}.", "info")
+    return redirect(url_for("logs.sharpening"))
+
+
 @logs_bp.route("/sharpening/notify", methods=["POST"])
 def sharpening_notify():
     if not is_admin():
@@ -282,6 +306,30 @@ def bakeware_delete(sid):
     return redirect(url_for("logs.bakeware"))
 
 
+@logs_bp.route("/bakeware/item/<int:iid>/purge", methods=["POST"])
+def bakeware_purge_item(iid):
+    item = Item.query.get_or_404(iid)
+    count = BakewareSession.query.filter_by(item_id=iid).count()
+    BakewareSession.query.filter_by(item_id=iid).delete()
+    if db_commit(db.session):
+        logger.info("Bakeware sessions purged for item %d (%d entries)", iid, count)
+        flash(f"Removed all {count} bakeware session{'s' if count != 1 else ''} for {item.name}.", "info")
+    return redirect(url_for("logs.bakeware"))
+
+
+@logs_bp.route("/bakeware/purge-all", methods=["POST"])
+def bakeware_purge_all():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("logs.bakeware"))
+    count = BakewareSession.query.count()
+    BakewareSession.query.delete()
+    if db_commit(db.session):
+        logger.info("All bakeware sessions purged (%d entries)", count)
+        flash(f"Removed all {count} bakeware session{'s' if count != 1 else ''}.", "info")
+    return redirect(url_for("logs.bakeware"))
+
+
 @logs_bp.route("/bakeware/notify", methods=["POST"])
 def bakeware_notify():
     if not is_admin():
@@ -405,6 +453,30 @@ def task_log_delete(lid):
     if db_commit(db.session):
         logger.info("Task log entry %d deleted", lid)
         flash("Entry removed.", "info")
+    return redirect(url_for("logs.tasks"))
+
+
+@logs_bp.route("/tasks/item/<int:iid>/purge", methods=["POST"])
+def task_log_purge_item(iid):
+    item = Item.query.get_or_404(iid)
+    count = KnifeTaskLog.query.filter_by(item_id=iid).count()
+    KnifeTaskLog.query.filter_by(item_id=iid).delete()
+    if db_commit(db.session):
+        logger.info("Task logs purged for item %d (%d entries)", iid, count)
+        flash(f"Removed all {count} task log entr{'ies' if count != 1 else 'y'} for {item.name}.", "info")
+    return redirect(url_for("logs.tasks"))
+
+
+@logs_bp.route("/tasks/purge-all", methods=["POST"])
+def task_log_purge_all():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("logs.tasks"))
+    count = KnifeTaskLog.query.count()
+    KnifeTaskLog.query.delete()
+    if db_commit(db.session):
+        logger.info("All task logs purged (%d entries)", count)
+        flash(f"Removed all {count} task log entr{'ies' if count != 1 else 'y'}.", "info")
     return redirect(url_for("logs.tasks"))
 
 

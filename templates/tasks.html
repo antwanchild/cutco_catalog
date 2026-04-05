@@ -5,6 +5,12 @@
   <h1 class="page-title">🔪 Knife Task Log {{ help_btn("tasks") }}</h1>
   <div class="page-actions">
     <a href="{{ url_for('logs.tasks_manage') }}" class="btn btn-secondary btn-sm">Manage Tasks</a>
+    {% if is_admin() and recent_entries %}
+    <form method="post" action="{{ url_for('logs.task_log_purge_all') }}"
+          onsubmit="return confirm('Delete ALL task log entries? This cannot be undone.')">
+      <button class="btn btn-danger btn-sm">🗑 Purge All</button>
+    </form>
+    {% endif %}
   </div>
 </div>
 
