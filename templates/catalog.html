@@ -7,6 +7,7 @@
     {% if is_admin %}
       <a class="btn btn-primary" href="{{ url_for('catalog.catalog_add') }}">+ Add Item</a>
       <a class="btn btn-secondary" id="sync-btn" href="{{ url_for('catalog.catalog_sync') }}">🔄 Sync</a>
+      <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('purge-dialog').showModal()">🗑 Purge</button>
     {% endif %}
   </div>
 </div>
@@ -134,4 +135,30 @@ document.getElementById('sync-btn').addEventListener('click', function(e) {
     });
 });
 </script>
+
+{% if is_admin %}
+<dialog id="purge-dialog" class="help-dialog" style="max-width:420px">
+  <div class="help-header">
+    <span>🗑 Purge Catalog</span>
+    <button class="help-close" onclick="document.getElementById('purge-dialog').close()">✕</button>
+  </div>
+  <div class="help-body">
+    <p style="margin-bottom:1rem">Choose a purge option. <strong>This cannot be undone.</strong></p>
+    <form method="post" action="{{ url_for('catalog.catalog_purge_unreferenced') }}" style="margin-bottom:.75rem">
+      <button type="submit" class="btn btn-secondary" style="width:100%;text-align:left"
+              onclick="return confirm('Remove all items with no ownership records?')">
+        🧹 Remove unreferenced items
+        <div style="font-size:.78rem;color:var(--muted);font-weight:400;margin-top:.2rem">Deletes items no collector owns — keeps all ownership data intact</div>
+      </button>
+    </form>
+    <form method="post" action="{{ url_for('catalog.catalog_purge_all') }}">
+      <button type="submit" class="btn btn-danger" style="width:100%;text-align:left"
+              onclick="return confirm('DELETE THE ENTIRE CATALOG including all ownership, sharpening, bakeware, and task records? This cannot be undone.')">
+        💥 Purge everything
+        <div style="font-size:.78rem;font-weight:400;margin-top:.2rem;opacity:.85">Deletes all items, variants, ownership, and all logs</div>
+      </button>
+    </form>
+  </div>
+</dialog>
+{% endif %}
 {% endblock %}
