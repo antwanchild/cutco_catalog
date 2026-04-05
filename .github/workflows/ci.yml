@@ -10,6 +10,9 @@ permissions:
   contents: write
   packages: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ── Lint ─────────────────────────────────────────────────────────────────
   lint:
@@ -34,11 +37,6 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: lint
-    env:
-      # Opt into Node.js 24 now; gitleaks-action@v2 and its cache dependency
-      # still ship with Node 20 runners and will break when GitHub enforces
-      # Node 24 as the default in June 2026.
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v6
         with:
