@@ -404,7 +404,7 @@ def scrape_sets(
             # Page has webItemsMap with one itemSetList per variant — search
             # from the URL's variant key so we get the right size set.
             _set_list_json = None
-            _url_variant = fetch_url.split("/")[-1].split("&")[0].upper()
+            _url_variant = fetch_url.split("/")[-1].split("?")[0].split("&")[0].upper()
             _search_from = 0
             if re.match(r'^\d+[A-Z]?$', _url_variant):
                 # Find the webItemsMap entry specifically (key followed by {)
