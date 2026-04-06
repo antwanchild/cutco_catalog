@@ -14,7 +14,7 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 📋 **Catalog** — Full product catalog with SKU, category, edge type, and link to Cutco.com
 - 🎨 **Variants** — Track every color/handle variant per item
 - 🏠 **Ownership** — Record who owns what, with statuses: Owned, Wishlist, Sold, Traded
-- 🗂️ **Sets & Bundles** — Manage curated Cutco sets and which items belong to each
+- 🗂️ **Sets & Bundles** — Manage curated Cutco sets with member items and quantities (e.g. Galley +6 shows ×6)
 - 🦄 **Unicorn Tracking** — Flag rare, discontinued, or limited-run items and variants
 - 🎯 **Wish List** — Track wanted items with target prices; get Discord alerts when MSRP drops to or below target
 - 📈 **Collection Stats** — Visual dashboard: owned items by category, handle color distribution, edge type breakdown, catalog coverage, and estimated collection value (Chart.js)
@@ -22,6 +22,7 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 🔪 **Sharpening Log** — Track sharpening events per knife (date, method, notes); surface overdue reminders in the UI or via Discord
 - 🍰 **Bakeware Tracker** — Log baking sessions per piece (what you made, rating, notes); flag pieces unused for a configurable number of days
 - 🔪 **Knife-to-Task Pairing** — Log which knife you use for which kitchen task; view usage patterns and top tasks per knife (only owned knives shown)
+- 🎯 **Suggested Uses** — Sync Cutco.com's recommended uses per knife into the task system; task dropdown highlights tasks suggested for the selected knife; task detail page shows all knives that can perform a given task
 - 🗂️ **Set Completion** — Track progress through Cutco sets with per-person completion bars and owned/missing panels; one-click wishlist from missing items
 - 🔄 **Catalog Sync** — Scrape Cutco.com to discover new items and sets automatically
 - 📥 **Import / Export** — Bulk import ownership data via CSV or XLSX; export full collection as CSV
@@ -91,7 +92,9 @@ The **Sync** button (admin only) scrapes Cutco.com and shows a preview of new it
 
 - Review and deselect items you don't want imported
 - Edit category assignments inline
-- Import new sets with their member SKUs pre-populated
+- Import new sets with member SKUs and quantities pre-populated (e.g. Galley +6 records ×6 steak knives)
+
+A separate **Sync Uses** button (admin, on the Manage Tasks page) scrapes Cutco.com's "Uses" tab for every cataloged item and populates the task system with Cutco-recommended pairings.
 
 To block specific categories from ever appearing in the sync preview, set `SYNC_BLOCKED_CATEGORIES`:
 
@@ -213,6 +216,7 @@ Set membership columns (mark `yes` to assign): `Beast`, `Fanatic`, `Signature`, 
 | 🔪 Sharpening Log | `/sharpening` | Public |
 | 🍰 Bakeware Tracker | `/bakeware` | Public |
 | 🔪 Knife Task Log | `/tasks` | Public |
+| 🎯 Task Detail | `/tasks/<id>` | Public |
 | 📥 Import | `/import` | Public |
 | 📤 Export CSV | `/export/csv` | Public |
 | 🔄 Catalog Sync | `/catalog/sync` | 🔒 Admin |
@@ -223,7 +227,7 @@ Set membership columns (mark `yes` to assign): `Beast`, `Fanatic`, `Signature`, 
 
 ## 🗄️ Database Schema
 
-Ten tables backed by SQLite. All migrations run automatically at startup.
+Eleven tables backed by SQLite. All migrations run automatically at startup.
 
 | Table | Key Columns | Notes |
 |---|---|---|
@@ -232,11 +236,12 @@ Ten tables backed by SQLite. All migrations run automatically at startup.
 | `ownership` | `id`, `variant_id`, `person_id`, `status`, `target_price` | Links a person to a variant; status is `Owned`, `Wishlist`, `Sold`, or `Traded` |
 | `people` | `id`, `name` | Collectors |
 | `sets` | `id`, `name`, `sku` | Named Cutco sets |
-| `item_sets` | `item_id`, `set_id` | Many-to-many join between items and sets |
+| `item_sets` | `item_id`, `set_id`, `quantity` | Many-to-many join between items and sets; quantity tracks how many of an item a set includes |
 | `sharpening_log` | `id`, `item_id`, `sharpened_on`, `method`, `notes` | One row per sharpening event |
 | `bakeware_sessions` | `id`, `item_id`, `baked_on`, `what_made`, `rating`, `notes` | One row per baking session |
 | `knife_tasks` | `id`, `name`, `is_preset` | Task definitions (e.g. "Slicing bread"); 10 presets seeded on startup |
 | `knife_task_log` | `id`, `item_id`, `task_id`, `logged_on`, `notes` | One row per knife-task usage event |
+| `item_tasks` | `item_id`, `task_id` | Cutco-sourced suggested uses per item; populated by the Uses Sync |
 
 ---
 
