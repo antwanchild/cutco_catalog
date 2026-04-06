@@ -47,6 +47,7 @@
       <col>
       <col style="width:100px">
       <col style="width:180px">
+      <col style="width:130px">
       <col style="width:32px">
     </colgroup>
     <thead>
@@ -55,6 +56,7 @@
         <th><span class="sort-hdr" data-col="name" style="cursor:pointer">Name</span></th>
         <th><span class="sort-hdr active" data-col="sku" style="cursor:pointer">SKU ▲</span></th>
         <th>Category</th>
+        <th>Edge</th>
         <th></th>
       </tr>
     </thead>
@@ -66,6 +68,13 @@
         <td>{{ item.name }}</td>
         <td class="mono">{{ item.sku }}</td>
         <td><input type="text" name="category_{{ item.sku }}" value="{{ item.category }}" class="input-xs"></td>
+        <td>
+          <select name="edge_type_{{ item.sku }}" class="input-xs">
+            {% for et in ["Straight","Double-D","Serrated","Micro-D","Tec Edge","Unknown"] %}
+            <option value="{{ et }}" {% if item.edge_type == et %}selected{% endif %}>{{ et }}</option>
+            {% endfor %}
+          </select>
+        </td>
         <td><a href="{{ item.url }}" target="_blank" class="ext-link">↗</a></td>
         <input type="hidden" name="name_{{ item.sku }}" value="{{ item.name }}">
         <input type="hidden" name="url_{{ item.sku }}"  value="{{ item.url }}">

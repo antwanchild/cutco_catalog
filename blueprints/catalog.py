@@ -8,7 +8,7 @@ from constants import EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR
 from extensions import db
 from helpers import db_commit, is_admin
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, ensure_unknown_variant, get_or_create_set
-from scraping import scrape_catalog, scrape_item_uses, scrape_sets
+from scraping import scrape_catalog, scrape_edge_type, scrape_item_uses, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
 logger = logging.getLogger(__name__)
@@ -430,6 +430,17 @@ def catalog_sync():
         logger.error("Sets scrape failed: %s", exc)
         scraped_sets = []
 
+    # Fetch edge types for new items in parallel
+    if new_items:
+        from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+        _edge_map: dict[str, str] = {}
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            _future_map = {pool.submit(scrape_edge_type, i["url"]): i["sku"] for i in new_items}
+            for _fut in _as_completed(_future_map):
+                _edge_map[_future_map[_fut]] = _fut.result()
+        for item in new_items:
+            item["edge_type"] = _edge_map.get(item["sku"], "Unknown")
+
     existing_sets = {s.name.lower() for s in Set.query.all()}
     new_sets      = sorted(
         (s for s in scraped_sets if s["name"].lower() not in existing_sets),
@@ -457,7 +468,7 @@ def catalog_sync_confirm():
     selected = set(request.form.getlist("selected_skus"))
     item_data = {}
     for key, val in request.form.items():
-        for prefix in ("name_", "category_", "url_"):
+        for prefix in ("name_", "category_", "url_", "edge_type_"):
             if key.startswith(prefix):
                 sku = key[len(prefix):]
                 item_data.setdefault(sku, {})[prefix.rstrip("_")] = val
@@ -469,7 +480,8 @@ def catalog_sync_confirm():
         data = item_data.get(sku, {})
         item = Item(name=data.get("name", sku), sku=sku,
                     category=data.get("category"), cutco_url=data.get("url"),
-                    in_catalog=True, is_unicorn=False, edge_type="Unknown")
+                    in_catalog=True, is_unicorn=False,
+                    edge_type=data.get("edge_type", "Unknown") or "Unknown")
         db.session.add(item)
         db.session.flush()
         ensure_unknown_variant(item)
