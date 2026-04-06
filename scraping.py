@@ -197,6 +197,44 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
         return None, None
 
 
+def scrape_item_uses(url: str) -> list[str]:
+    """Fetch a product page and return uses from the 'Uses+' accordion section."""
+    clean_url = url.split("&view=")[0].split("?view=")[0]
+    try:
+        resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
+            logger.debug("Uses fetch: HTTP %d for %s", resp.status_code, clean_url)
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        # Find the heading that starts with "Uses" (e.g. "Uses+")
+        uses_heading = None
+        for tag in soup.find_all(["h2", "h3", "h4"]):
+            if tag.get_text(strip=True).lower().startswith("uses"):
+                uses_heading = tag
+                break
+
+        if not uses_heading:
+            return []
+
+        # The <ul> is usually a sibling; fall back to next <ul> anywhere after it
+        uses_ul = uses_heading.find_next_sibling("ul")
+        if not uses_ul:
+            parent = uses_heading.parent
+            uses_ul = parent.find_next_sibling("ul") if parent else None
+        if not uses_ul:
+            uses_ul = uses_heading.find_next("ul")
+        if not uses_ul:
+            return []
+
+        uses = [li.get_text(strip=True) for li in uses_ul.find_all("li") if li.get_text(strip=True)]
+        logger.debug("Uses fetch: %s → %d uses", clean_url, len(uses))
+        return uses
+    except Exception as exc:
+        logger.warning("Uses scrape failed for %s: %s", url, exc)
+        return []
+
+
 def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
     """Scrape all item categories.
 

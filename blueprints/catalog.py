@@ -7,8 +7,8 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from constants import EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR
 from extensions import db
 from helpers import db_commit, is_admin
-from models import Item, ItemVariant, Ownership, Set, ensure_unknown_variant, get_or_create_set
-from scraping import scrape_catalog, scrape_sets
+from models import Item, ItemVariant, KnifeTask, Ownership, Set, ensure_unknown_variant, get_or_create_set
+from scraping import scrape_catalog, scrape_item_uses, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
 logger = logging.getLogger(__name__)
@@ -326,6 +326,67 @@ def set_detail(sid):
                            person_id=person_id,
                            person=person,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
+
+
+# ── Uses Sync ─────────────────────────────────────────────────────────────────
+
+@catalog_bp.route("/catalog/sync-uses", methods=["POST"])
+def catalog_sync_uses():
+    """Scrape Cutco.com uses for every cataloged item and populate item_tasks."""
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("logs.tasks_manage"))
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    items_with_url = Item.query.filter(Item.cutco_url.isnot(None)).all()
+    if not items_with_url:
+        flash("No catalog items have a Cutco URL — run a catalog sync first.", "info")
+        return redirect(url_for("logs.tasks_manage"))
+
+    # Fetch uses pages in parallel (no DB work in threads)
+    item_uses: dict[int, list[str]] = {}
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        future_map = {
+            pool.submit(scrape_item_uses, item.cutco_url): item.id
+            for item in items_with_url
+        }
+        for future in as_completed(future_map):
+            uses = future.result()
+            if uses:
+                item_uses[future_map[future]] = uses
+
+    # Apply results in main thread
+    item_lookup  = {item.id: item for item in items_with_url}
+    tasks_added  = 0
+    links_added  = 0
+
+    for item_id, uses in item_uses.items():
+        item = item_lookup[item_id]
+        existing_task_ids = {t.id for t in item.suggested_tasks}
+        for use_text in uses:
+            task = KnifeTask.query.filter(
+                db.func.lower(KnifeTask.name) == use_text.lower()
+            ).first()
+            if not task:
+                task = KnifeTask(name=use_text, is_preset=False)
+                db.session.add(task)
+                db.session.flush()
+                tasks_added += 1
+            if task.id not in existing_task_ids:
+                item.suggested_tasks.append(task)
+                existing_task_ids.add(task.id)
+                links_added += 1
+
+    db_commit(db.session)
+    logger.info("Uses sync: %d items, %d new tasks, %d links", len(item_uses), tasks_added, links_added)
+    flash(
+        f"Uses sync complete — {len(item_uses)} items processed, "
+        f"{tasks_added} new task{'s' if tasks_added != 1 else ''}, "
+        f"{links_added} link{'s' if links_added != 1 else ''} added.",
+        "success",
+    )
+    return redirect(url_for("logs.tasks_manage"))
 
 
 # ── Catalog Sync ──────────────────────────────────────────────────────────────
