@@ -259,6 +259,10 @@ def scrape_edge_type(url: str) -> str:
         if resp.status_code != 200:
             return "Unknown"
         raw_html = resp.text
+        # Flatware (itemClass=FLA) incorrectly carries an Edge spec on Cutco.com
+        item_class_m = re.search(r'"itemClass"\s*:\s*"([^"]+)"', raw_html)
+        if item_class_m and item_class_m.group(1) == "FLA":
+            return "N/A"
         # itemSpecs JSON: {"specName":"Edge","specValue":"Double-D®",...}
         m = re.search(r'"specName"\s*:\s*"Edge"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html)
         if not m:
