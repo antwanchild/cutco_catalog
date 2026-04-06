@@ -1,7 +1,7 @@
 import os
 import re
 
-EDGE_TYPES = ["Straight", "Double-D", "Serrated", "Micro-D", "Tec Edge", "N/A", "Unknown"]
+EDGE_TYPES = ["Straight", "Double-D", "Micro Double-D", "Serrated", "Micro-D", "Tec Edge", "N/A", "Unknown"]
 STATUS_OPTIONS = ["Owned", "Wishlist", "Sold", "Traded"]
 STATUS_RANK = {"Owned": 0, "Wishlist": 1, "Traded": 2, "Sold": 3}
 
