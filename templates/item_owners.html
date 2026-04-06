@@ -20,7 +20,7 @@
 <div class="item-meta mb-section">
   {% if item.sku %}<span><strong>SKU:</strong> <span class="mono">{{ item.sku }}</span></span>{% endif %}
   {% if item.category %}<span><strong>Category:</strong> {{ item.category }}</span>{% endif %}
-  <span><strong>Edge:</strong> {{ item.edge_type }}</span>
+  {% if item.edge_type != 'N/A' %}<span><strong>Edge:</strong> {{ item.edge_type }}</span>{% endif %}
   {% if item.msrp %}<span><strong>MSRP:</strong> ${{ "%.2f"|format(item.msrp) }}</span>{% endif %}
   {% if item.cutco_url %}<a href="{{ item.cutco_url }}" target="_blank" rel="noopener" class="btn btn-xs">Cutco.com ↗</a>{% endif %}
 </div>

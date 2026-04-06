@@ -60,7 +60,7 @@
       </td>
       <td class="mono">{{ item.sku or '—' }}</td>
       <td>{{ item.category or '—' }}</td>
-      <td>{{ item.edge_type }}</td>
+      <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>
         <a href="{{ url_for('catalog.variants', iid=item.id) }}">
           {{ item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length }}
