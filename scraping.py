@@ -238,8 +238,8 @@ def scrape_item_uses(url: str) -> list[str]:
 _EDGE_NORMALIZE = {
     "double-d":           "Double-D",
     "double-d®":          "Double-D",
-    "micro double-d™":    "Double-D",
-    "micro double-d":     "Double-D",
+    "micro double-d™":    "Micro Double-D",
+    "micro double-d":     "Micro Double-D",
     "straight":           "Straight",
     "serrated":           "Serrated",
     "micro-d":            "Micro-D",
