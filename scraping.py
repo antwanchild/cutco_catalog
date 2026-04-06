@@ -235,6 +235,40 @@ def scrape_item_uses(url: str) -> list[str]:
         return []
 
 
+_EDGE_NORMALIZE = {
+    "double-d":  "Double-D",
+    "double-d®": "Double-D",
+    "straight":  "Straight",
+    "serrated":  "Serrated",
+    "micro-d":   "Micro-D",
+    "micro-d®":  "Micro-D",
+    "tec edge":  "Tec Edge",
+    "tec-edge":  "Tec Edge",
+}
+
+
+def scrape_edge_type(url: str) -> str:
+    """Fetch a product page and return the normalized edge type, or 'Unknown'."""
+    clean_url = url.split("&view=")[0].split("?view=")[0]
+    try:
+        resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
+            return "Unknown"
+        raw_html = resp.text
+        # itemSpecs JSON: {"specName":"Edge","specValue":"Double-D®",...}
+        m = re.search(r'"specName"\s*:\s*"Edge"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html)
+        if not m:
+            m = re.search(r'"specValue"\s*:\s*"([^"]+)"\s*,\s*"specName"\s*:\s*"Edge"', raw_html)
+        if m:
+            raw = m.group(1).strip()
+            normalized = _EDGE_NORMALIZE.get(raw.lower(), "Unknown")
+            logger.debug("Edge scrape: %s → %s", clean_url, normalized)
+            return normalized
+    except Exception as exc:
+        logger.warning("Edge scrape failed for %s: %s", url, exc)
+    return "Unknown"
+
+
 def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
     """Scrape all item categories.
 
