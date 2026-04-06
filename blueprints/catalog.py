@@ -481,7 +481,7 @@ def catalog_sync_confirm():
         item = Item(name=data.get("name", sku), sku=sku,
                     category=data.get("category"), cutco_url=data.get("url"),
                     in_catalog=True, is_unicorn=False,
-                    edge_type=data.get("edge_type", "Unknown") or "Unknown")
+                    edge_type=data.get("edge_type") or "Unknown")
         db.session.add(item)
         db.session.flush()
         ensure_unknown_variant(item)
