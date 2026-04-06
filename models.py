@@ -2,12 +2,16 @@ from extensions import db
 from constants import UNKNOWN_COLOR
 
 
-# Many-to-many join table: items <-> sets
-item_sets = db.Table(
-    "item_sets",
-    db.Column("item_id", db.Integer, db.ForeignKey("items.id"), primary_key=True),
-    db.Column("set_id",  db.Integer, db.ForeignKey("sets.id"),  primary_key=True),
-)
+# Association object: items <-> sets (with quantity per member)
+class ItemSetMember(db.Model):
+    __tablename__ = "item_sets"
+
+    item_id  = db.Column(db.Integer, db.ForeignKey("items.id"), primary_key=True)
+    set_id   = db.Column(db.Integer, db.ForeignKey("sets.id"),  primary_key=True)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+
+    item = db.relationship("Item", back_populates="set_memberships")
+    set  = db.relationship("Set",  back_populates="members")
 
 # Many-to-many join table: items <-> knife_tasks (Cutco-sourced suggested uses)
 item_tasks = db.Table(
@@ -34,8 +38,10 @@ class Item(db.Model):
     variants        = db.relationship("ItemVariant", backref="item",
                                     lazy=True, cascade="all, delete-orphan",
                                     order_by="ItemVariant.color")
-    sets            = db.relationship("Set", secondary=item_sets,
-                                    back_populates="items", lazy="select")
+    set_memberships = db.relationship("ItemSetMember", back_populates="item",
+                                    cascade="all, delete-orphan")
+    sets            = db.relationship("Set", secondary="item_sets",
+                                    back_populates="items", viewonly=True, lazy="select")
     suggested_tasks = db.relationship("KnifeTask", secondary="item_tasks",
                                     back_populates="suggested_items", lazy="select")
 
@@ -66,8 +72,10 @@ class Set(db.Model):
     sku   = db.Column(db.String(20),  nullable=True)
     notes = db.Column(db.Text, nullable=True)
 
-    items = db.relationship("Item", secondary=item_sets,
-                            back_populates="sets", lazy="select")
+    members = db.relationship("ItemSetMember", back_populates="set",
+                             cascade="all, delete-orphan")
+    items   = db.relationship("Item", secondary="item_sets",
+                             back_populates="sets", viewonly=True, lazy="select")
 
 
 class Person(db.Model):
