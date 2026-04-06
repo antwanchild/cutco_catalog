@@ -386,8 +386,9 @@ def scrape_sets(
 
     def _fetch_set_detail(set_link: dict) -> dict | None:
         fetch_url = set_link["url"]
-        if "&view=product" not in fetch_url:
-            fetch_url += "&view=product"
+        if "view=product" not in fetch_url:
+            sep = "&" if "?" in fetch_url else "?"
+            fetch_url += sep + "view=product"
         try:
             set_sku, _ = _fetch_sku_from_page(fetch_url)
             resp = requests.get(fetch_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
@@ -400,13 +401,20 @@ def scrape_sets(
             seen_member: set[str] = set()
 
             # Strategy 1: parse itemSetList JSON embedded in page JS
-            # Use bracket counting instead of regex to handle nested arrays
+            # Page has webItemsMap with one itemSetList per variant — search
+            # from the URL's variant key so we get the right size set.
             _set_list_json = None
-            _key_match = re.search(r'"itemSetList"\s*:\s*\[', raw_html)
+            _url_variant = fetch_url.split("/")[-1].split("&")[0].upper()
+            _search_from = 0
+            if re.match(r'^\d+[A-Z]?$', _url_variant):
+                # Find the webItemsMap entry specifically (key followed by {)
+                _var_pos = raw_html.find(f'"{_url_variant}"' + ':{')
+                if _var_pos >= 0:
+                    _search_from = _var_pos
+            _key_match = re.search(r'"itemSetList"\s*:\s*\[', raw_html[_search_from:])
             if _key_match:
-                _start = _key_match.end() - 1  # position of opening [
-                _depth = 0
-                _end = _start
+                _start = _search_from + _key_match.end() - 1  # abs pos of opening [
+                _depth, _end = 0, _start
                 for _i, _ch in enumerate(raw_html[_start:], _start):
                     if _ch == '[':
                         _depth += 1
