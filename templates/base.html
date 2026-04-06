@@ -43,6 +43,8 @@
       <span class="badge-admin">Admin</span>
       <a href="{{ url_for('admin.msrp_diff_page') }}"
          {% if request.endpoint == 'admin.msrp_diff_page' %}class="active"{% endif %}>MSRP Diff</a>
+      <a href="{{ url_for('admin.specs_backfill_page') }}"
+         {% if request.endpoint == 'admin.specs_backfill_page' %}class="active"{% endif %}>Specs Backfill</a>
       <a href="{{ url_for('admin.admin_logout') }}">Logout</a>
     {% else %}
       <a href="{{ url_for('admin.admin_login') }}">Admin</a>

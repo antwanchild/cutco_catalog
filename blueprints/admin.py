@@ -8,7 +8,10 @@ from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN
 from extensions import limiter
 from helpers import is_admin
 from models import Item
-from msrp_helpers import _read_msrp_job, _run_msrp_diff_job, _write_msrp_job
+from msrp_helpers import (
+    _read_msrp_job, _run_msrp_diff_job, _write_msrp_job,
+    _read_specs_job, _run_specs_backfill_job, _write_specs_job,
+)
 
 admin_bp = Blueprint("admin", __name__)
 logger = logging.getLogger(__name__)
@@ -47,6 +50,39 @@ def msrp_diff_status():
     if not is_admin():
         return jsonify(error="Unauthorized"), 403
     return jsonify(_read_msrp_job())
+
+
+@admin_bp.route("/admin/specs-backfill")
+def specs_backfill_page():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("index"))
+    return render_template("specs_backfill_ui.html", job=_read_specs_job())
+
+
+@admin_bp.route("/admin/specs-backfill/run", methods=["POST"])
+def specs_backfill_run():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("index"))
+    job = _read_specs_job()
+    if job["status"] == "running":
+        flash("A backfill is already running.", "warning")
+        return redirect(url_for("admin.specs_backfill_page"))
+    _write_specs_job({"status": "running", "progress": [], "results": None,
+                      "error": None, "started_at": None, "finished_at": None})
+    from flask import current_app
+    app = current_app._get_current_object()
+    logger.info("Specs backfill job started")
+    threading.Thread(target=_run_specs_backfill_job, args=(app,), daemon=True).start()
+    return redirect(url_for("admin.specs_backfill_page"))
+
+
+@admin_bp.route("/admin/specs-backfill/status")
+def specs_backfill_status():
+    if not is_admin():
+        return jsonify(error="Unauthorized"), 403
+    return jsonify(_read_specs_job())
 
 
 @admin_bp.route("/admin/login", methods=["GET", "POST"])
