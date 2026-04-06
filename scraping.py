@@ -407,7 +407,7 @@ def scrape_sets(
                 try:
                     set_list = json.loads(set_list_match.group(1))
                     for entry in set_list:
-                        raw_sku = str(entry.get("childItemNumber") or "").upper().strip()
+                        raw_sku = str(entry.get("childItemNumber") or "").upper().strip().split("/")[0]
                         if not raw_sku:
                             continue
                         base_sku = re.sub(r"[A-Z]+$", "", raw_sku) if len(raw_sku) > 2 else raw_sku
