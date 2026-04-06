@@ -9,6 +9,13 @@ item_sets = db.Table(
     db.Column("set_id",  db.Integer, db.ForeignKey("sets.id"),  primary_key=True),
 )
 
+# Many-to-many join table: items <-> knife_tasks (Cutco-sourced suggested uses)
+item_tasks = db.Table(
+    "item_tasks",
+    db.Column("item_id", db.Integer, db.ForeignKey("items.id"),        primary_key=True),
+    db.Column("task_id", db.Integer, db.ForeignKey("knife_tasks.id"),  primary_key=True),
+)
+
 
 class Item(db.Model):
     __tablename__ = "items"
@@ -24,11 +31,13 @@ class Item(db.Model):
     msrp       = db.Column(db.Float,       nullable=True)
     notes      = db.Column(db.Text,        nullable=True)
 
-    variants = db.relationship("ItemVariant", backref="item",
-                               lazy=True, cascade="all, delete-orphan",
-                               order_by="ItemVariant.color")
-    sets     = db.relationship("Set", secondary=item_sets,
-                               back_populates="items", lazy="select")
+    variants        = db.relationship("ItemVariant", backref="item",
+                                    lazy=True, cascade="all, delete-orphan",
+                                    order_by="ItemVariant.color")
+    sets            = db.relationship("Set", secondary=item_sets,
+                                    back_populates="items", lazy="select")
+    suggested_tasks = db.relationship("KnifeTask", secondary="item_tasks",
+                                    back_populates="suggested_items", lazy="select")
 
     @property
     def any_unicorn(self) -> bool:
@@ -123,6 +132,9 @@ class KnifeTask(db.Model):
     id        = db.Column(db.Integer, primary_key=True)
     name      = db.Column(db.String(120), nullable=False, unique=True)
     is_preset = db.Column(db.Boolean, nullable=False, default=False)
+
+    suggested_items = db.relationship("Item", secondary="item_tasks",
+                                      back_populates="suggested_tasks", lazy="select")
 
 
 class KnifeTaskLog(db.Model):

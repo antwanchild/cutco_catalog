@@ -405,12 +405,20 @@ def tasks():
         if top_task:
             item_top_task[iid] = top_task.name
 
+    # Suggested task IDs per item (from Cutco uses sync) — used for JS filtering
+    item_tasks_map: dict[int, list[int]] = {
+        item.id: [t.id for t in item.suggested_tasks]
+        for item in owned_items
+        if item.suggested_tasks
+    }
+
     return render_template(
         "tasks.html",
         owned_items    = owned_items,
         all_tasks      = all_tasks,
         recent_entries = recent_entries,
         item_top_task  = item_top_task,
+        item_tasks_map = item_tasks_map,
         today          = today.isoformat(),
     )
 
@@ -484,6 +492,24 @@ def task_log_purge_all():
 def tasks_manage():
     all_tasks = KnifeTask.query.order_by(KnifeTask.is_preset.desc(), KnifeTask.name).all()
     return render_template("tasks_manage.html", all_tasks=all_tasks)
+
+
+@logs_bp.route("/tasks/manage/<int:tid>")
+def task_detail(tid):
+    task = KnifeTask.query.get_or_404(tid)
+    # Items that have this task as a Cutco-sourced suggested use
+    suggested_items = sorted(task.suggested_items, key=lambda i: i.name)
+    # Log count per item for this task
+    log_counts: dict[int, int] = {}
+    for entry in task.log_entries:
+        log_counts[entry.item_id] = log_counts.get(entry.item_id, 0) + 1
+    return render_template(
+        "task_detail.html",
+        task            = task,
+        suggested_items = suggested_items,
+        log_counts      = log_counts,
+        total_logs      = len(task.log_entries),
+    )
 
 
 @logs_bp.route("/tasks/manage/add", methods=["POST"])

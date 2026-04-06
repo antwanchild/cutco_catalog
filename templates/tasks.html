@@ -44,7 +44,7 @@
         </select>
       </label>
       <label>Task *
-        <select name="task_id" required class="input-full">
+        <select name="task_id" id="task-select" required class="input-full">
           <option value="">— select task —</option>
           {% for task in all_tasks %}
             <option value="{{ task.id }}">{{ task.name }}</option>
@@ -65,6 +65,48 @@
     </div>
   </form>
 </details>
+
+<script>
+(function() {
+  var itemTasksMap = {{ item_tasks_map | tojson }};
+  var itemSelect = document.querySelector('select[name="item_id"]');
+  var taskSelect = document.getElementById('task-select');
+
+  // Store original options once
+  var allOptions = Array.from(taskSelect.options).slice(1); // skip placeholder
+
+  function rebuildTaskSelect(suggestedIds) {
+    var current = taskSelect.value;
+    // Remove everything after placeholder
+    while (taskSelect.options.length > 1) taskSelect.remove(1);
+
+    if (suggestedIds && suggestedIds.length) {
+      var suggested = allOptions.filter(function(o) { return suggestedIds.indexOf(parseInt(o.value)) !== -1; });
+      var others    = allOptions.filter(function(o) { return suggestedIds.indexOf(parseInt(o.value)) === -1; });
+      if (suggested.length) {
+        var g1 = document.createElement('optgroup');
+        g1.label = 'Suggested for this knife';
+        suggested.forEach(function(o) { g1.appendChild(o.cloneNode(true)); });
+        taskSelect.appendChild(g1);
+      }
+      if (others.length) {
+        var g2 = document.createElement('optgroup');
+        g2.label = 'All other tasks';
+        others.forEach(function(o) { g2.appendChild(o.cloneNode(true)); });
+        taskSelect.appendChild(g2);
+      }
+    } else {
+      allOptions.forEach(function(o) { taskSelect.appendChild(o.cloneNode(true)); });
+    }
+    taskSelect.value = current;
+  }
+
+  itemSelect.addEventListener('change', function() {
+    var itemId = parseInt(this.value);
+    rebuildTaskSelect(itemTasksMap[itemId] || null);
+  });
+})();
+</script>
 
 {# ── Usage patterns ────────────────────────────────────────────────────────── #}
 {% if item_top_task %}

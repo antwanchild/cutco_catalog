@@ -3,7 +3,16 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">🔪 Manage Knife Tasks {{ help_btn("tasks_manage") }}</h1>
-  <a href="{{ url_for('logs.tasks') }}" class="btn btn-ghost">← Task Log</a>
+  <div class="page-actions">
+    {% if is_admin() %}
+    <form method="post" action="{{ url_for('catalog.catalog_sync_uses') }}" id="uses-sync-form">
+      <button type="submit" class="btn btn-secondary btn-sm" id="uses-sync-btn">
+        🔄 Sync Uses from Cutco
+      </button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('logs.tasks') }}" class="btn btn-ghost">← Task Log</a>
+  </div>
 </div>
 
 <form method="post" action="{{ url_for('logs.task_add') }}" class="form-card mb-section">
@@ -20,14 +29,15 @@
 <div class="table-wrap">
 <table class="data-table">
   <thead>
-    <tr><th>Task</th><th>Type</th><th>Uses</th><th></th></tr>
+    <tr><th>Task</th><th>Type</th><th>Knives</th><th>Logged Uses</th><th></th></tr>
   </thead>
   <tbody>
     {% for task in all_tasks %}
     <tr>
-      <td>{{ task.name }}</td>
+      <td><a href="{{ url_for('logs.task_detail', tid=task.id) }}">{{ task.name }}</a></td>
       <td>{% if task.is_preset %}<span class="badge badge-info">preset</span>{% else %}<span class="muted">custom</span>{% endif %}</td>
-      <td>{{ task.log_entries | length }}</td>
+      <td class="muted">{{ task.suggested_items | length }}</td>
+      <td class="muted">{{ task.log_entries | length }}</td>
       <td>
         {% if not task.is_preset and not task.log_entries %}
         <form method="post" action="{{ url_for('logs.task_delete', tid=task.id) }}"
@@ -43,4 +53,20 @@
   </tbody>
 </table>
 </div>
+
+{# ── Sync Uses loading overlay ─────────────────────────────────────────────── #}
+<div id="sync-overlay" style="display:none">
+  <div class="sync-overlay-inner">
+    <div class="sync-spinner"></div>
+    <p>Syncing uses from Cutco.com — this may take a few minutes…</p>
+  </div>
+</div>
+
+<script>
+document.getElementById('uses-sync-form').addEventListener('submit', function() {
+  document.getElementById('uses-sync-btn').textContent = 'Syncing…';
+  document.getElementById('uses-sync-btn').disabled = true;
+  document.getElementById('sync-overlay').style.display = 'flex';
+});
+</script>
 {% endblock %}

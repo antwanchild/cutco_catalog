@@ -62,6 +62,20 @@
     </section>
     {% endif %}
 
+    {# Suggested uses from Cutco #}
+    {% if item.suggested_tasks %}
+    <section class="detail-section">
+      <h2 class="section-heading">Suggested Uses</h2>
+      <div class="top-tasks-list">
+        {% for task in item.suggested_tasks | sort(attribute='name') %}
+        <div class="top-task-row">
+          <a href="{{ url_for('logs.task_detail', tid=task.id) }}">{{ task.name }}</a>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
     {# Task usage #}
     {% if top_tasks %}
     <section class="detail-section">
