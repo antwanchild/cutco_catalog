@@ -59,6 +59,7 @@
       <td>
         <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
         {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+        {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
       </td>
       <td class="mono">{{ item.sku or '—' }}</td>
       <td>{{ item.category or '—' }}</td>
@@ -88,6 +89,7 @@
       <td>
         <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
         {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+        {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
       </td>
       <td class="mono">{{ item.sku or '—' }}</td>
       <td>{{ item.category or '—' }}</td>

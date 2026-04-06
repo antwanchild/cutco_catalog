@@ -7,7 +7,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from constants import EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR
 from extensions import db
 from helpers import db_commit, is_admin
-from models import Item, ItemVariant, KnifeTask, Ownership, Set, ensure_unknown_variant, get_or_create_set
+from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, ensure_unknown_variant, get_or_create_set
 from scraping import scrape_catalog, scrape_item_uses, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
@@ -315,6 +315,8 @@ def set_detail(sid):
     owned_count = len(owned_items)
     pct = round(100 * owned_count / total) if total else 0
 
+    qty_map = {m.item_id: m.quantity for m in item_set.members}
+
     return render_template("set_detail.html",
                            set=item_set,
                            owned_items=owned_items,
@@ -325,6 +327,7 @@ def set_detail(sid):
                            all_persons=all_persons,
                            person_id=person_id,
                            person=person,
+                           qty_map=qty_map,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
@@ -484,6 +487,14 @@ def catalog_sync_confirm():
             continue
         member_skus = [raw.strip() for raw in
                        request.form.get(f"set_members_{i}", "").split("|") if raw.strip()]
+        member_qtys = {}
+        for raw_pair in request.form.get(f"set_member_qtys_{i}", "").split("|"):
+            if ":" in raw_pair:
+                sku_part, qty_part = raw_pair.split(":", 1)
+                try:
+                    member_qtys[sku_part.strip()] = int(qty_part.strip())
+                except ValueError:
+                    pass
         set_sku = request.form.get(f"set_sku_{i}", "").strip() or None
 
         item_set = get_or_create_set(set_name)
@@ -492,11 +503,18 @@ def catalog_sync_confirm():
         if set_sku and not item_set.sku:
             item_set.sku = set_sku
 
+        existing_members = {m.item_id: m for m in item_set.members}
         for msku in member_skus:
             item = sku_to_item.get(msku.upper())
-            if item and item not in item_set.items:
-                item_set.items.append(item)
+            if not item:
+                continue
+            qty = member_qtys.get(msku, 1)
+            if item.id not in existing_members:
+                db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
                 linked_items += 1
+            else:
+                # Update quantity if it changed
+                existing_members[item.id].quantity = qty
 
     db_commit(db.session)
     logger.info("Sync complete: %d items, %d sets, %d memberships", added_items, added_sets, linked_items)

@@ -93,12 +93,15 @@
           <input type="hidden" name="set_name_{{ loop.index0 }}"    value="{{ item_set.name }}">
           <input type="hidden" name="set_sku_{{ loop.index0 }}"     value="{{ item_set.sku or '' }}">
           <input type="hidden" name="set_members_{{ loop.index0 }}" value="{{ item_set.member_skus | join('|') }}">
+          <input type="hidden" name="set_member_qtys_{{ loop.index0 }}" value="{{ item_set.member_quantities.items() | map('join', ':') | join('|') }}">
         </td>
         <td>{{ item_set.name }}</td>
         <td class="mono">{{ item_set.sku or '—' }}</td>
         <td>
           <span class="muted small">{{ item_set.member_skus | length }} item(s):</span>
-          <span class="mono small">{{ item_set.member_skus | join(', ') }}</span>
+          {% for sku in item_set.member_skus %}
+            <span class="mono small">{{ sku }}{% set qty = item_set.member_quantities.get(sku, 1) %}{% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}</span>{% if not loop.last %}, {% endif %}
+          {% endfor %}
         </td>
         <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
       </tr>

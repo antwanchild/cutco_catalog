@@ -392,21 +392,62 @@ def scrape_sets(
             set_sku, _ = _fetch_sku_from_page(fetch_url)
             resp = requests.get(fetch_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
-            detail = BeautifulSoup(resp.text, "html.parser")
-            member_skus = []
+            raw_html = resp.text
+            detail = BeautifulSoup(raw_html, "html.parser")
+
+            member_skus: list[str] = []
+            member_quantities: dict[str, int] = {}
             seen_member: set[str] = set()
-            for img in detail.select("img[src*='/rolo/']"):
-                match = sku_pattern.search(img.get("src", ""))
-                if match:
-                    raw = match.group(1).upper()
-                    base_sku = re.sub(r"[A-Z]+$", "", raw) if len(raw) > 2 else raw
-                    if re.fullmatch(r"20\d{2}", base_sku):
-                        continue
-                    if base_sku not in seen_member:
-                        seen_member.add(base_sku)
-                        member_skus.append(base_sku)
+
+            # Strategy 1: parse itemSetList JSON embedded in page JS
+            set_list_match = re.search(
+                r'"itemSetList"\s*:\s*(\[.*?\])',
+                raw_html, re.DOTALL)
+            if set_list_match:
+                try:
+                    set_list = json.loads(set_list_match.group(1))
+                    for entry in set_list:
+                        raw_sku = str(entry.get("childItemNumber") or "").upper().strip()
+                        if not raw_sku:
+                            continue
+                        base_sku = re.sub(r"[A-Z]+$", "", raw_sku) if len(raw_sku) > 2 else raw_sku
+                        if re.fullmatch(r"20\d{2}", base_sku):
+                            continue
+                        qty = int(entry.get("qty") or 1)
+                        if base_sku not in seen_member:
+                            seen_member.add(base_sku)
+                            member_skus.append(base_sku)
+                            member_quantities[base_sku] = qty
+                    logger.debug("Set '%s': itemSetList → %d members", set_link["name"], len(member_skus))
+                except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                    logger.debug("itemSetList parse failed for %s: %s", fetch_url, exc)
+                    member_skus.clear()
+                    member_quantities.clear()
+                    seen_member.clear()
+
+            # Strategy 2: fallback — image /rolo/ SKU extraction
+            if not member_skus:
+                for img in detail.select("img[src*='/rolo/']"):
+                    match = sku_pattern.search(img.get("src", ""))
+                    if match:
+                        raw = match.group(1).upper()
+                        base_sku = re.sub(r"[A-Z]+$", "", raw) if len(raw) > 2 else raw
+                        if re.fullmatch(r"20\d{2}", base_sku):
+                            continue
+                        if base_sku not in seen_member:
+                            seen_member.add(base_sku)
+                            member_skus.append(base_sku)
+                            member_quantities[base_sku] = 1
+                logger.debug("Set '%s': image fallback → %d members", set_link["name"], len(member_skus))
+
             logger.debug("Set '%s': sku=%s, %d members", set_link["name"], set_sku, len(member_skus))
-            return dict(name=set_link["name"], sku=set_sku, url=set_link["url"], member_skus=member_skus)
+            return dict(
+                name             = set_link["name"],
+                sku              = set_sku,
+                url              = set_link["url"],
+                member_skus      = member_skus,
+                member_quantities= member_quantities,
+            )
         except Exception as exc:
             logger.warning("Scrape failed for set %s: %s", set_link["url"], exc)
             return None
