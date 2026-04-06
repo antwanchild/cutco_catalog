@@ -122,7 +122,13 @@
   {# ── DEBUG ── remove after diagnosis #}
   <pre style="font-size:.7rem;background:#111;color:#0f0;padding:.5rem;overflow:auto">
 existing_sets_data count: {{ existing_sets_data | length }}
-{% for s in existing_sets_data[:3] %}SET: {{ s.name }} | skus: {{ s.member_skus }} | qtys: {{ s.member_quantities }}
+new_sets count: {{ new_sets | length }}
+scraped_sets_total: {{ scraped_sets_total }}
+--- existing_sets_data ---
+{% for s in existing_sets_data[:5] %}  {{ s.name }} | qtys: {{ s.member_quantities }}
+{% endfor %}
+--- new_sets (first 5) ---
+{% for s in new_sets[:5] %}  {{ s.name }}
 {% endfor %}
   </pre>
   {# ── Existing Sets with Quantity Updates #}
