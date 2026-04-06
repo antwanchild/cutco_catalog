@@ -20,6 +20,12 @@
 
 <form method="post" action="{{ url_for('catalog.catalog_sync_confirm') }}">
   <input type="hidden" name="set_count" value="{{ new_sets | length }}">
+  {# Existing sets — hidden, quantities updated silently on confirm #}
+  <input type="hidden" name="existing_set_count" value="{{ existing_sets_data | length }}">
+  {% for item_set in existing_sets_data %}
+  <input type="hidden" name="existing_set_name_{{ loop.index0 }}" value="{{ item_set.name }}">
+  <input type="hidden" name="existing_set_member_qtys_{{ loop.index0 }}" value="{{ item_set.member_quantities.items() | map('join', ':') | join('|') }}">
+  {% endfor %}
 
   {# ── New Items #}
   {% if new_items %}

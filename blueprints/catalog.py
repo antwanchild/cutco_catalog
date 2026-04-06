@@ -435,12 +435,15 @@ def catalog_sync():
         (s for s in scraped_sets if s["name"].lower() not in existing_sets),
         key=_sku_sort_key,
     )
+    # Pass existing sets too so confirm can update member quantities
+    existing_sets_data = [s for s in scraped_sets if s["name"].lower() in existing_sets]
 
     return render_template("sync_preview.html",
                            grouped=grouped,
                            new_items=new_items,
                            scraped_total=len(scraped),
                            new_sets=new_sets,
+                           existing_sets_data=existing_sets_data,
                            scraped_sets_total=len(scraped_sets),
                            blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES))
 
@@ -516,8 +519,36 @@ def catalog_sync_confirm():
                 # Update quantity if it changed
                 existing_members[item.id].quantity = qty
 
+    # Update quantities on existing sets (no new rows, just qty backfill)
+    sku_to_item = sku_to_item  # already built above
+    existing_set_count = int(request.form.get("existing_set_count", 0))
+    qty_updates = 0
+    for i in range(existing_set_count):
+        set_name = request.form.get(f"existing_set_name_{i}", "").strip()
+        if not set_name:
+            continue
+        item_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
+        if not item_set:
+            continue
+        member_qtys = {}
+        for raw_pair in request.form.get(f"existing_set_member_qtys_{i}", "").split("|"):
+            if ":" in raw_pair:
+                sku_part, qty_part = raw_pair.split(":", 1)
+                try:
+                    member_qtys[sku_part.strip()] = int(qty_part.strip())
+                except ValueError:
+                    pass
+        for member in item_set.members:
+            item = db.session.get(Item, member.item_id)
+            if item and item.sku:
+                new_qty = member_qtys.get(item.sku.upper(), 1)
+                if member.quantity != new_qty:
+                    member.quantity = new_qty
+                    qty_updates += 1
+
     db_commit(db.session)
-    logger.info("Sync complete: %d items, %d sets, %d memberships", added_items, added_sets, linked_items)
+    logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates",
+                added_items, added_sets, linked_items, qty_updates)
 
     parts = []
     if added_items:
