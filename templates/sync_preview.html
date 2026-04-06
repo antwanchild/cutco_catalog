@@ -70,7 +70,7 @@
         <td><input type="text" name="category_{{ item.sku }}" value="{{ item.category }}" class="input-xs"></td>
         <td>
           <select name="edge_type_{{ item.sku }}" class="input-xs">
-            {% for et in ["Straight","Double-D","Serrated","Micro-D","Tec Edge","Unknown"] %}
+            {% for et in ["Straight","Double-D","Serrated","Micro-D","Tec Edge","N/A","Unknown"] %}
             <option value="{{ et }}" {% if item.edge_type == et %}selected{% endif %}>{{ et }}</option>
             {% endfor %}
           </select>

@@ -248,7 +248,11 @@ _EDGE_NORMALIZE = {
 
 
 def scrape_edge_type(url: str) -> str:
-    """Fetch a product page and return the normalized edge type, or 'Unknown'."""
+    """Fetch a product page and return the normalized edge type.
+
+    Returns 'N/A' when no Edge spec is found (cookware, cutting boards, etc.)
+    and 'Unknown' only on fetch/parse failure.
+    """
     clean_url = url.split("&view=")[0].split("?view=")[0]
     try:
         resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
@@ -264,6 +268,8 @@ def scrape_edge_type(url: str) -> str:
             normalized = _EDGE_NORMALIZE.get(raw.lower(), "Unknown")
             logger.debug("Edge scrape: %s → %s", clean_url, normalized)
             return normalized
+        # No Edge spec on page — item has no blade edge (cookware, boards, etc.)
+        return "N/A"
     except Exception as exc:
         logger.warning("Edge scrape failed for %s: %s", url, exc)
     return "Unknown"
