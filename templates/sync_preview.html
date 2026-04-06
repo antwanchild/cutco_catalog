@@ -14,7 +14,8 @@
   {% endif %}
 </p>
 
-{% if not new_items and not new_sets %}
+{% set qty_updates = existing_sets_data | selectattr('member_quantities') | list %}
+{% if not new_items and not new_sets and not qty_updates %}
   <p class="flash flash-success">✓ Catalog is up to date — no new items or sets found.</p>
 {% else %}
 
@@ -107,6 +108,43 @@
           <span class="muted small">{{ item_set.member_skus | length }} item(s):</span>
           {% for sku in item_set.member_skus %}
             <span class="mono small">{{ sku }}{% set qty = item_set.member_quantities.get(sku, 1) %}{% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}</span>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        </td>
+        <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  {# ── Existing Sets with Quantity Updates #}
+  {% set qty_sets = [] %}
+  {% for item_set in existing_sets_data %}
+    {% if item_set.member_quantities.values() | select('gt', 1) | list %}
+      {% set _ = qty_sets.append(item_set) %}
+    {% endif %}
+  {% endfor %}
+  {% if qty_sets %}
+  <h2 class="mt-section">Set Quantity Updates <span class="muted">({{ qty_sets | length }})</span></h2>
+  <p class="muted">These sets already exist — member quantities will be updated on confirm.</p>
+  <div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Set Name</th>
+        <th>Members with Quantities</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item_set in qty_sets %}
+      <tr>
+        <td>{{ item_set.name }}</td>
+        <td>
+          {% for sku in item_set.member_skus %}
+            {% set qty = item_set.member_quantities.get(sku, 1) %}
+            <span class="mono small">{{ sku }}{% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}</span>{% if not loop.last %}, {% endif %}
           {% endfor %}
         </td>
         <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
