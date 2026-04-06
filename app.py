@@ -79,7 +79,10 @@ with app.app_context():
         ("item_variants", "is_unicorn",   "ALTER TABLE item_variants ADD COLUMN is_unicorn BOOLEAN NOT NULL DEFAULT 0"),
         ("items",         "msrp",         "ALTER TABLE items ADD COLUMN msrp REAL"),
         ("ownership",     "target_price", "ALTER TABLE ownership ADD COLUMN target_price REAL"),
-        ("item_sets",     "quantity",     "ALTER TABLE item_sets ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1"),
+        ("item_sets",     "quantity",       "ALTER TABLE item_sets ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1"),
+        ("items",         "blade_length",   "ALTER TABLE items ADD COLUMN blade_length VARCHAR(20)"),
+        ("items",         "overall_length", "ALTER TABLE items ADD COLUMN overall_length VARCHAR(20)"),
+        ("items",         "weight",         "ALTER TABLE items ADD COLUMN weight VARCHAR(20)"),
     ]
     with db.engine.connect() as _conn:
         for _table, _col, _stmt in _col_migrations:

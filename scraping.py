@@ -249,39 +249,103 @@ _EDGE_NORMALIZE = {
 }
 
 
-def scrape_edge_type(url: str) -> str:
-    """Fetch a product page and return the normalized edge type.
+def scrape_item_specs(url: str) -> dict:
+    """Fetch a product page and return a dict with edge_type, msrp,
+    blade_length, overall_length, and weight.  One HTTP request covers all.
 
-    Returns 'N/A' when no Edge spec is found (cookware, cutting boards, etc.)
-    and 'Unknown' only on fetch/parse failure.
+    edge_type: 'N/A' = no blade edge, 'Unknown' = fetch failure or ambiguous.
+    All other keys are None when not found.
     """
     clean_url = url.split("&view=")[0].split("?view=")[0]
+    result = {
+        "edge_type":      "Unknown",
+        "msrp":           None,
+        "blade_length":   None,
+        "overall_length": None,
+        "weight":         None,
+    }
     try:
         resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         if resp.status_code != 200:
-            return "Unknown"
+            return result
         raw_html = resp.text
-        # Stainless flatware (FLA/STL — forks, spoons) incorrectly carries
-        # an Edge spec on Cutco.com; table knives (FLA but no STL) are real.
-        item_class_m   = re.search(r'"itemClass"\s*:\s*"([^"]+)"', raw_html)
+        soup = BeautifulSoup(raw_html, "html.parser")
+
+        # ── Edge type ────────────────────────────────────────────────────────
+        item_class_m    = re.search(r'"itemClass"\s*:\s*"([^"]+)"', raw_html)
         item_subclass_m = re.search(r'"itemSubclass"\s*:\s*"([^"]+)"', raw_html)
         if (item_class_m and item_class_m.group(1) == "FLA"
                 and item_subclass_m and item_subclass_m.group(1) == "STL"):
-            return "N/A"
-        # itemSpecs JSON: {"specName":"Edge","specValue":"Double-D®",...}
-        m = re.search(r'"specName"\s*:\s*"Edge"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html)
-        if not m:
-            m = re.search(r'"specValue"\s*:\s*"([^"]+)"\s*,\s*"specName"\s*:\s*"Edge"', raw_html)
-        if m:
-            raw = m.group(1).strip()
-            normalized = _EDGE_NORMALIZE.get(raw.lower(), "Unknown")
-            logger.debug("Edge scrape: %s → %s", clean_url, normalized)
-            return normalized
-        # No Edge spec on page — item has no blade edge (cookware, boards, etc.)
-        return "N/A"
+            result["edge_type"] = "N/A"
+        else:
+            m = re.search(r'"specName"\s*:\s*"Edge"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html)
+            if not m:
+                m = re.search(r'"specValue"\s*:\s*"([^"]+)"\s*,\s*"specName"\s*:\s*"Edge"', raw_html)
+            if m:
+                result["edge_type"] = _EDGE_NORMALIZE.get(m.group(1).strip().lower(), "Unknown")
+            else:
+                result["edge_type"] = "N/A"
+
+        # ── itemSpecs (blade length, overall length, weight) ─────────────────
+        _SPEC_MAP = {
+            "length - blade":   "blade_length",
+            "length - overall": "overall_length",
+            "weight - knife only": "weight",
+            "weight":           "weight",
+        }
+        for spec in re.finditer(
+                r'"specName"\s*:\s*"([^"]+)"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html):
+            key = spec.group(1).strip().lower()
+            val = spec.group(2).strip()
+            field = _SPEC_MAP.get(key)
+            if field and result[field] is None:
+                result[field] = val
+
+        # ── MSRP (JSON-LD → og:price → itemprop) ────────────────────────────
+        for ld_tag in soup.find_all("script", type="application/ld+json"):
+            try:
+                import json as _json
+                data = _json.loads(ld_tag.string or "")
+                entries = data if isinstance(data, list) else [data]
+                for entry in entries:
+                    if not isinstance(entry, dict) or entry.get("@type") != "Product":
+                        continue
+                    offers = entry.get("offers", {})
+                    if isinstance(offers, list):
+                        offers = offers[0] if offers else {}
+                    price_val = offers.get("price") if isinstance(offers, dict) else None
+                    if price_val is not None:
+                        result["msrp"] = float(price_val)
+                        break
+            except (ValueError, AttributeError):
+                pass
+            if result["msrp"] is not None:
+                break
+        if result["msrp"] is None:
+            # Cutco embeds fullRetail in webItemsMap JS
+            retail_m = re.search(r'"fullRetail"\s*:\s*([\d.]+)', raw_html)
+            if retail_m:
+                try:
+                    result["msrp"] = float(retail_m.group(1))
+                except ValueError:
+                    pass
+        if result["msrp"] is None:
+            og_tag = soup.find("meta", property="og:price:amount")
+            if og_tag and og_tag.get("content", "").strip():
+                try:
+                    result["msrp"] = float(og_tag["content"].replace(",", ""))
+                except ValueError:
+                    pass
+
+        logger.debug("Specs: %s → %s", clean_url, result)
     except Exception as exc:
-        logger.warning("Edge scrape failed for %s: %s", url, exc)
-    return "Unknown"
+        logger.warning("Spec scrape failed for %s: %s", url, exc)
+    return result
+
+
+# Keep old name as alias so existing callers still work
+def scrape_edge_type(url: str) -> str:
+    return scrape_item_specs(url)["edge_type"]
 
 
 def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:

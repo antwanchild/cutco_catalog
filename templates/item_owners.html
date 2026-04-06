@@ -21,6 +21,9 @@
   {% if item.sku %}<span><strong>SKU:</strong> <span class="mono">{{ item.sku }}</span></span>{% endif %}
   {% if item.category %}<span><strong>Category:</strong> {{ item.category }}</span>{% endif %}
   {% if item.edge_type != 'N/A' %}<span><strong>Edge:</strong> {{ item.edge_type }}</span>{% endif %}
+  {% if item.blade_length %}<span><strong>Blade:</strong> {{ item.blade_length }}</span>{% endif %}
+  {% if item.overall_length %}<span><strong>Overall:</strong> {{ item.overall_length }}</span>{% endif %}
+  {% if item.weight %}<span><strong>Weight:</strong> {{ item.weight }}</span>{% endif %}
   {% if item.msrp %}<span><strong>MSRP:</strong> ${{ "%.2f"|format(item.msrp) }}</span>{% endif %}
   {% if item.cutco_url %}<a href="{{ item.cutco_url }}" target="_blank" rel="noopener" class="btn btn-xs">Cutco.com ↗</a>{% endif %}
 </div>

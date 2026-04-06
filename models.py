@@ -31,9 +31,12 @@ class Item(db.Model):
     edge_type  = db.Column(db.String(40),  nullable=False, default="Unknown")
     is_unicorn = db.Column(db.Boolean,     nullable=False, default=False)
     in_catalog = db.Column(db.Boolean,     nullable=False, default=True)
-    cutco_url  = db.Column(db.String(300), nullable=True)
-    msrp       = db.Column(db.Float,       nullable=True)
-    notes      = db.Column(db.Text,        nullable=True)
+    cutco_url      = db.Column(db.String(300), nullable=True)
+    msrp           = db.Column(db.Float,       nullable=True)
+    blade_length   = db.Column(db.String(20),  nullable=True)
+    overall_length = db.Column(db.String(20),  nullable=True)
+    weight         = db.Column(db.String(20),  nullable=True)
+    notes          = db.Column(db.Text,        nullable=True)
 
     variants        = db.relationship("ItemVariant", backref="item",
                                     lazy=True, cascade="all, delete-orphan",

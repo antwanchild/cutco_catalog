@@ -76,8 +76,12 @@
           </select>
         </td>
         <td><a href="{{ item.url }}" target="_blank" class="ext-link">↗</a></td>
-        <input type="hidden" name="name_{{ item.sku }}" value="{{ item.name }}">
-        <input type="hidden" name="url_{{ item.sku }}"  value="{{ item.url }}">
+        <input type="hidden" name="name_{{ item.sku }}"           value="{{ item.name }}">
+        <input type="hidden" name="url_{{ item.sku }}"            value="{{ item.url }}">
+        <input type="hidden" name="msrp_{{ item.sku }}"           value="{{ item.msrp or '' }}">
+        <input type="hidden" name="blade_length_{{ item.sku }}"   value="{{ item.blade_length or '' }}">
+        <input type="hidden" name="overall_length_{{ item.sku }}" value="{{ item.overall_length or '' }}">
+        <input type="hidden" name="weight_{{ item.sku }}"         value="{{ item.weight or '' }}">
       </tr>
       {% endfor %}
     </tbody>
