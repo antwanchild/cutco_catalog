@@ -9,8 +9,6 @@
 <p class="muted">
   Scraped <strong>{{ scraped_total }}</strong> items
   and <strong>{{ scraped_sets_total }}</strong> sets from Cutco.com.
-  New sets: <strong>{{ new_sets | length }}</strong>.
-  Existing sets with data: <strong>{{ existing_sets_data | length }}</strong>.
   {% if blocked_categories %}
     Blocked categories: {{ blocked_categories | join(', ') }}.
   {% endif %}
@@ -119,18 +117,6 @@
   </div>
   {% endif %}
 
-  {# ── DEBUG ── remove after diagnosis #}
-  <pre style="font-size:.7rem;background:#111;color:#0f0;padding:.5rem;overflow:auto">
-existing_sets_data count: {{ existing_sets_data | length }}
-new_sets count: {{ new_sets | length }}
-scraped_sets_total: {{ scraped_sets_total }}
---- existing_sets_data ---
-{% for s in existing_sets_data[:5] %}  {{ s.name }} | qtys: {{ s.member_quantities }}
-{% endfor %}
---- new_sets (first 5) ---
-{% for s in new_sets[:5] %}  {{ s.name }}
-{% endfor %}
-  </pre>
   {# ── Existing Sets with Quantity Updates #}
   {% if existing_sets_data %}
   <h2 class="mt-section">Set Quantity Updates <span class="muted">({{ existing_sets_data | length }})</span></h2>

@@ -400,12 +400,26 @@ def scrape_sets(
             seen_member: set[str] = set()
 
             # Strategy 1: parse itemSetList JSON embedded in page JS
-            set_list_match = re.search(
-                r'"itemSetList"\s*:\s*(\[.*?\])',
-                raw_html, re.DOTALL)
-            if set_list_match:
+            # Use bracket counting instead of regex to handle nested arrays
+            _set_list_json = None
+            _key_match = re.search(r'"itemSetList"\s*:\s*\[', raw_html)
+            if _key_match:
+                _start = _key_match.end() - 1  # position of opening [
+                _depth = 0
+                _end = _start
+                for _i, _ch in enumerate(raw_html[_start:], _start):
+                    if _ch == '[':
+                        _depth += 1
+                    elif _ch == ']':
+                        _depth -= 1
+                        if _depth == 0:
+                            _end = _i + 1
+                            break
+                _set_list_json = raw_html[_start:_end]
+
+            if _set_list_json:
                 try:
-                    set_list = json.loads(set_list_match.group(1))
+                    set_list = json.loads(_set_list_json)
                     for entry in set_list:
                         raw_sku = str(entry.get("childItemNumber") or "").upper().strip().split("/")[0]
                         if not raw_sku:
