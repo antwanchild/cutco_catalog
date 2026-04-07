@@ -175,8 +175,10 @@ def stats():
 # ── Gift list ─────────────────────────────────────────────────────────────────
 
 @views_bp.route("/sets/<int:set_id>/gift-token")
-def gift_token(set_id):
+@views_bp.route("/sets/<int:sid>/gift-token")
+def gift_token(set_id=None, sid=None):
     """Generate a shareable gift list token for a set + person combination."""
+    set_id = set_id if set_id is not None else sid
     person_id = request.args.get("person", type=int)
     if not person_id:
         abort(400)
