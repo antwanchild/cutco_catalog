@@ -271,7 +271,11 @@ def set_add():
         if Set.query.filter(db.func.lower(Set.name) == name.lower()).first():
             flash(f'Set "{name}" already exists.', "error")
             return redirect(url_for("catalog.set_add"))
-        item_set = Set(name=name, notes=request.form.get("notes", "").strip() or None)
+        item_set = Set(
+            name=name,
+            sku=request.form.get("sku", "").strip().upper() or None,
+            notes=request.form.get("notes", "").strip() or None,
+        )
         db.session.add(item_set)
         if db_commit(db.session):
             logger.info("Set created: %s", name)
@@ -288,6 +292,7 @@ def set_edit(set_id=None, sid=None):
     item_set = Set.query.get_or_404(set_id)
     if request.method == "POST":
         item_set.name  = request.form["name"].strip()
+        item_set.sku   = request.form.get("sku", "").strip().upper() or None
         item_set.notes = request.form.get("notes", "").strip() or None
         if db_commit(db.session):
             logger.info("Set updated: %s", item_set.name)
