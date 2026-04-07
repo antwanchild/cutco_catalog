@@ -111,7 +111,7 @@ def admin_logout():
     return resp
 
 
-@admin_bp.route("/api/variants/<int:iid>")
-def api_variants(iid):
-    item = Item.query.get_or_404(iid)
+@admin_bp.route("/api/variants/<int:item_id>")
+def api_variants(item_id):
+    item = Item.query.get_or_404(item_id)
     return jsonify([{"id": v.id, "color": v.color} for v in item.variants])

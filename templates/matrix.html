@@ -29,7 +29,7 @@
       {% for item in items %}
       <tr>
         <td class="matrix-label">
-          <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
+          <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
           {% if item.is_unicorn %}<span title="Unicorn">🦄</span>{% endif %}
         </td>
         {% for person in people %}
@@ -37,7 +37,7 @@
           <td class="matrix-cell cell-{{ ownership.status | lower if ownership else 'none' }}"
               title="{{ person.name }} / {{ item.name }}{% if ownership %}: {{ ownership.status }}{% endif %}">
             {% if ownership %}
-              <a href="{{ url_for('people.ownership_edit', oid=ownership.id) }}" class="cell-link">
+              <a href="{{ url_for('people.ownership_edit', ownership_id=ownership.id) }}" class="cell-link">
                 {# Map status to display symbol #}
                 {{ {'Owned':'✓','Wishlist':'♡','Traded':'↔','Sold':'$'}.get(ownership.status, '?') }}
               </a>
@@ -69,7 +69,7 @@
         {% set variant_list = variants_by_item[item.id] %}
         <tr class="matrix-item-header">
           <td colspan="{{ people | length + 1 }}">
-            <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
+            <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
           </td>
         </tr>
         {% for variant in variant_list %}
@@ -82,7 +82,7 @@
             <td class="matrix-cell cell-{{ ownership.status | lower if ownership else 'none' }}"
                 title="{{ person.name }} / {{ item.name }} / {{ variant.color }}{% if ownership %}: {{ ownership.status }}{% endif %}">
               {% if ownership %}
-                <a href="{{ url_for('people.ownership_edit', oid=ownership.id) }}" class="cell-link">
+                <a href="{{ url_for('people.ownership_edit', ownership_id=ownership.id) }}" class="cell-link">
                   {# Map status to display symbol #}
                   {{ {'Owned':'✓','Wishlist':'♡','Traded':'↔','Sold':'$'}.get(ownership.status, '?') }}
                 </a>

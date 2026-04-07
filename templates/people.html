@@ -15,12 +15,12 @@
   <tbody>
     {% for person in persons %}
     <tr>
-      <td><a href="{{ url_for('people.person_collection', pid=person.id) }}">{{ person.name }}</a></td>
+      <td><a href="{{ url_for('people.person_collection', person_id=person.id) }}">{{ person.name }}</a></td>
       <td>{{ counts[person.id] }}</td>
       <td>{{ person.notes or '—' }}</td>
       <td class="actions">
-        <a href="{{ url_for('people.people_edit', pid=person.id) }}" class="btn btn-xs">Edit</a>
-        <form method="post" action="{{ url_for('people.people_delete', pid=person.id) }}"
+        <a href="{{ url_for('people.people_edit', person_id=person.id) }}" class="btn btn-xs">Edit</a>
+        <form method="post" action="{{ url_for('people.people_delete', person_id=person.id) }}"
               onsubmit="return confirm('Remove {{ person.name }}?')" class="form-inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>

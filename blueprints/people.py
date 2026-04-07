@@ -33,10 +33,10 @@ def people_add():
     return render_template("person_form.html", person=None, action="Add")
 
 
-@people_bp.route("/people/<int:pid>/edit", methods=["GET", "POST"])
+@people_bp.route("/people/<int:person_id>/edit", methods=["GET", "POST"])
 @admin_required
-def people_edit(pid):
-    person = Person.query.get_or_404(pid)
+def people_edit(person_id):
+    person = Person.query.get_or_404(person_id)
     if request.method == "POST":
         person.name  = request.form["name"].strip()
         person.notes = request.form.get("notes", "").strip() or None
@@ -47,10 +47,10 @@ def people_edit(pid):
     return render_template("person_form.html", person=person, action="Edit")
 
 
-@people_bp.route("/people/<int:pid>/delete", methods=["POST"])
+@people_bp.route("/people/<int:person_id>/delete", methods=["POST"])
 @admin_required
-def people_delete(pid):
-    person = Person.query.get_or_404(pid)
+def people_delete(person_id):
+    person = Person.query.get_or_404(person_id)
     name   = person.name
     db.session.delete(person)
     if db_commit(db.session):
@@ -59,22 +59,22 @@ def people_delete(pid):
     return redirect(url_for("people.people"))
 
 
-@people_bp.route("/people/<int:pid>/purge-collection", methods=["POST"])
+@people_bp.route("/people/<int:person_id>/purge-collection", methods=["POST"])
 @admin_required
-def purge_collection(pid):
-    person = Person.query.get_or_404(pid)
-    count  = Ownership.query.filter_by(person_id=pid).count()
-    Ownership.query.filter_by(person_id=pid).delete()
+def purge_collection(person_id):
+    person = Person.query.get_or_404(person_id)
+    count  = Ownership.query.filter_by(person_id=person_id).count()
+    Ownership.query.filter_by(person_id=person_id).delete()
     if db_commit(db.session):
         logger.info("Collection purged: %s (%d entries)", person.name, count)
         flash(f"Removed all {count} ownership entr{'ies' if count != 1 else 'y'} for {person.name}.", "info")
-    return redirect(url_for("people.person_collection", pid=pid))
+    return redirect(url_for("people.person_collection", person_id=person_id))
 
 
-@people_bp.route("/people/<int:pid>/collection")
-def person_collection(pid):
-    person     = Person.query.get_or_404(pid)
-    ownerships = (Ownership.query.filter_by(person_id=pid)
+@people_bp.route("/people/<int:person_id>/collection")
+def person_collection(person_id):
+    person     = Person.query.get_or_404(person_id)
+    ownerships = (Ownership.query.filter_by(person_id=person_id)
                   .order_by(Ownership.status).all())
 
     owned_item_ids = {o.variant.item_id for o in ownerships if o.status == "Owned"}
@@ -115,7 +115,7 @@ def ownership_add():
         variant_id = int(request.form["variant_id"])
         if Ownership.query.filter_by(person_id=person_id, variant_id=variant_id).first():
             flash("That person already has an entry for that variant.", "error")
-            return redirect(url_for("people.person_collection", pid=person_id))
+            return redirect(url_for("people.person_collection", person_id=person_id))
         raw_target = request.form.get("target_price", "").strip()
         try:
             target_price = float(raw_target) if raw_target else None
@@ -131,7 +131,7 @@ def ownership_add():
         if db_commit(db.session):
             logger.info("Ownership added: person %d, variant %d", person_id, variant_id)
             flash("Entry logged.", "success")
-        return redirect(url_for("people.person_collection", pid=person_id))
+        return redirect(url_for("people.person_collection", person_id=person_id))
 
     sel_item = Item.query.get(item_id) if item_id else None
     return render_template("ownership_form.html", ownership=None,
@@ -147,10 +147,10 @@ def ownership_add():
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
-@people_bp.route("/ownership/<int:oid>/edit", methods=["GET", "POST"])
+@people_bp.route("/ownership/<int:ownership_id>/edit", methods=["GET", "POST"])
 @admin_required
-def ownership_edit(oid):
-    ownership = Ownership.query.get_or_404(oid)
+def ownership_edit(ownership_id):
+    ownership = Ownership.query.get_or_404(ownership_id)
     if request.method == "POST":
         ownership.status = request.form.get("status", "Owned")
         raw_target = request.form.get("target_price", "").strip()
@@ -160,9 +160,9 @@ def ownership_edit(oid):
             ownership.target_price = None
         ownership.notes  = request.form.get("notes", "").strip() or None
         if db_commit(db.session):
-            logger.info("Ownership updated: id %d → %s", oid, ownership.status)
+            logger.info("Ownership updated: id %d → %s", ownership_id, ownership.status)
             flash("Updated.", "success")
-        return redirect(url_for("people.person_collection", pid=ownership.person_id))
+        return redirect(url_for("people.person_collection", person_id=ownership.person_id))
 
     return render_template("ownership_form.html", ownership=ownership,
                            people_list=Person.query.order_by(Person.name).all(),
@@ -176,38 +176,38 @@ def ownership_edit(oid):
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
-@people_bp.route("/ownership/<int:oid>/delete", methods=["POST"])
+@people_bp.route("/ownership/<int:ownership_id>/delete", methods=["POST"])
 @admin_required
-def ownership_delete(oid):
-    ownership = Ownership.query.get_or_404(oid)
-    pid       = ownership.person_id
+def ownership_delete(ownership_id):
+    ownership = Ownership.query.get_or_404(ownership_id)
+    person_id       = ownership.person_id
     db.session.delete(ownership)
     if db_commit(db.session):
-        logger.info("Ownership deleted: id %d", oid)
+        logger.info("Ownership deleted: id %d", ownership_id)
         flash("Entry removed.", "info")
-    return redirect(url_for("people.person_collection", pid=pid))
+    return redirect(url_for("people.person_collection", person_id=person_id))
 
 
 # ── Bulk status update ────────────────────────────────────────────────────────
 
-@people_bp.route("/people/<int:pid>/bulk-status", methods=["POST"])
+@people_bp.route("/people/<int:person_id>/bulk-status", methods=["POST"])
 @admin_required
-def bulk_status_update(pid):
-    Person.query.get_or_404(pid)
+def bulk_status_update(person_id):
+    Person.query.get_or_404(person_id)
     selected = request.form.getlist("ownership_ids", type=int)
     new_status = request.form.get("bulk_status", "").strip()
     if not selected or new_status not in STATUS_OPTIONS:
         flash("Select at least one entry and a valid status.", "error")
-        return redirect(url_for("people.person_collection", pid=pid))
+        return redirect(url_for("people.person_collection", person_id=person_id))
     updated = (Ownership.query
-               .filter(Ownership.id.in_(selected), Ownership.person_id == pid)
+               .filter(Ownership.id.in_(selected), Ownership.person_id == person_id)
                .all())
     for ownership in updated:
         ownership.status = new_status
     if db_commit(db.session):
-        logger.info("Bulk status update: person %d, %d entries → %s", pid, len(updated), new_status)
+        logger.info("Bulk status update: person %d, %d entries → %s", person_id, len(updated), new_status)
         flash(f"Updated {len(updated)} entr{'y' if len(updated) == 1 else 'ies'} to {new_status}.", "success")
-    return redirect(url_for("people.person_collection", pid=pid))
+    return redirect(url_for("people.person_collection", person_id=person_id))
 
 
 # ── Wishlist ──────────────────────────────────────────────────────────────────

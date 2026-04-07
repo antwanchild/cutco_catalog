@@ -16,12 +16,10 @@ Environment:
 
 import argparse
 import csv
-import io
 import json
 import os
 import re
 import sys
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 

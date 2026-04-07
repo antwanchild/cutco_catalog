@@ -108,7 +108,7 @@
     <tbody>
       {% for row in collector_rows %}
       <tr>
-        <td><a href="{{ url_for('people.person_collection', pid=row.id) }}">{{ row.name }}</a></td>
+        <td><a href="{{ url_for('people.person_collection', person_id=row.id) }}">{{ row.name }}</a></td>
         <td>{{ row.count }}</td>
         <td>
           {% if summary.catalog_total %}

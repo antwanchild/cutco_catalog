@@ -9,13 +9,13 @@ from models import Item, ItemVariant, KnifeTaskLog, Ownership, Person, Set, Shar
 views_bp = Blueprint("views", __name__)
 
 
-@views_bp.route("/views/item/<int:iid>")
-def item_owners(iid):
-    item = Item.query.get_or_404(iid)
+@views_bp.route("/views/item/<int:item_id>")
+def item_owners(item_id):
+    item = Item.query.get_or_404(item_id)
 
     entries = (Ownership.query
                .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
-               .filter(ItemVariant.item_id == iid)
+               .filter(ItemVariant.item_id == item_id)
                .order_by(Ownership.status).all())
     owner_ids      = {e.person_id for e in entries}
     people_without = (Person.query
@@ -23,12 +23,12 @@ def item_owners(iid):
                       .order_by(Person.name).all())
 
     sharpening = (SharpeningLog.query
-                  .filter_by(item_id=iid)
+                  .filter_by(item_id=item_id)
                   .order_by(SharpeningLog.sharpened_on.desc())
                   .all())
 
     task_log = (KnifeTaskLog.query
-                .filter_by(item_id=iid)
+                .filter_by(item_id=item_id)
                 .order_by(KnifeTaskLog.logged_on.desc())
                 .all())
 
@@ -174,19 +174,19 @@ def stats():
 
 # ── Gift list ─────────────────────────────────────────────────────────────────
 
-@views_bp.route("/sets/<int:sid>/gift-token")
-def gift_token(sid):
+@views_bp.route("/sets/<int:set_id>/gift-token")
+def gift_token(set_id):
     """Generate a shareable gift list token for a set + person combination."""
     person_id = request.args.get("person", type=int)
     if not person_id:
         abort(400)
     # Validate both exist
-    Set.query.get_or_404(sid)
+    Set.query.get_or_404(set_id)
     Person.query.get_or_404(person_id)
-    token = _gift_token(sid, person_id)
+    token = _gift_token(set_id, person_id)
     gift_url = request.host_url.rstrip("/") + f"/gifts/{token}"
     return render_template("gift_share.html", gift_url=gift_url,
-                           sid=sid, person_id=person_id)
+                           set_id=set_id, person_id=person_id)
 
 
 @views_bp.route("/gifts/<token>")
@@ -219,14 +219,14 @@ def gift_list(token):
 
 # ── Collection card ───────────────────────────────────────────────────────────
 
-@views_bp.route("/people/<int:pid>/collection-token")
-def collection_token(pid):
+@views_bp.route("/people/<int:person_id>/collection-token")
+def collection_token(person_id):
     """Generate a shareable collection card token for a person."""
-    person = Person.query.get_or_404(pid)
-    token  = _collection_token(pid)
+    person = Person.query.get_or_404(person_id)
+    token  = _collection_token(person_id)
     card_url = request.host_url.rstrip("/") + f"/collection-card/{token}"
     return render_template("collection_card_share.html", person=person,
-                           card_url=card_url, pid=pid)
+                           card_url=card_url, person_id=person_id)
 
 
 @views_bp.route("/collection-card/<token>")

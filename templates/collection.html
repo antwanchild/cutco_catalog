@@ -5,9 +5,9 @@
   <h1 class="page-title">🏠 {{ person.name }}'s Collection {{ help_btn('collection') }}</h1>
   <div class="page-actions">
     <a href="{{ url_for('people.ownership_add', person_id=person.id) }}" class="btn btn-primary">+ Add Entry</a>
-    <a href="{{ url_for('views.collection_token', pid=person.id) }}" class="btn btn-secondary">🃏 Share Card</a>
+    <a href="{{ url_for('views.collection_token', person_id=person.id) }}" class="btn btn-secondary">🃏 Share Card</a>
     {% if is_admin() %}
-    <form method="post" action="{{ url_for('people.purge_collection', pid=person.id) }}" class="form-inline"
+    <form method="post" action="{{ url_for('people.purge_collection', person_id=person.id) }}" class="form-inline"
           onsubmit="return confirm('Delete ALL ownership entries for {{ person.name }}? This cannot be undone.')">
       <button type="submit" class="btn btn-danger btn-sm">🗑 Purge Collection</button>
     </form>
@@ -17,7 +17,7 @@
 </div>
 
 {% if ownerships %}
-<form method="post" action="{{ url_for('people.bulk_status_update', pid=person.id) }}" id="bulk-form">
+<form method="post" action="{{ url_for('people.bulk_status_update', person_id=person.id) }}" id="bulk-form">
 <h2>Owned / Tracked</h2>
 <div class="table-wrap">
 <table class="data-table">
@@ -33,7 +33,7 @@
     {% for ownership in ownerships %}
     <tr>
       <td><input type="checkbox" name="ownership_ids" value="{{ ownership.id }}" class="row-check"></td>
-      <td><a href="{{ url_for('views.item_owners', iid=ownership.variant.item_id) }}">{{ ownership.variant.item.name }}</a></td>
+      <td><a href="{{ url_for('views.item_owners', item_id=ownership.variant.item_id) }}">{{ ownership.variant.item.name }}</a></td>
       <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
       <td>
@@ -45,8 +45,8 @@
       </td>
       <td>{{ ownership.notes or '—' }}</td>
       <td class="actions">
-        <a href="{{ url_for('people.ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
-        <form method="post" action="{{ url_for('people.ownership_delete', oid=ownership.id) }}"
+        <a href="{{ url_for('people.ownership_edit', ownership_id=ownership.id) }}" class="btn btn-xs">Edit</a>
+        <form method="post" action="{{ url_for('people.ownership_delete', ownership_id=ownership.id) }}"
               onsubmit="return confirm('Remove this entry?')" class="form-inline">
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
@@ -112,7 +112,7 @@
   <ul class="gap-list">
     {% for item in item_gaps %}
       <li>
-        <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
+        <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
         <a href="{{ url_for('people.ownership_add', person_id=person.id, item_id=item.id) }}"
            class="btn btn-xs btn-success">+ Add</a>
       </li>

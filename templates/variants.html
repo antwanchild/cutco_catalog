@@ -46,7 +46,7 @@
 
 <div class="form-card compact">
   <h3>Add Variant</h3>
-  <form method="post" action="{{ url_for('catalog.variant_add', iid=item.id) }}" class="inline-form">
+  <form method="post" action="{{ url_for('catalog.variant_add', item_id=item.id) }}" class="inline-form">
     <input type="text" name="color" placeholder="Color name *" class="input-sm" required>
     <input type="text" name="notes" placeholder="Notes (optional)" class="input-sm">
     <button type="submit" class="btn btn-primary btn-sm">Add</button>

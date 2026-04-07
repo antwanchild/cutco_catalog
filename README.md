@@ -242,7 +242,7 @@ Eleven tables backed by SQLite. All migrations run automatically at startup.
 | `sets` | `id`, `name`, `sku` | Named Cutco sets |
 | `item_sets` | `item_id`, `set_id`, `quantity` | Many-to-many join between items and sets; quantity tracks how many of an item a set includes |
 | `sharpening_log` | `id`, `item_id`, `sharpened_on`, `method`, `notes` | One row per sharpening event |
-| `cookware_sessions` | `id`, `item_id`, `baked_on`, `what_made`, `rating`, `notes` | One row per cookware usage session |
+| `cookware_sessions` | `id`, `item_id`, `used_on`, `made_item`, `rating`, `notes` | One row per cookware usage session |
 | `knife_tasks` | `id`, `name`, `is_preset` | Task definitions (e.g. "Slicing bread"); 10 presets seeded on startup |
 | `knife_task_log` | `id`, `item_id`, `task_id`, `logged_on`, `notes` | One row per knife-task usage event |
 | `item_tasks` | `item_id`, `task_id` | Cutco-sourced suggested uses per item; populated by the Uses Sync |
