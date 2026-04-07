@@ -152,13 +152,6 @@ function renderSortIndicators() {
 }
 
 document.querySelectorAll('.member-sort-btn').forEach(function (button) {
-  button.style.background = 'transparent';
-  button.style.border = '0';
-  button.style.padding = '0';
-  button.style.cursor = 'pointer';
-  button.style.font = 'inherit';
-  button.style.fontWeight = '600';
-
   button.addEventListener('click', function () {
     var key = button.dataset.sort;
     if (memberSortState.key === key) {
