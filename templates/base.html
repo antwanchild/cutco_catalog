@@ -25,27 +25,36 @@
     <a href="{{ url_for('catalog.catalog') }}" {% if request.endpoint and request.endpoint.startswith('catalog.') %}class="active"{% endif %}>Catalog</a>
     <a href="{{ url_for('catalog.sets_list') }}" {% if request.endpoint and 'set' in request.endpoint %}class="active"{% endif %}>Sets</a>
     <a href="{{ url_for('people.people') }}" {% if request.endpoint and 'people' in request.endpoint %}class="active"{% endif %}>People</a>
-    <a href="{{ url_for('views.matrix') }}"
-       {% if request.endpoint == 'views.matrix' %}class="active"{% endif %}>Matrix</a>
-    <a href="{{ url_for('people.wishlist') }}"
-       {% if request.endpoint and 'wishlist' in request.endpoint %}class="active"{% endif %}>Wishlist</a>
-    <a href="{{ url_for('logs.sharpening') }}"
-       {% if request.endpoint and 'sharpening' in request.endpoint %}class="active"{% endif %}>Sharpening</a>
-    <a href="{{ url_for('logs.cookware') }}"
-       {% if request.endpoint and ('bakeware' in request.endpoint or 'cookware' in request.endpoint) %}class="active"{% endif %}>Cookware</a>
-    <a href="{{ url_for('logs.tasks') }}"
-       {% if request.endpoint and 'task' in request.endpoint %}class="active"{% endif %}>Tasks</a>
     <a href="{{ url_for('views.stats') }}"
        {% if request.endpoint == 'views.stats' %}class="active"{% endif %}>Stats</a>
-    <a href="{{ url_for('data.import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
-    <a href="{{ url_for('data.export_page') }}">Export CSV</a>
+
+    <details class="nav-group">
+      <summary class="nav-group-toggle
+        {% if request.endpoint in ['views.matrix', 'people.wishlist', 'logs.sharpening', 'logs.cookware', 'logs.tasks', 'data.import_page', 'data.export_page', 'data.export_csv', 'data.import_template'] or (request.endpoint and ('bakeware' in request.endpoint or 'cookware' in request.endpoint or 'task' in request.endpoint or 'wishlist' in request.endpoint or 'sharpening' in request.endpoint or 'import' in request.endpoint or 'export' in request.endpoint)) %}active{% endif %}">
+        More
+      </summary>
+      <div class="nav-group-menu">
+        <a href="{{ url_for('views.matrix') }}" {% if request.endpoint == 'views.matrix' %}class="active"{% endif %}>Matrix</a>
+        <a href="{{ url_for('people.wishlist') }}" {% if request.endpoint and 'wishlist' in request.endpoint %}class="active"{% endif %}>Wishlist</a>
+        <a href="{{ url_for('logs.sharpening') }}" {% if request.endpoint and 'sharpening' in request.endpoint %}class="active"{% endif %}>Sharpening</a>
+        <a href="{{ url_for('logs.cookware') }}" {% if request.endpoint and ('bakeware' in request.endpoint or 'cookware' in request.endpoint) %}class="active"{% endif %}>Cookware</a>
+        <a href="{{ url_for('logs.tasks') }}" {% if request.endpoint and 'task' in request.endpoint %}class="active"{% endif %}>Tasks</a>
+        <a href="{{ url_for('data.import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
+        <a href="{{ url_for('data.export_page') }}" {% if request.endpoint and 'export' in request.endpoint %}class="active"{% endif %}>Export CSV</a>
+      </div>
+    </details>
+
     {% if is_admin() %}
-      <span class="badge-admin">Admin</span>
-      <a href="{{ url_for('admin.msrp_diff_page') }}"
-         {% if request.endpoint == 'admin.msrp_diff_page' %}class="active"{% endif %}>MSRP Diff</a>
-      <a href="{{ url_for('admin.specs_backfill_page') }}"
-         {% if request.endpoint == 'admin.specs_backfill_page' %}class="active"{% endif %}>Specs Backfill</a>
-      <a href="{{ url_for('admin.admin_logout') }}">Logout</a>
+      <details class="nav-group">
+        <summary class="nav-group-toggle {% if request.endpoint and request.endpoint.startswith('admin.') %}active{% endif %}">
+          Admin <span class="badge-admin">On</span>
+        </summary>
+        <div class="nav-group-menu">
+          <a href="{{ url_for('admin.msrp_diff_page') }}" {% if request.endpoint == 'admin.msrp_diff_page' %}class="active"{% endif %}>MSRP Diff</a>
+          <a href="{{ url_for('admin.specs_backfill_page') }}" {% if request.endpoint == 'admin.specs_backfill_page' %}class="active"{% endif %}>Specs Backfill</a>
+          <a href="{{ url_for('admin.admin_logout') }}">Logout</a>
+        </div>
+      </details>
     {% else %}
       <a href="{{ url_for('admin.admin_login') }}">Admin</a>
     {% endif %}
