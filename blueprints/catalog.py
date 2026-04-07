@@ -281,7 +281,7 @@ def set_add():
             logger.info("Set created: %s", name)
             flash(f'Created set "{name}".', "success")
         return redirect(url_for("catalog.sets_list"))
-    return render_template("set_form.html", set=None, action="Add")
+    return render_template("set_form.html", set=None, action="Add", all_items=[], member_qty_map={})
 
 
 @catalog_bp.route("/sets/<int:set_id>/edit", methods=["GET", "POST"])
@@ -290,15 +290,51 @@ def set_add():
 def set_edit(set_id=None, sid=None):
     set_id = set_id if set_id is not None else sid
     item_set = Set.query.get_or_404(set_id)
+    all_items = Item.query.order_by(Item.name).all()
+    member_qty_map = {member.item_id: member.quantity for member in item_set.members}
+
     if request.method == "POST":
         item_set.name  = request.form["name"].strip()
         item_set.sku   = request.form.get("sku", "").strip().upper() or None
         item_set.notes = request.form.get("notes", "").strip() or None
+
+        selected_item_ids: set[int] = set()
+        for raw_item_id in request.form.getlist("member_item_ids"):
+            try:
+                selected_item_ids.add(int(raw_item_id))
+            except (TypeError, ValueError):
+                continue
+
+        valid_item_ids = {
+            item_id for (item_id,) in db.session.query(Item.id).filter(Item.id.in_(selected_item_ids)).all()
+        } if selected_item_ids else set()
+
+        existing_members = {member.item_id: member for member in item_set.members}
+
+        # Remove memberships that are no longer selected.
+        for existing_item_id, existing_member in list(existing_members.items()):
+            if existing_item_id not in valid_item_ids:
+                db.session.delete(existing_member)
+
+        # Add new memberships and update quantities on selected members.
+        for item_id in valid_item_ids:
+            try:
+                qty = int(request.form.get(f"member_qty_{item_id}", "1"))
+            except (TypeError, ValueError):
+                qty = 1
+            qty = max(1, qty)
+
+            if item_id in existing_members:
+                existing_members[item_id].quantity = qty
+            else:
+                db.session.add(ItemSetMember(set_id=item_set.id, item_id=item_id, quantity=qty))
+
         if db_commit(db.session):
             logger.info("Set updated: %s", item_set.name)
             flash(f'Updated set "{item_set.name}".', "success")
         return redirect(url_for("catalog.sets_list"))
-    return render_template("set_form.html", set=item_set, action="Edit")
+    return render_template("set_form.html", set=item_set, action="Edit",
+                           all_items=all_items, member_qty_map=member_qty_map)
 
 
 @catalog_bp.route("/sets/<int:set_id>/delete", methods=["POST"])

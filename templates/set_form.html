@@ -16,9 +16,69 @@
   <label>Notes
     <textarea name="notes" rows="2" class="input-full">{{ set.notes if set and set.notes else '' }}</textarea>
   </label>
+  {% if action == "Edit" %}
+  <h2 class="section-heading">Set Members</h2>
+  <p class="muted">Select items in this set and set quantity for each selected item.</p>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Include</th>
+          <th>Name</th>
+          <th>SKU</th>
+          <th>Category</th>
+          <th>Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in all_items %}
+        {% set is_member = item.id in member_qty_map %}
+        <tr>
+          <td>
+            <input type="checkbox"
+                   name="member_item_ids"
+                   value="{{ item.id }}"
+                   class="member-checkbox"
+                   data-target="member-qty-{{ item.id }}"
+                   {% if is_member %}checked{% endif %}>
+          </td>
+          <td>{{ item.name }}</td>
+          <td class="mono">{{ item.sku or '—' }}</td>
+          <td>{{ item.category or '—' }}</td>
+          <td>
+            <input type="number"
+                   id="member-qty-{{ item.id }}"
+                   name="member_qty_{{ item.id }}"
+                   min="1"
+                   step="1"
+                   value="{{ member_qty_map.get(item.id, 1) }}"
+                   {% if not is_member %}disabled{% endif %}
+                   class="input-sm"
+                   style="max-width:90px">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">{{ action }} Set</button>
     <a href="{{ url_for('catalog.sets_list') }}" class="btn btn-ghost">Cancel</a>
   </div>
 </form>
+{% if action == "Edit" %}
+<script>
+document.querySelectorAll('.member-checkbox').forEach(function (checkbox) {
+  checkbox.addEventListener('change', function () {
+    var qtyInput = document.getElementById(checkbox.dataset.target);
+    if (!qtyInput) return;
+    qtyInput.disabled = !checkbox.checked;
+    if (checkbox.checked && (!qtyInput.value || Number(qtyInput.value) < 1)) {
+      qtyInput.value = '1';
+    }
+  });
+});
+</script>
+{% endif %}
 {% endblock %}
