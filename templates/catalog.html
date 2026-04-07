@@ -153,7 +153,7 @@ document.getElementById('sync-btn').addEventListener('click', function(e) {
     </form>
     <form method="post" action="{{ url_for('catalog.catalog_purge_all') }}">
       <button type="submit" class="btn btn-danger" style="width:100%;text-align:left"
-              onclick="return confirm('DELETE THE ENTIRE CATALOG including all ownership, sharpening, bakeware, and task records? This cannot be undone.')">
+              onclick="return confirm('DELETE THE ENTIRE CATALOG including all ownership, sharpening, cookware, and task records? This cannot be undone.')">
         💥 Purge everything
         <div style="font-size:.78rem;font-weight:400;margin-top:.2rem;opacity:.85">Deletes all items, variants, ownership, and all logs</div>
       </button>

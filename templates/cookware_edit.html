@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Edit Baking Session</h1>
-  <a href="{{ url_for('logs.bakeware') }}" class="btn btn-ghost">← Bakeware Tracker</a>
+  <a href="{{ url_for('logs.cookware') }}" class="btn btn-ghost">← Cookware Tracker</a>
 </div>
 
 <form method="post" class="form-card">
@@ -33,7 +33,7 @@
   </label>
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">Save</button>
-    <a href="{{ url_for('logs.bakeware') }}" class="btn btn-ghost">Cancel</a>
+    <a href="{{ url_for('logs.cookware') }}" class="btn btn-ghost">Cancel</a>
   </div>
 </form>
 {% endblock %}

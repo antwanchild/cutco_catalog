@@ -199,6 +199,7 @@ def sharpening_notify():
 
 # ── Bakeware ──────────────────────────────────────────────────────────────────
 
+@logs_bp.route("/cookware", endpoint="cookware")
 @logs_bp.route("/bakeware")
 def bakeware():
     today       = date.today()
@@ -254,7 +255,7 @@ def bakeware():
                       .order_by(Item.name).all()) if BAKEWARE_CATEGORIES else Item.query.order_by(Item.name).all()
 
     return render_template(
-        "bakeware.html",
+        "cookware.html",
         tracked          = tracked,
         recent_sessions  = all_sessions[:25],
         stale_count      = sum(1 for row in tracked if row["stale"]),
@@ -278,13 +279,13 @@ def bakeware_add():
 
     if not item_id or not baked_on or not what_made:
         flash("Item, date, and what you made are required.", "error")
-        return redirect(url_for("logs.bakeware"))
+        return redirect(url_for("logs.cookware"))
     if not _safe_parse_iso_date(baked_on):
         flash("Date must be valid YYYY-MM-DD.", "error")
-        return redirect(url_for("logs.bakeware"))
+        return redirect(url_for("logs.cookware"))
     if not Item.query.get(item_id):
         flash("Item not found.", "error")
-        return redirect(url_for("logs.bakeware"))
+        return redirect(url_for("logs.cookware"))
 
     try:
         rating = int(raw_rating) if raw_rating else None
@@ -301,9 +302,9 @@ def bakeware_add():
         notes    = notes,
     ))
     if db_commit(db.session):
-        logger.info("Bakeware session logged: item %d on %s — %s", item_id, baked_on, what_made)
+        logger.info("Cookware session logged: item %d on %s — %s", item_id, baked_on, what_made)
         flash("Baking session logged.", "success")
-    return redirect(url_for("logs.bakeware"))
+    return redirect(url_for("logs.cookware"))
 
 
 @logs_bp.route("/bakeware/<int:sid>/edit", methods=["GET", "POST"])
@@ -314,7 +315,7 @@ def bakeware_edit(sid):
         new_date = request.form.get("baked_on", session.baked_on).strip()
         if not _safe_parse_iso_date(new_date):
             flash("Date must be valid YYYY-MM-DD.", "error")
-            return redirect(url_for("logs.bakeware"))
+            return redirect(url_for("logs.cookware"))
         session.baked_on  = new_date
         session.what_made = request.form.get("what_made", "").strip() or session.what_made
         session.notes     = request.form.get("notes", "").strip() or None
@@ -325,10 +326,10 @@ def bakeware_edit(sid):
         except ValueError:
             pass
         if db_commit(db.session):
-            logger.info("Bakeware session %d updated", sid)
+            logger.info("Cookware session %d updated", sid)
             flash("Session updated.", "success")
-        return redirect(url_for("logs.bakeware"))
-    return render_template("bakeware_edit.html", session=session)
+        return redirect(url_for("logs.cookware"))
+    return render_template("cookware_edit.html", session=session)
 
 
 @logs_bp.route("/bakeware/<int:sid>/delete", methods=["POST"])
@@ -337,9 +338,9 @@ def bakeware_delete(sid):
     session = BakewareSession.query.get_or_404(sid)
     db.session.delete(session)
     if db_commit(db.session):
-        logger.info("Bakeware session %d deleted", sid)
+        logger.info("Cookware session %d deleted", sid)
         flash("Session removed.", "info")
-    return redirect(url_for("logs.bakeware"))
+    return redirect(url_for("logs.cookware"))
 
 
 @logs_bp.route("/bakeware/item/<int:iid>/purge", methods=["POST"])
@@ -349,9 +350,9 @@ def bakeware_purge_item(iid):
     count = BakewareSession.query.filter_by(item_id=iid).count()
     BakewareSession.query.filter_by(item_id=iid).delete()
     if db_commit(db.session):
-        logger.info("Bakeware sessions purged for item %d (%d entries)", iid, count)
-        flash(f"Removed all {count} bakeware session{'s' if count != 1 else ''} for {item.name}.", "info")
-    return redirect(url_for("logs.bakeware"))
+        logger.info("Cookware sessions purged for item %d (%d entries)", iid, count)
+        flash(f"Removed all {count} cookware session{'s' if count != 1 else ''} for {item.name}.", "info")
+    return redirect(url_for("logs.cookware"))
 
 
 @logs_bp.route("/bakeware/purge-all", methods=["POST"])
@@ -360,9 +361,9 @@ def bakeware_purge_all():
     count = BakewareSession.query.count()
     BakewareSession.query.delete()
     if db_commit(db.session):
-        logger.info("All bakeware sessions purged (%d entries)", count)
-        flash(f"Removed all {count} bakeware session{'s' if count != 1 else ''}.", "info")
-    return redirect(url_for("logs.bakeware"))
+        logger.info("All cookware sessions purged (%d entries)", count)
+        flash(f"Removed all {count} cookware session{'s' if count != 1 else ''}.", "info")
+    return redirect(url_for("logs.cookware"))
 
 
 @logs_bp.route("/bakeware/notify", methods=["POST"])
@@ -389,21 +390,21 @@ def bakeware_notify():
     stale.sort(key=lambda pair: pair[1], reverse=True)
 
     if not stale:
-        flash(f"No bakeware unused for >{BAKEWARE_THRESHOLD_DAYS} days.", "info")
-        return redirect(url_for("logs.bakeware"))
+        flash(f"No cookware unused for >{BAKEWARE_THRESHOLD_DAYS} days.", "info")
+        return redirect(url_for("logs.cookware"))
 
     if DISCORD_WEBHOOK_URL:
-        lines = [f"**🍰 Bakeware Reminder — {len(stale)} item(s) unused**"]
+        lines = [f"**🍳 Cookware Reminder — {len(stale)} item(s) unused**"]
         for item, days in stale:
             lines.append(f"• {item.name} — {days} days since last use")
         _notify_discord("\n".join(lines))
-        flash(f"Sent reminder for {len(stale)} idle bakeware item(s) to Discord.", "success")
+        flash(f"Sent reminder for {len(stale)} idle cookware item(s) to Discord.", "success")
     else:
         flash(
             f"{len(stale)} item(s) idle — set DISCORD_WEBHOOK_URL to enable notifications.",
             "info",
         )
-    return redirect(url_for("logs.bakeware"))
+    return redirect(url_for("logs.cookware"))
 
 
 # ── Knife Task Pairing ────────────────────────────────────────────────────────
