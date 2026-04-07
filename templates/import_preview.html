@@ -42,7 +42,7 @@
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-        <th>Edge</th><th>Category</th><th>Unicorn</th><th>Person</th><th>Status</th><th>Sets</th><th>Notes</th>
+        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Sets</th><th>Notes</th>
       </tr>
     </thead>
     <tbody>
@@ -71,9 +71,9 @@
         <td>
           <input type="text" name="item_category_{{ loop.index0 }}" value="{{ item.category or '' }}" class="input-xs">
         </td>
-        <td>
-          <input type="checkbox" name="item_unicorn_{{ loop.index0 }}" {% if item.is_unicorn %}checked{% endif %}>
-        </td>
+        <td><input type="checkbox" name="item_sku_unicorn_{{ loop.index0 }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
+        <td><input type="checkbox" name="item_variant_unicorn_{{ loop.index0 }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
+        <td><input type="checkbox" name="item_edge_unicorn_{{ loop.index0 }}" {% if item.is_edge_unicorn %}checked{% endif %}></td>
         <td>
           <input type="text" name="item_person_{{ loop.index0 }}" value="{{ item.person or '' }}" class="input-xs">
         </td>
@@ -111,7 +111,7 @@
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-        <th>Edge</th><th>Category</th><th>Unicorn</th><th>Person</th><th>Status</th><th>Sets</th>
+        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Sets</th>
       </tr>
     </thead>
     <tbody>
@@ -142,9 +142,9 @@
         <td>
           <input type="text" name="item_category_{{ form_field_index }}" value="{{ item.category or '' }}" class="input-xs">
         </td>
-        <td>
-          <input type="checkbox" name="item_unicorn_{{ form_field_index }}" {% if item.is_unicorn %}checked{% endif %}>
-        </td>
+        <td><input type="checkbox" name="item_sku_unicorn_{{ form_field_index }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
+        <td><input type="checkbox" name="item_variant_unicorn_{{ form_field_index }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
+        <td><input type="checkbox" name="item_edge_unicorn_{{ form_field_index }}" {% if item.is_edge_unicorn %}checked{% endif %}></td>
         <td>
           <input type="text" name="item_person_{{ form_field_index }}" value="{{ item.person or '' }}" class="input-xs">
         </td>
@@ -171,10 +171,17 @@
   {% if ownership_entries %}
   <h2>Ownership Entries ({{ ownership_entries | length }})</h2>
   <p class="muted">These items already exist in the catalog. Check entries to log ownership.</p>
+  {% set new_variant_count = ownership_entries | selectattr("is_new_variant") | list | length %}
+  {% if new_variant_count %}
+  <p class="flash flash-info">
+    <strong>{{ new_variant_count }}</strong> ownership row(s) will create a new variant for the matched item/SKU.
+  </p>
+  <p class="muted small">Variant colors are item-specific, so a new variant here applies only to that item/SKU.</p>
+  {% endif %}
   <input type="hidden" name="own_count" value="{{ ownership_entries | length }}">
   <table class="data-table">
     <thead>
-      <tr><th>Accept</th><th>Person</th><th>Item</th><th>Color</th><th>Status</th><th>Notes</th></tr>
+      <tr><th>Accept</th><th>Person</th><th>Item</th><th>Color</th><th>Status</th><th>Flags</th><th>Notes</th></tr>
     </thead>
     <tbody>
       {% for entry in ownership_entries %}
@@ -192,6 +199,7 @@
         <td>
           <input type="hidden" name="own_color_{{ loop.index0 }}" value="{{ entry.color }}">
           {{ entry.color }}
+          {% if entry.is_new_variant %}<span class="badge badge-new">new variant</span>{% endif %}
         </td>
         <td>
           <select name="own_status_{{ loop.index0 }}" class="select-xs">
@@ -199,6 +207,15 @@
               <option value="{{ status_option }}" {% if status_option == entry.status %}selected{% endif %}>{{ status_option }}</option>
             {% endfor %}
           </select>
+        </td>
+        <td>
+          <input type="hidden" name="own_sku_unicorn_{{ loop.index0 }}" value="{% if entry.is_sku_unicorn %}on{% endif %}">
+          <input type="hidden" name="own_variant_unicorn_{{ loop.index0 }}" value="{% if entry.is_variant_unicorn %}on{% endif %}">
+          <input type="hidden" name="own_edge_unicorn_{{ loop.index0 }}" value="{% if entry.is_edge_unicorn %}on{% endif %}">
+          {% if entry.is_sku_unicorn %}<span class="badge badge-unicorn">SKU 🦄</span>{% endif %}
+          {% if entry.is_variant_unicorn %}<span class="badge badge-unicorn">Variant 🦄</span>{% endif %}
+          {% if entry.is_edge_unicorn %}<span class="badge badge-unicorn">Edge 🦄</span>{% endif %}
+          {% if not entry.is_sku_unicorn and not entry.is_variant_unicorn and not entry.is_edge_unicorn %}<span class="muted">—</span>{% endif %}
         </td>
         <td>
           <input type="hidden" name="own_notes_{{ loop.index0 }}" value="{{ entry.notes or '' }}">

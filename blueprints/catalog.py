@@ -31,6 +31,7 @@ def catalog():
     if unicorn_f == "1":
         query = query.filter(db.or_(
             Item.is_unicorn,
+            Item.edge_is_unicorn,
             Item.variants.any(ItemVariant.is_unicorn == True)  # noqa: E712
         ))
 
@@ -64,6 +65,7 @@ def catalog_add():
             category   = request.form.get("category", "").strip() or None,
             edge_type  = request.form.get("edge_type", "Unknown"),
             is_unicorn = request.form.get("is_unicorn") == "on",
+            edge_is_unicorn = request.form.get("edge_is_unicorn") == "on",
             in_catalog = request.form.get("in_catalog") == "on",
             cutco_url  = request.form.get("cutco_url", "").strip() or None,
             notes      = request.form.get("notes", "").strip() or None,
@@ -97,6 +99,7 @@ def catalog_edit(item_id):
         item.category   = request.form.get("category", "").strip() or None
         item.edge_type  = request.form.get("edge_type", "Unknown")
         item.is_unicorn = request.form.get("is_unicorn") == "on"
+        item.edge_is_unicorn = request.form.get("edge_is_unicorn") == "on"
         item.in_catalog = request.form.get("in_catalog") == "on"
         item.cutco_url  = request.form.get("cutco_url", "").strip() or None
         item.notes      = request.form.get("notes", "").strip() or None
@@ -605,7 +608,7 @@ def catalog_sync_confirm():
             msrp = None
         item = Item(name=data.get("name", sku), sku=sku,
                     category=data.get("category"), cutco_url=data.get("url"),
-                    in_catalog=True, is_unicorn=False,
+                    in_catalog=True, is_unicorn=False, edge_is_unicorn=False,
                     edge_type=data.get("edge_type") or "Unknown",
                     msrp=msrp,
                     blade_length=data.get("blade_length") or None,

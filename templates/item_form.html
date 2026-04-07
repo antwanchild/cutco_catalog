@@ -47,7 +47,11 @@
   <div class="form-row checkbox-row">
     <label class="checkbox-label">
       <input type="checkbox" name="is_unicorn" {% if item and item.is_unicorn %}checked{% endif %}>
-      🦄 Unicorn (discontinued / rare)
+      🦄 SKU Unicorn (item-level)
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" name="edge_is_unicorn" {% if item and item.edge_is_unicorn %}checked{% endif %}>
+      🦄 Edge Unicorn (blade-type rarity)
     </label>
     <label class="checkbox-label">
       <input type="checkbox" name="in_catalog" {% if not item or item.in_catalog %}checked{% endif %}>
