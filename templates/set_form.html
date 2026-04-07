@@ -23,14 +23,34 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>Include</th>
-          <th>Name</th>
-          <th>SKU</th>
-          <th>Category</th>
-          <th>Qty</th>
+          <th>
+            <button type="button" class="member-sort-btn" data-sort="include">
+              Include <span class="member-sort-indicator" data-for="include"></span>
+            </button>
+          </th>
+          <th>
+            <button type="button" class="member-sort-btn" data-sort="name">
+              Name <span class="member-sort-indicator" data-for="name"></span>
+            </button>
+          </th>
+          <th>
+            <button type="button" class="member-sort-btn" data-sort="sku">
+              SKU <span class="member-sort-indicator" data-for="sku"></span>
+            </button>
+          </th>
+          <th>
+            <button type="button" class="member-sort-btn" data-sort="category">
+              Category <span class="member-sort-indicator" data-for="category"></span>
+            </button>
+          </th>
+          <th>
+            <button type="button" class="member-sort-btn" data-sort="qty">
+              Qty <span class="member-sort-indicator" data-for="qty"></span>
+            </button>
+          </th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="set-members-body">
         {% for item in all_items %}
         {% set is_member = item.id in member_qty_map %}
         <tr>
@@ -77,8 +97,87 @@ document.querySelectorAll('.member-checkbox').forEach(function (checkbox) {
     if (checkbox.checked && (!qtyInput.value || Number(qtyInput.value) < 1)) {
       qtyInput.value = '1';
     }
+    applyMemberSort();
   });
 });
+
+var memberSortState = { key: 'name', dir: 'asc' };
+
+function readSortValue(row, key) {
+  if (key === 'include') {
+    var checkbox = row.querySelector('.member-checkbox');
+    return checkbox && checkbox.checked ? 1 : 0;
+  }
+  if (key === 'qty') {
+    var qtyInput = row.querySelector('input[type="number"]');
+    return qtyInput ? Number(qtyInput.value || 0) : 0;
+  }
+  if (key === 'name') {
+    return (row.children[1].textContent || '').trim().toLowerCase();
+  }
+  if (key === 'sku') {
+    return (row.children[2].textContent || '').trim().toLowerCase();
+  }
+  if (key === 'category') {
+    return (row.children[3].textContent || '').trim().toLowerCase();
+  }
+  return '';
+}
+
+function applyMemberSort() {
+  var tbody = document.getElementById('set-members-body');
+  if (!tbody) return;
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  var key = memberSortState.key;
+  var dir = memberSortState.dir === 'desc' ? -1 : 1;
+
+  rows.sort(function (a, b) {
+    var av = readSortValue(a, key);
+    var bv = readSortValue(b, key);
+    if (typeof av === 'number' && typeof bv === 'number') {
+      return (av - bv) * dir;
+    }
+    return String(av).localeCompare(String(bv)) * dir;
+  });
+
+  rows.forEach(function (row) { tbody.appendChild(row); });
+  renderSortIndicators();
+}
+
+function renderSortIndicators() {
+  document.querySelectorAll('.member-sort-indicator').forEach(function (indicator) {
+    var isActive = indicator.dataset.for === memberSortState.key;
+    indicator.textContent = isActive ? (memberSortState.dir === 'asc' ? '▲' : '▼') : '';
+  });
+}
+
+document.querySelectorAll('.member-sort-btn').forEach(function (button) {
+  button.style.background = 'transparent';
+  button.style.border = '0';
+  button.style.padding = '0';
+  button.style.cursor = 'pointer';
+  button.style.font = 'inherit';
+  button.style.fontWeight = '600';
+
+  button.addEventListener('click', function () {
+    var key = button.dataset.sort;
+    if (memberSortState.key === key) {
+      memberSortState.dir = memberSortState.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      memberSortState.key = key;
+      memberSortState.dir = 'asc';
+    }
+    applyMemberSort();
+  });
+});
+
+document.querySelectorAll('#set-members-body input[type="number"]').forEach(function (input) {
+  input.addEventListener('input', function () {
+    if (memberSortState.key === 'qty') applyMemberSort();
+  });
+});
+
+applyMemberSort();
 </script>
 {% endif %}
 {% endblock %}
