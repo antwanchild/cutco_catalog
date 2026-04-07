@@ -4,12 +4,12 @@ from datetime import date
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from constants import (
-    BAKEWARE_CATEGORIES, BAKEWARE_THRESHOLD_DAYS,
+    COOKWARE_CATEGORIES, COOKWARE_THRESHOLD_DAYS,
     DISCORD_WEBHOOK_URL, SHARPEN_METHODS, SHARPEN_THRESHOLD_DAYS,
 )
 from extensions import db
 from helpers import _notify_discord, admin_required, db_commit
-from models import BakewareSession, Item, KnifeTask, KnifeTaskLog, Ownership, SharpeningLog
+from models import CookwareSession, Item, KnifeTask, KnifeTaskLog, Ownership, SharpeningLog
 
 logs_bp = Blueprint("logs", __name__)
 logger = logging.getLogger(__name__)
@@ -197,14 +197,14 @@ def sharpening_notify():
     return redirect(url_for("logs.sharpening"))
 
 
-# ── Bakeware ──────────────────────────────────────────────────────────────────
+# ── Cookware ──────────────────────────────────────────────────────────────────
 
 @logs_bp.route("/cookware", endpoint="cookware")
-@logs_bp.route("/bakeware")
-def bakeware():
+@logs_bp.route("/bakeware", endpoint="bakeware")
+def cookware():
     today       = date.today()
-    all_sessions = (BakewareSession.query
-                    .order_by(BakewareSession.baked_on.desc())
+    all_sessions = (CookwareSession.query
+                    .order_by(CookwareSession.baked_on.desc())
                     .all())
 
     last_by_item:   dict[int, str]   = {}
@@ -225,7 +225,7 @@ def bakeware():
             continue
         parsed_last = _safe_parse_iso_date(last_str)
         if not parsed_last:
-            logger.warning("Skipping invalid bakeware date for item_id=%s: %r", iid, last_str)
+            logger.warning("Skipping invalid cookware date for item_id=%s: %r", iid, last_str)
             continue
         days_since = (today - parsed_last).days
         ratings    = rating_by_item.get(iid, [])
@@ -233,7 +233,7 @@ def bakeware():
             item       = item,
             last_date  = last_str,
             days_since = days_since,
-            stale      = days_since > BAKEWARE_THRESHOLD_DAYS,
+            stale      = days_since > COOKWARE_THRESHOLD_DAYS,
             session_count = count_by_item[iid],
             avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None,
         ))
@@ -242,17 +242,17 @@ def bakeware():
 
     used_ids = set(last_by_item.keys())
     never_used = (Item.query
-                  .filter(Item.category.in_(BAKEWARE_CATEGORIES))
+                  .filter(Item.category.in_(COOKWARE_CATEGORIES))
                   .filter(Item.id.notin_(used_ids))
                   .order_by(Item.name)
-                  .all()) if BAKEWARE_CATEGORIES else []
+                  .all()) if COOKWARE_CATEGORIES else []
 
-    bakeware_items = (Item.query
-                      .filter(Item.category.in_(BAKEWARE_CATEGORIES))
-                      .order_by(Item.name).all()) if BAKEWARE_CATEGORIES else []
+    cookware_items = (Item.query
+                      .filter(Item.category.in_(COOKWARE_CATEGORIES))
+                      .order_by(Item.name).all()) if COOKWARE_CATEGORIES else []
     other_items    = (Item.query
-                      .filter(Item.category.notin_(BAKEWARE_CATEGORIES))
-                      .order_by(Item.name).all()) if BAKEWARE_CATEGORIES else Item.query.order_by(Item.name).all()
+                      .filter(Item.category.notin_(COOKWARE_CATEGORIES))
+                      .order_by(Item.name).all()) if COOKWARE_CATEGORIES else Item.query.order_by(Item.name).all()
 
     return render_template(
         "cookware.html",
@@ -260,17 +260,18 @@ def bakeware():
         recent_sessions  = all_sessions[:25],
         stale_count      = sum(1 for row in tracked if row["stale"]),
         never_used       = never_used,
-        threshold_days   = BAKEWARE_THRESHOLD_DAYS,
+        threshold_days   = COOKWARE_THRESHOLD_DAYS,
         today            = today.isoformat(),
-        bakeware_items   = bakeware_items,
+        cookware_items   = cookware_items,
         other_items      = other_items,
         has_discord      = bool(DISCORD_WEBHOOK_URL),
     )
 
 
-@logs_bp.route("/bakeware/add", methods=["POST"])
+@logs_bp.route("/cookware/add", methods=["POST"], endpoint="cookware_add")
+@logs_bp.route("/bakeware/add", methods=["POST"], endpoint="bakeware_add")
 @admin_required
-def bakeware_add():
+def cookware_add():
     item_id   = request.form.get("item_id", type=int)
     baked_on  = request.form.get("baked_on", "").strip()
     what_made = request.form.get("what_made", "").strip()
@@ -294,7 +295,7 @@ def bakeware_add():
     except ValueError:
         rating = None
 
-    db.session.add(BakewareSession(
+    db.session.add(CookwareSession(
         item_id  = item_id,
         baked_on = baked_on,
         what_made = what_made,
@@ -303,14 +304,15 @@ def bakeware_add():
     ))
     if db_commit(db.session):
         logger.info("Cookware session logged: item %d on %s — %s", item_id, baked_on, what_made)
-        flash("Baking session logged.", "success")
+        flash("Cookware session logged.", "success")
     return redirect(url_for("logs.cookware"))
 
 
-@logs_bp.route("/bakeware/<int:sid>/edit", methods=["GET", "POST"])
+@logs_bp.route("/cookware/<int:sid>/edit", methods=["GET", "POST"], endpoint="cookware_edit")
+@logs_bp.route("/bakeware/<int:sid>/edit", methods=["GET", "POST"], endpoint="bakeware_edit")
 @admin_required
-def bakeware_edit(sid):
-    session = BakewareSession.query.get_or_404(sid)
+def cookware_edit(sid):
+    session = CookwareSession.query.get_or_404(sid)
     if request.method == "POST":
         new_date = request.form.get("baked_on", session.baked_on).strip()
         if not _safe_parse_iso_date(new_date):
@@ -332,10 +334,11 @@ def bakeware_edit(sid):
     return render_template("cookware_edit.html", session=session)
 
 
-@logs_bp.route("/bakeware/<int:sid>/delete", methods=["POST"])
+@logs_bp.route("/cookware/<int:sid>/delete", methods=["POST"], endpoint="cookware_delete")
+@logs_bp.route("/bakeware/<int:sid>/delete", methods=["POST"], endpoint="bakeware_delete")
 @admin_required
-def bakeware_delete(sid):
-    session = BakewareSession.query.get_or_404(sid)
+def cookware_delete(sid):
+    session = CookwareSession.query.get_or_404(sid)
     db.session.delete(session)
     if db_commit(db.session):
         logger.info("Cookware session %d deleted", sid)
@@ -343,34 +346,37 @@ def bakeware_delete(sid):
     return redirect(url_for("logs.cookware"))
 
 
-@logs_bp.route("/bakeware/item/<int:iid>/purge", methods=["POST"])
+@logs_bp.route("/cookware/item/<int:iid>/purge", methods=["POST"], endpoint="cookware_purge_item")
+@logs_bp.route("/bakeware/item/<int:iid>/purge", methods=["POST"], endpoint="bakeware_purge_item")
 @admin_required
-def bakeware_purge_item(iid):
+def cookware_purge_item(iid):
     item = Item.query.get_or_404(iid)
-    count = BakewareSession.query.filter_by(item_id=iid).count()
-    BakewareSession.query.filter_by(item_id=iid).delete()
+    count = CookwareSession.query.filter_by(item_id=iid).count()
+    CookwareSession.query.filter_by(item_id=iid).delete()
     if db_commit(db.session):
         logger.info("Cookware sessions purged for item %d (%d entries)", iid, count)
         flash(f"Removed all {count} cookware session{'s' if count != 1 else ''} for {item.name}.", "info")
     return redirect(url_for("logs.cookware"))
 
 
-@logs_bp.route("/bakeware/purge-all", methods=["POST"])
+@logs_bp.route("/cookware/purge-all", methods=["POST"], endpoint="cookware_purge_all")
+@logs_bp.route("/bakeware/purge-all", methods=["POST"], endpoint="bakeware_purge_all")
 @admin_required
-def bakeware_purge_all():
-    count = BakewareSession.query.count()
-    BakewareSession.query.delete()
+def cookware_purge_all():
+    count = CookwareSession.query.count()
+    CookwareSession.query.delete()
     if db_commit(db.session):
         logger.info("All cookware sessions purged (%d entries)", count)
         flash(f"Removed all {count} cookware session{'s' if count != 1 else ''}.", "info")
     return redirect(url_for("logs.cookware"))
 
 
-@logs_bp.route("/bakeware/notify", methods=["POST"])
+@logs_bp.route("/cookware/notify", methods=["POST"], endpoint="cookware_notify")
+@logs_bp.route("/bakeware/notify", methods=["POST"], endpoint="bakeware_notify")
 @admin_required
-def bakeware_notify():
+def cookware_notify():
     today        = date.today()
-    all_sessions = BakewareSession.query.order_by(BakewareSession.baked_on.desc()).all()
+    all_sessions = CookwareSession.query.order_by(CookwareSession.baked_on.desc()).all()
     last_by_item: dict[int, str] = {}
     for session in all_sessions:
         if session.item_id not in last_by_item:
@@ -380,17 +386,17 @@ def bakeware_notify():
     for iid, last_str in last_by_item.items():
         parsed_last = _safe_parse_iso_date(last_str)
         if not parsed_last:
-            logger.warning("Skipping invalid bakeware date for item_id=%s: %r", iid, last_str)
+            logger.warning("Skipping invalid cookware date for item_id=%s: %r", iid, last_str)
             continue
         days_since = (today - parsed_last).days
-        if days_since > BAKEWARE_THRESHOLD_DAYS:
+        if days_since > COOKWARE_THRESHOLD_DAYS:
             item = Item.query.get(iid)
             if item:
                 stale.append((item, days_since))
     stale.sort(key=lambda pair: pair[1], reverse=True)
 
     if not stale:
-        flash(f"No cookware unused for >{BAKEWARE_THRESHOLD_DAYS} days.", "info")
+        flash(f"No cookware unused for >{COOKWARE_THRESHOLD_DAYS} days.", "info")
         return redirect(url_for("logs.cookware"))
 
     if DISCORD_WEBHOOK_URL:

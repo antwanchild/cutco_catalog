@@ -18,9 +18,19 @@ DATA_DIR                = os.environ.get("DATA_DIR", "/data")
 DISCORD_WEBHOOK_URL     = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
 SHARPEN_METHODS         = ["Home Sharpener", "Whetstone", "Cutco Service", "Professional", "Other"]
 SHARPEN_THRESHOLD_DAYS  = int(os.environ.get("SHARPEN_THRESHOLD_DAYS", "180"))
-BAKEWARE_THRESHOLD_DAYS = int(os.environ.get("BAKEWARE_THRESHOLD_DAYS", "60"))
-_bakeware_env = os.environ.get("BAKEWARE_CATEGORIES", "Cookware,Bakeware")
-BAKEWARE_CATEGORIES     = {cat.strip() for cat in _bakeware_env.split(",") if cat.strip()}
+_cookware_threshold_env = os.environ.get("COOKWARE_THRESHOLD_DAYS")
+if _cookware_threshold_env is None:
+    _cookware_threshold_env = os.environ.get("BAKEWARE_THRESHOLD_DAYS", "60")
+COOKWARE_THRESHOLD_DAYS = int(_cookware_threshold_env)
+
+_cookware_env = os.environ.get("COOKWARE_CATEGORIES")
+if _cookware_env is None:
+    _cookware_env = os.environ.get("BAKEWARE_CATEGORIES", "Cookware,Bakeware")
+COOKWARE_CATEGORIES = {cat.strip() for cat in _cookware_env.split(",") if cat.strip()}
+
+# Backward-compatible aliases.
+BAKEWARE_THRESHOLD_DAYS = COOKWARE_THRESHOLD_DAYS
+BAKEWARE_CATEGORIES     = COOKWARE_CATEGORIES
 KNIFE_TASK_PRESETS = [
     "Slicing bread", "Dicing vegetables", "Mincing herbs", "Carving meat",
     "Peeling fruit", "Filleting fish", "Chopping nuts", "Slicing cheese",

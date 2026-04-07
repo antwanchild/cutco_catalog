@@ -88,6 +88,14 @@ app.register_blueprint(admin_bp)
 
 with app.app_context():
     from sqlalchemy import inspect as _sa_inspect
+    # Pre-create table rename migrations
+    with db.engine.connect() as _conn:
+        _tables = set(_sa_inspect(_conn).get_table_names())
+        if "bakeware_sessions" in _tables and "cookware_sessions" not in _tables:
+            _conn.execute(db.text("ALTER TABLE bakeware_sessions RENAME TO cookware_sessions"))
+            _conn.commit()
+            logger.info("Schema migration: renamed bakeware_sessions -> cookware_sessions")
+
     db.Model.metadata.create_all(db.engine, checkfirst=True)
 
     # Backfill columns added after initial schema deployment

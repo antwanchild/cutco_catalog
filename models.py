@@ -106,8 +106,8 @@ class Ownership(db.Model):
                                           name="uq_variant_person"),)
 
 
-class BakewareSession(db.Model):
-    __tablename__ = "bakeware_sessions"
+class CookwareSession(db.Model):
+    __tablename__ = "cookware_sessions"
 
     id         = db.Column(db.Integer, primary_key=True)
     item_id    = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
@@ -117,9 +117,13 @@ class BakewareSession(db.Model):
     notes      = db.Column(db.Text, nullable=True)
 
     item = db.relationship("Item", backref=db.backref(
-        "bakeware_sessions", lazy=True,
-        order_by="BakewareSession.baked_on.desc()",
+        "cookware_sessions", lazy=True,
+        order_by="CookwareSession.baked_on.desc()",
     ))
+
+
+# Backward-compatible alias for older imports/usages.
+BakewareSession = CookwareSession
 
 
 class SharpeningLog(db.Model):
