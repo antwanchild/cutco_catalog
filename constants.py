@@ -67,6 +67,20 @@ CATEGORY_OVERRIDES: dict[str, str] = {
     "79": "Sheaths",  # Shears Holster
 }
 
+CANONICAL_CATEGORY_ALIASES = {
+    "everyday knives": "Kitchen Knives",
+}
+
+
+def canonicalize_category(category: str | None) -> str | None:
+    """Normalize category labels to canonical values."""
+    if category is None:
+        return None
+    normalized = category.strip()
+    if not normalized:
+        return None
+    return CANONICAL_CATEGORY_ALIASES.get(normalized.lower(), normalized)
+
 
 def _resolve_category(sku: str, scraped_category: str, name: str = "") -> str:
     """Return the effective category for an item, applying overrides."""
@@ -76,7 +90,7 @@ def _resolve_category(sku: str, scraped_category: str, name: str = "") -> str:
         return "Sheaths"
     if "sheath" in name.lower() and "with sheath" not in name.lower():
         return "Sheaths"
-    return scraped_category
+    return canonicalize_category(scraped_category) or scraped_category
 
 
 _SET_NAME_PATTERN = re.compile(

@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from constants import COOKWARE_CATEGORIES, EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR
+from constants import COOKWARE_CATEGORIES, EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR, canonicalize_category
 from extensions import db
 from helpers import admin_required, db_commit, is_admin
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, get_or_create_set, reconcile_unknown_variant
@@ -62,7 +62,7 @@ def catalog_add():
         item = Item(
             name       = request.form["name"].strip(),
             sku        = request.form.get("sku", "").strip().upper() or None,
-            category   = request.form.get("category", "").strip() or None,
+            category   = canonicalize_category(request.form.get("category", "")),
             edge_type  = request.form.get("edge_type", "Unknown"),
             is_unicorn = request.form.get("is_unicorn") == "on",
             edge_is_unicorn = request.form.get("edge_is_unicorn") == "on",
@@ -96,7 +96,7 @@ def catalog_edit(item_id):
     if request.method == "POST":
         item.name       = request.form["name"].strip()
         item.sku        = request.form.get("sku", "").strip().upper() or None
-        item.category   = request.form.get("category", "").strip() or None
+        item.category   = canonicalize_category(request.form.get("category", ""))
         item.edge_type  = request.form.get("edge_type", "Unknown")
         item.is_unicorn = request.form.get("is_unicorn") == "on"
         item.edge_is_unicorn = request.form.get("edge_is_unicorn") == "on"
@@ -607,7 +607,7 @@ def catalog_sync_confirm():
         except ValueError:
             msrp = None
         item = Item(name=data.get("name", sku), sku=sku,
-                    category=data.get("category"), cutco_url=data.get("url"),
+                    category=canonicalize_category(data.get("category")), cutco_url=data.get("url"),
                     in_catalog=True, is_unicorn=False, edge_is_unicorn=False,
                     edge_type=data.get("edge_type") or "Unknown",
                     msrp=msrp,
