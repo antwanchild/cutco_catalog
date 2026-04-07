@@ -141,15 +141,21 @@ def catalog_purge_unreferenced():
 
 @catalog_bp.route("/catalog/purge-all", methods=["POST"])
 def catalog_purge_all():
-    """Delete the entire catalog including all ownership, logs, and variants."""
+    """Delete the entire catalog including sets, ownership, logs, and variants."""
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))
     count = Item.query.count()
+    set_count = Set.query.count()
     Item.query.delete()
+    Set.query.delete()
     if db_commit(db.session):
-        logger.info("Full catalog purge: %d items deleted", count)
-        flash(f"Catalog purged — {count} item{'s' if count != 1 else ''} and all related records deleted.", "info")
+        logger.info("Full catalog purge: %d items deleted, %d sets deleted", count, set_count)
+        flash(
+            f"Catalog purged — {count} item{'s' if count != 1 else ''} and "
+            f"{set_count} set{'s' if set_count != 1 else ''} deleted, plus related records.",
+            "info",
+        )
     return redirect(url_for("catalog.catalog"))
 
 
@@ -240,7 +246,11 @@ def sets_list():
     owned_q = Ownership.query.filter_by(status="Owned")
     if person_id:
         owned_q = owned_q.filter_by(person_id=person_id)
-    owned_item_ids = {o.variant.item_id for o in owned_q.all()}
+    owned_item_ids = {
+        o.variant.item_id
+        for o in owned_q.all()
+        if o.variant is not None and o.variant.item is not None
+    }
 
     completion = {}
     for s in all_sets:
@@ -310,7 +320,11 @@ def set_detail(sid):
     owned_q = Ownership.query.filter_by(status="Owned")
     if person_id:
         owned_q = owned_q.filter_by(person_id=person_id)
-    owned_item_ids = {o.variant.item_id for o in owned_q.all()}
+    owned_item_ids = {
+        o.variant.item_id
+        for o in owned_q.all()
+        if o.variant is not None and o.variant.item is not None
+    }
 
     owned_items   = sorted([i for i in item_set.items if i.id in owned_item_ids],
                            key=lambda i: i.name)
