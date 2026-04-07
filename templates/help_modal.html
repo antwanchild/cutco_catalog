@@ -9,7 +9,7 @@
       {% elif page == 'set_detail' %}🗂️ Set Detail
       {% elif page == 'collection' %}🏠 Collection
       {% elif page == 'sharpening' %}🔪 Sharpening Log
-      {% elif page == 'bakeware' %}🍳 Cookware Tracker
+      {% elif page == 'cookware' %}🍳 Cookware Tracker
       {% elif page == 'tasks' %}🔪 Knife Tasks
       {% elif page == 'wishlist' %}🎯 Wishlist
       {% elif page == 'matrix' %}📊 Matrix
@@ -71,12 +71,12 @@
         <li>The threshold is configurable via the <code>SHARPEN_THRESHOLD_DAYS</code> environment variable.</li>
       </ul>
 
-    {% elif page == 'bakeware' %}
+    {% elif page == 'cookware' %}
       <p>Tracks usage sessions for Cutco cookware pieces.</p>
       <ul>
         <li>Log what you made, a rating (1–5), and optional notes.</li>
         <li>Items unused past the threshold (default 60 days) are flagged as <strong>stale</strong>.</li>
-        <li>The threshold is configurable via <code>BAKEWARE_THRESHOLD_DAYS</code>.</li>
+        <li>The threshold is configurable via <code>COOKWARE_THRESHOLD_DAYS</code>.</li>
         <li>Admin users can send stale reminders to Discord.</li>
       </ul>
 

@@ -20,7 +20,7 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 📈 **Collection Stats** — Visual dashboard: owned items by category, handle color distribution, edge type breakdown, catalog coverage, and estimated collection value (Chart.js)
 - 💲 **MSRP Diff** — Compare stored prices against live Cutco.com prices; run from the admin UI or CLI. Supports writing updated prices to the database and optional Discord summary
 - 🔪 **Sharpening Log** — Track sharpening events per knife (date, method, notes); surface overdue reminders in the UI or via Discord
-- 🍰 **Bakeware Tracker** — Log baking sessions per piece (what you made, rating, notes); flag pieces unused for a configurable number of days
+- 🍳 **Cookware Tracker** — Log usage sessions per piece (what you made, rating, notes); flag pieces unused for a configurable number of days
 - 🔪 **Knife-to-Task Pairing** — Log which knife you use for which kitchen task; view usage patterns and top tasks per knife (only owned knives shown)
 - 🎯 **Suggested Uses** — Sync Cutco.com's recommended uses per knife into the task system; task dropdown highlights tasks suggested for the selected knife; task detail page shows all knives that can perform a given task
 - 🗂️ **Set Completion** — Track progress through Cutco sets with per-person completion bars and owned/missing panels; one-click wishlist from missing items
@@ -28,7 +28,7 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 📥 **Import / Export** — Bulk import ownership data via CSV or XLSX; export full collection as CSV
 - 📊 **Matrix View** — Cross-tabulate items vs. collectors at a glance
 - 🔒 **Admin Controls** — Token-protected admin mode for catalog edits, syncing, and MSRP diffs
-- 🔔 **Discord Notifications** — Optional webhook integration for wishlist price alerts, sharpening reminders, and bakeware reminders
+- 🔔 **Discord Notifications** — Optional webhook integration for wishlist price alerts, sharpening reminders, and cookware reminders
 - 🌙 **Dark / Light Mode** — Toggle between dark (default) and light themes; preference saved in localStorage
 - 🎁 **Gift List Sharing** — Generate a signed shareable link showing missing set items for a person; no login required, print-friendly
 - 🃏 **Collection Card** — Shareable public page showing a person's full owned collection grouped by category, with stats and estimated value
@@ -68,21 +68,25 @@ Then open `http://localhost:8095` in your browser.
 |---|---|:---:|---|
 | `SECRET_KEY` | `cutco-vault-dev-key` | ⚠️ | Flask session secret — **change in production** |
 | `ADMIN_TOKEN` | `admin` | ⚠️ | Token required to log in as admin — **change in production** |
-| `ADMIN_SESSION_SECONDS` | `7200` | No | Admin cookie lifetime in seconds (default 2 h); set to `0` for browser-session only |
+| `ADMIN_SESSION_SECONDS` | `7200` | No | Admin session lifetime in seconds (default 2 h); set to `0` for browser-session only |
 | `DATABASE_URL` | `sqlite:////data/cutco.db` | No | SQLAlchemy connection string |
 | `DATA_DIR` | `/data` | No | Directory for the database and job state files |
 | `LOG_LEVEL` | `INFO` | No | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_DIR` | `/data/logs` | No | Directory for rotating log files |
+| `SESSION_COOKIE_SECURE` | `false` | No | Set to `true` when served over HTTPS so session cookies are sent only via TLS |
+| `ALLOW_INSECURE_DEFAULTS` | `false` | No | Set to `true` to bypass startup safety checks that reject default `SECRET_KEY` / `ADMIN_TOKEN` in production |
 | `SYNC_BLOCKED_CATEGORIES` | *(empty)* | No | Comma-separated category names to exclude from catalog sync |
 | `DISCORD_WEBHOOK_URL` | *(empty)* | No | Incoming webhook URL for Discord notifications |
 | `SHARPEN_THRESHOLD_DAYS` | `180` | No | Days before a knife is flagged overdue for sharpening |
-| `BAKEWARE_THRESHOLD_DAYS` | `60` | No | Days before a bakeware piece is flagged as idle |
-| `BAKEWARE_CATEGORIES` | `Cookware,Bakeware` | No | Catalog categories treated as bakeware |
+| `COOKWARE_THRESHOLD_DAYS` | `60` | No | Days before a cookware-tracked piece is flagged as idle |
+| `COOKWARE_CATEGORIES` | `Cookware,Bakeware` | No | Catalog categories tracked on the Cookware page |
 | `PUID` | `0` | No | Run container as this user ID (for correct file ownership on the host) |
 | `PGID` | `0` | No | Run container as this group ID |
 | `TZ` | `UTC` | No | Container timezone |
 
 ⚠️ = has a working default but must be changed before exposing to a network.
+
+Compatibility note: legacy `BAKEWARE_THRESHOLD_DAYS` and `BAKEWARE_CATEGORIES` are still accepted as fallbacks.
 
 ---
 
@@ -155,13 +159,13 @@ Methods: Home Sharpener, Whetstone, Cutco Service, Professional, Other.
 
 ---
 
-## 🍰 Bakeware Tracker
+## 🍳 Cookware Tracker
 
-Log baking sessions per piece. The Bakeware page (`/bakeware`) shows:
+Log usage sessions per piece. The Cookware page (`/cookware`) shows:
 
 - Days since last use per piece
-- ⚠️ Idle warnings for pieces past `BAKEWARE_THRESHOLD_DAYS` (default 60 days)
-- Never-used panel listing catalog bakeware with no sessions yet
+- ⚠️ Idle warnings for pieces past `COOKWARE_THRESHOLD_DAYS` (default 60 days)
+- Never-used panel listing tracked catalog pieces with no sessions yet
 - Per-session rating (1–5 ⭐) and what you made
 - **Check Idle** button (admin) to send a Discord reminder
 
@@ -176,7 +180,7 @@ Set `DISCORD_WEBHOOK_URL` to an [incoming webhook](https://support.discord.com/h
 | 🎯 Wishlist Check | MSRP ≤ target price for any wishlist item |
 | 💲 MSRP Diff `--update` / web UI | Same as above, plus overall diff summary (CLI only) |
 | 🔪 Sharpening Check Overdue | Any knife past the sharpening threshold |
-| 🍰 Bakeware Check Idle | Any piece past the bakeware threshold |
+| 🍳 Cookware Check Idle | Any piece past the cookware threshold |
 
 ---
 
@@ -214,7 +218,7 @@ Set membership columns (mark `yes` to assign): `Beast`, `Fanatic`, `Signature`, 
 | 🎯 Wishlist | `/wishlist` | Public |
 | 📈 Collection Stats | `/stats` | Public |
 | 🔪 Sharpening Log | `/sharpening` | Public |
-| 🍰 Bakeware Tracker | `/bakeware` | Public |
+| 🍳 Cookware Tracker | `/cookware` (legacy: `/bakeware`) | Public |
 | 🔪 Knife Task Log | `/tasks` | Public |
 | 🎯 Task Detail | `/tasks/<id>` | Public |
 | 📥 Import | `/import` | Public |
@@ -238,7 +242,7 @@ Eleven tables backed by SQLite. All migrations run automatically at startup.
 | `sets` | `id`, `name`, `sku` | Named Cutco sets |
 | `item_sets` | `item_id`, `set_id`, `quantity` | Many-to-many join between items and sets; quantity tracks how many of an item a set includes |
 | `sharpening_log` | `id`, `item_id`, `sharpened_on`, `method`, `notes` | One row per sharpening event |
-| `bakeware_sessions` | `id`, `item_id`, `baked_on`, `what_made`, `rating`, `notes` | One row per baking session |
+| `cookware_sessions` | `id`, `item_id`, `baked_on`, `what_made`, `rating`, `notes` | One row per cookware usage session |
 | `knife_tasks` | `id`, `name`, `is_preset` | Task definitions (e.g. "Slicing bread"); 10 presets seeded on startup |
 | `knife_task_log` | `id`, `item_id`, `task_id`, `logged_on`, `notes` | One row per knife-task usage event |
 | `item_tasks` | `item_id`, `task_id` | Cutco-sourced suggested uses per item; populated by the Uses Sync |
@@ -278,7 +282,7 @@ Restore by replacing the file and restarting the container.
 
 - **💲 MSRP scraping** — Price extraction relies on Cutco.com's current page structure (JSON-LD, Open Graph meta tags, and DOM patterns). A site redesign may reduce scraping success rates until extraction strategies are updated.
 - **🔄 Catalog sync accuracy** — SKU extraction uses a six-strategy heuristic. Gift sets and bundle pages occasionally return incorrect SKUs; the `CATEGORY_OVERRIDES` dict in `constants.py` handles known exceptions.
-- **🔒 No authentication beyond admin token** — All non-admin pages are publicly accessible to anyone who can reach the host. Do not expose this service directly to the internet without a reverse proxy or VPN.
+- **🔒 No per-user authentication** — Admin actions use token login + signed session; all non-admin pages are publicly accessible to anyone who can reach the host. Do not expose this service directly to the internet without a reverse proxy or VPN.
 
 ---
 
@@ -305,7 +309,7 @@ Routes are split across Flask Blueprints for maintainability:
 |---|---|
 | `catalog` | `/catalog`, `/variants`, `/sets`, `/catalog/sync` |
 | `people` | `/people`, `/ownership`, `/wishlist` |
-| `logs` | `/sharpening`, `/bakeware` |
+| `logs` | `/sharpening`, `/cookware` (legacy: `/bakeware`) |
 | `views` | `/views/matrix`, `/stats` |
 | `data` | `/import`, `/export` |
 | `admin` | `/admin/*`, `/api/variants` |
