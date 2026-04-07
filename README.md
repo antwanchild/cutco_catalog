@@ -222,7 +222,7 @@ Set membership columns (mark `yes` to assign): `Beast`, `Fanatic`, `Signature`, 
 | 🔪 Knife Task Log | `/tasks` | Public |
 | 🎯 Task Detail | `/tasks/<id>` | Public |
 | 📥 Import | `/import` | Public |
-| 📤 Export CSV | `/export/csv` | Public |
+| 📤 Export CSV | `/export` (download endpoint: `/export/csv`) | Public |
 | 🔄 Catalog Sync | `/catalog/sync` | 🔒 Admin |
 | 💲 MSRP Diff | `/admin/msrp-diff` | 🔒 Admin |
 | 🔑 Admin Login | `/admin/login` | Public |

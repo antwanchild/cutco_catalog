@@ -1,6 +1,8 @@
 import csv
 import io
 import logging
+import re
+from datetime import date
 
 import openpyxl
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
@@ -43,6 +45,22 @@ def _build_notes(row: dict) -> str | None:
     return "; ".join(parts) or None
 
 
+def _safe_csv_filename(raw_name: str) -> str:
+    """Normalize a user-provided filename into a safe CSV filename."""
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (raw_name or "").strip()).strip("._")
+    if not cleaned:
+        cleaned = "cutco_collection"
+    if not cleaned.lower().endswith(".csv"):
+        cleaned += ".csv"
+    return cleaned
+
+
+@data_bp.route("/export")
+def export_page():
+    suggested_name = f"cutco_collection_{date.today().isoformat()}.csv"
+    return render_template("export_page.html", suggested_name=suggested_name)
+
+
 @data_bp.route("/export/csv")
 def export_csv():
     rows = (db.session.query(Ownership, ItemVariant, Item, Person)
@@ -60,10 +78,11 @@ def export_csv():
                          item.edge_type, variant.color, ownership.status,
                          "yes" if (variant.is_unicorn or item.is_unicorn) else "no", ownership.notes or ""])
     csv_buffer.seek(0)
-    logger.info("CSV export requested: %d rows", len(rows))
+    filename = _safe_csv_filename(request.args.get("filename", "cutco_collection.csv"))
+    logger.info("CSV export requested: %d rows (%s)", len(rows), filename)
     return Response(csv_buffer.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
-                             "attachment; filename=cutco_collection.csv"})
+                             f"attachment; filename={filename}"})
 
 
 @data_bp.route("/import/template")
