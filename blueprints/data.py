@@ -374,6 +374,7 @@ def import_page():
                            ownership_entries=ownership_entries,
                            conflicts=conflicts,
                            errors=errors,
+                           total_rows=len(parsed_rows),
                            edge_types=EDGE_TYPES,
                            status_options=STATUS_OPTIONS,
                            person_override=person_override)
@@ -387,6 +388,10 @@ def import_confirm():
     added_items     = 0
     added_ownership = 0
     added_persons   = 0
+    item_rows_selected = 0
+    item_rows_imported = 0
+    own_rows_selected = 0
+    own_rows_imported = 0
 
     existing_items   = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
     existing_names   = {item.name.lower(): item for item in Item.query.all()}
@@ -394,11 +399,13 @@ def import_confirm():
 
     item_count = int(request.form.get("item_count", 0) or 0)
     own_count  = int(request.form.get("own_count",  0) or 0)
+    total_rows = int(request.form.get("total_rows", 0) or 0)
 
     try:
         for row_index in range(item_count):
             if request.form.get(f"item_accept_{row_index}") != "on":
                 continue
+            item_rows_selected += 1
 
             name        = request.form.get(f"item_name_{row_index}", "").strip()
             sku         = request.form.get(f"item_sku_{row_index}", "").strip().upper() or None
@@ -471,10 +478,12 @@ def import_confirm():
 
             db.session.flush()
             reconcile_unknown_variant(item)
+            item_rows_imported += 1
 
         for row_index in range(own_count):
             if request.form.get(f"own_accept_{row_index}") != "on":
                 continue
+            own_rows_selected += 1
 
             item_id     = int(request.form.get(f"own_item_id_{row_index}", 0))
             person_name = request.form.get(f"own_person_{row_index}", "").strip()
@@ -520,6 +529,7 @@ def import_confirm():
 
             db.session.flush()
             reconcile_unknown_variant(item)
+            own_rows_imported += 1
 
     except SQLAlchemyError as exc:
         db.session.rollback()
@@ -529,7 +539,13 @@ def import_confirm():
 
     if db_commit(db.session):
         logger.info("Import complete: %d items, %d ownership, %d persons", added_items, added_ownership, added_persons)
+        selected_rows = item_rows_selected + own_rows_selected
+        imported_rows = item_rows_imported + own_rows_imported
         parts = []
+        if total_rows:
+            parts.append(f"read {total_rows} row{'s' if total_rows != 1 else ''}")
+        parts.append(f"selected {selected_rows} row{'s' if selected_rows != 1 else ''}")
+        parts.append(f"imported {imported_rows} row{'s' if imported_rows != 1 else ''}")
         if added_items:
             parts.append(f"{added_items} item{'s' if added_items != 1 else ''}")
         if added_persons:

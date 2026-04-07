@@ -32,6 +32,7 @@
 {% endif %}
 
 <form method="post" action="{{ url_for('data.import_confirm') }}">
+  <input type="hidden" name="total_rows" value="{{ total_rows or 0 }}">
 
   {# ── New Items ──────────────────────────────────────────────────────── #}
   {% if new_items %}
