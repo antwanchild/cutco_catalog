@@ -23,6 +23,11 @@ def _safe_parse_iso_date(raw: str) -> date | None:
         return None
 
 
+def _is_bakeware_category(category: str | None) -> bool:
+    normalized = (category or "").strip().lower()
+    return normalized == "bakeware" or "bakeware" in normalized
+
+
 # ── Sharpening Log ────────────────────────────────────────────────────────────
 
 @logs_bp.route("/sharpening")
@@ -247,9 +252,11 @@ def cookware():
                   .order_by(Item.name)
                   .all()) if COOKWARE_CATEGORIES else []
 
-    cookware_items = (Item.query
+    loggable_items = (Item.query
                       .filter(Item.category.in_(COOKWARE_CATEGORIES))
                       .order_by(Item.name).all()) if COOKWARE_CATEGORIES else []
+    bakeware_items = [item for item in loggable_items if _is_bakeware_category(item.category)]
+    cookware_items = [item for item in loggable_items if not _is_bakeware_category(item.category)]
     other_items    = (Item.query
                       .filter(Item.category.notin_(COOKWARE_CATEGORIES))
                       .order_by(Item.name).all()) if COOKWARE_CATEGORIES else Item.query.order_by(Item.name).all()
@@ -263,6 +270,7 @@ def cookware():
         threshold_days   = COOKWARE_THRESHOLD_DAYS,
         today            = today.isoformat(),
         cookware_items   = cookware_items,
+        bakeware_items   = bakeware_items,
         other_items      = other_items,
         has_discord      = bool(DISCORD_WEBHOOK_URL),
     )
