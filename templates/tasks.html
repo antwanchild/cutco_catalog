@@ -124,7 +124,7 @@
       {% endfor %}
       {% if item.id in item_top_task %}
       <tr>
-        <td><a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a></td>
+        <td><a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a></td>
         <td>{{ item_top_task[item.id] }}</td>
         <td>{{ uses.count }}</td>
       </tr>
@@ -147,7 +147,7 @@
     {% for entry in recent_entries %}
     <tr>
       <td class="mono">{{ entry.logged_on }}</td>
-      <td><a href="{{ url_for('views.item_owners', iid=entry.item.id) }}">{{ entry.item.name }}</a></td>
+      <td><a href="{{ url_for('views.item_owners', item_id=entry.item.id) }}">{{ entry.item.name }}</a></td>
       <td>{{ entry.task.name }}</td>
       <td class="muted">{{ entry.notes or '' }}</td>
       <td>

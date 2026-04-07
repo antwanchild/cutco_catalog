@@ -55,7 +55,7 @@
     <h2>Collectors</h2>
     <ul class="link-list">
       {% for person in people %}
-        <li><a href="{{ url_for('people.person_collection', pid=person.id) }}">👤 {{ person.name }}</a></li>
+        <li><a href="{{ url_for('people.person_collection', person_id=person.id) }}">👤 {{ person.name }}</a></li>
       {% else %}
         <li class="muted">No collectors yet — <a href="{{ url_for('people.people_add') }}">add one</a>.</li>
       {% endfor %}
@@ -68,7 +68,7 @@
       {% for ownership in recent %}
         <li>
           <span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span>
-          <a href="{{ url_for('people.person_collection', pid=ownership.person_id) }}">{{ ownership.person.name }}</a>
+          <a href="{{ url_for('people.person_collection', person_id=ownership.person_id) }}">{{ ownership.person.name }}</a>
           — {{ ownership.variant.item.name }}
           {% if ownership.variant.color != UNKNOWN_COLOR %}
             <span class="muted">({{ ownership.variant.color }})</span>

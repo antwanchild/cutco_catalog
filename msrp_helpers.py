@@ -44,8 +44,11 @@ def _write_specs_job(data: dict) -> None:
 
 
 def _run_specs_backfill_job(app) -> None:
-    """Background job: fetch specs for all items with a cutco_url and backfill
-    blade_length, overall_length, weight, and msrp (only if not already set)."""
+    """Backfill item specs from cutco_url pages.
+
+    Updates blade_length, overall_length, weight, and msrp
+    (only when msrp is not already set).
+    """
     from scraping import scrape_item_specs
     from datetime import date as _date
 

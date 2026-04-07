@@ -250,8 +250,7 @@ _EDGE_NORMALIZE = {
 
 
 def scrape_item_specs(url: str) -> dict:
-    """Fetch a product page and return a dict with edge_type, msrp,
-    blade_length, overall_length, and weight.  One HTTP request covers all.
+    """Fetch a product page and return edge, price, and key measurements.
 
     edge_type: 'N/A' = no blade edge, 'Unknown' = fetch failure or ambiguous.
     All other keys are None when not found.
@@ -287,7 +286,7 @@ def scrape_item_specs(url: str) -> dict:
                 result["edge_type"] = "N/A"
 
         # ── itemSpecs (blade length, overall length, weight) ─────────────────
-        _SPEC_MAP = {
+        spec_map = {
             "length - blade":   "blade_length",
             "length - overall": "overall_length",
             "weight - knife only": "weight",
@@ -302,7 +301,7 @@ def scrape_item_specs(url: str) -> dict:
             except json.JSONDecodeError:
                 key = spec.group(1).strip().lower()
                 val = spec.group(2).strip()
-            field = _SPEC_MAP.get(key)
+            field = spec_map.get(key)
             if field and result[field] is None:
                 result[field] = val
 

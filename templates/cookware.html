@@ -38,7 +38,7 @@
 
 {# ── Quick add form ───────────────────────────────────────────────────────── #}
 <details class="sharpen-add-panel" {% if not tracked %}open{% endif %}>
-  <summary>+ Log Baking Session</summary>
+  <summary>+ Log Cookware Session</summary>
   <form method="post" action="{{ url_for('logs.cookware_add') }}" class="sharpen-add-form">
     <div class="form-row" style="max-width:760px">
       <label>Item *
@@ -63,12 +63,12 @@
         </select>
       </label>
       <label>Date *
-        <input type="date" name="baked_on" value="{{ today }}" required class="input-full">
+        <input type="date" name="used_on" value="{{ today }}" required class="input-full">
       </label>
     </div>
     <div class="form-row" style="max-width:760px">
       <label>What did you make? *
-        <input type="text" name="what_made" placeholder="e.g. Banana bread" required class="input-full">
+        <input type="text" name="made_item" placeholder="e.g. Banana bread" required class="input-full">
       </label>
       <label>Rating
         <select name="rating" class="input-full">
@@ -98,7 +98,7 @@
     <ul class="link-list">
       {% for item in never_used %}
         <li>
-          <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
+          <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
           <span class="muted">{{ item.category }}</span>
         </li>
       {% endfor %}
@@ -127,7 +127,7 @@
       {% for row in tracked %}
       <tr>
         <td>
-          <a href="{{ url_for('views.item_owners', iid=row.item.id) }}">{{ row.item.name }}</a>
+          <a href="{{ url_for('views.item_owners', item_id=row.item.id) }}">{{ row.item.name }}</a>
           {% if row.stale %}<span class="overdue-badge">idle</span>{% endif %}
         </td>
         <td class="muted">{{ row.item.category or '—' }}</td>
@@ -150,7 +150,7 @@
         </td>
         {% if is_admin() %}
         <td class="actions">
-          <form method="post" action="{{ url_for('logs.cookware_purge_item', iid=row.item.id) }}"
+          <form method="post" action="{{ url_for('logs.cookware_purge_item', item_id=row.item.id) }}"
                 onsubmit="return confirm('Remove all sessions for {{ row.item.name }}?')" class="form-inline">
             <button class="btn btn-xs btn-danger">🗑 Purge</button>
           </form>
@@ -181,14 +181,14 @@
     <tbody>
       {% for s in recent_sessions %}
       <tr>
-        <td class="mono">{{ s.baked_on }}</td>
-        <td><a href="{{ url_for('views.item_owners', iid=s.item_id) }}">{{ s.item.name }}</a></td>
-        <td>{{ s.what_made }}</td>
+        <td class="mono">{{ s.used_on }}</td>
+        <td><a href="{{ url_for('views.item_owners', item_id=s.item_id) }}">{{ s.item.name }}</a></td>
+        <td>{{ s.made_item }}</td>
         <td>{% if s.rating %}{{ '⭐' * s.rating }}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{{ s.notes or '—' }}</td>
         <td class="actions">
-          <a href="{{ url_for('logs.cookware_edit', sid=s.id) }}" class="btn btn-xs">Edit</a>
-          <form method="post" action="{{ url_for('logs.cookware_delete', sid=s.id) }}"
+          <a href="{{ url_for('logs.cookware_edit', session_id=s.id) }}" class="btn btn-xs">Edit</a>
+          <form method="post" action="{{ url_for('logs.cookware_delete', session_id=s.id) }}"
                 onsubmit="return confirm('Remove this session?')" class="form-inline">
             <button class="btn btn-xs btn-danger">Del</button>
           </form>

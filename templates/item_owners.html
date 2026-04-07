@@ -9,9 +9,9 @@
   </h1>
   <div class="page-actions">
     {% if is_admin() %}
-      <a href="{{ url_for('catalog.catalog_edit', iid=item.id) }}" class="btn btn-secondary">Edit</a>
+      <a href="{{ url_for('catalog.catalog_edit', item_id=item.id) }}" class="btn btn-secondary">Edit</a>
     {% endif %}
-    <a href="{{ url_for('catalog.variants', iid=item.id) }}" class="btn btn-secondary">Variants</a>
+    <a href="{{ url_for('catalog.variants', item_id=item.id) }}" class="btn btn-secondary">Variants</a>
     <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">← Catalog</a>
   </div>
 </div>
@@ -59,7 +59,7 @@
       <h2 class="section-heading">Sets</h2>
       <div class="chip-list">
         {% for item_set in item.sets %}
-          <a href="{{ url_for('catalog.set_detail', sid=item_set.id) }}" class="chip chip-link">{{ item_set.name }}</a>
+          <a href="{{ url_for('catalog.set_detail', set_id=item_set.id) }}" class="chip chip-link">{{ item_set.name }}</a>
         {% endfor %}
       </div>
     </section>
@@ -109,13 +109,13 @@
         <tbody>
           {% for ownership in entries %}
           <tr>
-            <td><a href="{{ url_for('people.person_collection', pid=ownership.person_id) }}">{{ ownership.person.name }}</a></td>
+            <td><a href="{{ url_for('people.person_collection', person_id=ownership.person_id) }}">{{ ownership.person.name }}</a></td>
             <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
             <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
             <td class="muted">{{ ownership.notes or '' }}</td>
             <td class="actions">
-              <a href="{{ url_for('people.ownership_edit', oid=ownership.id) }}" class="btn btn-xs">Edit</a>
-              <form method="post" action="{{ url_for('people.ownership_delete', oid=ownership.id) }}"
+              <a href="{{ url_for('people.ownership_edit', ownership_id=ownership.id) }}" class="btn btn-xs">Edit</a>
+              <form method="post" action="{{ url_for('people.ownership_delete', ownership_id=ownership.id) }}"
                     onsubmit="return confirm('Remove this entry?')" class="form-inline">
                 <button class="btn btn-xs btn-danger">Del</button>
               </form>
@@ -147,7 +147,7 @@
   <h2 class="section-heading section-heading-actions">
     Sharpening History ({{ sharpening | length }})
     {% if is_admin() %}
-    <form method="post" action="{{ url_for('logs.sharpening_purge_item', iid=item.id) }}" class="form-inline"
+    <form method="post" action="{{ url_for('logs.sharpening_purge_item', item_id=item.id) }}" class="form-inline"
           onsubmit="return confirm('Remove all sharpening history for {{ item.name }}?')">
       <button type="submit" class="btn btn-xs btn-danger">🗑 Purge</button>
     </form>
@@ -176,7 +176,7 @@
   <h2 class="section-heading section-heading-actions">
     Task Log ({{ task_log | length }})
     {% if is_admin() %}
-    <form method="post" action="{{ url_for('logs.task_log_purge_item', iid=item.id) }}" class="form-inline"
+    <form method="post" action="{{ url_for('logs.task_log_purge_item', item_id=item.id) }}" class="form-inline"
           onsubmit="return confirm('Remove all task log entries for {{ item.name }}?')">
       <button type="submit" class="btn btn-xs btn-danger">🗑 Purge</button>
     </form>

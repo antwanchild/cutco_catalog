@@ -4,7 +4,7 @@
 <div class="page-header">
   <h1 class="page-title">{{ action }} Ownership Entry</h1>
   {% if sel_person_id %}
-    <a href="{{ url_for('people.person_collection', pid=sel_person_id) }}" class="btn btn-ghost">← Collection</a>
+    <a href="{{ url_for('people.person_collection', person_id=sel_person_id) }}" class="btn btn-ghost">← Collection</a>
   {% else %}
     <a href="{{ url_for('people.people') }}" class="btn btn-ghost">← People</a>
   {% endif %}
@@ -85,7 +85,7 @@
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">{{ action }}</button>
     {% if sel_person_id %}
-      <a href="{{ url_for('people.person_collection', pid=sel_person_id) }}" class="btn btn-ghost">Cancel</a>
+      <a href="{{ url_for('people.person_collection', person_id=sel_person_id) }}" class="btn btn-ghost">Cancel</a>
     {% endif %}
   </div>
 </form>

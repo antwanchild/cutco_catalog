@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Edit Baking Session – Cutco Vault{% endblock %}
+{% block title %}Edit Cookware Session – Cutco Vault{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">Edit Baking Session</h1>
+  <h1 class="page-title">Edit Cookware Session</h1>
   <a href="{{ url_for('logs.cookware') }}" class="btn btn-ghost">← Cookware Tracker</a>
 </div>
 
@@ -12,7 +12,7 @@
   </label>
   <div class="form-row">
     <label>Date *
-      <input type="date" name="baked_on" value="{{ session.baked_on }}" required class="input-full">
+      <input type="date" name="used_on" value="{{ session.used_on }}" required class="input-full">
     </label>
     <label>Rating
       <select name="rating" class="input-full">
@@ -26,7 +26,7 @@
     </label>
   </div>
   <label>What did you make? *
-    <input type="text" name="what_made" value="{{ session.what_made }}" required class="input-full">
+    <input type="text" name="made_item" value="{{ session.made_item }}" required class="input-full">
   </label>
   <label>Notes
     <textarea name="notes" rows="2" class="input-full">{{ session.notes or '' }}</textarea>

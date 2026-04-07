@@ -5,9 +5,9 @@
   <h1 class="page-title">🗂️ {{ set.name }} {{ help_btn("set_detail") }}</h1>
   <div class="page-actions">
     {% if person_id %}
-      <a href="{{ url_for('views.gift_token', sid=set.id, person=person_id) }}" class="btn btn-secondary">🎁 Share Gift List</a>
+      <a href="{{ url_for('views.gift_token', set_id=set.id, person=person_id) }}" class="btn btn-secondary">🎁 Share Gift List</a>
     {% endif %}
-    <a href="{{ url_for('catalog.set_edit', sid=set.id) }}" class="btn btn-secondary">Edit</a>
+    <a href="{{ url_for('catalog.set_edit', set_id=set.id) }}" class="btn btn-secondary">Edit</a>
     <a href="{{ url_for('catalog.sets_list') }}{% if person_id %}?person={{ person_id }}{% endif %}" class="btn btn-ghost">← Sets</a>
   </div>
 </div>
@@ -57,7 +57,7 @@
     {% for item in owned_items %}
     <tr class="row-owned">
       <td>
-        <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
+        <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
         {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
         {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
       </td>
@@ -65,7 +65,7 @@
       <td>{{ item.category or '—' }}</td>
       <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>
-        <a href="{{ url_for('catalog.variants', iid=item.id) }}">
+        <a href="{{ url_for('catalog.variants', item_id=item.id) }}">
           {{ item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length }} color(s)
         </a>
       </td>
@@ -87,7 +87,7 @@
     {% for item in missing_items %}
     <tr class="row-missing">
       <td>
-        <a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a>
+        <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
         {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
         {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
       </td>

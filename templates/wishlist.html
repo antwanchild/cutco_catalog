@@ -50,11 +50,11 @@
       {% set o = row.ownership %}
       <tr{% if row.hit %} class="row-hit"{% endif %}>
         <td>
-          <a href="{{ url_for('views.item_owners', iid=o.variant.item_id) }}">{{ o.variant.item.name }}</a>
+          <a href="{{ url_for('views.item_owners', item_id=o.variant.item_id) }}">{{ o.variant.item.name }}</a>
           {% if o.variant.item.sku %}<span class="muted mono">#{{ o.variant.item.sku }}</span>{% endif %}
           {% if row.hit %}<span class="hit-badge">🎯 target met</span>{% endif %}
         </td>
-        <td><a href="{{ url_for('people.person_collection', pid=o.person_id) }}">{{ o.person.name }}</a></td>
+        <td><a href="{{ url_for('people.person_collection', person_id=o.person_id) }}">{{ o.person.name }}</a></td>
         <td>{% if o.variant.color != UNKNOWN_COLOR %}{{ o.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if row.target %}${{ "%.2f"|format(row.target) }}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if row.msrp %}${{ "%.2f"|format(row.msrp) }}{% else %}<span class="muted">—</span>{% endif %}</td>
@@ -70,8 +70,8 @@
           {% endif %}
         </td>
         <td class="actions">
-          <a href="{{ url_for('people.ownership_edit', oid=o.id) }}" class="btn btn-xs">Edit</a>
-          <form method="post" action="{{ url_for('people.ownership_delete', oid=o.id) }}"
+          <a href="{{ url_for('people.ownership_edit', ownership_id=o.id) }}" class="btn btn-xs">Edit</a>
+          <form method="post" action="{{ url_for('people.ownership_delete', ownership_id=o.id) }}"
                 onsubmit="return confirm('Remove this entry?')" class="form-inline">
             <button class="btn btn-xs btn-danger">Del</button>
           </form>

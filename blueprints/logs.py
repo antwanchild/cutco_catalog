@@ -133,14 +133,14 @@ def sharpening_delete(lid):
     return redirect(url_for("logs.sharpening"))
 
 
-@logs_bp.route("/sharpening/item/<int:iid>/purge", methods=["POST"])
+@logs_bp.route("/sharpening/item/<int:item_id>/purge", methods=["POST"])
 @admin_required
-def sharpening_purge_item(iid):
-    item = Item.query.get_or_404(iid)
-    count = SharpeningLog.query.filter_by(item_id=iid).count()
-    SharpeningLog.query.filter_by(item_id=iid).delete()
+def sharpening_purge_item(item_id):
+    item = Item.query.get_or_404(item_id)
+    count = SharpeningLog.query.filter_by(item_id=item_id).count()
+    SharpeningLog.query.filter_by(item_id=item_id).delete()
     if db_commit(db.session):
-        logger.info("Sharpening logs purged for item %d (%d entries)", iid, count)
+        logger.info("Sharpening logs purged for item %d (%d entries)", item_id, count)
         flash(f"Removed all {count} sharpening event{'s' if count != 1 else ''} for {item.name}.", "info")
     return redirect(url_for("logs.sharpening"))
 
@@ -204,37 +204,37 @@ def sharpening_notify():
 def cookware():
     today       = date.today()
     all_sessions = (CookwareSession.query
-                    .order_by(CookwareSession.baked_on.desc())
+                    .order_by(CookwareSession.used_on.desc())
                     .all())
 
     last_by_item:   dict[int, str]   = {}
     count_by_item:  dict[int, int]   = {}
     rating_by_item: dict[int, list]  = {}
     for session in all_sessions:
-        iid = session.item_id
-        count_by_item[iid] = count_by_item.get(iid, 0) + 1
-        if iid not in last_by_item:
-            last_by_item[iid] = session.baked_on
+        item_id = session.item_id
+        count_by_item[item_id] = count_by_item.get(item_id, 0) + 1
+        if item_id not in last_by_item:
+            last_by_item[item_id] = session.used_on
         if session.rating is not None:
-            rating_by_item.setdefault(iid, []).append(session.rating)
+            rating_by_item.setdefault(item_id, []).append(session.rating)
 
     tracked: list[dict] = []
-    for iid, last_str in last_by_item.items():
-        item = Item.query.get(iid)
+    for item_id, last_str in last_by_item.items():
+        item = Item.query.get(item_id)
         if not item:
             continue
         parsed_last = _safe_parse_iso_date(last_str)
         if not parsed_last:
-            logger.warning("Skipping invalid cookware date for item_id=%s: %r", iid, last_str)
+            logger.warning("Skipping invalid cookware date for item_id=%s: %r", item_id, last_str)
             continue
         days_since = (today - parsed_last).days
-        ratings    = rating_by_item.get(iid, [])
+        ratings    = rating_by_item.get(item_id, [])
         tracked.append(dict(
             item       = item,
             last_date  = last_str,
             days_since = days_since,
             stale      = days_since > COOKWARE_THRESHOLD_DAYS,
-            session_count = count_by_item[iid],
+            session_count = count_by_item[item_id],
             avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None,
         ))
 
@@ -273,15 +273,15 @@ def cookware():
 @admin_required
 def cookware_add():
     item_id   = request.form.get("item_id", type=int)
-    baked_on  = request.form.get("baked_on", "").strip()
-    what_made = request.form.get("what_made", "").strip()
+    used_on  = request.form.get("used_on", request.form.get("baked_on", "")).strip()
+    made_item = request.form.get("made_item", request.form.get("what_made", "")).strip()
     raw_rating = request.form.get("rating", "").strip()
     notes     = request.form.get("notes", "").strip() or None
 
-    if not item_id or not baked_on or not what_made:
+    if not item_id or not used_on or not made_item:
         flash("Item, date, and what you made are required.", "error")
         return redirect(url_for("logs.cookware"))
-    if not _safe_parse_iso_date(baked_on):
+    if not _safe_parse_iso_date(used_on):
         flash("Date must be valid YYYY-MM-DD.", "error")
         return redirect(url_for("logs.cookware"))
     if not Item.query.get(item_id):
@@ -297,29 +297,29 @@ def cookware_add():
 
     db.session.add(CookwareSession(
         item_id  = item_id,
-        baked_on = baked_on,
-        what_made = what_made,
+        used_on = used_on,
+        made_item = made_item,
         rating   = rating,
         notes    = notes,
     ))
     if db_commit(db.session):
-        logger.info("Cookware session logged: item %d on %s — %s", item_id, baked_on, what_made)
+        logger.info("Cookware session logged: item %d on %s — %s", item_id, used_on, made_item)
         flash("Cookware session logged.", "success")
     return redirect(url_for("logs.cookware"))
 
 
-@logs_bp.route("/cookware/<int:sid>/edit", methods=["GET", "POST"], endpoint="cookware_edit")
-@logs_bp.route("/bakeware/<int:sid>/edit", methods=["GET", "POST"], endpoint="bakeware_edit")
+@logs_bp.route("/cookware/<int:session_id>/edit", methods=["GET", "POST"], endpoint="cookware_edit")
+@logs_bp.route("/bakeware/<int:session_id>/edit", methods=["GET", "POST"], endpoint="bakeware_edit")
 @admin_required
-def cookware_edit(sid):
-    session = CookwareSession.query.get_or_404(sid)
+def cookware_edit(session_id):
+    session = CookwareSession.query.get_or_404(session_id)
     if request.method == "POST":
-        new_date = request.form.get("baked_on", session.baked_on).strip()
+        new_date = request.form.get("used_on", request.form.get("baked_on", session.used_on)).strip()
         if not _safe_parse_iso_date(new_date):
             flash("Date must be valid YYYY-MM-DD.", "error")
             return redirect(url_for("logs.cookware"))
-        session.baked_on  = new_date
-        session.what_made = request.form.get("what_made", "").strip() or session.what_made
+        session.used_on  = new_date
+        session.made_item = request.form.get("made_item", request.form.get("what_made", "")).strip() or session.made_item
         session.notes     = request.form.get("notes", "").strip() or None
         raw_rating = request.form.get("rating", "").strip()
         try:
@@ -328,33 +328,33 @@ def cookware_edit(sid):
         except ValueError:
             pass
         if db_commit(db.session):
-            logger.info("Cookware session %d updated", sid)
+            logger.info("Cookware session %d updated", session_id)
             flash("Session updated.", "success")
         return redirect(url_for("logs.cookware"))
     return render_template("cookware_edit.html", session=session)
 
 
-@logs_bp.route("/cookware/<int:sid>/delete", methods=["POST"], endpoint="cookware_delete")
-@logs_bp.route("/bakeware/<int:sid>/delete", methods=["POST"], endpoint="bakeware_delete")
+@logs_bp.route("/cookware/<int:session_id>/delete", methods=["POST"], endpoint="cookware_delete")
+@logs_bp.route("/bakeware/<int:session_id>/delete", methods=["POST"], endpoint="bakeware_delete")
 @admin_required
-def cookware_delete(sid):
-    session = CookwareSession.query.get_or_404(sid)
+def cookware_delete(session_id):
+    session = CookwareSession.query.get_or_404(session_id)
     db.session.delete(session)
     if db_commit(db.session):
-        logger.info("Cookware session %d deleted", sid)
+        logger.info("Cookware session %d deleted", session_id)
         flash("Session removed.", "info")
     return redirect(url_for("logs.cookware"))
 
 
-@logs_bp.route("/cookware/item/<int:iid>/purge", methods=["POST"], endpoint="cookware_purge_item")
-@logs_bp.route("/bakeware/item/<int:iid>/purge", methods=["POST"], endpoint="bakeware_purge_item")
+@logs_bp.route("/cookware/item/<int:item_id>/purge", methods=["POST"], endpoint="cookware_purge_item")
+@logs_bp.route("/bakeware/item/<int:item_id>/purge", methods=["POST"], endpoint="bakeware_purge_item")
 @admin_required
-def cookware_purge_item(iid):
-    item = Item.query.get_or_404(iid)
-    count = CookwareSession.query.filter_by(item_id=iid).count()
-    CookwareSession.query.filter_by(item_id=iid).delete()
+def cookware_purge_item(item_id):
+    item = Item.query.get_or_404(item_id)
+    count = CookwareSession.query.filter_by(item_id=item_id).count()
+    CookwareSession.query.filter_by(item_id=item_id).delete()
     if db_commit(db.session):
-        logger.info("Cookware sessions purged for item %d (%d entries)", iid, count)
+        logger.info("Cookware sessions purged for item %d (%d entries)", item_id, count)
         flash(f"Removed all {count} cookware session{'s' if count != 1 else ''} for {item.name}.", "info")
     return redirect(url_for("logs.cookware"))
 
@@ -376,21 +376,21 @@ def cookware_purge_all():
 @admin_required
 def cookware_notify():
     today        = date.today()
-    all_sessions = CookwareSession.query.order_by(CookwareSession.baked_on.desc()).all()
+    all_sessions = CookwareSession.query.order_by(CookwareSession.used_on.desc()).all()
     last_by_item: dict[int, str] = {}
     for session in all_sessions:
         if session.item_id not in last_by_item:
-            last_by_item[session.item_id] = session.baked_on
+            last_by_item[session.item_id] = session.used_on
 
     stale = []
-    for iid, last_str in last_by_item.items():
+    for item_id, last_str in last_by_item.items():
         parsed_last = _safe_parse_iso_date(last_str)
         if not parsed_last:
-            logger.warning("Skipping invalid cookware date for item_id=%s: %r", iid, last_str)
+            logger.warning("Skipping invalid cookware date for item_id=%s: %r", item_id, last_str)
             continue
         days_since = (today - parsed_last).days
         if days_since > COOKWARE_THRESHOLD_DAYS:
-            item = Item.query.get(iid)
+            item = Item.query.get(item_id)
             if item:
                 stale.append((item, days_since))
     stale.sort(key=lambda pair: pair[1], reverse=True)
@@ -442,11 +442,11 @@ def tasks():
 
     # Top task per owned item
     item_top_task: dict[int, str] = {}
-    for iid, task_counts in usage.items():
+    for item_id, task_counts in usage.items():
         top_tid = max(task_counts, key=task_counts.get)
         top_task = KnifeTask.query.get(top_tid)
         if top_task:
-            item_top_task[iid] = top_task.name
+            item_top_task[item_id] = top_task.name
 
     # Suggested task IDs per item (from Cutco uses sync) — used for JS filtering
     item_tasks_map: dict[int, list[int]] = {
@@ -512,14 +512,14 @@ def task_log_delete(lid):
     return redirect(url_for("logs.tasks"))
 
 
-@logs_bp.route("/tasks/item/<int:iid>/purge", methods=["POST"])
+@logs_bp.route("/tasks/item/<int:item_id>/purge", methods=["POST"])
 @admin_required
-def task_log_purge_item(iid):
-    item = Item.query.get_or_404(iid)
-    count = KnifeTaskLog.query.filter_by(item_id=iid).count()
-    KnifeTaskLog.query.filter_by(item_id=iid).delete()
+def task_log_purge_item(item_id):
+    item = Item.query.get_or_404(item_id)
+    count = KnifeTaskLog.query.filter_by(item_id=item_id).count()
+    KnifeTaskLog.query.filter_by(item_id=item_id).delete()
     if db_commit(db.session):
-        logger.info("Task logs purged for item %d (%d entries)", iid, count)
+        logger.info("Task logs purged for item %d (%d entries)", item_id, count)
         flash(f"Removed all {count} task log entr{'ies' if count != 1 else 'y'} for {item.name}.", "info")
     return redirect(url_for("logs.tasks"))
 

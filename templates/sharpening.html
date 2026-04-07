@@ -75,7 +75,7 @@
       {% for row in tracked %}
       <tr>
         <td>
-          <a href="{{ url_for('views.item_owners', iid=row.item.id) }}">{{ row.item.name }}</a>
+          <a href="{{ url_for('views.item_owners', item_id=row.item.id) }}">{{ row.item.name }}</a>
           {% if row.overdue %}<span class="overdue-badge">overdue</span>{% endif %}
         </td>
         <td class="muted">{{ row.item.category or '—' }}</td>
@@ -114,7 +114,7 @@
       {% for entry in recent_entries %}
       <tr>
         <td class="mono">{{ entry.sharpened_on }}</td>
-        <td><a href="{{ url_for('views.item_owners', iid=entry.item_id) }}">{{ entry.item.name }}</a></td>
+        <td><a href="{{ url_for('views.item_owners', item_id=entry.item_id) }}">{{ entry.item.name }}</a></td>
         <td>{{ entry.method }}</td>
         <td>{{ entry.notes or '—' }}</td>
         <td class="actions">

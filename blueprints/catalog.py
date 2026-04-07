@@ -8,7 +8,7 @@ from constants import EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR
 from extensions import db
 from helpers import admin_required, db_commit, is_admin
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, ensure_unknown_variant, get_or_create_set
-from scraping import scrape_catalog, scrape_edge_type, scrape_item_specs, scrape_item_uses, scrape_sets
+from scraping import scrape_catalog, scrape_item_specs, scrape_item_uses, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
 logger = logging.getLogger(__name__)
@@ -35,8 +35,8 @@ def catalog():
         ))
 
     from sqlalchemy.orm import selectinload
-    _SORT_COLS = {"name": Item.name, "sku": Item.sku, "category": Item.category, "edge_type": Item.edge_type}
-    col   = _SORT_COLS.get(sort, Item.name)
+    sort_cols = {"name": Item.name, "sku": Item.sku, "category": Item.category, "edge_type": Item.edge_type}
+    col   = sort_cols.get(sort, Item.name)
     items = (query
              .options(selectinload(Item.variants), selectinload(Item.sets))
              .order_by(col.desc() if direction == "desc" else col)
@@ -86,10 +86,10 @@ def catalog_add():
                            all_sets=Set.query.order_by(Set.name).all())
 
 
-@catalog_bp.route("/catalog/<int:iid>/edit", methods=["GET", "POST"])
+@catalog_bp.route("/catalog/<int:item_id>/edit", methods=["GET", "POST"])
 @admin_required
-def catalog_edit(iid):
-    item = Item.query.get_or_404(iid)
+def catalog_edit(item_id):
+    item = Item.query.get_or_404(item_id)
     if request.method == "POST":
         item.name       = request.form["name"].strip()
         item.sku        = request.form.get("sku", "").strip().upper() or None
@@ -159,12 +159,12 @@ def catalog_purge_all():
     return redirect(url_for("catalog.catalog"))
 
 
-@catalog_bp.route("/catalog/<int:iid>/delete", methods=["POST"])
-def catalog_delete(iid):
+@catalog_bp.route("/catalog/<int:item_id>/delete", methods=["POST"])
+def catalog_delete(item_id):
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))
-    item = Item.query.get_or_404(iid)
+    item = Item.query.get_or_404(item_id)
     name = item.name
     db.session.delete(item)
     if db_commit(db.session):
@@ -175,47 +175,47 @@ def catalog_delete(iid):
 
 # ── Variants ──────────────────────────────────────────────────────────────────
 
-@catalog_bp.route("/catalog/<int:iid>/variants")
-def variants(iid):
-    item = Item.query.get_or_404(iid)
+@catalog_bp.route("/catalog/<int:item_id>/variants")
+def variants(item_id):
+    item = Item.query.get_or_404(item_id)
     return render_template("variants.html", item=item, UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
-@catalog_bp.route("/catalog/<int:iid>/variants/add", methods=["POST"])
+@catalog_bp.route("/catalog/<int:item_id>/variants/add", methods=["POST"])
 @admin_required
-def variant_add(iid):
-    item = Item.query.get_or_404(iid)
+def variant_add(item_id):
+    item = Item.query.get_or_404(item_id)
     color = request.form.get("color", "").strip()
     if not color:
         flash("Color is required.", "error")
-        return redirect(url_for("catalog.variants", iid=iid))
+        return redirect(url_for("catalog.variants", item_id=item_id))
     if any(v.color.lower() == color.lower() for v in item.variants):
         flash(f'"{color}" already exists for this item.', "error")
-        return redirect(url_for("catalog.variants", iid=iid))
-    db.session.add(ItemVariant(item_id=iid, color=color,
+        return redirect(url_for("catalog.variants", item_id=item_id))
+    db.session.add(ItemVariant(item_id=item_id, color=color,
                                notes=request.form.get("notes", "").strip() or None))
     if db_commit(db.session):
         logger.info("Variant added: %s → %s", item.name, color)
         flash(f'Added variant "{color}".', "success")
-    return redirect(url_for("catalog.variants", iid=iid))
+    return redirect(url_for("catalog.variants", item_id=item_id))
 
 
 @catalog_bp.route("/variants/<int:vid>/edit", methods=["POST"])
 @admin_required
 def variant_edit(vid):
     variant = ItemVariant.query.get_or_404(vid)
-    iid     = variant.item_id
+    item_id     = variant.item_id
     color   = request.form.get("color", "").strip()
     if not color:
         flash("Color cannot be empty.", "error")
-        return redirect(url_for("catalog.variants", iid=iid))
+        return redirect(url_for("catalog.variants", item_id=item_id))
     variant.color      = color
     variant.notes      = request.form.get("notes", "").strip() or None
     variant.is_unicorn = request.form.get("is_unicorn") == "on"
     if db_commit(db.session):
-        logger.info("Variant updated: item %d → %s", iid, color)
+        logger.info("Variant updated: item %d → %s", item_id, color)
         flash(f'Updated to "{color}".', "success")
-    return redirect(url_for("catalog.variants", iid=iid))
+    return redirect(url_for("catalog.variants", item_id=item_id))
 
 
 @catalog_bp.route("/variants/<int:vid>/delete", methods=["POST"])
@@ -224,13 +224,13 @@ def variant_delete(vid):
     variant = ItemVariant.query.get_or_404(vid)
     if len(variant.item.variants) == 1:
         flash("Cannot delete the only variant. Add another first.", "error")
-        return redirect(url_for("catalog.variants", iid=variant.item_id))
-    iid = variant.item_id
+        return redirect(url_for("catalog.variants", item_id=variant.item_id))
+    item_id = variant.item_id
     db.session.delete(variant)
     if db_commit(db.session):
-        logger.info("Variant deleted: item %d", iid)
+        logger.info("Variant deleted: item %d", item_id)
         flash("Variant removed.", "info")
-    return redirect(url_for("catalog.variants", iid=iid))
+    return redirect(url_for("catalog.variants", item_id=item_id))
 
 
 # ── Sets ──────────────────────────────────────────────────────────────────────
@@ -280,10 +280,10 @@ def set_add():
     return render_template("set_form.html", set=None, action="Add")
 
 
-@catalog_bp.route("/sets/<int:sid>/edit", methods=["GET", "POST"])
+@catalog_bp.route("/sets/<int:set_id>/edit", methods=["GET", "POST"])
 @admin_required
-def set_edit(sid):
-    item_set = Set.query.get_or_404(sid)
+def set_edit(set_id):
+    item_set = Set.query.get_or_404(set_id)
     if request.method == "POST":
         item_set.name  = request.form["name"].strip()
         item_set.notes = request.form.get("notes", "").strip() or None
@@ -294,12 +294,12 @@ def set_edit(sid):
     return render_template("set_form.html", set=item_set, action="Edit")
 
 
-@catalog_bp.route("/sets/<int:sid>/delete", methods=["POST"])
-def set_delete(sid):
+@catalog_bp.route("/sets/<int:set_id>/delete", methods=["POST"])
+def set_delete(set_id):
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.sets_list"))
-    item_set = Set.query.get_or_404(sid)
+    item_set = Set.query.get_or_404(set_id)
     name = item_set.name
     db.session.delete(item_set)
     if db_commit(db.session):
@@ -308,10 +308,10 @@ def set_delete(sid):
     return redirect(url_for("catalog.sets_list"))
 
 
-@catalog_bp.route("/sets/<int:sid>")
-def set_detail(sid):
+@catalog_bp.route("/sets/<int:set_id>")
+def set_detail(set_id):
     from models import Ownership, Person
-    item_set    = Set.query.get_or_404(sid)
+    item_set    = Set.query.get_or_404(set_id)
     all_persons = Person.query.order_by(Person.name).all()
     person_id   = request.args.get("person", type=int)
     person      = Person.query.get(person_id) if person_id else None
@@ -564,7 +564,6 @@ def catalog_sync_confirm():
                 existing_members[item.id].quantity = qty
 
     # Update quantities on existing sets (no new rows, just qty backfill)
-    sku_to_item = sku_to_item  # already built above
     existing_set_count = int(request.form.get("existing_set_count", 0))
     qty_updates = 0
     for i in range(existing_set_count):

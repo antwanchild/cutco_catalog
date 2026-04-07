@@ -35,7 +35,7 @@
   <tbody>
     {% for item in suggested_items %}
     <tr>
-      <td><a href="{{ url_for('views.item_owners', iid=item.id) }}">{{ item.name }}</a></td>
+      <td><a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a></td>
       <td class="muted">{{ item.category or '—' }}</td>
       <td class="muted">{{ log_counts.get(item.id, 0) }}</td>
     </tr>
