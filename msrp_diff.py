@@ -236,7 +236,7 @@ def _fmt_delta(val: float | None) -> str:
 
 def print_report(diff: dict) -> None:
     today = date.today().isoformat()
-    total = sum(len(v) for v in diff.values())
+    total = sum(len(section_rows) for section_rows in diff.values())
     changes = len(diff["increased"]) + len(diff["decreased"])
 
     print()
@@ -262,7 +262,7 @@ def print_report(diff: dict) -> None:
         print(f"{title} ({len(rows)})")
         print(f"  {'SKU':<8}  {'Name':<40}  {'DB':>10}  {'Live':>10}{'  Δ':>8}")
         print(f"  {'-'*8}  {'-'*40}  {'-'*10}  {'-'*10}{'  -'*1:>8}")
-        for row in sorted(rows, key=lambda r: r["sku"]):
+        for row in sorted(rows, key=lambda report_row: report_row["sku"]):
             delta_str = _fmt_delta(row.get("delta")) if show_delta else ""
             print(
                 f"  {row['sku']:<8}  {row['name'][:40]:<40}  "
@@ -285,7 +285,7 @@ def write_csv(diff: dict, path: str) -> None:
                 "live_price": row["live_price"] if row["live_price"] is not None else "",
                 "delta":      row.get("delta", ""),
             })
-    all_rows.sort(key=lambda r: (r["category"], r["sku"]))
+    all_rows.sort(key=lambda report_row: (report_row["category"], report_row["sku"]))
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=["category", "sku", "name",
                                                   "db_price", "live_price", "delta"])

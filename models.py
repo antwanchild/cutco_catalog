@@ -189,7 +189,7 @@ class KnifeTaskLog(db.Model):
 
 def ensure_unknown_variant(item: Item) -> None:
     """Guarantee every item has an 'Unknown / Unspecified' color variant."""
-    if not any(v.color == UNKNOWN_COLOR for v in item.variants):
+    if not any(variant.color == UNKNOWN_COLOR for variant in item.variants):
         db.session.add(ItemVariant(item_id=item.id, color=UNKNOWN_COLOR))
         db.session.flush()
 
@@ -200,14 +200,14 @@ def reconcile_unknown_variant(item: Item) -> None:
     Safety rule: if an Unknown variant already has ownership records,
     keep it to avoid breaking historical links.
     """
-    real_variants = [v for v in item.variants if v.color != UNKNOWN_COLOR]
-    unknown_variants = [v for v in item.variants if v.color == UNKNOWN_COLOR]
+    real_variants = [variant for variant in item.variants if variant.color != UNKNOWN_COLOR]
+    unknown_variants = [variant for variant in item.variants if variant.color == UNKNOWN_COLOR]
 
     # Cookware is treated as single-variant: keep Unknown only.
     if (item.category or "") in COOKWARE_CATEGORIES:
         if not unknown_variants:
             ensure_unknown_variant(item)
-            unknown_variants = [v for v in item.variants if v.color == UNKNOWN_COLOR]
+            unknown_variants = [variant for variant in item.variants if variant.color == UNKNOWN_COLOR]
         for real_variant in real_variants:
             if not real_variant.ownerships:
                 db.session.delete(real_variant)

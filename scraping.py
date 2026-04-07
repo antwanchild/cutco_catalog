@@ -277,11 +277,11 @@ def scrape_item_specs(url: str) -> dict:
                 and item_subclass_m and item_subclass_m.group(1) == "STL"):
             result["edge_type"] = "N/A"
         else:
-            m = re.search(r'"specName"\s*:\s*"Edge"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html)
-            if not m:
-                m = re.search(r'"specValue"\s*:\s*"([^"]+)"\s*,\s*"specName"\s*:\s*"Edge"', raw_html)
-            if m:
-                result["edge_type"] = _EDGE_NORMALIZE.get(m.group(1).strip().lower(), "Unknown")
+            edge_match = re.search(r'"specName"\s*:\s*"Edge"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html)
+            if not edge_match:
+                edge_match = re.search(r'"specValue"\s*:\s*"([^"]+)"\s*,\s*"specName"\s*:\s*"Edge"', raw_html)
+            if edge_match:
+                result["edge_type"] = _EDGE_NORMALIZE.get(edge_match.group(1).strip().lower(), "Unknown")
             else:
                 result["edge_type"] = "N/A"
 
@@ -387,7 +387,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
 
             logger.debug("%s: found %d /p/ links — %s",
                          cat_name, len(product_links),
-                         [a.get("href", "") for a in product_links[:10]])
+                         [anchor.get("href", "") for anchor in product_links[:10]])
 
             seen_hrefs: set[str] = set()
             unique_links = []
