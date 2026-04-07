@@ -97,12 +97,62 @@ a:hover { text-decoration: underline; }
   background: var(--bg3);
   text-decoration: none;
 }
+.nav-group {
+  position: relative;
+}
+.nav-group-toggle {
+  list-style: none;
+  color: var(--muted);
+  padding: .3rem .6rem;
+  border-radius: var(--radius);
+  font-size: .875rem;
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+}
+.nav-group-toggle::-webkit-details-marker { display: none; }
+.nav-group-toggle::after {
+  content: "▾";
+  font-size: .72rem;
+  opacity: .85;
+}
+.nav-group[open] > .nav-group-toggle::after { transform: rotate(180deg); }
+.nav-group-toggle:hover,
+.nav-group-toggle.active,
+.nav-group[open] > .nav-group-toggle {
+  color: var(--text);
+  background: var(--bg3);
+}
+.nav-group-menu {
+  position: absolute;
+  top: calc(100% + .35rem);
+  right: 0;
+  min-width: 180px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: .35rem;
+  z-index: 120;
+  display: none;
+}
+.nav-group[open] > .nav-group-menu {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+.nav-group-menu a {
+  display: block;
+  width: 100%;
+}
 .badge-admin {
   background: var(--accent2);
   color: #fff;
-  padding: .2rem .5rem;
+  padding: .1rem .4rem;
   border-radius: 4px;
-  font-size: .75rem;
+  font-size: .68rem;
   font-weight: 600;
 }
 
@@ -710,6 +760,28 @@ textarea { resize: vertical; }
   }
   .nav-links.open { display: flex; }
   .nav-links a { width: 100%; padding: .45rem .5rem; font-size: .9rem; }
+  .nav-group {
+    width: 100%;
+  }
+  .nav-group-toggle {
+    width: 100%;
+    justify-content: space-between;
+    padding: .45rem .5rem;
+    font-size: .9rem;
+  }
+  .nav-group-menu {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+    padding: .1rem 0 .35rem .65rem;
+  }
+  .nav-group-menu a {
+    font-size: .88rem;
+    padding: .35rem .5rem;
+  }
 
   /* Container */
   .container { padding: .75rem .75rem; }
