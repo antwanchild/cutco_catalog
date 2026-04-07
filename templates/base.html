@@ -38,7 +38,7 @@
     <a href="{{ url_for('views.stats') }}"
        {% if request.endpoint == 'views.stats' %}class="active"{% endif %}>Stats</a>
     <a href="{{ url_for('data.import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
-    <a href="{{ url_for('data.export_csv') }}">Export CSV</a>
+    <a href="{{ url_for('data.export_page') }}">Export CSV</a>
     {% if is_admin() %}
       <span class="badge-admin">Admin</span>
       <a href="{{ url_for('admin.msrp_diff_page') }}"
