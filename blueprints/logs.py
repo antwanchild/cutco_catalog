@@ -8,11 +8,19 @@ from constants import (
     DISCORD_WEBHOOK_URL, SHARPEN_METHODS, SHARPEN_THRESHOLD_DAYS,
 )
 from extensions import db
-from helpers import _notify_discord, db_commit, is_admin
+from helpers import _notify_discord, admin_required, db_commit
 from models import BakewareSession, Item, KnifeTask, KnifeTaskLog, Ownership, SharpeningLog
 
 logs_bp = Blueprint("logs", __name__)
 logger = logging.getLogger(__name__)
+
+
+def _safe_parse_iso_date(raw: str) -> date | None:
+    """Return parsed ISO date or None when invalid."""
+    try:
+        return date.fromisoformat(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 # ── Sharpening Log ────────────────────────────────────────────────────────────
@@ -36,7 +44,11 @@ def sharpening():
         item = Item.query.get(item_id)
         if not item:
             continue
-        days_since = (today - date.fromisoformat(last_str)).days
+        parsed_last = _safe_parse_iso_date(last_str)
+        if not parsed_last:
+            logger.warning("Skipping invalid sharpening date for item_id=%s: %r", item_id, last_str)
+            continue
+        days_since = (today - parsed_last).days
         tracked.append(dict(
             item       = item,
             last_date  = last_str,
@@ -61,6 +73,7 @@ def sharpening():
 
 
 @logs_bp.route("/sharpening/add", methods=["POST"])
+@admin_required
 def sharpening_add():
     item_id      = request.form.get("item_id", type=int)
     sharpened_on = request.form.get("sharpened_on", "").strip()
@@ -69,6 +82,9 @@ def sharpening_add():
 
     if not item_id or not sharpened_on:
         flash("Item and date are required.", "error")
+        return redirect(url_for("logs.sharpening"))
+    if not _safe_parse_iso_date(sharpened_on):
+        flash("Date must be valid YYYY-MM-DD.", "error")
         return redirect(url_for("logs.sharpening"))
 
     if not Item.query.get(item_id):
@@ -88,10 +104,15 @@ def sharpening_add():
 
 
 @logs_bp.route("/sharpening/<int:lid>/edit", methods=["GET", "POST"])
+@admin_required
 def sharpening_edit(lid):
     entry = SharpeningLog.query.get_or_404(lid)
     if request.method == "POST":
-        entry.sharpened_on = request.form.get("sharpened_on", entry.sharpened_on).strip()
+        new_date = request.form.get("sharpened_on", entry.sharpened_on).strip()
+        if not _safe_parse_iso_date(new_date):
+            flash("Date must be valid YYYY-MM-DD.", "error")
+            return redirect(url_for("logs.sharpening"))
+        entry.sharpened_on = new_date
         entry.method       = request.form.get("method", entry.method).strip()
         entry.notes        = request.form.get("notes", "").strip() or None
         if db_commit(db.session):
@@ -102,6 +123,7 @@ def sharpening_edit(lid):
 
 
 @logs_bp.route("/sharpening/<int:lid>/delete", methods=["POST"])
+@admin_required
 def sharpening_delete(lid):
     entry = SharpeningLog.query.get_or_404(lid)
     db.session.delete(entry)
@@ -112,6 +134,7 @@ def sharpening_delete(lid):
 
 
 @logs_bp.route("/sharpening/item/<int:iid>/purge", methods=["POST"])
+@admin_required
 def sharpening_purge_item(iid):
     item = Item.query.get_or_404(iid)
     count = SharpeningLog.query.filter_by(item_id=iid).count()
@@ -123,10 +146,8 @@ def sharpening_purge_item(iid):
 
 
 @logs_bp.route("/sharpening/purge-all", methods=["POST"])
+@admin_required
 def sharpening_purge_all():
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("logs.sharpening"))
     count = SharpeningLog.query.count()
     SharpeningLog.query.delete()
     if db_commit(db.session):
@@ -136,11 +157,8 @@ def sharpening_purge_all():
 
 
 @logs_bp.route("/sharpening/notify", methods=["POST"])
+@admin_required
 def sharpening_notify():
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("logs.sharpening"))
-
     today       = date.today()
     all_entries = SharpeningLog.query.order_by(SharpeningLog.sharpened_on.desc()).all()
     last_by_item: dict[int, str] = {}
@@ -150,7 +168,11 @@ def sharpening_notify():
 
     overdue = []
     for item_id, last_str in last_by_item.items():
-        days_since = (today - date.fromisoformat(last_str)).days
+        parsed_last = _safe_parse_iso_date(last_str)
+        if not parsed_last:
+            logger.warning("Skipping invalid sharpening date for item_id=%s: %r", item_id, last_str)
+            continue
+        days_since = (today - parsed_last).days
         if days_since > SHARPEN_THRESHOLD_DAYS:
             item = Item.query.get(item_id)
             if item:
@@ -200,7 +222,11 @@ def bakeware():
         item = Item.query.get(iid)
         if not item:
             continue
-        days_since = (today - date.fromisoformat(last_str)).days
+        parsed_last = _safe_parse_iso_date(last_str)
+        if not parsed_last:
+            logger.warning("Skipping invalid bakeware date for item_id=%s: %r", iid, last_str)
+            continue
+        days_since = (today - parsed_last).days
         ratings    = rating_by_item.get(iid, [])
         tracked.append(dict(
             item       = item,
@@ -242,6 +268,7 @@ def bakeware():
 
 
 @logs_bp.route("/bakeware/add", methods=["POST"])
+@admin_required
 def bakeware_add():
     item_id   = request.form.get("item_id", type=int)
     baked_on  = request.form.get("baked_on", "").strip()
@@ -251,6 +278,9 @@ def bakeware_add():
 
     if not item_id or not baked_on or not what_made:
         flash("Item, date, and what you made are required.", "error")
+        return redirect(url_for("logs.bakeware"))
+    if not _safe_parse_iso_date(baked_on):
+        flash("Date must be valid YYYY-MM-DD.", "error")
         return redirect(url_for("logs.bakeware"))
     if not Item.query.get(item_id):
         flash("Item not found.", "error")
@@ -277,10 +307,15 @@ def bakeware_add():
 
 
 @logs_bp.route("/bakeware/<int:sid>/edit", methods=["GET", "POST"])
+@admin_required
 def bakeware_edit(sid):
     session = BakewareSession.query.get_or_404(sid)
     if request.method == "POST":
-        session.baked_on  = request.form.get("baked_on", session.baked_on).strip()
+        new_date = request.form.get("baked_on", session.baked_on).strip()
+        if not _safe_parse_iso_date(new_date):
+            flash("Date must be valid YYYY-MM-DD.", "error")
+            return redirect(url_for("logs.bakeware"))
+        session.baked_on  = new_date
         session.what_made = request.form.get("what_made", "").strip() or session.what_made
         session.notes     = request.form.get("notes", "").strip() or None
         raw_rating = request.form.get("rating", "").strip()
@@ -297,6 +332,7 @@ def bakeware_edit(sid):
 
 
 @logs_bp.route("/bakeware/<int:sid>/delete", methods=["POST"])
+@admin_required
 def bakeware_delete(sid):
     session = BakewareSession.query.get_or_404(sid)
     db.session.delete(session)
@@ -307,6 +343,7 @@ def bakeware_delete(sid):
 
 
 @logs_bp.route("/bakeware/item/<int:iid>/purge", methods=["POST"])
+@admin_required
 def bakeware_purge_item(iid):
     item = Item.query.get_or_404(iid)
     count = BakewareSession.query.filter_by(item_id=iid).count()
@@ -318,10 +355,8 @@ def bakeware_purge_item(iid):
 
 
 @logs_bp.route("/bakeware/purge-all", methods=["POST"])
+@admin_required
 def bakeware_purge_all():
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("logs.bakeware"))
     count = BakewareSession.query.count()
     BakewareSession.query.delete()
     if db_commit(db.session):
@@ -331,11 +366,8 @@ def bakeware_purge_all():
 
 
 @logs_bp.route("/bakeware/notify", methods=["POST"])
+@admin_required
 def bakeware_notify():
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("logs.bakeware"))
-
     today        = date.today()
     all_sessions = BakewareSession.query.order_by(BakewareSession.baked_on.desc()).all()
     last_by_item: dict[int, str] = {}
@@ -345,7 +377,11 @@ def bakeware_notify():
 
     stale = []
     for iid, last_str in last_by_item.items():
-        days_since = (today - date.fromisoformat(last_str)).days
+        parsed_last = _safe_parse_iso_date(last_str)
+        if not parsed_last:
+            logger.warning("Skipping invalid bakeware date for item_id=%s: %r", iid, last_str)
+            continue
+        days_since = (today - parsed_last).days
         if days_since > BAKEWARE_THRESHOLD_DAYS:
             item = Item.query.get(iid)
             if item:
@@ -424,6 +460,7 @@ def tasks():
 
 
 @logs_bp.route("/tasks/add", methods=["POST"])
+@admin_required
 def task_log_add():
     item_id   = request.form.get("item_id", type=int)
     task_id   = request.form.get("task_id", type=int)
@@ -432,6 +469,9 @@ def task_log_add():
 
     if not item_id or not task_id or not logged_on:
         flash("Item, task, and date are required.", "error")
+        return redirect(url_for("logs.tasks"))
+    if not _safe_parse_iso_date(logged_on):
+        flash("Date must be valid YYYY-MM-DD.", "error")
         return redirect(url_for("logs.tasks"))
     if not Item.query.get(item_id):
         flash("Item not found.", "error")
@@ -455,6 +495,7 @@ def task_log_add():
 
 
 @logs_bp.route("/tasks/log/<int:lid>/delete", methods=["POST"])
+@admin_required
 def task_log_delete(lid):
     entry = KnifeTaskLog.query.get_or_404(lid)
     db.session.delete(entry)
@@ -465,6 +506,7 @@ def task_log_delete(lid):
 
 
 @logs_bp.route("/tasks/item/<int:iid>/purge", methods=["POST"])
+@admin_required
 def task_log_purge_item(iid):
     item = Item.query.get_or_404(iid)
     count = KnifeTaskLog.query.filter_by(item_id=iid).count()
@@ -476,10 +518,8 @@ def task_log_purge_item(iid):
 
 
 @logs_bp.route("/tasks/purge-all", methods=["POST"])
+@admin_required
 def task_log_purge_all():
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("logs.tasks"))
     count = KnifeTaskLog.query.count()
     KnifeTaskLog.query.delete()
     if db_commit(db.session):
@@ -513,6 +553,7 @@ def task_detail(tid):
 
 
 @logs_bp.route("/tasks/manage/add", methods=["POST"])
+@admin_required
 def task_add():
     name = request.form.get("name", "").strip()
     if not name:
@@ -529,6 +570,7 @@ def task_add():
 
 
 @logs_bp.route("/tasks/manage/<int:tid>/delete", methods=["POST"])
+@admin_required
 def task_delete(tid):
     task = KnifeTask.query.get_or_404(tid)
     if task.log_entries:
