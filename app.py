@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from flask import Flask, jsonify, render_template, request
 
-from constants import ADMIN_TOKEN, ADMIN_SESSION_SECONDS, APP_VERSION, KNIFE_TASK_PRESETS, UNKNOWN_COLOR
+from constants import ADMIN_TOKEN, ADMIN_SESSION_SECONDS, APP_VERSION, KNIFE_TASK_PRESETS, UNKNOWN_COLOR, canonicalize_category
 from extensions import db, limiter
 from helpers import _csrf_token, is_admin, validate_csrf
 from models import Item, KnifeTask, ensure_unknown_variant
@@ -128,6 +128,14 @@ with app.app_context():
     for _item in _bad:
         logger.info("Removing item with invalid single-digit SKU: %s (sku=%s)", _item.name, _item.sku)
         db.session.delete(_item)
+    _renamed_categories = 0
+    for _item in Item.query.all():
+        _canonical = canonicalize_category(_item.category)
+        if _canonical != _item.category:
+            _item.category = _canonical
+            _renamed_categories += 1
+    if _renamed_categories:
+        logger.info("Category normalization: updated %d item category value(s)", _renamed_categories)
     for item in Item.query.all():
         ensure_unknown_variant(item)
     db.session.commit()

@@ -9,7 +9,7 @@ from flask import Blueprint, Response, flash, redirect, render_template, request
 
 from constants import (
     COOKWARE_CATEGORIES, EDGE_TYPES, STATUS_OPTIONS, TRUTHY, UNKNOWN_COLOR,
-    XLSX_COL_MAP, XLSX_SET_COLS,
+    XLSX_COL_MAP, XLSX_SET_COLS, canonicalize_category,
 )
 from extensions import db
 from helpers import admin_required, db_commit
@@ -280,7 +280,7 @@ def import_page():
         is_sku_unicorn = row.get("is_sku_unicorn", row.get("item_is_unicorn", "")).strip().lower() in TRUTHY
         is_variant_unicorn = row.get("is_variant_unicorn", row.get("is_unicorn", "")).strip().lower() in TRUTHY
         is_edge_unicorn = row.get("is_edge_unicorn", row.get("edge_is_unicorn", "")).strip().lower() in TRUTHY
-        category   = row.get("category", "").strip() or None
+        category   = canonicalize_category(row.get("category", ""))
         notes      = _build_notes(row) or row.get("notes", "").strip() or None
         set_names  = row.get("_sets", [])
 
@@ -414,7 +414,7 @@ def import_confirm():
             is_sku_unicorn = request.form.get(f"item_sku_unicorn_{row_index}") == "on"
             is_variant_unicorn = request.form.get(f"item_variant_unicorn_{row_index}") == "on"
             is_edge_unicorn = request.form.get(f"item_edge_unicorn_{row_index}") == "on"
-            category    = request.form.get(f"item_category_{row_index}", "").strip() or None
+            category    = canonicalize_category(request.form.get(f"item_category_{row_index}", ""))
             notes       = request.form.get(f"item_notes_{row_index}", "").strip() or None
             person_name = request.form.get(f"item_person_{row_index}", "").strip()
             status      = request.form.get(f"item_status_{row_index}", "Owned")
