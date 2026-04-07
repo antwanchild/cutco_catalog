@@ -294,9 +294,14 @@ def scrape_item_specs(url: str) -> dict:
             "weight":           "weight",
         }
         for spec in re.finditer(
-                r'"specName"\s*:\s*"([^"]+)"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html):
-            key = spec.group(1).strip().lower()
-            val = spec.group(2).strip()
+                r'"specName"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"specValue"\s*:\s*"((?:\\.|[^"\\])*)"',
+                raw_html):
+            try:
+                key = json.loads(f'"{spec.group(1)}"').strip().lower()
+                val = json.loads(f'"{spec.group(2)}"').strip()
+            except json.JSONDecodeError:
+                key = spec.group(1).strip().lower()
+                val = spec.group(2).strip()
             field = _SPEC_MAP.get(key)
             if field and result[field] is None:
                 result[field] = val
