@@ -17,6 +17,8 @@
 
 {# ── Person filter ─────────────────────────────────────────────────────────── #}
 <form method="get" style="margin-bottom:1rem">
+  <input type="hidden" name="sort" value="{{ sort }}">
+  <input type="hidden" name="dir" value="{{ direction }}">
   <label class="flex-center" style="font-size:.9rem">
     Completion for:
     <select name="person" onchange="this.form.submit()" class="input-sm">
@@ -81,7 +83,20 @@
 <div class="table-wrap">
 <table class="data-table">
   <thead>
-    <tr><th>Name</th><th>SKU</th><th>Category</th><th>Edge</th><th>MSRP</th><th>Wishlist</th></tr>
+    <tr>
+      {% set next_name_dir = 'desc' if sort == 'name' and direction == 'asc' else 'asc' %}
+      {% set next_sku_dir = 'desc' if sort == 'sku' and direction == 'asc' else 'asc' %}
+      {% set next_category_dir = 'desc' if sort == 'category' and direction == 'asc' else 'asc' %}
+      {% set next_edge_dir = 'desc' if sort == 'edge' and direction == 'asc' else 'asc' %}
+      {% set next_msrp_dir = 'desc' if sort == 'msrp' and direction == 'asc' else 'asc' %}
+      {% set next_wishlist_dir = 'desc' if sort == 'wishlist' and direction == 'asc' else 'asc' %}
+      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='name', dir=next_name_dir) }}">Name{% if sort == 'name' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='sku', dir=next_sku_dir) }}">SKU{% if sort == 'sku' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='category', dir=next_category_dir) }}">Category{% if sort == 'category' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='edge', dir=next_edge_dir) }}">Edge{% if sort == 'edge' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='msrp', dir=next_msrp_dir) }}">MSRP{% if sort == 'msrp' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='wishlist', dir=next_wishlist_dir) }}">Wishlist{% if sort == 'wishlist' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+    </tr>
   </thead>
   <tbody>
     {% for item in missing_items %}
@@ -96,7 +111,9 @@
       <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{% if item.msrp %}${{ "%.2f"|format(item.msrp) }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>
-        {% if person_id %}
+        {% if person_id and item.id in wishlisted_item_ids %}
+        <span class="muted">Wishlisted</span>
+        {% elif person_id %}
         <a href="{{ url_for('people.ownership_add', item_id=item.id, person_id=person_id) }}?status=Wishlist"
            class="btn btn-xs btn-ghost">+ Wishlist</a>
         {% else %}

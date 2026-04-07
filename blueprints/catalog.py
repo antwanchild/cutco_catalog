@@ -321,6 +321,12 @@ def set_detail(set_id=None, sid=None):
     all_persons = Person.query.order_by(Person.name).all()
     person_id   = request.args.get("person", type=int)
     person      = Person.query.get(person_id) if person_id else None
+    sort_field  = (request.args.get("sort", "name") or "name").strip().lower()
+    direction   = (request.args.get("dir", "asc") or "asc").strip().lower()
+    if direction not in {"asc", "desc"}:
+        direction = "asc"
+    if sort_field not in {"name", "sku", "category", "edge", "msrp", "wishlist"}:
+        sort_field = "name"
 
     # Split items into owned vs. missing for the selected person (or globally)
     owned_q = Ownership.query.filter_by(status="Owned")
@@ -332,10 +338,37 @@ def set_detail(set_id=None, sid=None):
         if o.variant is not None and o.variant.item is not None
     }
 
-    owned_items   = sorted([i for i in item_set.items if i.id in owned_item_ids],
-                           key=lambda i: i.name)
-    missing_items = sorted([i for i in item_set.items if i.id not in owned_item_ids],
-                           key=lambda i: i.name)
+    wishlisted_item_ids: set[int] = set()
+    if person_id:
+        wishlisted_item_ids = {
+            ownership.variant.item_id
+            for ownership in Ownership.query.filter_by(person_id=person_id, status="Wishlist").all()
+            if ownership.variant is not None and ownership.variant.item is not None
+        }
+
+    def _sort_items(items: list[Item]) -> list[Item]:
+        if sort_field == "msrp":
+            if direction == "desc":
+                return sorted(items, key=lambda item: (item.msrp is None, -(item.msrp or 0)))
+            return sorted(items, key=lambda item: (item.msrp is None, item.msrp or 0))
+        if sort_field == "wishlist":
+            return sorted(
+                items,
+                key=lambda item: (item.id in wishlisted_item_ids),
+                reverse=(direction == "desc"),
+            )
+
+        key_map = {
+            "name": lambda item: (item.name or "").lower(),
+            "sku": lambda item: (item.sku or "").lower(),
+            "category": lambda item: (item.category or "").lower(),
+            "edge": lambda item: (item.edge_type or "").lower(),
+        }
+        key_fn = key_map.get(sort_field, key_map["name"])
+        return sorted(items, key=key_fn, reverse=(direction == "desc"))
+
+    owned_items   = _sort_items([item for item in item_set.items if item.id in owned_item_ids])
+    missing_items = _sort_items([item for item in item_set.items if item.id not in owned_item_ids])
 
     total = len(item_set.items)
     owned_count = len(owned_items)
@@ -353,6 +386,9 @@ def set_detail(set_id=None, sid=None):
                            all_persons=all_persons,
                            person_id=person_id,
                            person=person,
+                           sort=sort_field,
+                           direction=direction,
+                           wishlisted_item_ids=wishlisted_item_ids,
                            qty_map=qty_map,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
