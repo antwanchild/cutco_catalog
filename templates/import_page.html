@@ -16,7 +16,9 @@
       <tr><td><code>COLOR</code></td><td>Variant color</td></tr>
       <tr><td><code>Category</code></td><td>Category</td></tr>
       <tr><td><code>Edge</code></td><td>Edge type</td></tr>
-      <tr><td><code>Unicorn?</code></td><td>Unicorn flag</td></tr>
+      <tr><td><code>is_sku_unicorn</code></td><td>SKU/item unicorn flag</td></tr>
+      <tr><td><code>is_variant_unicorn</code> or <code>Unicorn?</code></td><td>Variant/color unicorn flag</td></tr>
+      <tr><td><code>is_edge_unicorn</code></td><td>Edge/blade-type unicorn flag</td></tr>
       <tr><td><code>Owned?</code></td><td>yes → Owned, no → Wishlist, text → assigned person</td></tr>
       <tr><td><code>Price, Gift Box, Sheath, Quantity Purchased, Given Away</code></td><td>Merged into notes</td></tr>
       <tr><td><code>Beast, Fanatic, SIGNATURE, HOMEMAKER, Accomplished Chef, CUTCO Kitchen, BEAST2, HOMEMAKER2, Accomplished Chef3, CUTCO Kitchen4</code></td><td>Set membership (truthy cell = member)</td></tr>
@@ -40,7 +42,35 @@
   </label>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Preview Import</button>
+    <button type="submit" name="mode" value="preview" class="btn btn-primary">Preview Import</button>
+    <button type="submit" name="mode" value="check" class="btn btn-secondary">Check Compatibility</button>
   </div>
 </form>
+
+{% if import_check %}
+<div class="form-card">
+  <h2>Compatibility Result ({{ import_check.file_type }})</h2>
+  {% if import_check.ok %}
+    <p class="flash flash-success">Required headers look good.</p>
+  {% else %}
+    <p class="flash flash-error">Missing required headers: {{ import_check.missing_required | join(", ") }}</p>
+  {% endif %}
+
+  {% if import_check.warnings %}
+    <div class="flash flash-warning">
+      <strong>Warnings</strong>
+      <ul>
+        {% for warning in import_check.warnings %}
+          <li>{{ warning }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <p><strong>Recognized mapped columns:</strong> {{ import_check.mapped_headers | join(", ") if import_check.mapped_headers else "none" }}</p>
+  {% if import_check.unknown_headers %}
+    <p><strong>Unmapped headers:</strong> {{ import_check.unknown_headers | join(", ") }}</p>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

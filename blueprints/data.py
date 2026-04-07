@@ -55,6 +55,65 @@ def _safe_csv_filename(raw_name: str) -> str:
     return cleaned
 
 
+def _normalized_header(value: str) -> str:
+    return value.strip().lower().replace(" ", "_")
+
+
+def _build_import_compatibility_report(uploaded_file, ext: str) -> dict:
+    """Analyze import file headers and return a compatibility summary."""
+    raw_headers: list[str] = []
+    if ext == "xlsx":
+        workbook = openpyxl.load_workbook(io.BytesIO(uploaded_file.stream.read()), data_only=True)
+        worksheet = workbook.active
+        for cell in worksheet[1]:
+            if cell.value is None:
+                continue
+            header = str(cell.value).strip()
+            if header:
+                raw_headers.append(header)
+    else:
+        stream = io.StringIO(uploaded_file.stream.read().decode("utf-8-sig"))
+        reader = csv.reader(stream)
+        raw_headers = [col.strip() for col in next(reader, []) if col and col.strip()]
+
+    mapped_headers = set()
+    for header in raw_headers:
+        normalized = _normalized_header(header)
+        if normalized in XLSX_COL_MAP:
+            mapped_headers.add(XLSX_COL_MAP[normalized])
+        elif normalized in XLSX_SET_COLS:
+            mapped_headers.add("_sets")
+        else:
+            mapped_headers.add(normalized)
+
+    missing_required = []
+    if "name" not in mapped_headers:
+        missing_required.append("name")
+
+    ownership_columns_found = bool({"owned_raw", "status", "person"} & mapped_headers)
+    unicorn_columns_found = bool({"is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn", "is_unicorn"} & mapped_headers)
+    unknown_headers = sorted(
+        header for header in raw_headers
+        if _normalized_header(header) not in XLSX_COL_MAP and _normalized_header(header) not in XLSX_SET_COLS
+    )
+
+    warnings = []
+    if not ownership_columns_found:
+        warnings.append("No ownership/status column found (Owned? / status / person). Rows will default to Owned.")
+    if not unicorn_columns_found:
+        warnings.append("No unicorn columns found. If needed, add is_sku_unicorn / is_variant_unicorn / is_edge_unicorn.")
+
+    return {
+        "ok": not missing_required,
+        "file_type": ext.upper(),
+        "raw_headers": raw_headers,
+        "mapped_headers": sorted(mapped_headers),
+        "missing_required": missing_required,
+        "warnings": warnings,
+        "unknown_headers": unknown_headers,
+    }
+
+
 @data_bp.route("/export")
 def export_page():
     suggested_name = f"cutco_collection_{date.today().isoformat()}.csv"
@@ -118,17 +177,40 @@ def import_template():
 def import_page():
     if request.method == "GET":
         return render_template("import_page.html",
-                               people=Person.query.order_by(Person.name).all())
+                               people=Person.query.order_by(Person.name).all(),
+                               import_check=None)
 
     uploaded_file = request.files.get("csvfile")
     if not uploaded_file or not uploaded_file.filename:
         flash("Please choose a file.", "error")
         return render_template("import_page.html",
-                               people=Person.query.order_by(Person.name).all())
+                               people=Person.query.order_by(Person.name).all(),
+                               import_check=None)
 
     person_override = request.form.get("person_override", "").strip() or None
     ext = uploaded_file.filename.rsplit(".", 1)[-1].lower()
     logger.info("Import file received: %s (person override: %s)", uploaded_file.filename, person_override or "none")
+
+    if request.form.get("mode") == "check":
+        try:
+            compatibility = _build_import_compatibility_report(uploaded_file, ext)
+            if compatibility["ok"]:
+                flash("Compatibility check passed.", "success")
+            else:
+                flash("Compatibility check found required column issues.", "warning")
+            return render_template(
+                "import_page.html",
+                people=Person.query.order_by(Person.name).all(),
+                import_check=compatibility,
+            )
+        except Exception as exc:
+            logger.error("Import compatibility check failed: %s", exc)
+            flash("Could not read headers from this file. Use CSV/XLSX with a header row.", "error")
+            return render_template(
+                "import_page.html",
+                people=Person.query.order_by(Person.name).all(),
+                import_check=None,
+            )
 
     try:
         if ext == "xlsx":
