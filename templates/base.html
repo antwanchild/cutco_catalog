@@ -56,12 +56,12 @@
 </template>
 <script>
   /* Inject CSRF token into every form on the page */
-  (function() {
+  document.addEventListener('DOMContentLoaded', function() {
     var tpl = document.getElementById('csrf-field');
     document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(function(f) {
       f.appendChild(tpl.content.cloneNode(true));
     });
-  })();
+  });
 
   document.querySelector('.nav-toggle').addEventListener('click', function() {
     var links = document.querySelector('.nav-links');
