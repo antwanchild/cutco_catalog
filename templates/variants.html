@@ -18,6 +18,7 @@
       <td>{% if variant.is_unicorn %}🦄{% endif %}</td>
       <td>{{ variant.ownerships | length }}</td>
       <td class="actions">
+        {% if not is_cookware %}
         <button class="btn btn-xs" onclick="toggleEdit({{ variant.id }})">Edit</button>
         {% if item.variants | length > 1 %}
         <form method="post" action="{{ url_for('catalog.variant_delete', vid=variant.id) }}"
@@ -25,8 +26,12 @@
           <button class="btn btn-xs btn-danger">Del</button>
         </form>
         {% endif %}
+        {% else %}
+        <span class="muted">N/A for cookware</span>
+        {% endif %}
       </td>
     </tr>
+    {% if not is_cookware %}
     <tr id="edit-{{ variant.id }}" class="edit-row hidden">
       <td colspan="4">
         <form method="post" action="{{ url_for('catalog.variant_edit', vid=variant.id) }}" class="inline-form">
@@ -40,10 +45,14 @@
         </form>
       </td>
     </tr>
+    {% endif %}
     {% endfor %}
   </tbody>
 </table>
 
+{% if is_cookware %}
+<p class="muted mt-sm">Cookware items use a single fallback variant (Unknown). Color variants are disabled.</p>
+{% else %}
 <div class="form-card compact">
   <h3>Add Variant</h3>
   <form method="post" action="{{ url_for('catalog.variant_add', item_id=item.id) }}" class="inline-form">
@@ -52,6 +61,7 @@
     <button type="submit" class="btn btn-primary btn-sm">Add</button>
   </form>
 </div>
+{% endif %}
 
 <script>
 function toggleEdit(id) {
