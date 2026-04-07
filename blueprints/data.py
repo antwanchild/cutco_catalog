@@ -208,8 +208,8 @@ def import_page():
         if person_name and matched_item:
             person_obj = existing_persons.get(person_name.lower())
             if person_obj:
-                variant = next((v for v in matched_item.variants
-                                if v.color.lower() == color.lower()), None)
+                variant = next((existing_variant for existing_variant in matched_item.variants
+                                if existing_variant.color.lower() == color.lower()), None)
                 if variant:
                     existing_o = Ownership.query.filter_by(
                         person_id=person_obj.id, variant_id=variant.id).first()
@@ -263,20 +263,20 @@ def import_confirm():
     own_count  = int(request.form.get("own_count",  0) or 0)
 
     try:
-        for i in range(item_count):
-            if request.form.get(f"item_accept_{i}") != "on":
+        for row_index in range(item_count):
+            if request.form.get(f"item_accept_{row_index}") != "on":
                 continue
 
-            name        = request.form.get(f"item_name_{i}", "").strip()
-            sku         = request.form.get(f"item_sku_{i}", "").strip().upper() or None
-            color       = request.form.get(f"item_color_{i}", "").strip() or UNKNOWN_COLOR
-            edge_type   = request.form.get(f"item_edge_{i}", "Unknown")
-            is_unicorn  = request.form.get(f"item_unicorn_{i}") == "on"
-            category    = request.form.get(f"item_category_{i}", "").strip() or None
-            notes       = request.form.get(f"item_notes_{i}", "").strip() or None
-            person_name = request.form.get(f"item_person_{i}", "").strip()
-            status      = request.form.get(f"item_status_{i}", "Owned")
-            set_names   = [sname for sname in request.form.get(f"item_sets_{i}", "").split("|") if sname]
+            name        = request.form.get(f"item_name_{row_index}", "").strip()
+            sku         = request.form.get(f"item_sku_{row_index}", "").strip().upper() or None
+            color       = request.form.get(f"item_color_{row_index}", "").strip() or UNKNOWN_COLOR
+            edge_type   = request.form.get(f"item_edge_{row_index}", "Unknown")
+            is_unicorn  = request.form.get(f"item_unicorn_{row_index}") == "on"
+            category    = request.form.get(f"item_category_{row_index}", "").strip() or None
+            notes       = request.form.get(f"item_notes_{row_index}", "").strip() or None
+            person_name = request.form.get(f"item_person_{row_index}", "").strip()
+            status      = request.form.get(f"item_status_{row_index}", "Owned")
+            set_names   = [set_name for set_name in request.form.get(f"item_sets_{row_index}", "").split("|") if set_name]
 
             if not name:
                 continue
@@ -298,15 +298,15 @@ def import_confirm():
                 existing_names[name.lower()] = item
                 added_items += 1
 
-            for sname in set_names:
-                item_set = get_or_create_set(sname)
+            for set_name in set_names:
+                item_set = get_or_create_set(set_name)
                 if item_set not in item.sets:
                     item.sets.append(item_set)
 
             is_cookware = (item.category or "") in COOKWARE_CATEGORIES
             target_color = UNKNOWN_COLOR if is_cookware else (color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR)
-            variant = next((v for v in item.variants
-                            if v.color.lower() == target_color.lower()), None)
+            variant = next((existing_variant for existing_variant in item.variants
+                            if existing_variant.color.lower() == target_color.lower()), None)
             if not variant:
                 variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_unicorn)
                 db.session.add(variant)
@@ -331,15 +331,15 @@ def import_confirm():
             db.session.flush()
             reconcile_unknown_variant(item)
 
-        for i in range(own_count):
-            if request.form.get(f"own_accept_{i}") != "on":
+        for row_index in range(own_count):
+            if request.form.get(f"own_accept_{row_index}") != "on":
                 continue
 
-            item_id     = int(request.form.get(f"own_item_id_{i}", 0))
-            person_name = request.form.get(f"own_person_{i}", "").strip()
-            color       = request.form.get(f"own_color_{i}", "").strip() or UNKNOWN_COLOR
-            status      = request.form.get(f"own_status_{i}", "Owned")
-            notes       = request.form.get(f"own_notes_{i}", "").strip() or None
+            item_id     = int(request.form.get(f"own_item_id_{row_index}", 0))
+            person_name = request.form.get(f"own_person_{row_index}", "").strip()
+            color       = request.form.get(f"own_color_{row_index}", "").strip() or UNKNOWN_COLOR
+            status      = request.form.get(f"own_status_{row_index}", "Owned")
+            notes       = request.form.get(f"own_notes_{row_index}", "").strip() or None
 
             item = Item.query.get(item_id)
             if not item or not person_name:
@@ -354,8 +354,8 @@ def import_confirm():
                 added_persons += 1
 
             target_color = UNKNOWN_COLOR if (item.category or "") in COOKWARE_CATEGORIES else color
-            variant = next((v for v in item.variants
-                            if v.color.lower() == target_color.lower()), None)
+            variant = next((existing_variant for existing_variant in item.variants
+                            if existing_variant.color.lower() == target_color.lower()), None)
             if not variant:
                 variant = ItemVariant(item_id=item.id, color=target_color)
                 db.session.add(variant)

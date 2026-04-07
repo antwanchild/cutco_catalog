@@ -17,7 +17,7 @@ def item_owners(item_id):
                .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
                .filter(ItemVariant.item_id == item_id)
                .order_by(Ownership.status).all())
-    owner_ids      = {e.person_id for e in entries}
+    owner_ids      = {entry.person_id for entry in entries}
     people_without = (Person.query
                       .filter(~Person.id.in_(owner_ids))
                       .order_by(Person.name).all())
@@ -124,18 +124,18 @@ def stats():
 
     collector_rows = []
     for person in people_list:
-        p_owned = Ownership.query.filter_by(person_id=person.id, status="Owned").all()
-        p_item_ids = {o.variant.item_id for o in p_owned}
-        p_items    = Item.query.filter(Item.id.in_(p_item_ids)).all() if p_item_ids else []
-        p_value    = sum(i.msrp for i in p_items if i.msrp)
+        person_owned = Ownership.query.filter_by(person_id=person.id, status="Owned").all()
+        person_item_ids = {ownership.variant.item_id for ownership in person_owned}
+        person_items = Item.query.filter(Item.id.in_(person_item_ids)).all() if person_item_ids else []
+        person_value = sum(item.msrp for item in person_items if item.msrp)
         collector_rows.append(dict(
             id=person.id, name=person.name,
-            count=len(p_item_ids), value=p_value,
+            count=len(person_item_ids), value=person_value,
         ))
     collector_rows.sort(key=lambda row: row["count"], reverse=True)
 
-    total_value  = sum(i.msrp for i in owned_items if i.msrp)
-    priced_count = sum(1 for i in owned_items if i.msrp)
+    total_value  = sum(item.msrp for item in owned_items if item.msrp)
+    priced_count = sum(1 for item in owned_items if item.msrp)
     catalog_total = Item.query.count()
 
     summary = dict(
@@ -202,12 +202,12 @@ def gift_list(token):
     person   = Person.query.get_or_404(person_id)
 
     owned_item_ids = {
-        o.variant.item_id
-        for o in Ownership.query.filter_by(person_id=person_id, status="Owned").all()
+        ownership.variant.item_id
+        for ownership in Ownership.query.filter_by(person_id=person_id, status="Owned").all()
     }
     missing_items = sorted(
-        [i for i in item_set.items if i.id not in owned_item_ids],
-        key=lambda i: i.name,
+        [item for item in item_set.items if item.id not in owned_item_ids],
+        key=lambda item: item.name,
     )
     owned_count = len(item_set.items) - len(missing_items)
     total       = len(item_set.items)
@@ -247,8 +247,8 @@ def collection_card(token):
     total_value = 0.0
     priced      = 0
     seen_items: set[int] = set()
-    for o in ownerships:
-        item = o.variant.item
+    for ownership in ownerships:
+        item = ownership.variant.item
         if item.id in seen_items:
             continue
         seen_items.add(item.id)

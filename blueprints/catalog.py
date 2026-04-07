@@ -70,7 +70,7 @@ def catalog_add():
         )
         db.session.add(item)
         db.session.flush()
-        colors = [c.strip() for c in request.form.get("colors", "").split(",") if c.strip()]
+        colors = [raw_color.strip() for raw_color in request.form.get("colors", "").split(",") if raw_color.strip()]
         for color in colors:
             if color != UNKNOWN_COLOR and (item.category or "") not in COOKWARE_CATEGORIES:
                 db.session.add(ItemVariant(item_id=item.id, color=color))
@@ -129,7 +129,7 @@ def catalog_purge_unreferenced():
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))
-    referenced_item_ids = {o.variant.item_id for o in Ownership.query.all()}
+    referenced_item_ids = {ownership.variant.item_id for ownership in Ownership.query.all()}
     items = Item.query.filter(~Item.id.in_(referenced_item_ids)).all() if referenced_item_ids else Item.query.all()
     count = len(items)
     for item in items:
@@ -194,7 +194,7 @@ def variant_add(item_id):
     if (item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
         flash("Cookware items use a single Unknown variant; color variants are not supported.", "warning")
         return redirect(url_for("catalog.variants", item_id=item_id))
-    if any(v.color.lower() == color.lower() for v in item.variants):
+    if any(existing_variant.color.lower() == color.lower() for existing_variant in item.variants):
         flash(f'"{color}" already exists for this item.', "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
     db.session.add(ItemVariant(item_id=item_id, color=color,
@@ -262,17 +262,17 @@ def sets_list():
     if person_id:
         owned_q = owned_q.filter_by(person_id=person_id)
     owned_item_ids = {
-        o.variant.item_id
-        for o in owned_q.all()
-        if o.variant is not None and o.variant.item is not None
+        ownership.variant.item_id
+        for ownership in owned_q.all()
+        if ownership.variant is not None and ownership.variant.item is not None
     }
 
     completion = {}
-    for s in all_sets:
-        total = len(s.items)
-        owned = sum(1 for item in s.items if item.id in owned_item_ids)
-        completion[s.id] = dict(total=total, owned=owned,
-                                pct=round(100 * owned / total) if total else 0)
+    for item_set in all_sets:
+        total = len(item_set.items)
+        owned = sum(1 for item in item_set.items if item.id in owned_item_ids)
+        completion[item_set.id] = dict(total=total, owned=owned,
+                                       pct=round(100 * owned / total) if total else 0)
 
     return render_template("sets.html", sets=all_sets, completion=completion,
                            all_persons=all_persons, person_id=person_id)
@@ -389,9 +389,9 @@ def set_detail(set_id=None, sid=None):
     if person_id:
         owned_q = owned_q.filter_by(person_id=person_id)
     owned_item_ids = {
-        o.variant.item_id
-        for o in owned_q.all()
-        if o.variant is not None and o.variant.item is not None
+        ownership.variant.item_id
+        for ownership in owned_q.all()
+        if ownership.variant is not None and ownership.variant.item is not None
     }
 
     wishlisted_item_ids: set[int] = set()
@@ -430,7 +430,7 @@ def set_detail(set_id=None, sid=None):
     owned_count = len(owned_items)
     pct = round(100 * owned_count / total) if total else 0
 
-    qty_map = {m.item_id: m.quantity for m in item_set.members}
+    qty_map = {membership.item_id: membership.quantity for membership in item_set.members}
 
     return render_template("set_detail.html",
                            set=item_set,
@@ -481,7 +481,7 @@ def catalog_sync_uses():
 
     for item_id, uses in item_uses.items():
         item = item_lookup[item_id]
-        existing_task_ids = {t.id for t in item.suggested_tasks}
+        existing_task_ids = {task.id for task in item.suggested_tasks}
         for use_text in uses:
             task = KnifeTask.query.filter(
                 db.func.lower(KnifeTask.name) == use_text.lower()
@@ -523,7 +523,7 @@ def catalog_sync():
         return redirect(url_for("catalog.catalog"))
 
     existing_skus = {item.sku for item in Item.query.filter(Item.sku.isnot(None)).all()}
-    new_items = [i for i in scraped if i["sku"] not in existing_skus]
+    new_items = [scraped_item for scraped_item in scraped if scraped_item["sku"] not in existing_skus]
 
     _grouped_unsorted: dict = {}
     for item in new_items:
@@ -550,9 +550,9 @@ def catalog_sync():
         from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
         _specs_map: dict[str, dict] = {}
         with ThreadPoolExecutor(max_workers=8) as pool:
-            _future_map = {pool.submit(scrape_item_specs, i["url"]): i["sku"] for i in new_items}
-            for _fut in _as_completed(_future_map):
-                _specs_map[_future_map[_fut]] = _fut.result()
+            _future_map = {pool.submit(scrape_item_specs, item_data["url"]): item_data["sku"] for item_data in new_items}
+            for future in _as_completed(_future_map):
+                _specs_map[_future_map[future]] = future.result()
         for item in new_items:
             specs = _specs_map.get(item["sku"], {})
             item["edge_type"]      = specs.get("edge_type", "Unknown")
@@ -561,13 +561,13 @@ def catalog_sync():
             item["overall_length"] = specs.get("overall_length")
             item["weight"]         = specs.get("weight")
 
-    existing_sets = {s.name.lower() for s in Set.query.all()}
+    existing_sets = {item_set.name.lower() for item_set in Set.query.all()}
     new_sets      = sorted(
-        (s for s in scraped_sets if s["name"].lower() not in existing_sets),
+        (scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() not in existing_sets),
         key=_sku_sort_key,
     )
     # Pass existing sets too so confirm can update member quantities
-    existing_sets_data = [s for s in scraped_sets if s["name"].lower() in existing_sets]
+    existing_sets_data = [scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() in existing_sets]
 
     return render_template("sync_preview.html",
                            grouped=grouped,
@@ -625,21 +625,21 @@ def catalog_sync_confirm():
     sku_to_item = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
 
     set_count = int(request.form.get("set_count", 0))
-    for i in range(set_count):
-        set_name = request.form.get(f"set_name_{i}", "").strip()
+    for index in range(set_count):
+        set_name = request.form.get(f"set_name_{index}", "").strip()
         if not set_name or set_name not in selected_sets:
             continue
         member_skus = [raw.strip() for raw in
-                       request.form.get(f"set_members_{i}", "").split("|") if raw.strip()]
+                       request.form.get(f"set_members_{index}", "").split("|") if raw.strip()]
         member_qtys = {}
-        for raw_pair in request.form.get(f"set_member_qtys_{i}", "").split("|"):
+        for raw_pair in request.form.get(f"set_member_qtys_{index}", "").split("|"):
             if ":" in raw_pair:
                 sku_part, qty_part = raw_pair.split(":", 1)
                 try:
                     member_qtys[sku_part.strip()] = int(qty_part.strip())
                 except ValueError:
                     pass
-        set_sku = request.form.get(f"set_sku_{i}", "").strip() or None
+        set_sku = request.form.get(f"set_sku_{index}", "").strip() or None
 
         pre_existing_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         item_set = get_or_create_set(set_name)
@@ -648,12 +648,12 @@ def catalog_sync_confirm():
         if set_sku and not item_set.sku:
             item_set.sku = set_sku
 
-        existing_members = {m.item_id: m for m in item_set.members}
-        for msku in member_skus:
-            item = sku_to_item.get(msku.upper())
+        existing_members = {membership.item_id: membership for membership in item_set.members}
+        for member_sku in member_skus:
+            item = sku_to_item.get(member_sku.upper())
             if not item:
                 continue
-            qty = member_qtys.get(msku, 1)
+            qty = member_qtys.get(member_sku, 1)
             if item.id not in existing_members:
                 db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
                 linked_items += 1
@@ -664,15 +664,15 @@ def catalog_sync_confirm():
     # Update quantities on existing sets (no new rows, just qty backfill)
     existing_set_count = int(request.form.get("existing_set_count", 0))
     qty_updates = 0
-    for i in range(existing_set_count):
-        set_name = request.form.get(f"existing_set_name_{i}", "").strip()
+    for index in range(existing_set_count):
+        set_name = request.form.get(f"existing_set_name_{index}", "").strip()
         if not set_name:
             continue
         item_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         if not item_set:
             continue
         member_qtys = {}
-        for raw_pair in request.form.get(f"existing_set_member_qtys_{i}", "").split("|"):
+        for raw_pair in request.form.get(f"existing_set_member_qtys_{index}", "").split("|"):
             if ":" in raw_pair:
                 sku_part, qty_part = raw_pair.split(":", 1)
                 try:
