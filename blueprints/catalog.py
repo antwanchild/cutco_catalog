@@ -6,7 +6,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from constants import EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR
 from extensions import db
-from helpers import db_commit, is_admin
+from helpers import admin_required, db_commit, is_admin
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, ensure_unknown_variant, get_or_create_set
 from scraping import scrape_catalog, scrape_edge_type, scrape_item_specs, scrape_item_uses, scrape_sets
 
@@ -55,6 +55,7 @@ def catalog():
 
 
 @catalog_bp.route("/catalog/add", methods=["GET", "POST"])
+@admin_required
 def catalog_add():
     if request.method == "POST":
         item = Item(
@@ -86,6 +87,7 @@ def catalog_add():
 
 
 @catalog_bp.route("/catalog/<int:iid>/edit", methods=["GET", "POST"])
+@admin_required
 def catalog_edit(iid):
     item = Item.query.get_or_404(iid)
     if request.method == "POST":
@@ -98,8 +100,16 @@ def catalog_edit(iid):
         item.cutco_url  = request.form.get("cutco_url", "").strip() or None
         item.notes      = request.form.get("notes", "").strip() or None
 
-        selected_set_ids = set(int(set_id_str) for set_id_str in request.form.getlist("set_ids"))
-        item.sets = Set.query.filter(Set.id.in_(selected_set_ids)).all()
+        selected_set_ids: set[int] = set()
+        invalid_set_id_seen = False
+        for set_id_str in request.form.getlist("set_ids"):
+            try:
+                selected_set_ids.add(int(set_id_str))
+            except (TypeError, ValueError):
+                invalid_set_id_seen = True
+        if invalid_set_id_seen:
+            flash("Some set selections were invalid and were ignored.", "warning")
+        item.sets = Set.query.filter(Set.id.in_(selected_set_ids)).all() if selected_set_ids else []
 
         if db_commit(db.session):
             logger.info("Item updated: %s (SKU: %s)", item.name, item.sku or "none")
@@ -166,10 +176,8 @@ def variants(iid):
 
 
 @catalog_bp.route("/catalog/<int:iid>/variants/add", methods=["POST"])
+@admin_required
 def variant_add(iid):
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("catalog.variants", iid=iid))
     item = Item.query.get_or_404(iid)
     color = request.form.get("color", "").strip()
     if not color:
@@ -187,10 +195,8 @@ def variant_add(iid):
 
 
 @catalog_bp.route("/variants/<int:vid>/edit", methods=["POST"])
+@admin_required
 def variant_edit(vid):
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("catalog.catalog"))
     variant = ItemVariant.query.get_or_404(vid)
     iid     = variant.item_id
     color   = request.form.get("color", "").strip()
@@ -207,10 +213,8 @@ def variant_edit(vid):
 
 
 @catalog_bp.route("/variants/<int:vid>/delete", methods=["POST"])
+@admin_required
 def variant_delete(vid):
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("catalog.catalog"))
     variant = ItemVariant.query.get_or_404(vid)
     if len(variant.item.variants) == 1:
         flash("Cannot delete the only variant. Add another first.", "error")
@@ -250,6 +254,7 @@ def sets_list():
 
 
 @catalog_bp.route("/sets/add", methods=["GET", "POST"])
+@admin_required
 def set_add():
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -266,6 +271,7 @@ def set_add():
 
 
 @catalog_bp.route("/sets/<int:sid>/edit", methods=["GET", "POST"])
+@admin_required
 def set_edit(sid):
     item_set = Set.query.get_or_404(sid)
     if request.method == "POST":
@@ -334,12 +340,9 @@ def set_detail(sid):
 # ── Uses Sync ─────────────────────────────────────────────────────────────────
 
 @catalog_bp.route("/catalog/sync-uses", methods=["POST"])
+@admin_required
 def catalog_sync_uses():
     """Scrape Cutco.com uses for every cataloged item and populate item_tasks."""
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("logs.tasks_manage"))
-
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     items_with_url = Item.query.filter(Item.cutco_url.isnot(None)).all()
@@ -526,8 +529,9 @@ def catalog_sync_confirm():
                     pass
         set_sku = request.form.get(f"set_sku_{i}", "").strip() or None
 
+        pre_existing_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         item_set = get_or_create_set(set_name)
-        if item_set.id is None:
+        if pre_existing_set is None:
             added_sets += 1
         if set_sku and not item_set.sku:
             item_set.sku = set_sku

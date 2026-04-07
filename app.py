@@ -1,10 +1,11 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+from datetime import timedelta
 
 from flask import Flask, jsonify, render_template, request
 
-from constants import APP_VERSION, KNIFE_TASK_PRESETS, UNKNOWN_COLOR
+from constants import ADMIN_TOKEN, ADMIN_SESSION_SECONDS, APP_VERSION, KNIFE_TASK_PRESETS, UNKNOWN_COLOR
 from extensions import db, limiter
 from helpers import _csrf_token, is_admin, validate_csrf
 from models import Item, KnifeTask, ensure_unknown_variant
@@ -46,6 +47,23 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "DATABASE_URL", "sqlite:////data/cutco.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "").lower() in {
+    "1", "true", "yes", "on"
+}
+app.permanent_session_lifetime = timedelta(seconds=ADMIN_SESSION_SECONDS)
+
+_is_prod = os.environ.get("FLASK_ENV", "production").lower() == "production"
+_allow_insecure = os.environ.get("ALLOW_INSECURE_DEFAULTS", "").lower() in {
+    "1", "true", "yes", "on"
+}
+if _is_prod and not _allow_insecure:
+    if app.secret_key == "cutco-vault-dev-key" or ADMIN_TOKEN == "admin":
+        raise RuntimeError(
+            "Refusing to start in production with default SECRET_KEY or ADMIN_TOKEN. "
+            "Set strong values, or set ALLOW_INSECURE_DEFAULTS=1 to bypass."
+        )
 
 db.init_app(app)
 limiter.init_app(app)

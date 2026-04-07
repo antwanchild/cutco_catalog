@@ -2,7 +2,7 @@ import logging
 import threading
 from datetime import date
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 
 from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN
 from extensions import limiter
@@ -90,9 +90,9 @@ def specs_backfill_status():
 def admin_login():
     if request.method == "POST":
         if request.form.get("token") == ADMIN_TOKEN:
+            session["is_admin"] = True
+            session.permanent = ADMIN_SESSION_SECONDS > 0
             resp = redirect(url_for("catalog.catalog"))
-            resp.set_cookie("admin_token", ADMIN_TOKEN, httponly=True, samesite="Lax",
-                            max_age=ADMIN_SESSION_SECONDS)
             logger.info("Admin login successful")
             flash("Admin access granted.", "success")
             return resp
@@ -104,7 +104,9 @@ def admin_login():
 @admin_bp.route("/admin/logout")
 def admin_logout():
     logger.info("Admin logged out")
+    session.pop("is_admin", None)
     resp = redirect(url_for("index"))
+    # Keep deleting legacy cookie for old sessions.
     resp.delete_cookie("admin_token")
     return resp
 

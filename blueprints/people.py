@@ -4,7 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
 from extensions import db
-from helpers import _notify_discord, check_wishlist_targets, db_commit, is_admin
+from helpers import _notify_discord, admin_required, check_wishlist_targets, db_commit
 from models import Item, Ownership, Person
 
 people_bp = Blueprint("people", __name__)
@@ -20,6 +20,7 @@ def people():
 
 
 @people_bp.route("/people/add", methods=["GET", "POST"])
+@admin_required
 def people_add():
     if request.method == "POST":
         person = Person(name=request.form["name"].strip(),
@@ -33,6 +34,7 @@ def people_add():
 
 
 @people_bp.route("/people/<int:pid>/edit", methods=["GET", "POST"])
+@admin_required
 def people_edit(pid):
     person = Person.query.get_or_404(pid)
     if request.method == "POST":
@@ -46,6 +48,7 @@ def people_edit(pid):
 
 
 @people_bp.route("/people/<int:pid>/delete", methods=["POST"])
+@admin_required
 def people_delete(pid):
     person = Person.query.get_or_404(pid)
     name   = person.name
@@ -57,6 +60,7 @@ def people_delete(pid):
 
 
 @people_bp.route("/people/<int:pid>/purge-collection", methods=["POST"])
+@admin_required
 def purge_collection(pid):
     person = Person.query.get_or_404(pid)
     count  = Ownership.query.filter_by(person_id=pid).count()
@@ -99,6 +103,7 @@ def person_collection(pid):
 # ── Ownership CRUD ────────────────────────────────────────────────────────────
 
 @people_bp.route("/ownership/add", methods=["GET", "POST"])
+@admin_required
 def ownership_add():
     person_id   = request.args.get("person_id", type=int)
     item_id     = request.args.get("item_id", type=int)
@@ -143,6 +148,7 @@ def ownership_add():
 
 
 @people_bp.route("/ownership/<int:oid>/edit", methods=["GET", "POST"])
+@admin_required
 def ownership_edit(oid):
     ownership = Ownership.query.get_or_404(oid)
     if request.method == "POST":
@@ -171,6 +177,7 @@ def ownership_edit(oid):
 
 
 @people_bp.route("/ownership/<int:oid>/delete", methods=["POST"])
+@admin_required
 def ownership_delete(oid):
     ownership = Ownership.query.get_or_404(oid)
     pid       = ownership.person_id
@@ -184,6 +191,7 @@ def ownership_delete(oid):
 # ── Bulk status update ────────────────────────────────────────────────────────
 
 @people_bp.route("/people/<int:pid>/bulk-status", methods=["POST"])
+@admin_required
 def bulk_status_update(pid):
     Person.query.get_or_404(pid)
     selected = request.form.getlist("ownership_ids", type=int)
@@ -244,10 +252,8 @@ def wishlist():
 
 
 @people_bp.route("/wishlist/check", methods=["POST"])
+@admin_required
 def wishlist_check():
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("people.wishlist"))
     hits = check_wishlist_targets()
     if not hits:
         flash("No wishlist targets met at current MSRP prices.", "info")

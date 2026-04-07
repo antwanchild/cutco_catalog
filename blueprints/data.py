@@ -10,7 +10,7 @@ from constants import (
     XLSX_COL_MAP, XLSX_SET_COLS,
 )
 from extensions import db
-from helpers import db_commit
+from helpers import admin_required, db_commit
 from models import Item, ItemVariant, Ownership, Person, ensure_unknown_variant, get_or_create_set
 
 data_bp = Blueprint("data", __name__)
@@ -83,6 +83,7 @@ def import_template():
 
 
 @data_bp.route("/import", methods=["GET", "POST"])
+@admin_required
 def import_page():
     if request.method == "GET":
         return render_template("import_page.html",
@@ -246,6 +247,7 @@ def import_page():
 
 
 @data_bp.route("/import/confirm", methods=["POST"])
+@admin_required
 def import_confirm():
     from sqlalchemy.exc import SQLAlchemyError
 
