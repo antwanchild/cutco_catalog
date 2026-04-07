@@ -281,8 +281,10 @@ def set_add():
 
 
 @catalog_bp.route("/sets/<int:set_id>/edit", methods=["GET", "POST"])
+@catalog_bp.route("/sets/<int:sid>/edit", methods=["GET", "POST"])
 @admin_required
-def set_edit(set_id):
+def set_edit(set_id=None, sid=None):
+    set_id = set_id if set_id is not None else sid
     item_set = Set.query.get_or_404(set_id)
     if request.method == "POST":
         item_set.name  = request.form["name"].strip()
@@ -295,7 +297,9 @@ def set_edit(set_id):
 
 
 @catalog_bp.route("/sets/<int:set_id>/delete", methods=["POST"])
-def set_delete(set_id):
+@catalog_bp.route("/sets/<int:sid>/delete", methods=["POST"])
+def set_delete(set_id=None, sid=None):
+    set_id = set_id if set_id is not None else sid
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.sets_list"))
@@ -309,7 +313,9 @@ def set_delete(set_id):
 
 
 @catalog_bp.route("/sets/<int:set_id>")
-def set_detail(set_id):
+@catalog_bp.route("/sets/<int:sid>")
+def set_detail(set_id=None, sid=None):
+    set_id = set_id if set_id is not None else sid
     from models import Ownership, Person
     item_set    = Set.query.get_or_404(set_id)
     all_persons = Person.query.order_by(Person.name).all()
