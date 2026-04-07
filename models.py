@@ -30,6 +30,7 @@ class Item(db.Model):
     category   = db.Column(db.String(80),  nullable=True)
     edge_type  = db.Column(db.String(40),  nullable=False, default="Unknown")
     is_unicorn = db.Column(db.Boolean,     nullable=False, default=False)
+    edge_is_unicorn = db.Column(db.Boolean, nullable=False, default=False)
     in_catalog = db.Column(db.Boolean,     nullable=False, default=True)
     cutco_url      = db.Column(db.String(300), nullable=True)
     msrp           = db.Column(db.Float,       nullable=True)
@@ -50,8 +51,8 @@ class Item(db.Model):
 
     @property
     def any_unicorn(self) -> bool:
-        """True if the item itself is flagged unicorn OR any specific variant is."""
-        return self.is_unicorn or any(variant.is_unicorn for variant in self.variants)
+        """True if the item, edge type, or any specific variant is flagged unicorn."""
+        return self.is_unicorn or self.edge_is_unicorn or any(variant.is_unicorn for variant in self.variants)
 
 
 class ItemVariant(db.Model):

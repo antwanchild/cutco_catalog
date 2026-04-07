@@ -134,7 +134,7 @@
       <p>Bulk-import ownership data from a CSV or XLSX file.</p>
       <ul>
         <li>Required columns: <code>person</code>, <code>item_name</code> or <code>sku</code>, <code>status</code>.</li>
-        <li>Optional columns: <code>color</code>, <code>notes</code>, <code>is_unicorn</code>.</li>
+        <li>Optional columns: <code>color</code>, <code>notes</code>, <code>is_sku_unicorn</code>, <code>is_variant_unicorn</code>, <code>is_edge_unicorn</code> (legacy <code>is_unicorn</code> still works as variant unicorn).</li>
         <li>A preview is shown before any data is written — you can deselect rows.</li>
         <li>Existing ownership entries are skipped (no duplicates created).</li>
       </ul>
@@ -166,7 +166,7 @@
       <ul>
         <li>If an item has no real colors yet, it uses <strong>Unknown / Unspecified</strong> as a fallback variant.</li>
         <li>Add named color variants (e.g. "Classic Brown", "Camo") to track color-specific ownership.</li>
-        <li>A variant can be flagged as a 🦄 <strong>unicorn</strong> if that specific color is rare or discontinued.</li>
+        <li>Unicorn flags can be tracked separately at SKU/item level, edge/blade-type level, and variant/color level.</li>
         <li>Ownership entries are linked to a specific variant, not just the item.</li>
       </ul>
 

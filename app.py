@@ -109,6 +109,7 @@ with app.app_context():
         ("items",         "blade_length",   "ALTER TABLE items ADD COLUMN blade_length VARCHAR(20)"),
         ("items",         "overall_length", "ALTER TABLE items ADD COLUMN overall_length VARCHAR(20)"),
         ("items",         "weight",         "ALTER TABLE items ADD COLUMN weight VARCHAR(20)"),
+        ("items",         "edge_is_unicorn","ALTER TABLE items ADD COLUMN edge_is_unicorn BOOLEAN NOT NULL DEFAULT 0"),
     ]
     with db.engine.connect() as _conn:
         for _table, _col, _stmt in _col_migrations:
@@ -206,6 +207,7 @@ def index():
         item_count = Item.query.count(),
         unicorns = Item.query.filter(db.or_(
                        Item.is_unicorn,
+                       Item.edge_is_unicorn,
                        Item.variants.any(ItemVariant.is_unicorn == True)  # noqa: E712
                    )).count(),
         people   = Person.query.count(),

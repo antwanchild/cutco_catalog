@@ -71,12 +71,23 @@ def export_csv():
 
     csv_buffer = io.StringIO()
     writer = csv.writer(csv_buffer)
-    writer.writerow(["person", "item_name", "sku", "category", "edge_type",
-                     "color", "status", "is_unicorn", "notes"])
+    writer.writerow([
+        "person", "item_name", "sku", "category", "edge_type",
+        "color", "status",
+        "is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn",
+        "is_unicorn",  # backward-compatible alias of variant unicorn
+        "notes",
+    ])
     for ownership, variant, item, person in rows:
-        writer.writerow([person.name, item.name, item.sku or "", item.category or "",
-                         item.edge_type, variant.color, ownership.status,
-                         "yes" if (variant.is_unicorn or item.is_unicorn) else "no", ownership.notes or ""])
+        writer.writerow([
+            person.name, item.name, item.sku or "", item.category or "",
+            item.edge_type, variant.color, ownership.status,
+            "yes" if item.is_unicorn else "no",
+            "yes" if variant.is_unicorn else "no",
+            "yes" if item.edge_is_unicorn else "no",
+            "yes" if variant.is_unicorn else "no",
+            ownership.notes or "",
+        ])
     csv_buffer.seek(0)
     filename = _safe_csv_filename(request.args.get("filename", "cutco_collection.csv"))
     logger.info("CSV export requested: %d rows (%s)", len(rows), filename)
@@ -89,12 +100,13 @@ def export_csv():
 def import_template():
     csv_buffer = io.StringIO()
     writer = csv.writer(csv_buffer)
-    writer.writerow(["name", "sku", "color", "edge_type", "is_unicorn",
+    writer.writerow(["name", "sku", "color", "edge_type",
+                     "is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn",
                      "person", "status", "category", "notes"])
     writer.writerow(["2-3/4\" Paring Knife", "1720", "Classic Brown", "Double-D",
-                     "no", "Anthony", "Owned", "Kitchen Knives", ""])
+                     "no", "no", "no", "Anthony", "Owned", "Kitchen Knives", ""])
     writer.writerow(["Super Shears", "2137", "Pearl White", "Straight",
-                     "no", "Anthony", "Owned", "Kitchen Knives", ""])
+                     "no", "no", "no", "Anthony", "Owned", "Kitchen Knives", ""])
     csv_buffer.seek(0)
     return Response(csv_buffer.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
@@ -183,7 +195,9 @@ def import_page():
         sku        = (row.get("sku", "") or "").strip().upper() or None
         color      = row.get("color", "").strip() or UNKNOWN_COLOR
         edge_type  = row.get("edge_type", "").strip() or "Unknown"
-        is_unicorn = row.get("is_unicorn", "").strip().lower() in TRUTHY
+        is_sku_unicorn = row.get("is_sku_unicorn", row.get("item_is_unicorn", "")).strip().lower() in TRUTHY
+        is_variant_unicorn = row.get("is_variant_unicorn", row.get("is_unicorn", "")).strip().lower() in TRUTHY
+        is_edge_unicorn = row.get("is_edge_unicorn", row.get("edge_is_unicorn", "")).strip().lower() in TRUTHY
         category   = row.get("category", "").strip() or None
         notes      = _build_notes(row) or row.get("notes", "").strip() or None
         set_names  = row.get("_sets", [])
@@ -207,6 +221,19 @@ def import_page():
         elif name.lower() in existing_names:
             matched_item = existing_names[name.lower()]
 
+        is_cookware = ((matched_item.category or "") in COOKWARE_CATEGORIES) if matched_item else False
+        target_color = UNKNOWN_COLOR if is_cookware else color
+        existing_variant = None
+        if matched_item:
+            existing_variant = next(
+                (
+                    variant
+                    for variant in matched_item.variants
+                    if variant.color.lower() == target_color.lower()
+                ),
+                None,
+            )
+
         dedup_key = (sku or name.lower(), color.lower())
 
         if matched_item:
@@ -215,10 +242,13 @@ def import_page():
                                        "status": status, "sets": set_names})
         elif dedup_key not in seen_skus:
             seen_skus.add(dedup_key)
-            bucket = likely_unicorns if is_unicorn or not sku else new_items_list
+            bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku else new_items_list
             bucket.append({
                 "name": name, "sku": sku, "color": color,
-                "edge_type": edge_type, "is_unicorn": is_unicorn,
+                "edge_type": edge_type,
+                "is_sku_unicorn": is_sku_unicorn,
+                "is_variant_unicorn": is_variant_unicorn,
+                "is_edge_unicorn": is_edge_unicorn,
                 "category": category, "notes": notes,
                 "person": person_name, "status": status,
                 "sets": set_names, "row": row_num,
@@ -227,11 +257,9 @@ def import_page():
         if person_name and matched_item:
             person_obj = existing_persons.get(person_name.lower())
             if person_obj:
-                variant = next((existing_variant for existing_variant in matched_item.variants
-                                if existing_variant.color.lower() == color.lower()), None)
-                if variant:
+                if existing_variant:
                     existing_o = Ownership.query.filter_by(
-                        person_id=person_obj.id, variant_id=variant.id).first()
+                        person_id=person_obj.id, variant_id=existing_variant.id).first()
                     if existing_o:
                         if existing_o.status != status:
                             conflicts.append({
@@ -247,9 +275,13 @@ def import_page():
                 "person": person_name,
                 "item_name": matched_item.name,
                 "item_id":   matched_item.id,
-                "color":     color,
+                "color":     target_color,
                 "status":    status,
                 "notes":     notes,
+                "is_sku_unicorn": is_sku_unicorn,
+                "is_variant_unicorn": is_variant_unicorn,
+                "is_edge_unicorn": is_edge_unicorn,
+                "is_new_variant": existing_variant is None,
                 "is_new_person": person_name.lower() not in existing_persons,
             })
 
@@ -290,7 +322,9 @@ def import_confirm():
             sku         = request.form.get(f"item_sku_{row_index}", "").strip().upper() or None
             color       = request.form.get(f"item_color_{row_index}", "").strip() or UNKNOWN_COLOR
             edge_type   = request.form.get(f"item_edge_{row_index}", "Unknown")
-            is_unicorn  = request.form.get(f"item_unicorn_{row_index}") == "on"
+            is_sku_unicorn = request.form.get(f"item_sku_unicorn_{row_index}") == "on"
+            is_variant_unicorn = request.form.get(f"item_variant_unicorn_{row_index}") == "on"
+            is_edge_unicorn = request.form.get(f"item_edge_unicorn_{row_index}") == "on"
             category    = request.form.get(f"item_category_{row_index}", "").strip() or None
             notes       = request.form.get(f"item_notes_{row_index}", "").strip() or None
             person_name = request.form.get(f"item_person_{row_index}", "").strip()
@@ -308,7 +342,8 @@ def import_confirm():
 
             if not item:
                 item = Item(name=name, sku=sku, category=category,
-                            edge_type=edge_type, is_unicorn=False,
+                            edge_type=edge_type, is_unicorn=is_sku_unicorn,
+                            edge_is_unicorn=is_edge_unicorn,
                             in_catalog=bool(sku), notes=notes)
                 db.session.add(item)
                 db.session.flush()
@@ -316,6 +351,11 @@ def import_confirm():
                     existing_items[sku] = item
                 existing_names[name.lower()] = item
                 added_items += 1
+            else:
+                if is_sku_unicorn and not item.is_unicorn:
+                    item.is_unicorn = True
+                if is_edge_unicorn and not item.edge_is_unicorn:
+                    item.edge_is_unicorn = True
 
             for set_name in set_names:
                 item_set = get_or_create_set(set_name)
@@ -327,10 +367,10 @@ def import_confirm():
             variant = next((existing_variant for existing_variant in item.variants
                             if existing_variant.color.lower() == target_color.lower()), None)
             if not variant:
-                variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_unicorn)
+                variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_variant_unicorn)
                 db.session.add(variant)
                 db.session.flush()
-            elif is_unicorn and not variant.is_unicorn:
+            elif is_variant_unicorn and not variant.is_unicorn:
                 variant.is_unicorn = True
 
             if person_name:
@@ -359,10 +399,17 @@ def import_confirm():
             color       = request.form.get(f"own_color_{row_index}", "").strip() or UNKNOWN_COLOR
             status      = request.form.get(f"own_status_{row_index}", "Owned")
             notes       = request.form.get(f"own_notes_{row_index}", "").strip() or None
+            is_sku_unicorn = request.form.get(f"own_sku_unicorn_{row_index}") == "on"
+            is_variant_unicorn = request.form.get(f"own_variant_unicorn_{row_index}") == "on"
+            is_edge_unicorn = request.form.get(f"own_edge_unicorn_{row_index}") == "on"
 
             item = Item.query.get(item_id)
             if not item or not person_name:
                 continue
+            if is_sku_unicorn and not item.is_unicorn:
+                item.is_unicorn = True
+            if is_edge_unicorn and not item.edge_is_unicorn:
+                item.edge_is_unicorn = True
 
             person = existing_persons.get(person_name.lower())
             if not person:
@@ -376,9 +423,11 @@ def import_confirm():
             variant = next((existing_variant for existing_variant in item.variants
                             if existing_variant.color.lower() == target_color.lower()), None)
             if not variant:
-                variant = ItemVariant(item_id=item.id, color=target_color)
+                variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_variant_unicorn)
                 db.session.add(variant)
                 db.session.flush()
+            elif is_variant_unicorn and not variant.is_unicorn:
+                variant.is_unicorn = True
 
             if not Ownership.query.filter_by(person_id=person.id,
                                               variant_id=variant.id).first():
