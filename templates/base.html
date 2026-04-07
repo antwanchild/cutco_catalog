@@ -31,8 +31,8 @@
        {% if request.endpoint and 'wishlist' in request.endpoint %}class="active"{% endif %}>Wishlist</a>
     <a href="{{ url_for('logs.sharpening') }}"
        {% if request.endpoint and 'sharpening' in request.endpoint %}class="active"{% endif %}>Sharpening</a>
-    <a href="{{ url_for('logs.bakeware') }}"
-       {% if request.endpoint and 'bakeware' in request.endpoint %}class="active"{% endif %}>Bakeware</a>
+    <a href="{{ url_for('logs.cookware') }}"
+       {% if request.endpoint and ('bakeware' in request.endpoint or 'cookware' in request.endpoint) %}class="active"{% endif %}>Cookware</a>
     <a href="{{ url_for('logs.tasks') }}"
        {% if request.endpoint and 'task' in request.endpoint %}class="active"{% endif %}>Tasks</a>
     <a href="{{ url_for('views.stats') }}"
