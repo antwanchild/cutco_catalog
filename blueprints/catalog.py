@@ -4,10 +4,10 @@ from collections import OrderedDict
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from constants import EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR
+from constants import COOKWARE_CATEGORIES, EDGE_TYPES, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR
 from extensions import db
 from helpers import admin_required, db_commit, is_admin
-from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, ensure_unknown_variant, get_or_create_set
+from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, get_or_create_set, reconcile_unknown_variant
 from scraping import scrape_catalog, scrape_item_specs, scrape_item_uses, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
@@ -70,11 +70,12 @@ def catalog_add():
         )
         db.session.add(item)
         db.session.flush()
-        ensure_unknown_variant(item)
         colors = [c.strip() for c in request.form.get("colors", "").split(",") if c.strip()]
         for color in colors:
-            if color != UNKNOWN_COLOR:
+            if color != UNKNOWN_COLOR and (item.category or "") not in COOKWARE_CATEGORIES:
                 db.session.add(ItemVariant(item_id=item.id, color=color))
+        db.session.flush()
+        reconcile_unknown_variant(item)
         if db_commit(db.session):
             logger.info("Item added: %s (SKU: %s)", item.name, item.sku or "none")
             flash(f'Added "{item.name}" to catalog.', "success")
@@ -178,7 +179,8 @@ def catalog_delete(item_id):
 @catalog_bp.route("/catalog/<int:item_id>/variants")
 def variants(item_id):
     item = Item.query.get_or_404(item_id)
-    return render_template("variants.html", item=item, UNKNOWN_COLOR=UNKNOWN_COLOR)
+    is_cookware = (item.category or "") in COOKWARE_CATEGORIES
+    return render_template("variants.html", item=item, UNKNOWN_COLOR=UNKNOWN_COLOR, is_cookware=is_cookware)
 
 
 @catalog_bp.route("/catalog/<int:item_id>/variants/add", methods=["POST"])
@@ -189,11 +191,16 @@ def variant_add(item_id):
     if not color:
         flash("Color is required.", "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
+    if (item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
+        flash("Cookware items use a single Unknown variant; color variants are not supported.", "warning")
+        return redirect(url_for("catalog.variants", item_id=item_id))
     if any(v.color.lower() == color.lower() for v in item.variants):
         flash(f'"{color}" already exists for this item.', "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
     db.session.add(ItemVariant(item_id=item_id, color=color,
                                notes=request.form.get("notes", "").strip() or None))
+    db.session.flush()
+    reconcile_unknown_variant(item)
     if db_commit(db.session):
         logger.info("Variant added: %s → %s", item.name, color)
         flash(f'Added variant "{color}".', "success")
@@ -209,9 +216,14 @@ def variant_edit(vid):
     if not color:
         flash("Color cannot be empty.", "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
+    if (variant.item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
+        flash("Cookware items use a single Unknown variant; color variants are not supported.", "warning")
+        return redirect(url_for("catalog.variants", item_id=item_id))
     variant.color      = color
     variant.notes      = request.form.get("notes", "").strip() or None
     variant.is_unicorn = request.form.get("is_unicorn") == "on"
+    db.session.flush()
+    reconcile_unknown_variant(variant.item)
     if db_commit(db.session):
         logger.info("Variant updated: item %d → %s", item_id, color)
         flash(f'Updated to "{color}".', "success")
@@ -226,7 +238,10 @@ def variant_delete(vid):
         flash("Cannot delete the only variant. Add another first.", "error")
         return redirect(url_for("catalog.variants", item_id=variant.item_id))
     item_id = variant.item_id
+    item = variant.item
     db.session.delete(variant)
+    db.session.flush()
+    reconcile_unknown_variant(item)
     if db_commit(db.session):
         logger.info("Variant deleted: item %d", item_id)
         flash("Variant removed.", "info")
@@ -598,7 +613,7 @@ def catalog_sync_confirm():
                     weight=data.get("weight") or None)
         db.session.add(item)
         db.session.flush()
-        ensure_unknown_variant(item)
+        reconcile_unknown_variant(item)
         added_items += 1
 
     db.session.flush()

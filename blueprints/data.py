@@ -6,12 +6,12 @@ import openpyxl
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
 
 from constants import (
-    EDGE_TYPES, STATUS_OPTIONS, TRUTHY, UNKNOWN_COLOR,
+    COOKWARE_CATEGORIES, EDGE_TYPES, STATUS_OPTIONS, TRUTHY, UNKNOWN_COLOR,
     XLSX_COL_MAP, XLSX_SET_COLS,
 )
 from extensions import db
 from helpers import admin_required, db_commit
-from models import Item, ItemVariant, Ownership, Person, ensure_unknown_variant, get_or_create_set
+from models import Item, ItemVariant, Ownership, Person, get_or_create_set, reconcile_unknown_variant
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
@@ -293,7 +293,6 @@ def import_confirm():
                             in_catalog=bool(sku), notes=notes)
                 db.session.add(item)
                 db.session.flush()
-                ensure_unknown_variant(item)
                 if sku:
                     existing_items[sku] = item
                 existing_names[name.lower()] = item
@@ -304,7 +303,8 @@ def import_confirm():
                 if item_set not in item.sets:
                     item.sets.append(item_set)
 
-            target_color = color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR
+            is_cookware = (item.category or "") in COOKWARE_CATEGORIES
+            target_color = UNKNOWN_COLOR if is_cookware else (color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR)
             variant = next((v for v in item.variants
                             if v.color.lower() == target_color.lower()), None)
             if not variant:
@@ -328,6 +328,9 @@ def import_confirm():
                                              variant_id=variant.id, status=status))
                     added_ownership += 1
 
+            db.session.flush()
+            reconcile_unknown_variant(item)
+
         for i in range(own_count):
             if request.form.get(f"own_accept_{i}") != "on":
                 continue
@@ -350,10 +353,11 @@ def import_confirm():
                 existing_persons[person_name.lower()] = person
                 added_persons += 1
 
+            target_color = UNKNOWN_COLOR if (item.category or "") in COOKWARE_CATEGORIES else color
             variant = next((v for v in item.variants
-                            if v.color.lower() == color.lower()), None)
+                            if v.color.lower() == target_color.lower()), None)
             if not variant:
-                variant = ItemVariant(item_id=item.id, color=color)
+                variant = ItemVariant(item_id=item.id, color=target_color)
                 db.session.add(variant)
                 db.session.flush()
 
@@ -363,6 +367,9 @@ def import_confirm():
                                          variant_id=variant.id,
                                          status=status, notes=notes))
                 added_ownership += 1
+
+            db.session.flush()
+            reconcile_unknown_variant(item)
 
     except SQLAlchemyError as exc:
         db.session.rollback()

@@ -236,7 +236,7 @@ Eleven tables backed by SQLite. All migrations run automatically at startup.
 | Table | Key Columns | Notes |
 |---|---|---|
 | `items` | `id`, `name`, `sku`, `category`, `edge_type`, `is_unicorn`, `in_catalog`, `cutco_url`, `msrp` | One row per catalog item |
-| `item_variants` | `id`, `item_id`, `color`, `is_unicorn` | One row per handle color; every item has at least an "Unknown" variant |
+| `item_variants` | `id`, `item_id`, `color`, `is_unicorn` | One row per handle color; `Unknown` is kept only when no real colors exist (or when legacy ownership still references it) |
 | `ownership` | `id`, `variant_id`, `person_id`, `status`, `target_price` | Links a person to a variant; status is `Owned`, `Wishlist`, `Sold`, or `Traded` |
 | `people` | `id`, `name` | Collectors |
 | `sets` | `id`, `name`, `sku` | Named Cutco sets |

@@ -1,5 +1,5 @@
 from extensions import db
-from constants import UNKNOWN_COLOR
+from constants import COOKWARE_CATEGORIES, UNKNOWN_COLOR
 
 
 # Association object: items <-> sets (with quantity per member)
@@ -192,6 +192,38 @@ def ensure_unknown_variant(item: Item) -> None:
     if not any(v.color == UNKNOWN_COLOR for v in item.variants):
         db.session.add(ItemVariant(item_id=item.id, color=UNKNOWN_COLOR))
         db.session.flush()
+
+
+def reconcile_unknown_variant(item: Item) -> None:
+    """Keep Unknown only when an item has no real color variants.
+
+    Safety rule: if an Unknown variant already has ownership records,
+    keep it to avoid breaking historical links.
+    """
+    real_variants = [v for v in item.variants if v.color != UNKNOWN_COLOR]
+    unknown_variants = [v for v in item.variants if v.color == UNKNOWN_COLOR]
+
+    # Cookware is treated as single-variant: keep Unknown only.
+    if (item.category or "") in COOKWARE_CATEGORIES:
+        if not unknown_variants:
+            ensure_unknown_variant(item)
+            unknown_variants = [v for v in item.variants if v.color == UNKNOWN_COLOR]
+        for real_variant in real_variants:
+            if not real_variant.ownerships:
+                db.session.delete(real_variant)
+        db.session.flush()
+        return
+
+    if not real_variants:
+        if not unknown_variants:
+            ensure_unknown_variant(item)
+        return
+
+    for unknown_variant in unknown_variants:
+        if not unknown_variant.ownerships:
+            db.session.delete(unknown_variant)
+
+    db.session.flush()
 
 
 def get_or_create_set(name: str) -> Set:
