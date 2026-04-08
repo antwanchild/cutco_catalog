@@ -108,15 +108,26 @@ jobs:
               exit 1
             fi
             echo "Tag ${NEW_TAG} already exists on this commit; skipping tag creation."
+            RERUN=true
             echo "rerun=true" >> "$GITHUB_OUTPUT"
           else
             git tag "$NEW_TAG"
             git push origin "$NEW_TAG"
+            RERUN=false
             echo "rerun=false" >> "$GITHUB_OUTPUT"
           fi
 
           echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Release Tag"
+            echo ""
+            echo "- Commit message: ${COMMIT_MSG}"
+            echo "- Previous tag: ${LAST_TAG}"
+            echo "- Computed tag: ${NEW_TAG}"
+            echo "- Rerun: $( [ \"$RERUN\" = "true" ] && echo yes || echo no )"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Build & push (runs in same workflow as auto-tag, uses its outputs) ─────
   build:
@@ -135,6 +146,7 @@ jobs:
         run: echo "version=${{ needs.auto-tag.outputs.version }}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
+        if: needs.auto-tag.outputs.rerun != 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -143,6 +155,7 @@ jobs:
 
       - name: Docker meta
         id: docker_meta
+        if: needs.auto-tag.outputs.rerun != 'true'
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
@@ -194,3 +207,26 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summarize publish result
+        run: |
+          if [ "${{ needs.auto-tag.outputs.rerun }}" = "true" ]; then
+            IMAGE_STATUS="skipped (rerun)"
+          else
+            IMAGE_STATUS="published"
+          fi
+
+          if [ "${{ steps.release_check.outputs.exists }}" = "true" ]; then
+            RELEASE_STATUS="already existed"
+          else
+            RELEASE_STATUS="created"
+          fi
+
+          {
+            echo "## Publish Result"
+            echo ""
+            echo "- Version: ${{ needs.auto-tag.outputs.version }}"
+            echo "- Tag: ${{ needs.auto-tag.outputs.new_tag }}"
+            echo "- Image: ${IMAGE_STATUS}"
+            echo "- GitHub release: ${RELEASE_STATUS}"
+          } >> "$GITHUB_STEP_SUMMARY"
