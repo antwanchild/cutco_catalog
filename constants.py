@@ -2,6 +2,7 @@ import os
 import re
 
 EDGE_TYPES = ["Straight", "Double-D", "Micro Double-D", "Serrated", "Micro-D", "Tec Edge", "N/A", "Unknown"]
+SHEATH_AVAILABILITY_OPTIONS = ["Unknown", "Yes", "No"]
 STATUS_OPTIONS = ["Owned", "Wishlist", "Sold", "Traded"]
 STATUS_RANK = {"Owned": 0, "Wishlist": 1, "Traded": 2, "Sold": 3}
 

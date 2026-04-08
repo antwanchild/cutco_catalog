@@ -48,6 +48,7 @@
       <col style="width:100px">
       <col style="width:180px">
       <col style="width:130px">
+      <col style="width:110px">
       <col style="width:32px">
     </colgroup>
     <thead>
@@ -57,6 +58,7 @@
         <th><span class="sort-hdr active" data-col="sku" style="cursor:pointer">SKU ▲</span></th>
         <th>Category</th>
         <th>Edge</th>
+        <th>Sheath</th>
         <th></th>
       </tr>
     </thead>
@@ -72,6 +74,13 @@
           <select name="edge_type_{{ item.sku }}" class="input-xs">
             {% for et in ["Straight","Double-D","Micro Double-D","Serrated","Micro-D","Tec Edge","N/A","Unknown"] %}
             <option value="{{ et }}" {% if item.edge_type == et %}selected{% endif %}>{{ et }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <select name="sheath_available_{{ item.sku }}" class="input-xs">
+            {% for sheath_opt in ["Unknown", "Yes", "No"] %}
+            <option value="{{ sheath_opt }}" {% if item.sheath_available == sheath_opt %}selected{% endif %}>{{ sheath_opt }}</option>
             {% endfor %}
           </select>
         </td>
