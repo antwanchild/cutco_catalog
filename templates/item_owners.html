@@ -23,9 +23,6 @@
   {% if item.edge_type != 'N/A' %}
     <span><strong>Edge:</strong> {{ item.edge_type }}{% if item.edge_is_unicorn %} 🦄{% endif %}</span>
   {% endif %}
-  {% if item.sheath_available and item.sheath_available != 'Unknown' %}
-    <span><strong>Sheath:</strong> {{ item.sheath_available }}</span>
-  {% endif %}
   {% if item.blade_length %}<span><strong>Blade:</strong> {{ item.blade_length }}</span>{% endif %}
   {% if item.overall_length %}<span><strong>Overall:</strong> {{ item.overall_length }}</span>{% endif %}
   {% if item.weight %}<span><strong>Weight:</strong> {{ item.weight }}</span>{% endif %}

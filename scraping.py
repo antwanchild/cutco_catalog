@@ -250,16 +250,14 @@ _EDGE_NORMALIZE = {
 
 
 def scrape_item_specs(url: str) -> dict:
-    """Fetch a product page and return edge, sheath, price, and key measurements.
+    """Fetch a product page and return edge, price, and key measurements.
 
     edge_type: 'N/A' = no blade edge, 'Unknown' = fetch failure or ambiguous.
-    sheath_available: 'Yes' / 'No' / 'Unknown' based on product-page wording.
     All other keys are None when not found.
     """
     clean_url = url.split("&view=")[0].split("?view=")[0]
     result = {
         "edge_type":      "Unknown",
-        "sheath_available": "Unknown",
         "msrp":           None,
         "blade_length":   None,
         "overall_length": None,
@@ -271,7 +269,6 @@ def scrape_item_specs(url: str) -> dict:
             return result
         raw_html = resp.text
         soup = BeautifulSoup(raw_html, "html.parser")
-        page_text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True).lower())
 
         # ── Edge type ────────────────────────────────────────────────────────
         item_class_m    = re.search(r'"itemClass"\s*:\s*"([^"]+)"', raw_html)
@@ -287,14 +284,6 @@ def scrape_item_specs(url: str) -> dict:
                 result["edge_type"] = _EDGE_NORMALIZE.get(edge_match.group(1).strip().lower(), "Unknown")
             else:
                 result["edge_type"] = "N/A"
-
-        # ── Sheath availability (heuristic) ──────────────────────────────────
-        if re.search(r"\b(without sheath|no sheath|does not include sheath|no sheath included)\b", page_text):
-            result["sheath_available"] = "No"
-        elif re.search(
-                r"\b(with sheath|includes sheath|includes a sheath|sheath included|sheath sold separately|optional sheath|compatible sheath|use with sheath)\b",
-                page_text):
-            result["sheath_available"] = "Yes"
 
         # ── itemSpecs (blade length, overall length, weight) ─────────────────
         spec_map = {

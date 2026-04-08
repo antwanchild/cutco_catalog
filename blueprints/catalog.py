@@ -5,7 +5,7 @@ from collections import OrderedDict
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from constants import (
-    COOKWARE_CATEGORIES, EDGE_TYPES, SHEATH_AVAILABILITY_OPTIONS,
+    COOKWARE_CATEGORIES, EDGE_TYPES,
     SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR, canonicalize_category,
 )
 from extensions import db
@@ -15,11 +15,6 @@ from scraping import scrape_catalog, scrape_item_specs, scrape_item_uses, scrape
 
 catalog_bp = Blueprint("catalog", __name__)
 logger = logging.getLogger(__name__)
-
-
-def _normalized_sheath_value(raw_value: str | None) -> str:
-    value = (raw_value or "Unknown").strip().title()
-    return value if value in SHEATH_AVAILABILITY_OPTIONS else "Unknown"
 
 
 @catalog_bp.route("/catalog")
@@ -72,7 +67,6 @@ def catalog_add():
             sku        = request.form.get("sku", "").strip().upper() or None,
             category   = canonicalize_category(request.form.get("category", "")),
             edge_type  = request.form.get("edge_type", "Unknown"),
-            sheath_available = _normalized_sheath_value(request.form.get("sheath_available")),
             is_unicorn = request.form.get("is_unicorn") == "on",
             edge_is_unicorn = request.form.get("edge_is_unicorn") == "on",
             in_catalog = request.form.get("in_catalog") == "on",
@@ -94,7 +88,6 @@ def catalog_add():
 
     return render_template("item_form.html", item=None,
                            edge_types=EDGE_TYPES, action="Add",
-                           sheath_options=SHEATH_AVAILABILITY_OPTIONS,
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            all_sets=Set.query.order_by(Set.name).all())
 
@@ -108,7 +101,6 @@ def catalog_edit(item_id):
         item.sku        = request.form.get("sku", "").strip().upper() or None
         item.category   = canonicalize_category(request.form.get("category", ""))
         item.edge_type  = request.form.get("edge_type", "Unknown")
-        item.sheath_available = _normalized_sheath_value(request.form.get("sheath_available"))
         item.is_unicorn = request.form.get("is_unicorn") == "on"
         item.edge_is_unicorn = request.form.get("edge_is_unicorn") == "on"
         item.in_catalog = request.form.get("in_catalog") == "on"
@@ -133,7 +125,6 @@ def catalog_edit(item_id):
 
     return render_template("item_form.html", item=item,
                            edge_types=EDGE_TYPES, action="Edit",
-                           sheath_options=SHEATH_AVAILABILITY_OPTIONS,
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            all_sets=Set.query.order_by(Set.name).all())
 
@@ -560,7 +551,7 @@ def catalog_sync():
         logger.error("Sets scrape failed: %s", exc)
         scraped_sets = []
 
-    # Fetch specs (edge, sheath, msrp, lengths, weight) for new items in parallel
+    # Fetch specs (edge, msrp, lengths, weight) for new items in parallel
     if new_items:
         from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
         _specs_map: dict[str, dict] = {}
@@ -571,7 +562,6 @@ def catalog_sync():
         for item in new_items:
             specs = _specs_map.get(item["sku"], {})
             item["edge_type"]      = specs.get("edge_type", "Unknown")
-            item["sheath_available"] = specs.get("sheath_available", "Unknown")
             item["msrp"]           = specs.get("msrp")
             item["blade_length"]   = specs.get("blade_length")
             item["overall_length"] = specs.get("overall_length")
@@ -605,7 +595,7 @@ def catalog_sync_confirm():
     item_data = {}
     for key, val in request.form.items():
         for prefix in ("name_", "category_", "url_", "edge_type_",
-                       "sheath_available_", "msrp_", "blade_length_", "overall_length_", "weight_"):
+                       "msrp_", "blade_length_", "overall_length_", "weight_"):
             if key.startswith(prefix):
                 sku = key[len(prefix):]
                 item_data.setdefault(sku, {})[prefix.rstrip("_")] = val
@@ -623,7 +613,6 @@ def catalog_sync_confirm():
                     category=canonicalize_category(data.get("category")), cutco_url=data.get("url"),
                     in_catalog=True, is_unicorn=False, edge_is_unicorn=False,
                     edge_type=data.get("edge_type") or "Unknown",
-                    sheath_available=_normalized_sheath_value(data.get("sheath_available")),
                     msrp=msrp,
                     blade_length=data.get("blade_length") or None,
                     overall_length=data.get("overall_length") or None,

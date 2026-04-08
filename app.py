@@ -7,7 +7,7 @@ from flask import Flask, jsonify, render_template, request
 
 from constants import (
     ADMIN_TOKEN, ADMIN_SESSION_SECONDS, APP_VERSION, KNIFE_TASK_PRESETS,
-    SHEATH_AVAILABILITY_OPTIONS, UNKNOWN_COLOR, canonicalize_category,
+    UNKNOWN_COLOR, canonicalize_category,
 )
 from extensions import db, limiter
 from helpers import _csrf_token, is_admin, validate_csrf
@@ -113,7 +113,6 @@ with app.app_context():
         ("items",         "overall_length", "ALTER TABLE items ADD COLUMN overall_length VARCHAR(20)"),
         ("items",         "weight",         "ALTER TABLE items ADD COLUMN weight VARCHAR(20)"),
         ("items",         "edge_is_unicorn","ALTER TABLE items ADD COLUMN edge_is_unicorn BOOLEAN NOT NULL DEFAULT 0"),
-        ("items",         "sheath_available","ALTER TABLE items ADD COLUMN sheath_available VARCHAR(10) NOT NULL DEFAULT 'Unknown'"),
     ]
     with db.engine.connect() as _conn:
         for _table, _col, _stmt in _col_migrations:
@@ -140,16 +139,6 @@ with app.app_context():
             _renamed_categories += 1
     if _renamed_categories:
         logger.info("Category normalization: updated %d item category value(s)", _renamed_categories)
-    _normalized_sheath = 0
-    for _item in Item.query.all():
-        sheath_value = (_item.sheath_available or "Unknown").strip().title()
-        if sheath_value not in SHEATH_AVAILABILITY_OPTIONS:
-            sheath_value = "Unknown"
-        if _item.sheath_available != sheath_value:
-            _item.sheath_available = sheath_value
-            _normalized_sheath += 1
-    if _normalized_sheath:
-        logger.info("Sheath normalization: updated %d item sheath value(s)", _normalized_sheath)
     for item in Item.query.all():
         ensure_unknown_variant(item)
     db.session.commit()
