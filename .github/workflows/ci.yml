@@ -121,7 +121,7 @@ jobs:
     name: Build & Push
     runs-on: ubuntu-latest
     needs: auto-tag
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.auto-tag.outputs.rerun != 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v6
 
@@ -146,6 +146,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build & push image
+        if: needs.auto-tag.outputs.rerun != 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -155,8 +156,32 @@ jobs:
           build-args: |
             APP_VERSION=${{ steps.version.outputs.version }}
 
+      - name: Check if GitHub release exists
+        id: release_check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.auto-tag.outputs.new_tag }}
+        run: |
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$RELEASE_TAG")
+
+          case "$STATUS" in
+            200)
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Failed to check whether release ${RELEASE_TAG} exists (HTTP ${STATUS})." >&2
+              exit 1
+              ;;
+          esac
+
       - name: Create GitHub release
-        if: needs.auto-tag.outputs.rerun != 'true'
+        if: steps.release_check.outputs.exists != 'true'
         uses: softprops/action-gh-release@v2.6.1
         with:
           tag_name: ${{ needs.auto-tag.outputs.new_tag }}
