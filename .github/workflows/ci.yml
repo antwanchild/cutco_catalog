@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+  packages: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -66,6 +66,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: security
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
       version: ${{ steps.tag.outputs.version }}
@@ -122,6 +124,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: auto-tag
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v6
 
