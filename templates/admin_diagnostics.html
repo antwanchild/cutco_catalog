@@ -28,6 +28,15 @@
   </div>
 </div>
 
+<div class="stat-grid" style="margin-bottom:1.5rem">
+  {% for check in details.path_checks if check %}
+  <div class="stat-card{% if not check.writable %} stat-card-warn{% endif %}">
+    <div class="stat-number">{{ "Writable" if check.writable else "Read-only" }}</div>
+    <div class="stat-label">{{ check.label }}</div>
+  </div>
+  {% endfor %}
+</div>
+
 <div class="table-wrap">
   <table class="data-table">
     <tbody>
@@ -73,6 +82,18 @@
         <td class="mono">{{ details.database_file }}</td>
       </tr>
       {% endif %}
+      {% for check in details.path_checks if check %}
+      <tr>
+        <th>{{ check.label }} Status</th>
+        <td>
+          {{ "Exists" if check.exists else "Missing" }} /
+          {{ "Writable" if check.writable else "Not writable" }}
+          {% if check.path %}
+          <span class="mono">({{ check.path }})</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
       <tr>
         <th>PID 1 Command</th>
         <td class="mono">{{ details.pid1_cmdline or "Unavailable" }}</td>
