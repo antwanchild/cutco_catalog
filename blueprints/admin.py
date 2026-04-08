@@ -47,8 +47,23 @@ def _read_pid1_cmdline():
         return None
 
 
+def _path_status(path):
+    if not path:
+        return {"path": None, "exists": False, "writable": False}
+    candidate = Path(path)
+    target = candidate if candidate.exists() else candidate.parent
+    return {
+        "path": str(candidate),
+        "exists": candidate.exists(),
+        "writable": os.access(target, os.W_OK),
+    }
+
+
 def _runtime_details():
     db_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    sqlite_file = db_uri.removeprefix("sqlite:////") if db_uri.startswith("sqlite:////") else None
+    data_dir = os.environ.get("DATA_DIR", "/data")
+    log_dir = os.environ.get("LOG_DIR", "/data/logs")
     return {
         "app_version": APP_VERSION,
         "python_version": sys.version.split()[0],
@@ -58,15 +73,20 @@ def _runtime_details():
         "uid": os.getuid(),
         "gid": os.getgid(),
         "database_uri": _mask_database_uri(db_uri),
-        "database_file": db_uri.removeprefix("sqlite:////") if db_uri.startswith("sqlite:////") else None,
-        "log_dir": os.environ.get("LOG_DIR", "/data/logs"),
-        "data_dir": os.environ.get("DATA_DIR", "/data"),
+        "database_file": sqlite_file,
+        "log_dir": log_dir,
+        "data_dir": data_dir,
         "log_level": os.environ.get("LOG_LEVEL", "INFO"),
         "tz": os.environ.get("TZ", "UTC"),
         "flask_env": os.environ.get("FLASK_ENV", "production"),
         "puid": os.environ.get("PUID", "0"),
         "pgid": os.environ.get("PGID", "0"),
         "pid1_cmdline": _read_pid1_cmdline(),
+        "path_checks": [
+            {"label": "Data Directory", **_path_status(data_dir)},
+            {"label": "Log Directory", **_path_status(log_dir)},
+            {"label": "SQLite File", **_path_status(sqlite_file)} if sqlite_file else None,
+        ],
     }
 
 
