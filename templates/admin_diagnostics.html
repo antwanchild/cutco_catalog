@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Diagnostics – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🩺 Runtime Diagnostics</h1>
+</div>
+
+<p class="muted" style="margin-bottom:1rem">
+  Quick runtime details for confirming what the current container is actually running.
+</p>
+
+<div class="stat-grid" style="margin-bottom:1.5rem">
+  <div class="stat-card">
+    <div class="stat-number">v{{ details.app_version }}</div>
+    <div class="stat-label">App Version</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ details.python_version }}</div>
+    <div class="stat-label">Python</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ details.uid }}:{{ details.gid }}</div>
+    <div class="stat-label">UID:GID</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ details.puid }}:{{ details.pgid }}</div>
+    <div class="stat-label">PUID:PGID</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <tbody>
+      <tr>
+        <th style="width:220px">Platform</th>
+        <td>{{ details.platform }}</td>
+      </tr>
+      <tr>
+        <th>Flask Environment</th>
+        <td>{{ details.flask_env }}</td>
+      </tr>
+      <tr>
+        <th>Timezone</th>
+        <td>{{ details.tz }}</td>
+      </tr>
+      <tr>
+        <th>Log Level</th>
+        <td>{{ details.log_level }}</td>
+      </tr>
+      <tr>
+        <th>Working Directory</th>
+        <td class="mono">{{ details.cwd }}</td>
+      </tr>
+      <tr>
+        <th>Home Directory</th>
+        <td class="mono">{{ details.home or "—" }}</td>
+      </tr>
+      <tr>
+        <th>Data Directory</th>
+        <td class="mono">{{ details.data_dir }}</td>
+      </tr>
+      <tr>
+        <th>Log Directory</th>
+        <td class="mono">{{ details.log_dir }}</td>
+      </tr>
+      <tr>
+        <th>Database URI</th>
+        <td class="mono">{{ details.database_uri }}</td>
+      </tr>
+      {% if details.database_file %}
+      <tr>
+        <th>SQLite File</th>
+        <td class="mono">{{ details.database_file }}</td>
+      </tr>
+      {% endif %}
+      <tr>
+        <th>PID 1 Command</th>
+        <td class="mono">{{ details.pid1_cmdline or "Unavailable" }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}

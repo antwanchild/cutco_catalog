@@ -52,6 +52,7 @@
           Admin <span class="badge-admin">On</span>
         </summary>
         <div class="nav-group-menu">
+          <a href="{{ url_for('admin.diagnostics_page') }}" {% if request.endpoint == 'admin.diagnostics_page' %}class="active"{% endif %}>Diagnostics</a>
           <a href="{{ url_for('admin.msrp_diff_page') }}" {% if request.endpoint == 'admin.msrp_diff_page' %}class="active"{% endif %}>MSRP Diff</a>
           <a href="{{ url_for('admin.specs_backfill_page') }}" {% if request.endpoint == 'admin.specs_backfill_page' %}class="active"{% endif %}>Specs Backfill</a>
           <a href="{{ url_for('admin.admin_logout') }}">Logout</a>
