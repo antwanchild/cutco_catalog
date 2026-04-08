@@ -1,10 +1,15 @@
 import logging
+import os
+import platform
+import sys
 import threading
+from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 from datetime import date
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
-from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN
+from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION
 from extensions import limiter
 from helpers import is_admin
 from models import Item
@@ -15,6 +20,54 @@ from msrp_helpers import (
 
 admin_bp = Blueprint("admin", __name__)
 logger = logging.getLogger(__name__)
+
+
+def _mask_database_uri(uri):
+    if not uri or uri.startswith("sqlite:"):
+        return uri
+    parsed = urlsplit(uri)
+    if not parsed.scheme or not parsed.hostname:
+        return uri
+    auth = ""
+    if parsed.username:
+        auth = parsed.username
+        if parsed.password is not None:
+            auth += ":***"
+        auth += "@"
+    host = parsed.hostname
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    return urlunsplit((parsed.scheme, f"{auth}{host}", parsed.path, parsed.query, parsed.fragment))
+
+
+def _read_pid1_cmdline():
+    try:
+        return Path("/proc/1/cmdline").read_text().replace("\x00", " ").strip()
+    except OSError:
+        return None
+
+
+def _runtime_details():
+    db_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    return {
+        "app_version": APP_VERSION,
+        "python_version": sys.version.split()[0],
+        "platform": platform.platform(),
+        "cwd": os.getcwd(),
+        "home": os.environ.get("HOME", ""),
+        "uid": os.getuid(),
+        "gid": os.getgid(),
+        "database_uri": _mask_database_uri(db_uri),
+        "database_file": db_uri.removeprefix("sqlite:////") if db_uri.startswith("sqlite:////") else None,
+        "log_dir": os.environ.get("LOG_DIR", "/data/logs"),
+        "data_dir": os.environ.get("DATA_DIR", "/data"),
+        "log_level": os.environ.get("LOG_LEVEL", "INFO"),
+        "tz": os.environ.get("TZ", "UTC"),
+        "flask_env": os.environ.get("FLASK_ENV", "production"),
+        "puid": os.environ.get("PUID", "0"),
+        "pgid": os.environ.get("PGID", "0"),
+        "pid1_cmdline": _read_pid1_cmdline(),
+    }
 
 
 @admin_bp.route("/admin/msrp-diff")
@@ -83,6 +136,14 @@ def specs_backfill_status():
     if not is_admin():
         return jsonify(error="Unauthorized"), 403
     return jsonify(_read_specs_job())
+
+
+@admin_bp.route("/admin/diagnostics")
+def diagnostics_page():
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("index"))
+    return render_template("admin_diagnostics.html", details=_runtime_details())
 
 
 @admin_bp.route("/admin/login", methods=["GET", "POST"])
