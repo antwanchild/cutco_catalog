@@ -60,6 +60,12 @@ services:
 
 Then open `http://localhost:8095` in your browser.
 
+Notes:
+
+- Set `PUID` / `PGID` to your host user and group if you want files under the mounted `/data` volume to be owned by your normal account instead of root.
+- Gunicorn runtime files are intentionally kept inside the container (`/dev/shm` and `/tmp`) so hidden `.gunicorn` directories do not get created in bind mounts.
+- After changing the Dockerfile or image tag, rebuild and recreate the container so the running container picks up the new startup command.
+
 ---
 
 ## ⚙️ Environment Variables
@@ -80,8 +86,8 @@ Then open `http://localhost:8095` in your browser.
 | `SHARPEN_THRESHOLD_DAYS` | `180` | No | Days before a knife is flagged overdue for sharpening |
 | `COOKWARE_THRESHOLD_DAYS` | `60` | No | Days before a cookware-tracked piece is flagged as idle |
 | `COOKWARE_CATEGORIES` | `Cookware,Bakeware` | No | Catalog categories tracked on the Cookware page |
-| `PUID` | `0` | No | Run container as this user ID (for correct file ownership on the host) |
-| `PGID` | `0` | No | Run container as this group ID |
+| `PUID` | `0` | No | If non-zero, create a matching container user and run the app as that UID for correct ownership on mounted volumes |
+| `PGID` | `0` | No | Group ID paired with `PUID` when running the container as a non-root host user |
 | `TZ` | `UTC` | No | Container timezone |
 
 ⚠️ = has a working default but must be changed before exposing to a network.
