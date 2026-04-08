@@ -44,5 +44,6 @@ CMD ["sh", "-c", \
      chown -R $PUID:$PGID /data /app; \
      exec gosu appuser env HOME=/data gunicorn --bind 0.0.0.0:8095 --workers 4 --timeout 120 --worker-tmp-dir /dev/shm app:app; \
    else \
+     # Keep Gunicorn heartbeat temp files in RAM so they stay out of bind mounts.
      exec gunicorn --bind 0.0.0.0:8095 --workers 4 --timeout 120 --worker-tmp-dir /dev/shm app:app; \
    fi"]
