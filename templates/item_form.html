@@ -34,6 +34,13 @@
     <label>Cutco URL
       <input type="url" name="cutco_url" value="{{ item.cutco_url if item and item.cutco_url else '' }}" class="input-full">
     </label>
+    <label>Sheath Option
+      <select name="sheath_available" class="input-full">
+        {% for opt in sheath_options %}
+          <option value="{{ opt }}" {% if (item and item.sheath_available == opt) or (not item and opt == 'Unknown') %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    </label>
   </div>
 
   {% if not item %}
