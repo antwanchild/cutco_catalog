@@ -29,7 +29,6 @@ class Item(db.Model):
     sku        = db.Column(db.String(60),  nullable=True, unique=True)
     category   = db.Column(db.String(80),  nullable=True)
     edge_type  = db.Column(db.String(40),  nullable=False, default="Unknown")
-    sheath_available = db.Column(db.String(10), nullable=False, default="Unknown")
     is_unicorn = db.Column(db.Boolean,     nullable=False, default=False)
     edge_is_unicorn = db.Column(db.Boolean, nullable=False, default=False)
     in_catalog = db.Column(db.Boolean,     nullable=False, default=True)
