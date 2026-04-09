@@ -38,6 +38,7 @@ KNIFE_TASK_PRESETS = [
 ]
 UNKNOWN_COLOR = "Unknown / Unspecified"
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
+GIT_SHA = os.environ.get("GIT_SHA", "unknown")
 
 SCRAPE_CATEGORIES = [
     ("Utility Knives",  "https://www.cutco.com/shop/utility-knives"),

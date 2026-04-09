@@ -15,6 +15,10 @@
     <div class="stat-label">App Version</div>
   </div>
   <div class="stat-card">
+    <div class="stat-number mono">{{ details.git_sha[:7] if details.git_sha and details.git_sha != "unknown" else "unknown" }}</div>
+    <div class="stat-label">Git SHA</div>
+  </div>
+  <div class="stat-card">
     <div class="stat-number">{{ details.python_version }}</div>
     <div class="stat-label">Python</div>
   </div>
@@ -75,6 +79,10 @@
       <tr>
         <th>Database URI</th>
         <td class="mono">{{ details.database_uri }}</td>
+      </tr>
+      <tr>
+        <th>Git SHA</th>
+        <td class="mono">{{ details.git_sha }}</td>
       </tr>
       {% if details.database_file %}
       <tr>

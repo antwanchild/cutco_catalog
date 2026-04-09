@@ -66,6 +66,7 @@ def _runtime_details():
     log_dir = os.environ.get("LOG_DIR", "/data/logs")
     return {
         "app_version": APP_VERSION,
+        "git_sha": os.environ.get("GIT_SHA", "unknown"),
         "python_version": sys.version.split()[0],
         "platform": platform.platform(),
         "cwd": os.getcwd(),
