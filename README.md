@@ -194,21 +194,27 @@ Set `DISCORD_WEBHOOK_URL` to an [incoming webhook](https://support.discord.com/h
 
 Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted template from the **Import** page.
 
-### Required Columns
+### Common Columns
 
 | Column | Description |
 |---|---|
 | `name` | Item name (must match or be new) |
 | `sku` | Cutco model number |
 | `color` | Handle color (or leave blank for Unknown) |
-| `edge_type` | `Straight`, `Double-D`, `Serrated`, `Micro-D`, `Tec Edge`, or `Unknown` |
-| `is_unicorn` | `yes` / `no` |
+| `edge_type` | `Straight`, `Double-D`, `Micro Double-D`, `Serrated`, `Micro-D`, `Tec Edge`, `N/A`, or `Unknown` |
+| `is_sku_unicorn` | `yes` / `no` item-level unicorn flag |
+| `is_variant_unicorn` | `yes` / `no` variant/color unicorn flag |
+| `is_edge_unicorn` | `yes` / `no` edge/blade-type unicorn flag |
 | `person` | Collector name |
 | `status` | `Owned`, `Wishlist`, `Sold`, or `Traded` |
 | `category` | Product category |
 | `notes` | Free-text notes |
 
-Set membership columns (mark `yes` to assign): `Beast`, `Fanatic`, `Signature`, `Homemaker`, `Gourmet`, `Hunter`, and others as configured.
+Compatibility note: legacy `is_unicorn` is still accepted as an alias for `is_variant_unicorn`.
+
+For XLSX imports, the app also recognizes `Owned?` and older auxiliary columns like `Price`, `Gift Box`, `Sheath`, `Quantity Purchased`, and `Given Away`, which are merged into notes.
+
+Set membership columns (mark a truthy value such as `yes` to assign): `Beast`, `Fanatic`, `SIGNATURE`, `HOMEMAKER`, `Accomplished Chef`, `CUTCO Kitchen`, and other configured set columns.
 
 ---
 
@@ -226,8 +232,9 @@ Set membership columns (mark `yes` to assign): `Beast`, `Fanatic`, `Signature`, 
 | 🔪 Sharpening Log | `/sharpening` | Public |
 | 🍳 Cookware Tracker | `/cookware` (legacy: `/bakeware`) | Public |
 | 🔪 Knife Task Log | `/tasks` | Public |
-| 🎯 Task Detail | `/tasks/<id>` | Public |
-| 📥 Import | `/import` | Public |
+| 🛠️ Manage Tasks | `/tasks/manage` | Public |
+| 🎯 Task Detail | `/tasks/manage/<id>` | Public |
+| 📥 Import | `/import` | 🔒 Admin |
 | 📤 Export CSV | `/export` (download endpoint: `/export/csv`) | Public |
 | 🔄 Catalog Sync | `/catalog/sync` | 🔒 Admin |
 | 💲 MSRP Diff | `/admin/msrp-diff` | 🔒 Admin |
@@ -257,12 +264,13 @@ Eleven tables backed by SQLite. All migrations run automatically at startup.
 
 ## 🦄 Unicorn Tracking
 
-A **unicorn** is any item or variant that is rare, discontinued, or otherwise hard to find. Unicorns can be flagged at two levels:
+A **unicorn** is any item, edge type, or variant that is rare, discontinued, or otherwise hard to find. Unicorns can be flagged at three levels:
 
 - **Item level** — marks the entire item as a unicorn regardless of color (set via the catalog Edit form)
-- **Variant level** — marks a specific color or edge variant as a unicorn (set via the variant Edit form or during import via the `is_unicorn` column)
+- **Edge level** — marks a specific edge / blade-type version of an item as a unicorn
+- **Variant level** — marks a specific color variant as a unicorn (set via the variant Edit form or during import via the unicorn import columns)
 
-The `any_unicorn` property on an item returns `true` if either the item itself or any of its variants is flagged. The catalog filter and stats page both use this property, so a variant-level unicorn surfaces the item in unicorn searches.
+The `any_unicorn` property on an item returns `true` if the item itself, its edge type, or any of its variants is flagged. The catalog filter and stats page both use this property, so any unicorn flag surfaces the item in unicorn searches.
 
 ---
 
@@ -315,7 +323,7 @@ Routes are split across Flask Blueprints for maintainability:
 |---|---|
 | `catalog` | `/catalog`, `/variants`, `/sets`, `/catalog/sync` |
 | `people` | `/people`, `/ownership`, `/wishlist` |
-| `logs` | `/sharpening`, `/cookware` (legacy: `/bakeware`) |
+| `logs` | `/sharpening`, `/cookware` (legacy: `/bakeware`), `/tasks`, `/tasks/manage` |
 | `views` | `/views/matrix`, `/stats` |
 | `data` | `/import`, `/export` |
 | `admin` | `/admin/*`, `/api/variants` |
@@ -329,6 +337,7 @@ Shared logic lives in `models.py`, `helpers.py`, `scraping.py`, `msrp_helpers.py
 ```bash
 # Install dependencies
 pip install -r requirements.txt
+pip install ruff
 
 # Run locally
 flask --app app run --debug
@@ -356,8 +365,8 @@ All persistent data lives in `/data/` inside the container — mount this as a v
 ## 🏥 Health Check
 
 ```
-GET /health   → 200 OK  {"status": "ok", "version": "x.y.z"}
-GET /version  → {"version": "x.y.z"}
+GET /health   → 200 OK  {"status": "ok", "version": "x.y.z", "git_sha": "..."}
+GET /version  → {"version": "x.y.z", "git_sha": "..."}
 ```
 
 ---
