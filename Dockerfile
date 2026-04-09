@@ -6,8 +6,11 @@ LABEL org.opencontainers.image.description="Cutco Collection Tracker"
 WORKDIR /app
 
 ARG APP_VERSION=dev
+ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.version="${APP_VERSION}"
+LABEL org.opencontainers.image.revision="${GIT_SHA}"
 ENV APP_VERSION=${APP_VERSION}
+ENV GIT_SHA=${GIT_SHA}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2 libxslt1.1 gosu tzdata && \

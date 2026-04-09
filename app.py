@@ -6,7 +6,7 @@ from datetime import timedelta
 from flask import Flask, jsonify, render_template, request
 
 from constants import (
-    ADMIN_TOKEN, ADMIN_SESSION_SECONDS, APP_VERSION, KNIFE_TASK_PRESETS,
+    ADMIN_TOKEN, ADMIN_SESSION_SECONDS, APP_VERSION, GIT_SHA, KNIFE_TASK_PRESETS,
     UNKNOWN_COLOR, canonicalize_category,
 )
 from extensions import db, limiter
@@ -236,7 +236,7 @@ def index():
 def health():
     try:
         db.session.execute(db.text("SELECT 1"))
-        return jsonify(status="ok", version=APP_VERSION), 200
+        return jsonify(status="ok", version=APP_VERSION, git_sha=GIT_SHA), 200
     except Exception as exc:
         logger.error("Health check failed: %s", exc)
         return jsonify(status="error"), 500
@@ -244,7 +244,7 @@ def health():
 
 @app.route("/version")
 def version():
-    return jsonify(version=APP_VERSION)
+    return jsonify(version=APP_VERSION, git_sha=GIT_SHA)
 
 
 if __name__ == "__main__":
