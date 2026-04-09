@@ -55,6 +55,18 @@ def _safe_csv_filename(raw_name: str) -> str:
     return cleaned
 
 
+def _import_row_label(row_num: int | None, name: str | None = None, sku: str | None = None) -> str:
+    """Build a compact human-readable row label for import summaries."""
+    parts = []
+    if row_num is not None:
+        parts.append(f"Row {row_num}")
+    if name:
+        parts.append(name)
+    if sku:
+        parts.append(f"SKU {sku}")
+    return " - ".join(parts) if parts else "Unknown row"
+
+
 def _normalized_header(value: str) -> str:
     return value.strip().lower().replace(" ", "_")
 
@@ -320,6 +332,7 @@ def import_page():
 
         if matched_item:
             already_in_catalog.append({"item": matched_item, "row": row,
+                                       "row_num": row_num,
                                        "color": color, "person": person_name,
                                        "status": status, "sets": set_names})
         elif dedup_key not in seen_skus:
@@ -345,8 +358,10 @@ def import_page():
                     if existing_o:
                         if existing_o.status != status:
                             conflicts.append({
+                                "row": row_num,
                                 "person": person_name,
                                 "item": matched_item.name,
+                                "sku": matched_item.sku,
                                 "color": color,
                                 "existing_status": existing_o.status,
                                 "import_status": status,
@@ -354,8 +369,10 @@ def import_page():
                             })
                         continue
             ownership_entries.append({
+                "row": row_num,
                 "person": person_name,
                 "item_name": matched_item.name,
+                "sku": matched_item.sku,
                 "item_id":   matched_item.id,
                 "color":     target_color,
                 "status":    status,
@@ -392,6 +409,7 @@ def import_confirm():
     item_rows_imported = 0
     own_rows_selected = 0
     own_rows_imported = 0
+    skipped_details = []
 
     existing_items   = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
     existing_names   = {item.name.lower(): item for item in Item.query.all()}
@@ -403,7 +421,16 @@ def import_confirm():
 
     try:
         for row_index in range(item_count):
+            row_num = request.form.get(f"item_row_{row_index}", type=int)
+            name_hint = request.form.get(f"item_name_{row_index}", "").strip() or None
+            sku_hint = request.form.get(f"item_sku_{row_index}", "").strip().upper() or None
+
             if request.form.get(f"item_accept_{row_index}") != "on":
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, name_hint, sku_hint),
+                    "reason": "Not selected during import review.",
+                })
                 continue
             item_rows_selected += 1
 
@@ -421,6 +448,11 @@ def import_confirm():
             set_names   = [set_name for set_name in request.form.get(f"item_sets_{row_index}", "").split("|") if set_name]
 
             if not name:
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, name_hint, sku_hint),
+                    "reason": "Missing name.",
+                })
                 continue
 
             item = None
@@ -481,7 +513,16 @@ def import_confirm():
             item_rows_imported += 1
 
         for row_index in range(own_count):
+            row_num = request.form.get(f"own_row_{row_index}", type=int)
+            item_name_hint = request.form.get(f"own_item_name_{row_index}", "").strip() or None
+            sku_hint = request.form.get(f"own_item_sku_{row_index}", "").strip().upper() or None
+
             if request.form.get(f"own_accept_{row_index}") != "on":
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, item_name_hint, sku_hint),
+                    "reason": "Not selected during import review.",
+                })
                 continue
             own_rows_selected += 1
 
@@ -495,7 +536,19 @@ def import_confirm():
             is_edge_unicorn = request.form.get(f"own_edge_unicorn_{row_index}") == "on"
 
             item = Item.query.get(item_id)
-            if not item or not person_name:
+            if not item:
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, item_name_hint, sku_hint),
+                    "reason": "Matched catalog item was not found during confirmation.",
+                })
+                continue
+            if not person_name:
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, item_name_hint, sku_hint),
+                    "reason": "Missing person/collector name.",
+                })
                 continue
             if is_sku_unicorn and not item.is_unicorn:
                 item.is_unicorn = True
@@ -541,6 +594,37 @@ def import_confirm():
         logger.info("Import complete: %d items, %d ownership, %d persons", added_items, added_ownership, added_persons)
         selected_rows = item_rows_selected + own_rows_selected
         imported_rows = item_rows_imported + own_rows_imported
+        error_count = int(request.form.get("error_count", 0) or 0)
+        for idx in range(error_count):
+            row_num = request.form.get(f"error_row_{idx}", type=int)
+            name_hint = request.form.get(f"error_name_{idx}", "").strip() or None
+            sku_hint = request.form.get(f"error_sku_{idx}", "").strip().upper() or None
+            reason = request.form.get(f"error_reason_{idx}", "").strip() or "Could not parse row."
+            skipped_details.append({
+                "row": row_num,
+                "label": _import_row_label(row_num, name_hint, sku_hint),
+                "reason": reason,
+            })
+
+        conflict_count = int(request.form.get("conflict_count", 0) or 0)
+        for idx in range(conflict_count):
+            row_num = request.form.get(f"conflict_row_{idx}", type=int)
+            item_name = request.form.get(f"conflict_item_{idx}", "").strip() or None
+            sku_hint = request.form.get(f"conflict_sku_{idx}", "").strip().upper() or None
+            person_name = request.form.get(f"conflict_person_{idx}", "").strip()
+            existing_status = request.form.get(f"conflict_existing_status_{idx}", "").strip()
+            import_status = request.form.get(f"conflict_import_status_{idx}", "").strip()
+            reason = (
+                f'Existing entry for {person_name or "collector"} kept unchanged '
+                f"({existing_status or 'existing'} vs {import_status or 'import'})."
+            )
+            skipped_details.append({
+                "row": row_num,
+                "label": _import_row_label(row_num, item_name, sku_hint),
+                "reason": reason,
+            })
+
+        skipped_details.sort(key=lambda entry: (entry["row"] is None, entry["row"] or 0, entry["label"]))
         parts = []
         if total_rows:
             parts.append(f"read {total_rows} row{'s' if total_rows != 1 else ''}")
@@ -552,5 +636,16 @@ def import_confirm():
             parts.append(f"{added_persons} collector{'s' if added_persons != 1 else ''}")
         if added_ownership:
             parts.append(f"{added_ownership} ownership entr{'ies' if added_ownership != 1 else 'y'}")
-        flash("Import complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
+        summary = "Import complete — added " + (", ".join(parts) if parts else "nothing new") + "."
+        return render_template(
+            "import_result.html",
+            summary=summary,
+            total_rows=total_rows,
+            selected_rows=selected_rows,
+            imported_rows=imported_rows,
+            skipped_details=skipped_details,
+            added_items=added_items,
+            added_persons=added_persons,
+            added_ownership=added_ownership,
+        )
     return redirect(url_for("catalog.catalog"))

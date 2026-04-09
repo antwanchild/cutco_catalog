@@ -33,6 +33,22 @@
 
 <form method="post" action="{{ url_for('data.import_confirm') }}">
   <input type="hidden" name="total_rows" value="{{ total_rows or 0 }}">
+  <input type="hidden" name="error_count" value="{{ errors | length }}">
+  {% for error in errors %}
+  <input type="hidden" name="error_row_{{ loop.index0 }}" value="{{ error.row }}">
+  <input type="hidden" name="error_name_{{ loop.index0 }}" value="{{ error.data.get('name', '') if error.data else '' }}">
+  <input type="hidden" name="error_sku_{{ loop.index0 }}" value="{{ error.data.get('sku', '') if error.data else '' }}">
+  <input type="hidden" name="error_reason_{{ loop.index0 }}" value="{{ error.reason }}">
+  {% endfor %}
+  <input type="hidden" name="conflict_count" value="{{ conflicts | length }}">
+  {% for conflict in conflicts %}
+  <input type="hidden" name="conflict_row_{{ loop.index0 }}" value="{{ conflict.row }}">
+  <input type="hidden" name="conflict_person_{{ loop.index0 }}" value="{{ conflict.person }}">
+  <input type="hidden" name="conflict_item_{{ loop.index0 }}" value="{{ conflict.item }}">
+  <input type="hidden" name="conflict_sku_{{ loop.index0 }}" value="{{ conflict.sku or '' }}">
+  <input type="hidden" name="conflict_existing_status_{{ loop.index0 }}" value="{{ conflict.existing_status }}">
+  <input type="hidden" name="conflict_import_status_{{ loop.index0 }}" value="{{ conflict.import_status }}">
+  {% endfor %}
 
   {# ── New Items ──────────────────────────────────────────────────────── #}
   {% if new_items %}
@@ -51,6 +67,7 @@
       <tr>
         <td><input type="checkbox" name="item_accept_{{ loop.index0 }}" checked></td>
         <td>
+          <input type="hidden" name="item_row_{{ loop.index0 }}" value="{{ item.row }}">
           <input type="hidden" name="item_name_{{ loop.index0 }}" value="{{ item.name }}">
           {{ item.name }}
         </td>
@@ -122,6 +139,7 @@
       <tr>
         <td><input type="checkbox" name="item_accept_{{ form_field_index }}" checked></td>
         <td>
+          <input type="hidden" name="item_row_{{ form_field_index }}" value="{{ item.row }}">
           <input type="hidden" name="item_name_{{ form_field_index }}" value="{{ item.name }}">
           {{ item.name }}
         </td>
@@ -189,12 +207,15 @@
       <tr>
         <td><input type="checkbox" name="own_accept_{{ loop.index0 }}" checked></td>
         <td>
+          <input type="hidden" name="own_row_{{ loop.index0 }}" value="{{ entry.row }}">
           <input type="hidden" name="own_person_{{ loop.index0 }}" value="{{ entry.person }}">
           {{ entry.person }}
           {% if entry.is_new_person %}<span class="badge badge-new">new</span>{% endif %}
         </td>
         <td>
           <input type="hidden" name="own_item_id_{{ loop.index0 }}" value="{{ entry.item_id }}">
+          <input type="hidden" name="own_item_name_{{ loop.index0 }}" value="{{ entry.item_name }}">
+          <input type="hidden" name="own_item_sku_{{ loop.index0 }}" value="{{ entry.sku or '' }}">
           {{ entry.item_name }}
         </td>
         <td>
