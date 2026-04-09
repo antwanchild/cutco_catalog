@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Import Result – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Import Result</h1>
+  <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">← Catalog</a>
+</div>
+
+<div class="flash flash-success">{{ summary }}</div>
+
+<div class="form-card">
+  <h2>Summary</h2>
+  <table class="data-table compact" style="max-width: 720px;">
+    <tbody>
+      <tr><th>Total rows read</th><td>{{ total_rows }}</td></tr>
+      <tr><th>Rows selected</th><td>{{ selected_rows }}</td></tr>
+      <tr><th>Rows processed</th><td>{{ imported_rows }}</td></tr>
+      <tr><th>Rows skipped / unchanged</th><td>{{ skipped_details | length }}</td></tr>
+      <tr><th>Items added</th><td>{{ added_items }}</td></tr>
+      <tr><th>Collectors added</th><td>{{ added_persons }}</td></tr>
+      <tr><th>Ownership entries added</th><td>{{ added_ownership }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% if skipped_details %}
+<div class="form-card">
+  <h2>Skipped or Unchanged Rows ({{ skipped_details | length }})</h2>
+  <p class="muted">These rows were not imported as new changes, or were left unchanged on purpose.</p>
+  <table class="data-table">
+    <thead>
+      <tr><th>Row</th><th>Row / Item</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+      {% for entry in skipped_details %}
+      <tr>
+        <td>{{ entry.row if entry.row is not none else "—" }}</td>
+        <td>{{ entry.label }}</td>
+        <td>{{ entry.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="form-actions">
+  <a href="{{ url_for('data.import_page') }}" class="btn btn-secondary">Import Another File</a>
+  <a href="{{ url_for('catalog.catalog') }}" class="btn btn-primary">Back to Catalog</a>
+</div>
+{% endblock %}
