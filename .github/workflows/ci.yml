@@ -154,7 +154,7 @@ jobs:
 
       - name: Create GitHub release
         if: steps.release_check.outputs.exists != 'true'
-        uses: softprops/action-gh-release@v2.6.1
+        uses: softprops/action-gh-release@v3.0.0
         with:
           tag_name: ${{ needs.auto-tag.outputs.new_tag }}
           name: ${{ needs.auto-tag.outputs.new_tag }}
