@@ -128,14 +128,22 @@ jobs:
                   title: $title,
                   url: $url,
                   color: $color,
-                  fields: [
-                    {name: "🏷️ Version", value: $version, inline: true},
-                    {name: "👤 Triggered by", value: $actor, inline: true},
-                    {name: "🌿 Branch", value: $branch, inline: true},
-                    {name: "⏱️ Duration", value: $duration, inline: true},
-                    {name: "🔗 Run", value: $run_link, inline: true},
-                    {name: "SHA", value: $sha, inline: true}
-                  ] + if $failure_name != "" then [{name: $failure_name, value: $failure_value, inline: false}] else [] end,
+                  fields: (
+                    [
+                      {name: "🏷️ Version", value: $version, inline: true},
+                      {name: "👤 Triggered by", value: $actor, inline: true},
+                      {name: "🌿 Branch", value: $branch, inline: true},
+                      {name: "⏱️ Duration", value: $duration, inline: true},
+                      {name: "🔗 Run", value: $run_link, inline: true},
+                      {name: "SHA", value: $sha, inline: true}
+                    ] + (
+                      if $failure_name != "" then
+                        [{name: $failure_name, value: $failure_value, inline: false}]
+                      else
+                        []
+                      end
+                    )
+                  ),
                   description: $description,
                   footer: {text: $footer},
                   timestamp: now | todateiso8601
