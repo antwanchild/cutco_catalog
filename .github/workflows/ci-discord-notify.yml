@@ -110,8 +110,8 @@ jobs:
             --arg username "$REPO_NAME" \
             --arg title "${{ steps.context.outputs.status_emoji }} ${REPO_NAME} - ${{ steps.context.outputs.status_text }}" \
             --arg url "$RUN_URL" \
-            --arg description "💬 **Commit**\n${{ steps.context.outputs.commit }}" \
             --arg footer "${REPO} • Run #${RUN_NUMBER}" \
+            --arg commit "${{ steps.context.outputs.commit }}" \
             --arg version "${{ steps.context.outputs.version }}" \
             --arg actor "$TRIGGERED_BY" \
             --arg branch "$BRANCH" \
@@ -130,6 +130,7 @@ jobs:
                   color: $color,
                   fields: (
                     [
+                      {name: "💬 Commit", value: $commit, inline: false},
                       {name: "🏷️ Version", value: $version, inline: true},
                       {name: "👤 Triggered by", value: $actor, inline: true},
                       {name: "🌿 Branch", value: $branch, inline: true},
@@ -144,7 +145,6 @@ jobs:
                       end
                     )
                   ),
-                  description: $description,
                   footer: {text: $footer},
                   timestamp: now | todateiso8601
                 }
