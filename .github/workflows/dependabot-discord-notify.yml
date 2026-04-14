@@ -1,0 +1,153 @@
+name: Dependabot Discord Notifications
+
+on:
+  pull_request_target:
+    types: [opened, closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  notify:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      PR_BODY: ${{ github.event.pull_request.body || '' }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+      MERGED_BY: ${{ github.event.pull_request.merged_by.login || '' }}
+
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        if: env.DISCORD_WEBHOOK_URL != ''
+        uses: dependabot/fetch-metadata@v3.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Collect update context
+        id: context
+        if: env.DISCORD_WEBHOOK_URL != ''
+        run: |
+          release_notes_url=$(
+            printf '%s\n' "$PR_BODY" \
+              | awk 'BEGIN { IGNORECASE=1 }
+                /release notes/ {
+                  if (match($0, /https?:\/\/[^ )>]+/)) {
+                    print substr($0, RSTART, RLENGTH)
+                    exit
+                  }
+                }'
+          )
+
+          changelog_url=$(
+            printf '%s\n' "$PR_BODY" \
+              | awk 'BEGIN { IGNORECASE=1 }
+                /changelog/ {
+                  if (match($0, /https?:\/\/[^ )>]+/)) {
+                    print substr($0, RSTART, RLENGTH)
+                    exit
+                  }
+                }'
+          )
+
+          compare_url=$(
+            printf '%s\n' "$PR_BODY" \
+              | awk 'BEGIN { IGNORECASE=1 }
+                /compare/ {
+                  if (match($0, /https?:\/\/[^ )>]+/)) {
+                    print substr($0, RSTART, RLENGTH)
+                    exit
+                  }
+                }'
+          )
+
+          link_block=""
+          if [ -n "$release_notes_url" ]; then
+            link_block="${link_block}Release notes: ${release_notes_url}\n"
+          fi
+          if [ -n "$changelog_url" ]; then
+            link_block="${link_block}Changelog: ${changelog_url}\n"
+          fi
+          if [ -n "$compare_url" ]; then
+            link_block="${link_block}Compare: ${compare_url}\n"
+          fi
+
+          {
+            echo "version_line=Version: ${{ steps.meta.outputs.previous-version }} -> ${{ steps.meta.outputs.new-version }}"
+            echo "link_block<<EOF"
+            printf '%b' "$link_block"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify non-automergeable Dependabot PR
+        if: >
+          env.DISCORD_WEBHOOK_URL != '' &&
+          github.event.action == 'opened' &&
+          steps.meta.outputs.update-type == 'version-update:semver-major'
+        run: |
+          content=$(cat <<EOF
+          🚫 Dependabot PR #${PR_NUMBER} is not eligible for auto-merge in ${REPO}.
+          ${PR_TITLE}
+          Dependency: ${{ steps.meta.outputs.dependency-names }}
+          Update type: ${{ steps.meta.outputs.update-type }}
+          ${{ steps.context.outputs.version_line }}
+          ${{ steps.context.outputs.link_block }}
+          ${PR_URL}
+          EOF
+          )
+
+          jq -n --arg content "$content" '{content: $content}' \
+            | curl -fsSL -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
+
+      - name: Notify auto-merged Dependabot PR
+        if: >
+          env.DISCORD_WEBHOOK_URL != '' &&
+          github.event.action == 'closed' &&
+          github.event.pull_request.merged == true &&
+          (env.MERGED_BY == 'github-actions[bot]' || env.MERGED_BY == 'dependabot[bot]')
+        run: |
+          content=$(cat <<EOF
+          ✅ Dependabot PR #${PR_NUMBER} was auto-merged in ${REPO}.
+          ${PR_TITLE}
+          Dependency: ${{ steps.meta.outputs.dependency-names }}
+          Update type: ${{ steps.meta.outputs.update-type }}
+          ${{ steps.context.outputs.version_line }}
+          ${{ steps.context.outputs.link_block }}
+          Merged by: ${MERGED_BY}
+          ${PR_URL}
+          EOF
+          )
+
+          jq -n --arg content "$content" '{content: $content}' \
+            | curl -fsSL -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
+
+      - name: Notify manually merged Dependabot PR
+        if: >
+          env.DISCORD_WEBHOOK_URL != '' &&
+          github.event.action == 'closed' &&
+          github.event.pull_request.merged == true &&
+          env.MERGED_BY != 'github-actions[bot]' &&
+          env.MERGED_BY != 'dependabot[bot]'
+        run: |
+          content=$(cat <<EOF
+          ℹ️ Dependabot PR #${PR_NUMBER} was merged manually in ${REPO}.
+          ${PR_TITLE}
+          Dependency: ${{ steps.meta.outputs.dependency-names }}
+          Update type: ${{ steps.meta.outputs.update-type }}
+          ${{ steps.context.outputs.version_line }}
+          ${{ steps.context.outputs.link_block }}
+          Merged by: ${MERGED_BY}
+          ${PR_URL}
+          EOF
+          )
+
+          jq -n --arg content "$content" '{content: $content}' \
+            | curl -fsSL -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"

@@ -1,0 +1,145 @@
+name: CI Discord Notifications
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  notify:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure')
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      REPO_NAME: ${{ github.event.repository.name }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      RUN_STARTED_AT: ${{ github.event.workflow_run.run_started_at }}
+      RUN_UPDATED_AT: ${{ github.event.workflow_run.updated_at }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      TRIGGERED_BY: ${{ github.event.workflow_run.actor.login }}
+      COMMIT_MESSAGE: ${{ github.event.workflow_run.head_commit.message || github.event.workflow_run.display_title }}
+
+    steps:
+      - name: Check out repository
+        if: env.DISCORD_WEBHOOK_URL != ''
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Collect notification context
+        id: context
+        if: env.DISCORD_WEBHOOK_URL != ''
+        run: |
+          short_sha=$(printf '%s' "$HEAD_SHA" | cut -c1-7)
+
+          version=$(git tag --points-at "$HEAD_SHA" | sort -V | tail -n1)
+          if [ -z "$version" ]; then
+            version="n/a"
+          fi
+
+          duration_seconds=$(
+            python3 -c 'from datetime import datetime; import os; started = datetime.fromisoformat(os.environ["RUN_STARTED_AT"].replace("Z", "+00:00")); updated = datetime.fromisoformat(os.environ["RUN_UPDATED_AT"].replace("Z", "+00:00")); print(max(0, int((updated - started).total_seconds())))'
+          )
+
+          minutes=$((duration_seconds / 60))
+          seconds=$((duration_seconds % 60))
+          duration="${minutes}m ${seconds}s"
+
+          commit=$(printf '%s' "$COMMIT_MESSAGE" | tr '\n' ' ' | sed 's/[[:space:]][[:space:]]*/ /g' | cut -c1-280)
+          if [ -z "$commit" ]; then
+            commit="No commit message available"
+          fi
+
+          failed_jobs=$(
+            gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs?per_page=100" \
+              --jq '.jobs[] | select(.conclusion == "failure") | .name' \
+              | paste -sd ', ' -
+          )
+
+          if [ "$RUN_CONCLUSION" = "success" ]; then
+            status_emoji="✅"
+            status_text="Build Succeeded"
+            color=5763719
+          else
+            status_emoji="❌"
+            status_text="Build Failed"
+            color=15548997
+          fi
+
+          if [ -n "$failed_jobs" ]; then
+            failure_field_name="Failed job(s)"
+            failure_field_value="$failed_jobs"
+          else
+            failure_field_name=""
+            failure_field_value=""
+          fi
+
+          {
+            echo "short_sha=${short_sha}"
+            echo "version=${version}"
+            echo "duration=${duration}"
+            echo "commit=${commit}"
+            echo "status_emoji=${status_emoji}"
+            echo "status_text=${status_text}"
+            echo "color=${color}"
+            echo "failure_field_name=${failure_field_name}"
+            echo "failure_field_value=${failure_field_value}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send Discord notification
+        if: env.DISCORD_WEBHOOK_URL != ''
+        run: |
+          jq -n \
+            --arg username "$REPO_NAME" \
+            --arg title "${{ steps.context.outputs.status_emoji }} ${REPO_NAME} - ${{ steps.context.outputs.status_text }}" \
+            --arg url "$RUN_URL" \
+            --arg description "💬 **Commit**\n${{ steps.context.outputs.commit }}" \
+            --arg footer "${REPO} • Run #${RUN_NUMBER}" \
+            --arg version "${{ steps.context.outputs.version }}" \
+            --arg actor "$TRIGGERED_BY" \
+            --arg branch "$BRANCH" \
+            --arg duration "${{ steps.context.outputs.duration }}" \
+            --arg run_link "[View run]($RUN_URL)" \
+            --arg sha "${{ steps.context.outputs.short_sha }}" \
+            --arg failure_name "${{ steps.context.outputs.failure_field_name }}" \
+            --arg failure_value "${{ steps.context.outputs.failure_field_value }}" \
+            --argjson color "${{ steps.context.outputs.color }}" \
+            '{
+              username: $username,
+              embeds: [
+                {
+                  title: $title,
+                  url: $url,
+                  color: $color,
+                  fields: [
+                    {name: "🏷️ Version", value: $version, inline: true},
+                    {name: "👤 Triggered by", value: $actor, inline: true},
+                    {name: "🌿 Branch", value: $branch, inline: true},
+                    {name: "⏱️ Duration", value: $duration, inline: true},
+                    {name: "🔗 Run", value: $run_link, inline: true},
+                    {name: "SHA", value: $sha, inline: true}
+                  ] + if $failure_name != "" then [{name: $failure_name, value: $failure_value, inline: false}] else [] end,
+                  description: $description,
+                  footer: {text: $footer},
+                  timestamp: now | todateiso8601
+                }
+              ]
+            }' \
+            | curl -fsSL -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
