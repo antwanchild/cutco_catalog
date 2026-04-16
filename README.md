@@ -3,6 +3,7 @@
 A self-hosted web application for Cutco collectors to catalog, track, and manage their Cutco knife and kitchen product collections.
 
 ![Version](https://img.shields.io/github/v/release/antwanchild/cutco_catalog)
+![CI](https://github.com/antwanchild/cutco_catalog/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.14-blue)
 ![Flask](https://img.shields.io/badge/flask-3.1-lightgrey)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED)
@@ -75,6 +76,8 @@ Run the lightweight smoke tests against a temporary SQLite database:
 ```bash
 python3 -m unittest discover -s tests
 ```
+
+The smoke suite is grouped by feature area: public, import, catalog, people, ownership, logs, and tasks.
 
 Lint the repo with:
 

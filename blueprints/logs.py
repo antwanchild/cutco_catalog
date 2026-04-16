@@ -1,7 +1,7 @@
 import logging
 from datetime import date
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from constants import (
     COOKWARE_CATEGORIES, COOKWARE_THRESHOLD_DAYS,
@@ -46,7 +46,7 @@ def sharpening():
 
     tracked: list[dict] = []
     for item_id, last_str in last_by_item.items():
-        item = Item.query.get(item_id)
+        item = db.session.get(Item, item_id)
         if not item:
             continue
         parsed_last = _safe_parse_iso_date(last_str)
@@ -92,7 +92,7 @@ def sharpening_add():
         flash("Date must be valid YYYY-MM-DD.", "error")
         return redirect(url_for("logs.sharpening"))
 
-    if not Item.query.get(item_id):
+    if not db.session.get(Item, item_id):
         flash("Item not found.", "error")
         return redirect(url_for("logs.sharpening"))
 
@@ -111,7 +111,9 @@ def sharpening_add():
 @logs_bp.route("/sharpening/<int:lid>/edit", methods=["GET", "POST"])
 @admin_required
 def sharpening_edit(lid):
-    entry = SharpeningLog.query.get_or_404(lid)
+    entry = db.session.get(SharpeningLog, lid)
+    if not entry:
+        abort(404)
     if request.method == "POST":
         new_date = request.form.get("sharpened_on", entry.sharpened_on).strip()
         if not _safe_parse_iso_date(new_date):
@@ -130,7 +132,9 @@ def sharpening_edit(lid):
 @logs_bp.route("/sharpening/<int:lid>/delete", methods=["POST"])
 @admin_required
 def sharpening_delete(lid):
-    entry = SharpeningLog.query.get_or_404(lid)
+    entry = db.session.get(SharpeningLog, lid)
+    if not entry:
+        abort(404)
     db.session.delete(entry)
     if db_commit(db.session):
         logger.info("Sharpening entry %d deleted", lid)
@@ -141,7 +145,9 @@ def sharpening_delete(lid):
 @logs_bp.route("/sharpening/item/<int:item_id>/purge", methods=["POST"])
 @admin_required
 def sharpening_purge_item(item_id):
-    item = Item.query.get_or_404(item_id)
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
     count = SharpeningLog.query.filter_by(item_id=item_id).count()
     SharpeningLog.query.filter_by(item_id=item_id).delete()
     if db_commit(db.session):
@@ -179,7 +185,7 @@ def sharpening_notify():
             continue
         days_since = (today - parsed_last).days
         if days_since > SHARPEN_THRESHOLD_DAYS:
-            item = Item.query.get(item_id)
+            item = db.session.get(Item, item_id)
             if item:
                 overdue.append((item, days_since))
     overdue.sort(key=lambda pair: pair[1], reverse=True)
@@ -225,7 +231,7 @@ def cookware():
 
     tracked: list[dict] = []
     for item_id, last_str in last_by_item.items():
-        item = Item.query.get(item_id)
+        item = db.session.get(Item, item_id)
         if not item:
             continue
         parsed_last = _safe_parse_iso_date(last_str)
@@ -292,7 +298,7 @@ def cookware_add():
     if not _safe_parse_iso_date(used_on):
         flash("Date must be valid YYYY-MM-DD.", "error")
         return redirect(url_for("logs.cookware"))
-    if not Item.query.get(item_id):
+    if not db.session.get(Item, item_id):
         flash("Item not found.", "error")
         return redirect(url_for("logs.cookware"))
 
@@ -320,7 +326,9 @@ def cookware_add():
 @logs_bp.route("/bakeware/<int:session_id>/edit", methods=["GET", "POST"], endpoint="bakeware_edit")
 @admin_required
 def cookware_edit(session_id):
-    session = CookwareSession.query.get_or_404(session_id)
+    session = db.session.get(CookwareSession, session_id)
+    if not session:
+        abort(404)
     if request.method == "POST":
         new_date = request.form.get("used_on", request.form.get("baked_on", session.used_on)).strip()
         if not _safe_parse_iso_date(new_date):
@@ -346,7 +354,9 @@ def cookware_edit(session_id):
 @logs_bp.route("/bakeware/<int:session_id>/delete", methods=["POST"], endpoint="bakeware_delete")
 @admin_required
 def cookware_delete(session_id):
-    session = CookwareSession.query.get_or_404(session_id)
+    session = db.session.get(CookwareSession, session_id)
+    if not session:
+        abort(404)
     db.session.delete(session)
     if db_commit(db.session):
         logger.info("Cookware session %d deleted", session_id)
@@ -358,7 +368,9 @@ def cookware_delete(session_id):
 @logs_bp.route("/bakeware/item/<int:item_id>/purge", methods=["POST"], endpoint="bakeware_purge_item")
 @admin_required
 def cookware_purge_item(item_id):
-    item = Item.query.get_or_404(item_id)
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
     count = CookwareSession.query.filter_by(item_id=item_id).count()
     CookwareSession.query.filter_by(item_id=item_id).delete()
     if db_commit(db.session):
@@ -398,7 +410,7 @@ def cookware_notify():
             continue
         days_since = (today - parsed_last).days
         if days_since > COOKWARE_THRESHOLD_DAYS:
-            item = Item.query.get(item_id)
+            item = db.session.get(Item, item_id)
             if item:
                 stale.append((item, days_since))
     stale.sort(key=lambda pair: pair[1], reverse=True)
@@ -452,7 +464,7 @@ def tasks():
     item_top_task: dict[int, str] = {}
     for item_id, task_counts in usage.items():
         top_tid = max(task_counts, key=task_counts.get)
-        top_task = KnifeTask.query.get(top_tid)
+        top_task = db.session.get(KnifeTask, top_tid)
         if top_task:
             item_top_task[item_id] = top_task.name
 
@@ -488,10 +500,10 @@ def task_log_add():
     if not _safe_parse_iso_date(logged_on):
         flash("Date must be valid YYYY-MM-DD.", "error")
         return redirect(url_for("logs.tasks"))
-    if not Item.query.get(item_id):
+    if not db.session.get(Item, item_id):
         flash("Item not found.", "error")
         return redirect(url_for("logs.tasks"))
-    if not KnifeTask.query.get(task_id):
+    if not db.session.get(KnifeTask, task_id):
         flash("Task not found.", "error")
         return redirect(url_for("logs.tasks"))
 
@@ -502,8 +514,8 @@ def task_log_add():
         notes     = notes,
     ))
     if db_commit(db.session):
-        item = Item.query.get(item_id)
-        task = KnifeTask.query.get(task_id)
+        item = db.session.get(Item, item_id)
+        task = db.session.get(KnifeTask, task_id)
         logger.info("Task logged: %s → %s on %s", item.name, task.name, logged_on)
         flash("Usage logged.", "success")
     return redirect(url_for("logs.tasks"))
@@ -512,7 +524,9 @@ def task_log_add():
 @logs_bp.route("/tasks/log/<int:lid>/delete", methods=["POST"])
 @admin_required
 def task_log_delete(lid):
-    entry = KnifeTaskLog.query.get_or_404(lid)
+    entry = db.session.get(KnifeTaskLog, lid)
+    if not entry:
+        abort(404)
     db.session.delete(entry)
     if db_commit(db.session):
         logger.info("Task log entry %d deleted", lid)
@@ -523,7 +537,9 @@ def task_log_delete(lid):
 @logs_bp.route("/tasks/item/<int:item_id>/purge", methods=["POST"])
 @admin_required
 def task_log_purge_item(item_id):
-    item = Item.query.get_or_404(item_id)
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
     count = KnifeTaskLog.query.filter_by(item_id=item_id).count()
     KnifeTaskLog.query.filter_by(item_id=item_id).delete()
     if db_commit(db.session):
@@ -551,7 +567,9 @@ def tasks_manage():
 
 @logs_bp.route("/tasks/manage/<int:tid>")
 def task_detail(tid):
-    task = KnifeTask.query.get_or_404(tid)
+    task = db.session.get(KnifeTask, tid)
+    if not task:
+        abort(404)
     # Items that have this task as a Cutco-sourced suggested use
     suggested_items = sorted(task.suggested_items, key=lambda i: i.name)
     # Log count per item for this task
@@ -587,7 +605,9 @@ def task_add():
 @logs_bp.route("/tasks/manage/<int:tid>/delete", methods=["POST"])
 @admin_required
 def task_delete(tid):
-    task = KnifeTask.query.get_or_404(tid)
+    task = db.session.get(KnifeTask, tid)
+    if not task:
+        abort(404)
     if task.log_entries:
         flash(f'Cannot delete "{task.name}" — it has logged usage. Remove logs first.', "error")
         return redirect(url_for("logs.tasks_manage"))
