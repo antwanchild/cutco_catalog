@@ -71,8 +71,8 @@ def _normalized_header(value: str) -> str:
     return value.strip().lower().replace(" ", "_")
 
 
-def _build_import_compatibility_report(uploaded_file, ext: str) -> dict:
-    """Analyze import file headers and return a compatibility summary."""
+def _build_import_header_report(uploaded_file, ext: str) -> dict:
+    """Analyze import file headers and return a header summary."""
     raw_headers: list[str] = []
     if ext == "xlsx":
         workbook = openpyxl.load_workbook(io.BytesIO(uploaded_file.stream.read()), data_only=True)
@@ -103,7 +103,7 @@ def _build_import_compatibility_report(uploaded_file, ext: str) -> dict:
         missing_required.append("name")
 
     ownership_columns_found = bool({"owned_raw", "status", "person"} & mapped_headers)
-    unicorn_columns_found = bool({"is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn", "is_unicorn"} & mapped_headers)
+    unicorn_columns_found = bool({"is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn"} & mapped_headers)
     unknown_headers = sorted(
         header for header in raw_headers
         if _normalized_header(header) not in XLSX_COL_MAP and _normalized_header(header) not in XLSX_SET_COLS
@@ -146,7 +146,6 @@ def export_csv():
         "person", "item_name", "sku", "category", "edge_type",
         "color", "status",
         "is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn",
-        "is_unicorn",  # backward-compatible alias of variant unicorn
         "notes",
     ])
     for ownership, variant, item, person in rows:
@@ -156,7 +155,6 @@ def export_csv():
             "yes" if item.is_unicorn else "no",
             "yes" if variant.is_unicorn else "no",
             "yes" if item.edge_is_unicorn else "no",
-            "yes" if variant.is_unicorn else "no",
             ownership.notes or "",
         ])
     csv_buffer.seek(0)
@@ -205,18 +203,18 @@ def import_page():
 
     if request.form.get("mode") == "check":
         try:
-            compatibility = _build_import_compatibility_report(uploaded_file, ext)
-            if compatibility["ok"]:
-                flash("Compatibility check passed.", "success")
+            header_report = _build_import_header_report(uploaded_file, ext)
+            if header_report["ok"]:
+                flash("Header check passed.", "success")
             else:
-                flash("Compatibility check found required column issues.", "warning")
+                flash("Header check found required column issues.", "warning")
             return render_template(
                 "import_page.html",
                 people=Person.query.order_by(Person.name).all(),
-                import_check=compatibility,
+                import_check=header_report,
             )
         except Exception as exc:
-            logger.error("Import compatibility check failed: %s", exc)
+            logger.error("Import header check failed: %s", exc)
             flash("Could not read headers from this file. Use CSV/XLSX with a header row.", "error")
             return render_template(
                 "import_page.html",
@@ -290,7 +288,7 @@ def import_page():
         color      = row.get("color", "").strip() or UNKNOWN_COLOR
         edge_type  = row.get("edge_type", "").strip() or "Unknown"
         is_sku_unicorn = row.get("is_sku_unicorn", row.get("item_is_unicorn", "")).strip().lower() in TRUTHY
-        is_variant_unicorn = row.get("is_variant_unicorn", row.get("is_unicorn", "")).strip().lower() in TRUTHY
+        is_variant_unicorn = row.get("is_variant_unicorn", "").strip().lower() in TRUTHY
         is_edge_unicorn = row.get("is_edge_unicorn", row.get("edge_is_unicorn", "")).strip().lower() in TRUTHY
         category   = canonicalize_category(row.get("category", ""))
         notes      = _build_notes(row) or row.get("notes", "").strip() or None

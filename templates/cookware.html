@@ -44,32 +44,19 @@
       <label>Item *
         <select name="item_id" required class="input-full">
           <option value="">— select piece —</option>
-          {% if cookware_items or bakeware_items %}
-            {% if cookware_items %}
-            <optgroup label="Cookware">
+          {% if cookware_items %}
+            <optgroup label="Tracked Cookware">
               {% for item in cookware_items %}
                 <option value="{{ item.id }}">{{ item.name }}{% if item.sku %} (#{{ item.sku }}){% endif %}</option>
               {% endfor %}
             </optgroup>
-            {% endif %}
-            {% if bakeware_items %}
-            <optgroup label="Bakeware">
-              {% for item in bakeware_items %}
-                <option value="{{ item.id }}">{{ item.name }}{% if item.sku %} (#{{ item.sku }}){% endif %}</option>
-              {% endfor %}
-            </optgroup>
-            {% endif %}
-            {% if other_items %}
+          {% endif %}
+          {% if other_items %}
             <optgroup label="Other Catalog Items">
-              {% for item in other_items %}
-                <option value="{{ item.id }}">{{ item.name }}{% if item.sku %} (#{{ item.sku }}){% endif %}</option>
-              {% endfor %}
-            </optgroup>
-            {% endif %}
-          {% else %}
             {% for item in other_items %}
               <option value="{{ item.id }}">{{ item.name }}{% if item.sku %} (#{{ item.sku }}){% endif %}</option>
             {% endfor %}
+            </optgroup>
           {% endif %}
         </select>
       </label>

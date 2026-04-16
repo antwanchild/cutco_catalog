@@ -128,7 +128,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(response.mimetype, "text/csv")
         self.assertIn("cutco_import_template.csv", response.headers["Content-Disposition"])
 
-    def test_import_compatibility_check_accepts_basic_csv(self):
+    def test_import_check_accepts_basic_csv(self):
         self._login_as_admin()
         self._set_csrf_token()
 
@@ -146,7 +146,7 @@ class ImportSmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Compatibility check passed.", response.data)
+        self.assertIn(b"Header check passed.", response.data)
 
     def test_import_confirm_creates_ownership(self):
         self._login_as_admin()

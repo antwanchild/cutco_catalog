@@ -23,11 +23,6 @@ def _safe_parse_iso_date(raw: str) -> date | None:
         return None
 
 
-def _is_bakeware_category(category: str | None) -> bool:
-    normalized = (category or "").strip().lower()
-    return normalized == "bakeware" or "bakeware" in normalized
-
-
 # ── Sharpening Log ────────────────────────────────────────────────────────────
 
 @logs_bp.route("/sharpening")
@@ -211,7 +206,6 @@ def sharpening_notify():
 # ── Cookware ──────────────────────────────────────────────────────────────────
 
 @logs_bp.route("/cookware", endpoint="cookware")
-@logs_bp.route("/bakeware", endpoint="bakeware")
 def cookware():
     today       = date.today()
     sessions = (CookwareSession.query
@@ -258,11 +252,9 @@ def cookware():
                   .order_by(Item.name)
                   .all()) if COOKWARE_CATEGORIES else []
 
-    loggable_items = (Item.query
+    cookware_items = (Item.query
                       .filter(Item.category.in_(COOKWARE_CATEGORIES))
                       .order_by(Item.name).all()) if COOKWARE_CATEGORIES else []
-    bakeware_items = [item for item in loggable_items if _is_bakeware_category(item.category)]
-    cookware_items = [item for item in loggable_items if not _is_bakeware_category(item.category)]
     other_items    = (Item.query
                       .filter(Item.category.notin_(COOKWARE_CATEGORIES))
                       .order_by(Item.name).all()) if COOKWARE_CATEGORIES else Item.query.order_by(Item.name).all()
@@ -276,19 +268,17 @@ def cookware():
         threshold_days   = COOKWARE_THRESHOLD_DAYS,
         today            = today.isoformat(),
         cookware_items   = cookware_items,
-        bakeware_items   = bakeware_items,
         other_items      = other_items,
         has_discord      = bool(DISCORD_WEBHOOK_URL),
     )
 
 
 @logs_bp.route("/cookware/add", methods=["POST"], endpoint="cookware_add")
-@logs_bp.route("/bakeware/add", methods=["POST"], endpoint="bakeware_add")
 @admin_required
 def cookware_add():
     item_id   = request.form.get("item_id", type=int)
-    used_on  = request.form.get("used_on", request.form.get("baked_on", "")).strip()
-    made_item = request.form.get("made_item", request.form.get("what_made", "")).strip()
+    used_on  = request.form.get("used_on", "").strip()
+    made_item = request.form.get("made_item", "").strip()
     raw_rating = request.form.get("rating", "").strip()
     notes     = request.form.get("notes", "").strip() or None
 
@@ -323,19 +313,18 @@ def cookware_add():
 
 
 @logs_bp.route("/cookware/<int:session_id>/edit", methods=["GET", "POST"], endpoint="cookware_edit")
-@logs_bp.route("/bakeware/<int:session_id>/edit", methods=["GET", "POST"], endpoint="bakeware_edit")
 @admin_required
 def cookware_edit(session_id):
     cookware_session = db.session.get(CookwareSession, session_id)
     if not cookware_session:
         abort(404)
     if request.method == "POST":
-        new_date = request.form.get("used_on", request.form.get("baked_on", cookware_session.used_on)).strip()
+        new_date = request.form.get("used_on", cookware_session.used_on).strip()
         if not _safe_parse_iso_date(new_date):
             flash("Date must be valid YYYY-MM-DD.", "error")
             return redirect(url_for("logs.cookware"))
         cookware_session.used_on  = new_date
-        cookware_session.made_item = request.form.get("made_item", request.form.get("what_made", "")).strip() or cookware_session.made_item
+        cookware_session.made_item = request.form.get("made_item", "").strip() or cookware_session.made_item
         cookware_session.notes     = request.form.get("notes", "").strip() or None
         raw_rating = request.form.get("rating", "").strip()
         try:
@@ -351,7 +340,6 @@ def cookware_edit(session_id):
 
 
 @logs_bp.route("/cookware/<int:session_id>/delete", methods=["POST"], endpoint="cookware_delete")
-@logs_bp.route("/bakeware/<int:session_id>/delete", methods=["POST"], endpoint="bakeware_delete")
 @admin_required
 def cookware_delete(session_id):
     cookware_session = db.session.get(CookwareSession, session_id)
@@ -365,7 +353,6 @@ def cookware_delete(session_id):
 
 
 @logs_bp.route("/cookware/item/<int:item_id>/purge", methods=["POST"], endpoint="cookware_purge_item")
-@logs_bp.route("/bakeware/item/<int:item_id>/purge", methods=["POST"], endpoint="bakeware_purge_item")
 @admin_required
 def cookware_purge_item(item_id):
     item = db.session.get(Item, item_id)
@@ -380,7 +367,6 @@ def cookware_purge_item(item_id):
 
 
 @logs_bp.route("/cookware/purge-all", methods=["POST"], endpoint="cookware_purge_all")
-@logs_bp.route("/bakeware/purge-all", methods=["POST"], endpoint="bakeware_purge_all")
 @admin_required
 def cookware_purge_all():
     count = CookwareSession.query.count()
@@ -392,7 +378,6 @@ def cookware_purge_all():
 
 
 @logs_bp.route("/cookware/notify", methods=["POST"], endpoint="cookware_notify")
-@logs_bp.route("/bakeware/notify", methods=["POST"], endpoint="bakeware_notify")
 @admin_required
 def cookware_notify():
     today        = date.today()

@@ -104,19 +104,12 @@ ruff check .
 | `DISCORD_WEBHOOK_URL` | *(empty)* | No | Incoming webhook URL for Discord notifications |
 | `SHARPEN_THRESHOLD_DAYS` | `180` | No | Days before a knife is flagged overdue for sharpening |
 | `COOKWARE_THRESHOLD_DAYS` | `60` | No | Days before a cookware-tracked piece is flagged as idle |
-| `COOKWARE_CATEGORIES` | `Cookware,Bakeware` | No | Catalog categories tracked on the Cookware page |
+| `COOKWARE_CATEGORIES` | `Cookware` | No | Catalog categories tracked on the Cookware page |
 | `PUID` | `0` | No | If non-zero, create a matching container user and run the app as that UID for correct ownership on mounted volumes |
 | `PGID` | `0` | No | Group ID paired with `PUID` when running the container as a non-root host user |
 | `TZ` | `UTC` | No | Container timezone |
 
 ⚠️ = has a working default but must be changed before exposing to a network.
-
-## Compatibility
-
-- Legacy `BAKEWARE_THRESHOLD_DAYS` and `BAKEWARE_CATEGORIES` are still accepted as fallbacks.
-- Legacy `is_unicorn` is still accepted as an alias for `is_variant_unicorn`.
-
----
 
 ## 🔄 Catalog Sync
 
@@ -250,7 +243,7 @@ Set membership columns (mark a truthy value such as `yes` to assign): `Beast`, `
 | 🎯 Wishlist | `/wishlist` | Public |
 | 📈 Collection Stats | `/stats` | Public |
 | 🔪 Sharpening Log | `/sharpening` | Public |
-| 🍳 Cookware Tracker | `/cookware` (legacy: `/bakeware`) | Public |
+| 🍳 Cookware Tracker | `/cookware` | Public |
 | 🔪 Knife Task Log | `/tasks` | Public |
 | 🛠️ Manage Tasks | `/tasks/manage` | Public |
 | 🎯 Task Detail | `/tasks/manage/<id>` | Public |
@@ -269,7 +262,7 @@ Eleven tables backed by SQLite. All migrations run automatically at startup.
 | Table | Key Columns | Notes |
 |---|---|---|
 | `items` | `id`, `name`, `sku`, `category`, `edge_type`, `is_unicorn`, `in_catalog`, `cutco_url`, `msrp` | One row per catalog item |
-| `item_variants` | `id`, `item_id`, `color`, `is_unicorn` | One row per handle color; `Unknown` is kept only when no real colors exist (or when legacy ownership still references it) |
+| `item_variants` | `id`, `item_id`, `color`, `is_unicorn` | One row per handle color; `Unknown` is kept only when no real colors exist |
 | `ownership` | `id`, `variant_id`, `person_id`, `status`, `target_price` | Links a person to a variant; status is `Owned`, `Wishlist`, `Sold`, or `Traded` |
 | `people` | `id`, `name` | Collectors |
 | `sets` | `id`, `name`, `sku` | Named Cutco sets |
@@ -343,7 +336,7 @@ Routes are split across Flask Blueprints for maintainability:
 |---|---|
 | `catalog` | `/catalog`, `/variants`, `/sets`, `/catalog/sync` |
 | `people` | `/people`, `/ownership`, `/wishlist` |
-| `logs` | `/sharpening`, `/cookware` (legacy: `/bakeware`), `/tasks`, `/tasks/manage` |
+| `logs` | `/sharpening`, `/cookware`, `/tasks`, `/tasks/manage` |
 | `views` | `/views/matrix`, `/stats` |
 | `data` | `/import`, `/export` |
 | `admin` | `/admin/*`, `/api/variants` |

@@ -112,9 +112,8 @@ class CookwareSession(db.Model):
 
     id         = db.Column(db.Integer, primary_key=True)
     item_id    = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
-    # Keep legacy physical column names for seamless upgrades on existing DBs.
-    used_on    = db.Column("baked_on", db.String(10), nullable=False)   # ISO date YYYY-MM-DD
-    made_item  = db.Column("what_made", db.String(200), nullable=False)
+    used_on    = db.Column(db.String(10), nullable=False)   # ISO date YYYY-MM-DD
+    made_item  = db.Column(db.String(200), nullable=False)
     rating     = db.Column(db.Integer, nullable=True)        # 1–5
     notes      = db.Column(db.Text, nullable=True)
 
@@ -122,28 +121,6 @@ class CookwareSession(db.Model):
         "cookware_sessions", lazy=True,
         order_by="CookwareSession.used_on.desc()",
     ))
-
-    @property
-    def baked_on(self):
-        """Backward-compatible alias for legacy templates/imports."""
-        return self.used_on
-
-    @baked_on.setter
-    def baked_on(self, value):
-        self.used_on = value
-
-    @property
-    def what_made(self):
-        """Backward-compatible alias for legacy templates/imports."""
-        return self.made_item
-
-    @what_made.setter
-    def what_made(self, value):
-        self.made_item = value
-
-
-# Backward-compatible alias for older imports/usages.
-BakewareSession = CookwareSession
 
 
 class SharpeningLog(db.Model):

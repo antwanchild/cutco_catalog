@@ -17,7 +17,7 @@
       <tr><td><code>Category</code></td><td>Category</td></tr>
       <tr><td><code>Edge</code></td><td>Edge type</td></tr>
       <tr><td><code>is_sku_unicorn</code></td><td>SKU/item unicorn flag</td></tr>
-      <tr><td><code>is_variant_unicorn</code> or <code>Unicorn?</code></td><td>Variant/color unicorn flag</td></tr>
+      <tr><td><code>is_variant_unicorn</code></td><td>Variant/color unicorn flag</td></tr>
       <tr><td><code>is_edge_unicorn</code></td><td>Edge/blade-type unicorn flag</td></tr>
       <tr><td><code>Owned?</code></td><td>yes → Owned, no → Wishlist, text → assigned person</td></tr>
       <tr><td><code>Price, Gift Box, Sheath, Quantity Purchased, Given Away</code></td><td>Merged into notes</td></tr>
@@ -43,13 +43,13 @@
 
   <div class="form-actions">
     <button type="submit" name="mode" value="preview" class="btn btn-primary">Preview Import</button>
-    <button type="submit" name="mode" value="check" class="btn btn-secondary">Check Compatibility</button>
+    <button type="submit" name="mode" value="check" class="btn btn-secondary">Check Headers</button>
   </div>
 </form>
 
 {% if import_check %}
 <div class="form-card">
-  <h2>Compatibility Result ({{ import_check.file_type }})</h2>
+  <h2>Header Check Result ({{ import_check.file_type }})</h2>
   {% if import_check.ok %}
     <p class="flash flash-success">Required headers look good.</p>
   {% else %}

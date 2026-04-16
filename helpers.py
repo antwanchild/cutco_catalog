@@ -9,7 +9,7 @@ import requests
 from flask import abort, current_app, flash, redirect, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
 
-from constants import ADMIN_TOKEN, DISCORD_WEBHOOK_URL
+from constants import DISCORD_WEBHOOK_URL
 from models import Ownership
 
 logger = logging.getLogger(__name__)
@@ -19,12 +19,11 @@ def is_admin() -> bool:
     # Primary auth path: signed Flask session flag.
     if session.get("is_admin") is True:
         return True
-    # Legacy compatibility path: old admin_token cookie.
-    return request.cookies.get("admin_token") == ADMIN_TOKEN
+    return False
 
 
 def admin_required(fn):
-    """Require admin cookie for a route."""
+    """Require an admin session for a route."""
     @wraps(fn)
     def _wrapped(*args, **kwargs):
         if not is_admin():

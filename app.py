@@ -79,13 +79,6 @@ def _register_blueprints(app: Flask) -> None:
 def _initialize_database() -> None:
     from sqlalchemy import inspect as sa_inspect
 
-    with db.engine.connect() as conn:
-        tables = set(sa_inspect(conn).get_table_names())
-        if "bakeware_sessions" in tables and "cookware_sessions" not in tables:
-            conn.execute(db.text("ALTER TABLE bakeware_sessions RENAME TO cookware_sessions"))
-            conn.commit()
-            logger.info("Schema migration: renamed bakeware_sessions -> cookware_sessions")
-
     db.Model.metadata.create_all(db.engine, checkfirst=True)
 
     inspector = sa_inspect(db.engine)
