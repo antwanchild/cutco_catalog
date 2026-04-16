@@ -111,7 +111,10 @@ ruff check .
 
 ⚠️ = has a working default but must be changed before exposing to a network.
 
-Compatibility note: legacy `BAKEWARE_THRESHOLD_DAYS` and `BAKEWARE_CATEGORIES` are still accepted as fallbacks.
+## Compatibility
+
+- Legacy `BAKEWARE_THRESHOLD_DAYS` and `BAKEWARE_CATEGORIES` are still accepted as fallbacks.
+- Legacy `is_unicorn` is still accepted as an alias for `is_variant_unicorn`.
 
 ---
 
@@ -228,8 +231,6 @@ Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted tem
 | `status` | `Owned`, `Wishlist`, `Sold`, or `Traded` |
 | `category` | Product category |
 | `notes` | Free-text notes |
-
-Compatibility note: legacy `is_unicorn` is still accepted as an alias for `is_variant_unicorn`.
 
 For XLSX imports, the app also recognizes `Owned?` and older auxiliary columns like `Price`, `Gift Box`, `Sheath`, `Quantity Purchased`, and `Given Away`, which are merged into notes.
 

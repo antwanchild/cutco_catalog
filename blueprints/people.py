@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 
 @people_bp.route("/people")
 def people():
-    persons = Person.query.order_by(Person.name).all()
-    counts  = {person.id: Ownership.query.filter_by(person_id=person.id, status="Owned").count()
-               for person in persons}
-    return render_template("people.html", persons=persons, counts=counts)
+    people = Person.query.order_by(Person.name).all()
+    counts = {person.id: Ownership.query.filter_by(person_id=person.id, status="Owned").count()
+              for person in people}
+    return render_template("people.html", persons=people, counts=counts)
 
 
 @people_bp.route("/people/add", methods=["GET", "POST"])
@@ -141,7 +141,7 @@ def ownership_add():
             flash("Entry logged.", "success")
         return redirect(url_for("people.person_collection", person_id=person_id))
 
-    sel_item = db.session.get(Item, item_id) if item_id else None
+    selected_item = db.session.get(Item, item_id) if item_id else None
     return render_template("ownership_form.html", ownership=None,
                            people_list=Person.query.order_by(Person.name).all(),
                            items_list=Item.query.order_by(Item.name).all(),
@@ -149,7 +149,7 @@ def ownership_add():
                            sel_person_id=person_id,
                            sel_item_id=item_id,
                            sel_variant_id=variant_id,
-                           sel_item=sel_item,
+                           sel_item=selected_item,
                            sel_status=sel_status,
                            action="Add",
                            UNKNOWN_COLOR=UNKNOWN_COLOR)

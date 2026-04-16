@@ -214,20 +214,20 @@ def sharpening_notify():
 @logs_bp.route("/bakeware", endpoint="bakeware")
 def cookware():
     today       = date.today()
-    all_sessions = (CookwareSession.query
-                    .order_by(CookwareSession.used_on.desc())
-                    .all())
+    sessions = (CookwareSession.query
+                .order_by(CookwareSession.used_on.desc())
+                .all())
 
     last_by_item:   dict[int, str]   = {}
     count_by_item:  dict[int, int]   = {}
     rating_by_item: dict[int, list]  = {}
-    for session in all_sessions:
-        item_id = session.item_id
+    for cookware_session in sessions:
+        item_id = cookware_session.item_id
         count_by_item[item_id] = count_by_item.get(item_id, 0) + 1
         if item_id not in last_by_item:
-            last_by_item[item_id] = session.used_on
-        if session.rating is not None:
-            rating_by_item.setdefault(item_id, []).append(session.rating)
+            last_by_item[item_id] = cookware_session.used_on
+        if cookware_session.rating is not None:
+            rating_by_item.setdefault(item_id, []).append(cookware_session.rating)
 
     tracked: list[dict] = []
     for item_id, last_str in last_by_item.items():
@@ -270,7 +270,7 @@ def cookware():
     return render_template(
         "cookware.html",
         tracked          = tracked,
-        recent_sessions  = all_sessions[:25],
+        recent_sessions  = sessions[:25],
         stale_count      = sum(1 for row in tracked if row["stale"]),
         never_used       = never_used,
         threshold_days   = COOKWARE_THRESHOLD_DAYS,
@@ -326,38 +326,38 @@ def cookware_add():
 @logs_bp.route("/bakeware/<int:session_id>/edit", methods=["GET", "POST"], endpoint="bakeware_edit")
 @admin_required
 def cookware_edit(session_id):
-    session = db.session.get(CookwareSession, session_id)
-    if not session:
+    cookware_session = db.session.get(CookwareSession, session_id)
+    if not cookware_session:
         abort(404)
     if request.method == "POST":
-        new_date = request.form.get("used_on", request.form.get("baked_on", session.used_on)).strip()
+        new_date = request.form.get("used_on", request.form.get("baked_on", cookware_session.used_on)).strip()
         if not _safe_parse_iso_date(new_date):
             flash("Date must be valid YYYY-MM-DD.", "error")
             return redirect(url_for("logs.cookware"))
-        session.used_on  = new_date
-        session.made_item = request.form.get("made_item", request.form.get("what_made", "")).strip() or session.made_item
-        session.notes     = request.form.get("notes", "").strip() or None
+        cookware_session.used_on  = new_date
+        cookware_session.made_item = request.form.get("made_item", request.form.get("what_made", "")).strip() or cookware_session.made_item
+        cookware_session.notes     = request.form.get("notes", "").strip() or None
         raw_rating = request.form.get("rating", "").strip()
         try:
             rating = int(raw_rating) if raw_rating else None
-            session.rating = rating if (rating is None or 1 <= rating <= 5) else session.rating
+            cookware_session.rating = rating if (rating is None or 1 <= rating <= 5) else cookware_session.rating
         except ValueError:
             pass
         if db_commit(db.session):
             logger.info("Cookware session %d updated", session_id)
             flash("Session updated.", "success")
         return redirect(url_for("logs.cookware"))
-    return render_template("cookware_edit.html", session=session)
+    return render_template("cookware_edit.html", session=cookware_session)
 
 
 @logs_bp.route("/cookware/<int:session_id>/delete", methods=["POST"], endpoint="cookware_delete")
 @logs_bp.route("/bakeware/<int:session_id>/delete", methods=["POST"], endpoint="bakeware_delete")
 @admin_required
 def cookware_delete(session_id):
-    session = db.session.get(CookwareSession, session_id)
-    if not session:
+    cookware_session = db.session.get(CookwareSession, session_id)
+    if not cookware_session:
         abort(404)
-    db.session.delete(session)
+    db.session.delete(cookware_session)
     if db_commit(db.session):
         logger.info("Cookware session %d deleted", session_id)
         flash("Session removed.", "info")
