@@ -2,7 +2,7 @@ import logging
 import re
 from collections import OrderedDict
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from constants import (
     COOKWARE_CATEGORIES, EDGE_TYPES,
@@ -95,7 +95,9 @@ def catalog_add():
 @catalog_bp.route("/catalog/<int:item_id>/edit", methods=["GET", "POST"])
 @admin_required
 def catalog_edit(item_id):
-    item = Item.query.get_or_404(item_id)
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
     if request.method == "POST":
         item.name       = request.form["name"].strip()
         item.sku        = request.form.get("sku", "").strip().upper() or None
@@ -171,7 +173,9 @@ def catalog_delete(item_id):
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))
-    item = Item.query.get_or_404(item_id)
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
     name = item.name
     db.session.delete(item)
     if db_commit(db.session):
@@ -184,7 +188,9 @@ def catalog_delete(item_id):
 
 @catalog_bp.route("/catalog/<int:item_id>/variants")
 def variants(item_id):
-    item = Item.query.get_or_404(item_id)
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
     is_cookware = (item.category or "") in COOKWARE_CATEGORIES
     return render_template("variants.html", item=item, UNKNOWN_COLOR=UNKNOWN_COLOR, is_cookware=is_cookware)
 
@@ -192,7 +198,9 @@ def variants(item_id):
 @catalog_bp.route("/catalog/<int:item_id>/variants/add", methods=["POST"])
 @admin_required
 def variant_add(item_id):
-    item = Item.query.get_or_404(item_id)
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
     color = request.form.get("color", "").strip()
     if not color:
         flash("Color is required.", "error")
@@ -216,7 +224,9 @@ def variant_add(item_id):
 @catalog_bp.route("/variants/<int:vid>/edit", methods=["POST"])
 @admin_required
 def variant_edit(vid):
-    variant = ItemVariant.query.get_or_404(vid)
+    variant = db.session.get(ItemVariant, vid)
+    if not variant:
+        abort(404)
     item_id     = variant.item_id
     color   = request.form.get("color", "").strip()
     if not color:
@@ -239,7 +249,9 @@ def variant_edit(vid):
 @catalog_bp.route("/variants/<int:vid>/delete", methods=["POST"])
 @admin_required
 def variant_delete(vid):
-    variant = ItemVariant.query.get_or_404(vid)
+    variant = db.session.get(ItemVariant, vid)
+    if not variant:
+        abort(404)
     if len(variant.item.variants) == 1:
         flash("Cannot delete the only variant. Add another first.", "error")
         return redirect(url_for("catalog.variants", item_id=variant.item_id))
@@ -310,7 +322,9 @@ def set_add():
 @admin_required
 def set_edit(set_id=None, sid=None):
     set_id = set_id if set_id is not None else sid
-    item_set = Set.query.get_or_404(set_id)
+    item_set = db.session.get(Set, set_id)
+    if not item_set:
+        abort(404)
     all_items = Item.query.order_by(Item.name).all()
     member_qty_map = {member.item_id: member.quantity for member in item_set.members}
 
@@ -365,7 +379,9 @@ def set_delete(set_id=None, sid=None):
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.sets_list"))
-    item_set = Set.query.get_or_404(set_id)
+    item_set = db.session.get(Set, set_id)
+    if not item_set:
+        abort(404)
     name = item_set.name
     db.session.delete(item_set)
     if db_commit(db.session):
@@ -379,10 +395,12 @@ def set_delete(set_id=None, sid=None):
 def set_detail(set_id=None, sid=None):
     set_id = set_id if set_id is not None else sid
     from models import Ownership, Person
-    item_set    = Set.query.get_or_404(set_id)
+    item_set    = db.session.get(Set, set_id)
+    if not item_set:
+        abort(404)
     all_persons = Person.query.order_by(Person.name).all()
     person_id   = request.args.get("person", type=int)
-    person      = Person.query.get(person_id) if person_id else None
+    person      = db.session.get(Person, person_id) if person_id else None
     sort_field  = (request.args.get("sort", "name") or "name").strip().lower()
     direction   = (request.args.get("dir", "asc") or "asc").strip().lower()
     if direction not in {"asc", "desc"}:

@@ -11,7 +11,9 @@ views_bp = Blueprint("views", __name__)
 
 @views_bp.route("/views/item/<int:item_id>")
 def item_owners(item_id):
-    item = Item.query.get_or_404(item_id)
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
 
     entries = (Ownership.query
                .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
@@ -183,8 +185,10 @@ def gift_token(set_id=None, sid=None):
     if not person_id:
         abort(400)
     # Validate both exist
-    Set.query.get_or_404(set_id)
-    Person.query.get_or_404(person_id)
+    if not db.session.get(Set, set_id):
+        abort(404)
+    if not db.session.get(Person, person_id):
+        abort(404)
     token = _gift_token(set_id, person_id)
     gift_url = request.host_url.rstrip("/") + f"/gifts/{token}"
     return render_template("gift_share.html", gift_url=gift_url,
@@ -198,8 +202,10 @@ def gift_list(token):
     if ids is None:
         abort(404)
     set_id, person_id = ids
-    item_set = Set.query.get_or_404(set_id)
-    person   = Person.query.get_or_404(person_id)
+    item_set = db.session.get(Set, set_id)
+    person   = db.session.get(Person, person_id)
+    if not item_set or not person:
+        abort(404)
 
     owned_item_ids = {
         ownership.variant.item_id
@@ -224,7 +230,9 @@ def gift_list(token):
 @views_bp.route("/people/<int:person_id>/collection-token")
 def collection_token(person_id):
     """Generate a shareable collection card token for a person."""
-    person = Person.query.get_or_404(person_id)
+    person = db.session.get(Person, person_id)
+    if not person:
+        abort(404)
     token  = _collection_token(person_id)
     card_url = request.host_url.rstrip("/") + f"/collection-card/{token}"
     return render_template("collection_card_share.html", person=person,
@@ -237,7 +245,9 @@ def collection_card(token):
     person_id = _verify_collection_token(token)
     if person_id is None:
         abort(404)
-    person     = Person.query.get_or_404(person_id)
+    person     = db.session.get(Person, person_id)
+    if not person:
+        abort(404)
     ownerships = (Ownership.query
                   .filter_by(person_id=person_id, status="Owned")
                   .order_by(Ownership.id).all())

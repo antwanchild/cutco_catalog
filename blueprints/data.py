@@ -535,7 +535,7 @@ def import_confirm():
             is_variant_unicorn = request.form.get(f"own_variant_unicorn_{row_index}") == "on"
             is_edge_unicorn = request.form.get(f"own_edge_unicorn_{row_index}") == "on"
 
-            item = Item.query.get(item_id)
+            item = db.session.get(Item, item_id)
             if not item:
                 skipped_details.append({
                     "row": row_num,

@@ -45,9 +45,9 @@ CMD ["sh", "-c", \
      groupadd -g $PGID appgroup 2>/dev/null || true; \
      useradd -u $PUID -g $PGID -M -d /data -s /sbin/nologin appuser 2>/dev/null || true; \
      chown -R $PUID:$PGID /data /app; \
-     exec gosu appuser env HOME=/data gunicorn --bind 0.0.0.0:8095 --workers 4 --timeout 120 --worker-tmp-dir /dev/shm --pid /tmp/gunicorn.pid --control-socket /tmp/gunicorn.ctl app:app; \
+     exec gosu appuser env HOME=/data gunicorn --bind 0.0.0.0:8095 --workers 4 --timeout 120 --worker-tmp-dir /dev/shm --pid /tmp/gunicorn.pid --control-socket /tmp/gunicorn.ctl 'app:create_app()'; \
    else \
      # Keep Gunicorn runtime files off bind mounts: heartbeat temp files in RAM,
      # plus pid and control socket files in /tmp.
-     exec gunicorn --bind 0.0.0.0:8095 --workers 4 --timeout 120 --worker-tmp-dir /dev/shm --pid /tmp/gunicorn.pid --control-socket /tmp/gunicorn.ctl app:app; \
+     exec gunicorn --bind 0.0.0.0:8095 --workers 4 --timeout 120 --worker-tmp-dir /dev/shm --pid /tmp/gunicorn.pid --control-socket /tmp/gunicorn.ctl 'app:create_app()'; \
    fi"]

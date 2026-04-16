@@ -68,6 +68,22 @@ Notes:
 
 ---
 
+## 🧪 Testing
+
+Run the lightweight smoke tests against a temporary SQLite database:
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+Lint the repo with:
+
+```bash
+ruff check .
+```
+
+---
+
 ## ⚙️ Environment Variables
 
 | Variable | Default | Required | Description |
@@ -340,7 +356,7 @@ pip install -r requirements.txt
 pip install ruff
 
 # Run locally
-flask --app app run --debug
+flask --app app:create_app run --debug
 
 # Lint
 ruff check app.py blueprints/ models.py helpers.py scraping.py msrp_helpers.py constants.py

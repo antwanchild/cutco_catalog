@@ -27,14 +27,16 @@ import requests
 from bs4 import BeautifulSoup
 
 # ── Bootstrap Flask app context ───────────────────────────────────────────────
-# Importing app.py triggers db.create_all() and the startup migrations, which
-# is fine — it's idempotent.  We get all models and scraping constants for free.
+# Build an app instance so the script gets the same DB/session setup as the web app.
 sys.path.insert(0, os.path.dirname(__file__))
-from app import app, db  # noqa: E402
+from app import create_app  # noqa: E402
+from extensions import db  # noqa: E402
 from models import Item  # noqa: E402
 from constants import SCRAPE_HEADERS, REQUEST_TIMEOUT  # noqa: E402
 from scraping import scrape_catalog  # noqa: E402
 from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
+
+app = create_app()
 
 # ── Price scraping ─────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import logging
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
 from extensions import db
@@ -36,7 +36,9 @@ def people_add():
 @people_bp.route("/people/<int:person_id>/edit", methods=["GET", "POST"])
 @admin_required
 def people_edit(person_id):
-    person = Person.query.get_or_404(person_id)
+    person = db.session.get(Person, person_id)
+    if not person:
+        abort(404)
     if request.method == "POST":
         person.name  = request.form["name"].strip()
         person.notes = request.form.get("notes", "").strip() or None
@@ -50,7 +52,9 @@ def people_edit(person_id):
 @people_bp.route("/people/<int:person_id>/delete", methods=["POST"])
 @admin_required
 def people_delete(person_id):
-    person = Person.query.get_or_404(person_id)
+    person = db.session.get(Person, person_id)
+    if not person:
+        abort(404)
     name   = person.name
     db.session.delete(person)
     if db_commit(db.session):
@@ -62,7 +66,9 @@ def people_delete(person_id):
 @people_bp.route("/people/<int:person_id>/purge-collection", methods=["POST"])
 @admin_required
 def purge_collection(person_id):
-    person = Person.query.get_or_404(person_id)
+    person = db.session.get(Person, person_id)
+    if not person:
+        abort(404)
     count  = Ownership.query.filter_by(person_id=person_id).count()
     Ownership.query.filter_by(person_id=person_id).delete()
     if db_commit(db.session):
@@ -73,7 +79,9 @@ def purge_collection(person_id):
 
 @people_bp.route("/people/<int:person_id>/collection")
 def person_collection(person_id):
-    person     = Person.query.get_or_404(person_id)
+    person     = db.session.get(Person, person_id)
+    if not person:
+        abort(404)
     ownerships = (Ownership.query.filter_by(person_id=person_id)
                   .order_by(Ownership.status).all())
 
@@ -133,7 +141,7 @@ def ownership_add():
             flash("Entry logged.", "success")
         return redirect(url_for("people.person_collection", person_id=person_id))
 
-    sel_item = Item.query.get(item_id) if item_id else None
+    sel_item = db.session.get(Item, item_id) if item_id else None
     return render_template("ownership_form.html", ownership=None,
                            people_list=Person.query.order_by(Person.name).all(),
                            items_list=Item.query.order_by(Item.name).all(),
@@ -150,7 +158,9 @@ def ownership_add():
 @people_bp.route("/ownership/<int:ownership_id>/edit", methods=["GET", "POST"])
 @admin_required
 def ownership_edit(ownership_id):
-    ownership = Ownership.query.get_or_404(ownership_id)
+    ownership = db.session.get(Ownership, ownership_id)
+    if not ownership:
+        abort(404)
     if request.method == "POST":
         ownership.status = request.form.get("status", "Owned")
         raw_target = request.form.get("target_price", "").strip()
@@ -179,7 +189,9 @@ def ownership_edit(ownership_id):
 @people_bp.route("/ownership/<int:ownership_id>/delete", methods=["POST"])
 @admin_required
 def ownership_delete(ownership_id):
-    ownership = Ownership.query.get_or_404(ownership_id)
+    ownership = db.session.get(Ownership, ownership_id)
+    if not ownership:
+        abort(404)
     person_id       = ownership.person_id
     db.session.delete(ownership)
     if db_commit(db.session):
@@ -193,7 +205,8 @@ def ownership_delete(ownership_id):
 @people_bp.route("/people/<int:person_id>/bulk-status", methods=["POST"])
 @admin_required
 def bulk_status_update(person_id):
-    Person.query.get_or_404(person_id)
+    if not db.session.get(Person, person_id):
+        abort(404)
     selected = request.form.getlist("ownership_ids", type=int)
     new_status = request.form.get("bulk_status", "").strip()
     if not selected or new_status not in STATUS_OPTIONS:

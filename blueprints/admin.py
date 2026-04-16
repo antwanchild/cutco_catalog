@@ -7,9 +7,10 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 from datetime import date
 
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
 from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION
+from extensions import db
 from extensions import limiter
 from helpers import is_admin
 from models import Item
@@ -195,5 +196,7 @@ def admin_logout():
 
 @admin_bp.route("/api/variants/<int:item_id>")
 def api_variants(item_id):
-    item = Item.query.get_or_404(item_id)
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
     return jsonify([{"id": v.id, "color": v.color} for v in item.variants])
