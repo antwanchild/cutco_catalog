@@ -5,6 +5,25 @@
   <h1 class="page-title">📐 Specs Backfill</h1>
 </div>
 
+<div class="stat-grid mb-section">
+  <div class="stat-card{% if job.status == 'running' %} stat-card-warn{% endif %}">
+    <div class="stat-number">{{ job.status | capitalize }}</div>
+    <div class="stat-label">Job Status</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ job.progress | length }}</div>
+    <div class="stat-label">Log Lines</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ job.results.total if job.results else 0 }}</div>
+    <div class="stat-label">Total Items</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ job.results.updated if job.results else 0 }}</div>
+    <div class="stat-label">Updated</div>
+  </div>
+</div>
+
 <div class="form-card compact mb-section" style="max-width:560px">
   <form method="post" action="{{ url_for('admin.specs_backfill_run') }}" id="run-form">
     <div class="inline-form" style="flex-wrap:wrap;gap:.75rem">

@@ -165,7 +165,12 @@ def diagnostics_page():
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("index"))
-    return render_template("admin_diagnostics.html", details=_runtime_details())
+    return render_template(
+        "admin_diagnostics.html",
+        details=_runtime_details(),
+        msrp_job=_read_msrp_job(),
+        specs_job=_read_specs_job(),
+    )
 
 
 @admin_bp.route("/admin/login", methods=["GET", "POST"])
@@ -188,10 +193,7 @@ def admin_login():
 def admin_logout():
     logger.info("Admin logged out")
     session.pop("is_admin", None)
-    resp = redirect(url_for("index"))
-    # Keep deleting legacy cookie for old sessions.
-    resp.delete_cookie("admin_token")
-    return resp
+    return redirect(url_for("index"))
 
 
 @admin_bp.route("/api/variants/<int:item_id>")

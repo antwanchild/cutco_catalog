@@ -10,6 +10,25 @@
 </p>
 
 <div class="stat-grid" style="margin-bottom:1.5rem">
+  <div class="stat-card{% if msrp_job.status == 'running' %} stat-card-warn{% endif %}">
+    <div class="stat-number">{{ msrp_job.status | capitalize }}</div>
+    <div class="stat-label">MSRP Diff</div>
+  </div>
+  <div class="stat-card{% if specs_job.status == 'running' %} stat-card-warn{% endif %}">
+    <div class="stat-number">{{ specs_job.status | capitalize }}</div>
+    <div class="stat-label">Specs Backfill</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ msrp_job.progress | length }}</div>
+    <div class="stat-label">MSRP Log Lines</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ specs_job.progress | length }}</div>
+    <div class="stat-label">Specs Log Lines</div>
+  </div>
+</div>
+
+<div class="stat-grid" style="margin-bottom:1.5rem">
   <div class="stat-card">
     <div class="stat-number">v{{ details.app_version }}</div>
     <div class="stat-label">App Version</div>

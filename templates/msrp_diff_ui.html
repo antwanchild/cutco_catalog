@@ -5,6 +5,26 @@
   <h1 class="page-title">💲 MSRP Diff {{ help_btn("msrp_diff") }}</h1>
 </div>
 
+<div class="stat-grid mb-section">
+  {% set changed_prices = (job.results.increased | length + job.results.decreased | length) if job.results else 0 %}
+  <div class="stat-card{% if job.status == 'running' %} stat-card-warn{% endif %}">
+    <div class="stat-number">{{ job.status | capitalize }}</div>
+    <div class="stat-label">Job Status</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ job.progress | length }}</div>
+    <div class="stat-label">Log Lines</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ "On" if job.update_db else "Off" }}</div>
+    <div class="stat-label">Write to DB</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ changed_prices }}</div>
+    <div class="stat-label">Changed Prices</div>
+  </div>
+</div>
+
 {# ── Run form ─────────────────────────────────────────────────────────────── #}
 <div class="form-card compact mb-section" style="max-width:560px">
   <form method="post" action="{{ url_for('admin.msrp_diff_run') }}" id="run-form">
