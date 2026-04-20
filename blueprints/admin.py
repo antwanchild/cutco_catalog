@@ -14,6 +14,7 @@ from extensions import db
 from extensions import limiter
 from helpers import is_admin
 from models import Item
+from schema_migrations import get_schema_history, get_schema_state, SCHEMA_VERSION
 from startup import BOOTSTRAP_VERSION, get_bootstrap_history, get_bootstrap_state
 from msrp_helpers import (
     _read_msrp_job, _run_msrp_diff_job, _write_msrp_job,
@@ -85,6 +86,9 @@ def _runtime_details():
         "puid": os.environ.get("PUID", "0"),
         "pgid": os.environ.get("PGID", "0"),
         "pid1_cmdline": _read_pid1_cmdline(),
+        "schema_state": get_schema_state(),
+        "schema_history": get_schema_history(),
+        "schema_version": SCHEMA_VERSION,
         "bootstrap_state": get_bootstrap_state(),
         "bootstrap_history": get_bootstrap_history(),
         "bootstrap_version": BOOTSTRAP_VERSION,

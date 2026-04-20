@@ -3,11 +3,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Callable
 
-from sqlalchemy import inspect as sa_inspect
-
 from constants import KNIFE_TASK_PRESETS, canonicalize_category
 from extensions import db
 from models import Item, KnifeTask, ensure_unknown_variant
+from schema_migrations import apply_schema_migrations
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +85,13 @@ def _record_history(version: int, name: str) -> None:
         history.applied_at = _now_utc()
 
 
-def _backfill_history(current_version: int) -> None:
+def _backfill_history(current_version: int) -> bool:
     if current_version <= 0:
-        return
+        return False
 
     state = db.session.get(BootstrapState, BOOTSTRAP_STATE_NAME)
     applied_at = state.updated_at if state else _now_utc()
+    added = False
     for migration in BOOTSTRAP_MIGRATIONS:
         if migration.version > current_version:
             break
@@ -103,48 +103,18 @@ def _backfill_history(current_version: int) -> None:
                     applied_at=applied_at,
                 )
             )
+            added = True
+    return added
 
 
 BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
-    BootstrapMigration(1, "schema", lambda: _apply_column_migrations()),
-    BootstrapMigration(2, "seed_tasks", lambda: _seed_default_tasks()),
-    BootstrapMigration(3, "cleanup_invalid_skus", lambda: _cleanup_invalid_items()),
-    BootstrapMigration(4, "normalize_categories", lambda: _normalize_categories()),
-    BootstrapMigration(5, "ensure_unknown_variants", lambda: _ensure_unknown_variants()),
+    BootstrapMigration(1, "seed_tasks", lambda: _seed_default_tasks()),
+    BootstrapMigration(2, "cleanup_invalid_skus", lambda: _cleanup_invalid_items()),
+    BootstrapMigration(3, "normalize_categories", lambda: _normalize_categories()),
+    BootstrapMigration(4, "ensure_unknown_variants", lambda: _ensure_unknown_variants()),
 )
 
 BOOTSTRAP_VERSION = BOOTSTRAP_MIGRATIONS[-1].version
-
-
-def _apply_column_migrations() -> None:
-    column_migrations = [
-        ("sets", "sku", "ALTER TABLE sets ADD COLUMN sku VARCHAR(20)"),
-        (
-            "item_variants",
-            "is_unicorn",
-            "ALTER TABLE item_variants ADD COLUMN is_unicorn BOOLEAN NOT NULL DEFAULT 0",
-        ),
-        ("items", "msrp", "ALTER TABLE items ADD COLUMN msrp REAL"),
-        ("ownership", "target_price", "ALTER TABLE ownership ADD COLUMN target_price REAL"),
-        ("item_sets", "quantity", "ALTER TABLE item_sets ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1"),
-        ("items", "blade_length", "ALTER TABLE items ADD COLUMN blade_length VARCHAR(20)"),
-        ("items", "overall_length", "ALTER TABLE items ADD COLUMN overall_length VARCHAR(20)"),
-        ("items", "weight", "ALTER TABLE items ADD COLUMN weight VARCHAR(20)"),
-        (
-            "items",
-            "edge_is_unicorn",
-            "ALTER TABLE items ADD COLUMN edge_is_unicorn BOOLEAN NOT NULL DEFAULT 0",
-        ),
-    ]
-
-    inspector = sa_inspect(db.engine)
-    with db.engine.connect() as conn:
-        for table_name, column_name, statement in column_migrations:
-            existing = {column["name"] for column in inspector.get_columns(table_name)}
-            if column_name not in existing:
-                conn.execute(db.text(statement))
-                conn.commit()
-                logger.info("Schema migration: added %s.%s", table_name, column_name)
 
 
 def _seed_default_tasks() -> None:
@@ -181,9 +151,10 @@ def _ensure_unknown_variants() -> None:
 
 def initialize_database() -> None:
     db.Model.metadata.create_all(db.engine, checkfirst=True)
+    apply_schema_migrations()
 
     current_version = _get_bootstrap_version()
-    _backfill_history(current_version)
+    backfilled = _backfill_history(current_version)
     for migration in BOOTSTRAP_MIGRATIONS:
         version = migration.version
         if current_version >= version:
@@ -194,6 +165,9 @@ def initialize_database() -> None:
         _set_bootstrap_version(version)
         db.session.commit()
         current_version = version
+
+    if backfilled:
+        db.session.commit()
 
     if current_version < BOOTSTRAP_VERSION:
         _set_bootstrap_version(BOOTSTRAP_VERSION)

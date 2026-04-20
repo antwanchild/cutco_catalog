@@ -9,6 +9,7 @@ from app import create_app
 from constants import KNIFE_TASK_PRESETS
 from extensions import db
 from models import Item, ItemSetMember, KnifeTask, Set
+from schema_migrations import SCHEMA_VERSION, SchemaState, apply_schema_migrations
 from startup import BOOTSTRAP_VERSION, BootstrapState, initialize_database
 
 
@@ -129,13 +130,17 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"MSRP Diff", response.data)
         self.assertIn(b"Specs Backfill", response.data)
-        self.assertIn(b"Bootstrap Version", response.data)
+        self.assertIn(b"Schema Migrations", response.data)
         self.assertIn(b"Bootstrap History", response.data)
-        self.assertIn(b"schema", response.data)
+        self.assertIn(b"Bootstrap Version", response.data)
+        self.assertIn(str(SCHEMA_VERSION).encode(), response.data)
         self.assertIn(str(BOOTSTRAP_VERSION).encode(), response.data)
 
     def test_startup_bootstrap_is_idempotent(self):
         with self.app.app_context():
+            schema_state = db.session.get(SchemaState, "schema")
+            self.assertIsNotNone(schema_state)
+            self.assertEqual(schema_state.version, SCHEMA_VERSION)
             initial_task_names = {
                 task.name for task in db.session.execute(db.select(KnifeTask)).scalars().all()
             }
@@ -144,6 +149,7 @@ class AdminJobSmokeTests(unittest.TestCase):
             self.assertEqual(bootstrap_state.version, BOOTSTRAP_VERSION)
             initial_updated_at = bootstrap_state.updated_at
             initial_version = bootstrap_state.version
+            apply_schema_migrations()
             initialize_database()
             second_state = db.session.get(BootstrapState, "bootstrap")
             second_task_names = {

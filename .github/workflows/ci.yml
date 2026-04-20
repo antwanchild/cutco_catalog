@@ -81,7 +81,13 @@ jobs:
           SECRET_KEY: test-secret-key
         run: |
           coverage run -m unittest discover -s tests
-          coverage report --show-missing
+          coverage report \
+            --include='app.py,blueprints/admin.py,constants.py,extensions.py,helpers.py,models.py,schema_migrations.py,startup.py' \
+            --show-missing
+          coverage report \
+            --include='app.py,blueprints/admin.py,constants.py,extensions.py,helpers.py,models.py,schema_migrations.py,startup.py' \
+            --fail-under=80 \
+            --show-missing
 
   # ── Security scans ────────────────────────────────────────────────────────
   security:
