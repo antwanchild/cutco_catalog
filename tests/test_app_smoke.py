@@ -586,6 +586,29 @@ class ImportSmokeTests(SmokeBaseTest):
             self.assertEqual(ownership.status, "Owned")
             self.assertEqual(ownership.notes, "Imported ownership")
 
+    def test_import_check_reports_header_warnings(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "check",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(b"sku,color\nIM-2,Classic Brown\n"),
+                    "headers.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Header Check Result (CSV)", response.data)
+        self.assertIn(b"Missing required headers: name", response.data)
+        self.assertIn(b"No ownership/status column found", response.data)
+
 
 class PeopleSmokeTests(SmokeBaseTest):
     def test_people_add_creates_a_record(self):
@@ -607,6 +630,60 @@ class PeopleSmokeTests(SmokeBaseTest):
             person = db.session.execute(db.select(Person).filter_by(name="Anthony")).scalar_one_or_none()
             self.assertIsNotNone(person)
             self.assertEqual(person.notes, "Primary collector")
+
+    def test_people_bulk_status_and_purge_collection(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        _item_id, variant_id = self._add_catalog_item(name="Bulk Knife", sku="BL-1")
+        person_id = self._add_person(name="Bulk Collector", notes="")
+
+        add_response = self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(variant_id),
+                "status": "Wishlist",
+                "target_price": "49.99",
+                "notes": "Queued",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(add_response.status_code, 302)
+        with self.app.app_context():
+            ownership = db.session.execute(
+                db.select(Ownership).filter_by(person_id=person_id, variant_id=variant_id)
+            ).scalar_one()
+
+        bulk_response = self.client.post(
+            f"/people/{person_id}/bulk-status",
+            data={
+                "csrf_token": "test-csrf-token",
+                "ownership_ids": [str(ownership.id)],
+                "bulk_status": "Owned",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(bulk_response.status_code, 302)
+        with self.app.app_context():
+            ownership = db.session.get(Ownership, ownership.id)
+            self.assertIsNotNone(ownership)
+            self.assertEqual(ownership.status, "Owned")
+
+        purge_response = self.client.post(
+            f"/people/{person_id}/purge-collection",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+
+        self.assertEqual(purge_response.status_code, 302)
+        with self.app.app_context():
+            remaining = db.session.execute(
+                db.select(Ownership).filter_by(person_id=person_id)
+            ).scalars().all()
+            self.assertEqual(remaining, [])
 
     def test_people_delete_removes_a_record(self):
         self._login_as_admin()
@@ -657,6 +734,61 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual(item.notes, "Updated note")
             self.assertTrue(item.is_unicorn)
             self.assertTrue(item.edge_is_unicorn)
+
+    def test_catalog_purge_and_delete_routes(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        keep_item_id, keep_variant_id = self._add_catalog_item(name="Keep Knife", sku="KP-1")
+        drop_item_id, _drop_variant_id = self._add_catalog_item(name="Drop Knife", sku="DR-1")
+        person_id = self._add_person(name="Catalog Keeper", notes="")
+        self._add_set(name="Catalog Set", sku="CS-1", item_ids=(keep_item_id,))
+
+        add_response = self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(keep_variant_id),
+                "status": "Owned",
+                "target_price": "",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(add_response.status_code, 302)
+
+        purge_unreferenced = self.client.post(
+            "/catalog/purge-unreferenced",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(purge_unreferenced.status_code, 302)
+        with self.app.app_context():
+            self.assertIsNotNone(db.session.get(Item, keep_item_id))
+            self.assertIsNone(db.session.get(Item, drop_item_id))
+
+        delete_response = self.client.post(
+            f"/catalog/{keep_item_id}/delete",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(delete_response.status_code, 302)
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(Item, keep_item_id))
+
+        temp_item_id, _ = self._add_catalog_item(name="Purge All Knife", sku="PA-1")
+        self._add_set(name="Purge All Set", sku="PS-1", item_ids=(temp_item_id,))
+
+        purge_all = self.client.post(
+            "/catalog/purge-all",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(purge_all.status_code, 302)
+        with self.app.app_context():
+            self.assertEqual(db.session.query(Item).count(), 0)
+            self.assertEqual(db.session.query(Set).count(), 0)
 
 
 class OwnershipSmokeTests(SmokeBaseTest):
@@ -771,6 +903,61 @@ class LogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             self.assertIsNone(db.session.get(SharpeningLog, entry.id))
 
+    def test_sharpening_purge_routes(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        item_id, _variant_id = self._add_catalog_item(name="Sharpen Purge Knife", sku="SP-1")
+
+        self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Home Sharpener",
+                "notes": "Purge me",
+            },
+            follow_redirects=False,
+        )
+        with self.app.app_context():
+            entry = db.session.execute(db.select(SharpeningLog).filter_by(item_id=item_id)).scalar_one()
+            self.assertEqual(entry.method, "Home Sharpener")
+
+        purge_item_response = self.client.post(
+            f"/sharpening/item/{item_id}/purge",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(purge_item_response.status_code, 302)
+        with self.app.app_context():
+            remaining = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=item_id)
+            ).scalars().all()
+            self.assertEqual(remaining, [])
+
+        self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(item_id),
+                "sharpened_on": "2026-04-16",
+                "method": "Home Sharpener",
+                "notes": "Delete me",
+            },
+            follow_redirects=False,
+        )
+        with self.app.app_context():
+            delete_entry = db.session.execute(db.select(SharpeningLog).filter_by(item_id=item_id)).scalar_one()
+
+        delete_response = self.client.post(
+            f"/sharpening/{delete_entry.id}/delete",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(delete_response.status_code, 302)
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(SharpeningLog, delete_entry.id))
+
     def test_cookware_add_edit_and_delete(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -827,6 +1014,64 @@ class LogSmokeTests(SmokeBaseTest):
         self.assertEqual(delete_response.status_code, 302)
         with self.app.app_context():
             self.assertIsNone(db.session.get(CookwareSession, session.id))
+
+    def test_cookware_purge_routes(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        item_id, _variant_id = self._add_catalog_item(name="Cookware Purge", sku="CP-1", category="Cookware")
+
+        self.client.post(
+            "/cookware/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(item_id),
+                "used_on": "2026-04-15",
+                "made_item": "Soup",
+                "rating": "4",
+                "notes": "Purge me",
+            },
+            follow_redirects=False,
+        )
+        with self.app.app_context():
+            session = db.session.execute(db.select(CookwareSession).filter_by(item_id=item_id)).scalar_one()
+            self.assertEqual(session.made_item, "Soup")
+            self.assertEqual(session.rating, 4)
+
+        purge_item_response = self.client.post(
+            f"/cookware/item/{item_id}/purge",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(purge_item_response.status_code, 302)
+        with self.app.app_context():
+            remaining = db.session.execute(
+                db.select(CookwareSession).filter_by(item_id=item_id)
+            ).scalars().all()
+            self.assertEqual(remaining, [])
+
+        self.client.post(
+            "/cookware/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(item_id),
+                "used_on": "2026-04-16",
+                "made_item": "Bread",
+                "rating": "5",
+                "notes": "Delete me",
+            },
+            follow_redirects=False,
+        )
+        with self.app.app_context():
+            delete_session = db.session.execute(db.select(CookwareSession).filter_by(item_id=item_id)).scalar_one()
+
+        delete_response = self.client.post(
+            f"/cookware/{delete_session.id}/delete",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(delete_response.status_code, 302)
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(CookwareSession, delete_session.id))
 
 
 class TaskSmokeTests(SmokeBaseTest):

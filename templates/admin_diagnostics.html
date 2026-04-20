@@ -9,24 +9,27 @@
   Quick runtime details for confirming what the current container is actually running.
 </p>
 
-<div class="stat-grid" style="margin-bottom:1.5rem">
-  <div class="stat-card{% if msrp_job.status == 'running' %} stat-card-warn{% endif %}">
-    <div class="stat-number">{{ msrp_job.status | capitalize }}</div>
-    <div class="stat-label">MSRP Diff</div>
+<section class="stats-panel stats-panel-wide" style="margin-bottom:1.5rem">
+  <h2 class="stats-panel-title">Service Health</h2>
+  <div class="stat-grid" style="margin-bottom:0">
+    <div class="stat-card{% if msrp_job.status == 'running' %} stat-card-warn{% endif %}">
+      <div class="stat-number">{{ msrp_job.status | capitalize }}</div>
+      <div class="stat-label">MSRP Diff</div>
+    </div>
+    <div class="stat-card{% if specs_job.status == 'running' %} stat-card-warn{% endif %}">
+      <div class="stat-number">{{ specs_job.status | capitalize }}</div>
+      <div class="stat-label">Specs Backfill</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ msrp_job.progress | length }}</div>
+      <div class="stat-label">MSRP Log Lines</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ specs_job.progress | length }}</div>
+      <div class="stat-label">Specs Log Lines</div>
+    </div>
   </div>
-  <div class="stat-card{% if specs_job.status == 'running' %} stat-card-warn{% endif %}">
-    <div class="stat-number">{{ specs_job.status | capitalize }}</div>
-    <div class="stat-label">Specs Backfill</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ msrp_job.progress | length }}</div>
-    <div class="stat-label">MSRP Log Lines</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ specs_job.progress | length }}</div>
-    <div class="stat-label">Specs Log Lines</div>
-  </div>
-</div>
+</section>
 
 <div class="stat-grid" style="margin-bottom:1.5rem">
   <div class="stat-card">
@@ -55,146 +58,164 @@
   </div>
 </div>
 
-<div class="table-wrap" style="margin-bottom:1.5rem">
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th colspan="3">Schema Migrations</th>
-      </tr>
-      <tr>
-        <th style="width:100px">Version</th>
-        <th>Migration</th>
-        <th style="width:220px">Applied At</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for entry in details.schema_history %}
-      <tr>
-        <td class="mono">v{{ entry.version }}</td>
-        <td>{{ entry.name }}</td>
-        <td class="mono">{{ entry.applied_at }}</td>
-      </tr>
-      {% endfor %}
-      {% if not details.schema_history %}
-      <tr>
-        <td colspan="3" class="muted">No schema migrations recorded yet.</td>
-      </tr>
-      {% endif %}
-    </tbody>
-  </table>
-</div>
+<div class="stats-grid">
+  <section class="stats-panel stats-panel-wide">
+    <h2 class="stats-panel-title">Runtime Snapshot</h2>
+    <table class="data-table compact">
+      <tbody>
+        <tr>
+          <th style="width:220px">Platform</th>
+          <td>{{ details.platform }}</td>
+        </tr>
+        <tr>
+          <th>Flask Environment</th>
+          <td>{{ details.flask_env }}</td>
+        </tr>
+        <tr>
+          <th>Timezone</th>
+          <td>{{ details.tz }}</td>
+        </tr>
+        <tr>
+          <th>Log Level</th>
+          <td>{{ details.log_level }}</td>
+        </tr>
+        <tr>
+          <th>Working Directory</th>
+          <td class="mono">{{ details.cwd }}</td>
+        </tr>
+        <tr>
+          <th>Home Directory</th>
+          <td class="mono">{{ details.home or "—" }}</td>
+        </tr>
+        <tr>
+          <th>UID:GID</th>
+          <td class="mono">{{ details.uid }}:{{ details.gid }}</td>
+        </tr>
+        <tr>
+          <th>PUID:PGID</th>
+          <td class="mono">{{ details.puid }}:{{ details.pgid }}</td>
+        </tr>
+        <tr>
+          <th>PID 1 Command</th>
+          <td class="mono">{{ details.pid1_cmdline or "Unavailable" }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
 
-<div class="stat-grid" style="margin-bottom:1.5rem">
-  {% for check in details.path_checks if check %}
-  <div class="stat-card{% if not check.writable %} stat-card-warn{% endif %}">
-    <div class="stat-number">{{ "Writable" if check.writable else "Read-only" }}</div>
-    <div class="stat-label">{{ check.label }}</div>
-  </div>
-  {% endfor %}
-</div>
-
-<div class="table-wrap">
-  <table class="data-table">
-    <tbody>
-      <tr>
-        <th style="width:220px">Platform</th>
-        <td>{{ details.platform }}</td>
-      </tr>
-      <tr>
-        <th>Flask Environment</th>
-        <td>{{ details.flask_env }}</td>
-      </tr>
-      <tr>
-        <th>Timezone</th>
-        <td>{{ details.tz }}</td>
-      </tr>
-      <tr>
-        <th>Log Level</th>
-        <td>{{ details.log_level }}</td>
-      </tr>
-      <tr>
-        <th>Working Directory</th>
-        <td class="mono">{{ details.cwd }}</td>
-      </tr>
-      <tr>
-        <th>Home Directory</th>
-        <td class="mono">{{ details.home or "—" }}</td>
-      </tr>
-      <tr>
-        <th>Data Directory</th>
-        <td class="mono">{{ details.data_dir }}</td>
-      </tr>
-      <tr>
-        <th>Log Directory</th>
-        <td class="mono">{{ details.log_dir }}</td>
-      </tr>
-      <tr>
-        <th>Database URI</th>
-        <td class="mono">{{ details.database_uri }}</td>
-      </tr>
-      <tr>
-        <th>Git SHA</th>
-        <td class="mono">{{ details.git_sha }}</td>
-      </tr>
-      {% if details.database_file %}
-      <tr>
-        <th>SQLite File</th>
-        <td class="mono">{{ details.database_file }}</td>
-      </tr>
-      {% endif %}
-      {% for check in details.path_checks if check %}
-      <tr>
-        <th>{{ check.label }} Status</th>
-        <td>
-          {{ "Exists" if check.exists else "Missing" }} /
-          {{ "Writable" if check.writable else "Not writable" }}
-          {% if check.path %}
-          <span class="mono">({{ check.path }})</span>
+  <section class="stats-panel">
+    <h2 class="stats-panel-title">Schema Migrations</h2>
+    <div class="stat-grid" style="margin-bottom:1rem">
+      <div class="stat-card">
+        <div class="stat-number">v{{ details.schema_state.version }}</div>
+        <div class="stat-label">Current Version</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ details.schema_history | length }}</div>
+        <div class="stat-label">History Entries</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table compact">
+        <thead>
+          <tr>
+            <th style="width:100px">Version</th>
+            <th>Migration</th>
+            <th style="width:220px">Applied At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in details.schema_history %}
+          <tr>
+            <td class="mono">v{{ entry.version }}</td>
+            <td>{{ entry.name }}</td>
+            <td class="mono">{{ entry.applied_at }}</td>
+          </tr>
+          {% endfor %}
+          {% if not details.schema_history %}
+          <tr>
+            <td colspan="3" class="muted">No schema migrations recorded yet.</td>
+          </tr>
           {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-      <tr>
-        <th>PID 1 Command</th>
-        <td class="mono">{{ details.pid1_cmdline or "Unavailable" }}</td>
-      </tr>
-      <tr>
-        <th>Bootstrap State</th>
-        <td class="mono">
-          v{{ details.bootstrap_state.version }}
-          {% if details.bootstrap_state.updated_at %}(updated {{ details.bootstrap_state.updated_at }}){% endif %}
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+        </tbody>
+      </table>
+    </div>
+  </section>
 
-<div class="table-wrap" style="margin-top:1.5rem">
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th colspan="3">Bootstrap History</th>
-      </tr>
-      <tr>
-        <th style="width:100px">Version</th>
-        <th>Migration</th>
-        <th style="width:220px">Applied At</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for entry in details.bootstrap_history %}
-      <tr>
-        <td class="mono">v{{ entry.version }}</td>
-        <td>{{ entry.name }}</td>
-        <td class="mono">{{ entry.applied_at }}</td>
-      </tr>
-      {% endfor %}
-      {% if not details.bootstrap_history %}
-      <tr>
-        <td colspan="3" class="muted">No bootstrap history recorded yet.</td>
-      </tr>
-      {% endif %}
-    </tbody>
-  </table>
+  <section class="stats-panel">
+    <h2 class="stats-panel-title">Bootstrap History</h2>
+    <div class="stat-grid" style="margin-bottom:1rem">
+      <div class="stat-card">
+        <div class="stat-number">v{{ details.bootstrap_state.version }}</div>
+        <div class="stat-label">Current Version</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ details.bootstrap_history | length }}</div>
+        <div class="stat-label">History Entries</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table compact">
+        <thead>
+          <tr>
+            <th style="width:100px">Version</th>
+            <th>Bootstrap Step</th>
+            <th style="width:220px">Applied At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in details.bootstrap_history %}
+          <tr>
+            <td class="mono">v{{ entry.version }}</td>
+            <td>{{ entry.name }}</td>
+            <td class="mono">{{ entry.applied_at }}</td>
+          </tr>
+          {% endfor %}
+          {% if not details.bootstrap_history %}
+          <tr>
+            <td colspan="3" class="muted">No bootstrap history recorded yet.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="stats-panel stats-panel-wide">
+    <h2 class="stats-panel-title">Storage &amp; Paths</h2>
+    <table class="data-table compact">
+      <tbody>
+        <tr>
+          <th style="width:220px">Database URI</th>
+          <td class="mono">{{ details.database_uri }}</td>
+        </tr>
+        <tr>
+          <th>SQLite File</th>
+          <td class="mono">{{ details.database_file or "Not using SQLite" }}</td>
+        </tr>
+        <tr>
+          <th>Data Directory</th>
+          <td class="mono">{{ details.data_dir }}</td>
+        </tr>
+        <tr>
+          <th>Log Directory</th>
+          <td class="mono">{{ details.log_dir }}</td>
+        </tr>
+        <tr>
+          <th>Working Paths</th>
+          <td>
+            <div class="stat-grid" style="margin:0">
+              {% for check in details.path_checks if check %}
+              <div class="stat-card{% if not check.writable %} stat-card-warn{% endif %}">
+                <div class="stat-number">{{ "Writable" if check.writable else "Read-only" }}</div>
+                <div class="stat-label">{{ check.label }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
 </div>
 {% endblock %}
