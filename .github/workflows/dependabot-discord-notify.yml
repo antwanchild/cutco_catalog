@@ -28,7 +28,7 @@ jobs:
       - name: Fetch Dependabot metadata
         id: meta
         if: env.DISCORD_WEBHOOK_URL != ''
-        uses: dependabot/fetch-metadata@v3.0.0
+        uses: dependabot/fetch-metadata@v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
