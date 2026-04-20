@@ -236,6 +236,233 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn("/wishlist", check_response.headers["Location"])
         notify_mock.assert_called_once()
 
+    def test_views_pages_render(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, variant_id = self._add_catalog_item(name="View Knife", sku="VW-1")
+        person_id = self._add_person(name="Viewer", notes="")
+        set_id = self._add_set(name="View Set", sku="VS-1", item_ids=(item_id,))
+
+        self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(variant_id),
+                "status": "Owned",
+                "target_price": "",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+
+        item_response = self.client.get(f"/views/item/{item_id}")
+        matrix_response = self.client.get("/views/matrix")
+        stats_response = self.client.get("/stats")
+        gift_share_response = self.client.get(f"/sets/{set_id}/gift-token?person={person_id}")
+        collection_share_response = self.client.get(f"/people/{person_id}/collection-token")
+
+        self.assertEqual(item_response.status_code, 200)
+        self.assertIn(b"View Knife", item_response.data)
+        self.assertEqual(matrix_response.status_code, 200)
+        self.assertIn(b"Matrix", matrix_response.data)
+        self.assertEqual(stats_response.status_code, 200)
+        self.assertIn(b"Coverage", stats_response.data)
+        self.assertEqual(gift_share_response.status_code, 200)
+        self.assertIn(b"Share Gift List", gift_share_response.data)
+        self.assertEqual(collection_share_response.status_code, 200)
+        self.assertIn(b"Share Collection Card", collection_share_response.data)
+
+    def test_catalog_pages_render(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, variant_id = self._add_catalog_item(name="Catalog Knife", sku="CA-1")
+        set_id = self._add_set(name="Catalog Set", sku="CS-1", item_ids=(item_id,))
+
+        catalog_response = self.client.get("/catalog")
+        variants_response = self.client.get(f"/catalog/{item_id}/variants")
+        sets_response = self.client.get("/sets")
+        set_detail_response = self.client.get(f"/sets/{set_id}")
+
+        self.assertEqual(catalog_response.status_code, 200)
+        self.assertIn(b"Catalog Knife", catalog_response.data)
+        self.assertEqual(variants_response.status_code, 200)
+        self.assertIn(b"Variants", variants_response.data)
+        self.assertEqual(sets_response.status_code, 200)
+        self.assertIn(b"Catalog Set", sets_response.data)
+        self.assertEqual(set_detail_response.status_code, 200)
+        self.assertIn(b"Catalog Set", set_detail_response.data)
+
+        add_variant_response = self.client.post(
+            f"/catalog/{item_id}/variants/add",
+            data={"csrf_token": "test-csrf-token", "color": "Pearl White", "notes": "Alt color"},
+            follow_redirects=False,
+        )
+        self.assertEqual(add_variant_response.status_code, 302)
+        with self.app.app_context():
+            added_variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=item_id, color="Pearl White")
+            ).scalar_one()
+
+        edit_variant_response = self.client.post(
+            f"/variants/{added_variant.id}/edit",
+            data={"csrf_token": "test-csrf-token", "color": "Pearl Ivory", "notes": "Updated color"},
+            follow_redirects=False,
+        )
+        self.assertEqual(edit_variant_response.status_code, 302)
+
+    def test_people_pages_render(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, variant_id = self._add_catalog_item(name="People Knife", sku="PL-1")
+        person_id = self._add_person(name="People Viewer", notes="")
+
+        add_ownership_response = self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(variant_id),
+                "status": "Owned",
+                "target_price": "",
+                "notes": "Owned item",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(add_ownership_response.status_code, 302)
+
+        people_response = self.client.get("/people")
+        collection_response = self.client.get(f"/people/{person_id}/collection")
+        edit_page_response = self.client.get(f"/people/{person_id}/edit")
+        wishlist_response = self.client.get("/wishlist")
+
+        self.assertEqual(people_response.status_code, 200)
+        self.assertIn(b"People Viewer", people_response.data)
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertIn(b"Owned", collection_response.data)
+        self.assertEqual(edit_page_response.status_code, 200)
+        self.assertIn(b"People Viewer", edit_page_response.data)
+        self.assertEqual(wishlist_response.status_code, 200)
+        self.assertIn(b"Wishlist", wishlist_response.data)
+
+    def test_data_routes_render(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, variant_id = self._add_catalog_item(name="Export Knife", sku="EX-1")
+        person_id = self._add_person(name="Exporter", notes="")
+        self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(variant_id),
+                "status": "Owned",
+                "target_price": "",
+                "notes": "Exported",
+            },
+            follow_redirects=False,
+        )
+
+        export_page_response = self.client.get("/export")
+        export_csv_response = self.client.get("/export/csv?filename=my export.csv")
+        import_page_response = self.client.get("/import")
+        import_template_response = self.client.get("/import/template")
+
+        self.assertEqual(export_page_response.status_code, 200)
+        self.assertIn(b"Export", export_page_response.data)
+        self.assertEqual(export_csv_response.status_code, 200)
+        self.assertEqual(export_csv_response.mimetype, "text/csv")
+        self.assertIn("my_export.csv", export_csv_response.headers["Content-Disposition"])
+        self.assertIn(b"Exporter", export_csv_response.data)
+        self.assertEqual(import_page_response.status_code, 200)
+        self.assertIn(b"Import", import_page_response.data)
+        self.assertEqual(import_template_response.status_code, 200)
+        self.assertEqual(import_template_response.mimetype, "text/csv")
+
+    def test_log_dashboards_render(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        sharpening_item_id, _ = self._add_catalog_item(name="Sharpen View Knife", sku="SV-1")
+        cookware_item_id, _ = self._add_catalog_item(name="Cook View Piece", sku="CV-1", category="Cookware")
+        task_item_id, _ = self._add_catalog_item(name="Task View Knife", sku="TV-1")
+        task_id = self._add_task(name="Slice onions")
+
+        self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(sharpening_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/cookware/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(cookware_item_id),
+                "used_on": "2026-04-15",
+                "made_item": "Soup",
+                "rating": "5",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/tasks/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(task_item_id),
+                "task_id": str(task_id),
+                "logged_on": "2026-04-15",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+
+        sharpening_response = self.client.get("/sharpening")
+        cookware_response = self.client.get("/cookware")
+        tasks_response = self.client.get("/tasks")
+        tasks_manage_response = self.client.get("/tasks/manage")
+        task_detail_response = self.client.get(f"/tasks/manage/{task_id}")
+
+        self.assertEqual(sharpening_response.status_code, 200)
+        self.assertIn(b"Sharpening", sharpening_response.data)
+        self.assertEqual(cookware_response.status_code, 200)
+        self.assertIn(b"Cookware", cookware_response.data)
+        self.assertEqual(tasks_response.status_code, 200)
+        self.assertIn(b"Tasks", tasks_response.data)
+        self.assertEqual(tasks_manage_response.status_code, 200)
+        self.assertIn(b"Slice onions", tasks_manage_response.data)
+        self.assertEqual(task_detail_response.status_code, 200)
+        self.assertIn(b"Slice onions", task_detail_response.data)
+
+        with mock.patch("blueprints.logs._notify_discord", return_value=True) as notify_mock, \
+             mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
+             mock.patch("blueprints.logs.SHARPEN_THRESHOLD_DAYS", 1), \
+             mock.patch("blueprints.logs.COOKWARE_THRESHOLD_DAYS", 1):
+            sharpening_notify_response = self.client.post(
+                "/sharpening/notify",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
+            cookware_notify_response = self.client.post(
+                "/cookware/notify",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(sharpening_notify_response.status_code, 302)
+        self.assertEqual(cookware_notify_response.status_code, 302)
+        self.assertTrue(notify_mock.called)
+
 
 class ErrorSmokeTests(SmokeBaseTest):
     def test_forbidden_page_shows_access_denied(self):
