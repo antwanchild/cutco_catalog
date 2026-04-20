@@ -10,7 +10,10 @@
 </p>
 
 <section class="stats-panel stats-panel-wide" style="margin-bottom:1.5rem">
-  <h2 class="stats-panel-title">Service Health</h2>
+  <div class="section-heading-actions" style="margin-bottom:.6rem">
+    <h2 class="stats-panel-title" style="margin:0">Service Health</h2>
+    <button type="button" class="help-btn" onclick="document.getElementById('diag-service-modal').showModal()" aria-label="Service health help" title="What this means">?</button>
+  </div>
   <div class="stat-grid" style="margin-bottom:0">
     <div class="stat-card{% if msrp_job.status == 'running' %} stat-card-warn{% endif %}">
       <div class="stat-number">{{ msrp_job.status | capitalize }}</div>
@@ -60,7 +63,10 @@
 
 <div class="stats-grid">
   <section class="stats-panel stats-panel-wide">
-    <h2 class="stats-panel-title">Runtime Snapshot</h2>
+    <div class="section-heading-actions" style="margin-bottom:.6rem">
+      <h2 class="stats-panel-title" style="margin:0">Runtime Snapshot</h2>
+      <button type="button" class="help-btn" onclick="document.getElementById('diag-runtime-modal').showModal()" aria-label="Runtime snapshot help" title="What this means">?</button>
+    </div>
     <table class="data-table compact">
       <tbody>
         <tr>
@@ -104,7 +110,10 @@
   </section>
 
   <section class="stats-panel">
-    <h2 class="stats-panel-title">Schema Migrations</h2>
+    <div class="section-heading-actions" style="margin-bottom:.6rem">
+      <h2 class="stats-panel-title" style="margin:0">Schema Migrations</h2>
+      <button type="button" class="help-btn" onclick="document.getElementById('diag-schema-modal').showModal()" aria-label="Schema help" title="What this means">?</button>
+    </div>
     <div class="stat-grid" style="margin-bottom:1rem">
       <div class="stat-card">
         <div class="stat-number">v{{ details.schema_state.version }}</div>
@@ -143,7 +152,10 @@
   </section>
 
   <section class="stats-panel">
-    <h2 class="stats-panel-title">Bootstrap History</h2>
+    <div class="section-heading-actions" style="margin-bottom:.6rem">
+      <h2 class="stats-panel-title" style="margin:0">Bootstrap History</h2>
+      <button type="button" class="help-btn" onclick="document.getElementById('diag-bootstrap-modal').showModal()" aria-label="Bootstrap help" title="What this means">?</button>
+    </div>
     <div class="stat-grid" style="margin-bottom:1rem">
       <div class="stat-card">
         <div class="stat-number">v{{ details.bootstrap_state.version }}</div>
@@ -182,7 +194,10 @@
   </section>
 
   <section class="stats-panel stats-panel-wide">
-    <h2 class="stats-panel-title">Storage &amp; Paths</h2>
+    <div class="section-heading-actions" style="margin-bottom:.6rem">
+      <h2 class="stats-panel-title" style="margin:0">Storage &amp; Paths</h2>
+      <button type="button" class="help-btn" onclick="document.getElementById('diag-storage-modal').showModal()" aria-label="Storage help" title="What this means">?</button>
+    </div>
     <table class="data-table compact">
       <tbody>
         <tr>
@@ -218,4 +233,79 @@
     </table>
   </section>
 </div>
+
+<dialog class="help-dialog diag-dialog" id="diag-service-modal">
+  <div class="help-header">
+    <strong>Service Health</strong>
+    <button class="help-close" onclick="document.getElementById('diag-service-modal').close()" aria-label="Close">✕</button>
+  </div>
+  <div class="help-body">
+    <p>This panel tells you whether the background jobs are busy or idle right now.</p>
+    <ul>
+      <li><strong>MSRP Diff</strong> shows the price sync job state.</li>
+      <li><strong>Specs Backfill</strong> shows the item spec backfill state.</li>
+      <li>The log line counts help confirm that work is actually happening.</li>
+    </ul>
+  </div>
+</dialog>
+
+<dialog class="help-dialog diag-dialog" id="diag-runtime-modal">
+  <div class="help-header">
+    <strong>Runtime Snapshot</strong>
+    <button class="help-close" onclick="document.getElementById('diag-runtime-modal').close()" aria-label="Close">✕</button>
+  </div>
+  <div class="help-body">
+    <p>These are the app and container details that tend to change between deployments.</p>
+    <ul>
+      <li>Use the app version and git SHA to confirm the image you expected is running.</li>
+      <li>UID/GID and PUID/PGID help catch permission problems in mounted volumes.</li>
+      <li>The PID 1 command is useful when debugging container entrypoints.</li>
+    </ul>
+  </div>
+</dialog>
+
+<dialog class="help-dialog diag-dialog" id="diag-schema-modal">
+  <div class="help-header">
+    <strong>Schema Migrations</strong>
+    <button class="help-close" onclick="document.getElementById('diag-schema-modal').close()" aria-label="Close">✕</button>
+  </div>
+  <div class="help-body">
+    <p>This history shows structural database migrations that have been applied.</p>
+    <ul>
+      <li>The current version tells you what schema shape the database should have.</li>
+      <li>Each history entry is a numbered table change, applied once in order.</li>
+      <li>If this lags behind code, startup may still need to finish a migration step.</li>
+    </ul>
+  </div>
+</dialog>
+
+<dialog class="help-dialog diag-dialog" id="diag-bootstrap-modal">
+  <div class="help-header">
+    <strong>Bootstrap History</strong>
+    <button class="help-close" onclick="document.getElementById('diag-bootstrap-modal').close()" aria-label="Close">✕</button>
+  </div>
+  <div class="help-body">
+    <p>Bootstrap history tracks one-time startup data fixes and seed work.</p>
+    <ul>
+      <li>These steps seed defaults, clean bad data, and normalize the collection.</li>
+      <li>This is separate from schema migrations because it changes data behavior, not tables.</li>
+      <li>It helps explain why startup may touch the database even when the schema is already current.</li>
+    </ul>
+  </div>
+</dialog>
+
+<dialog class="help-dialog diag-dialog" id="diag-storage-modal">
+  <div class="help-header">
+    <strong>Storage &amp; Paths</strong>
+    <button class="help-close" onclick="document.getElementById('diag-storage-modal').close()" aria-label="Close">✕</button>
+  </div>
+  <div class="help-body">
+    <p>This section tells you whether the app can write where it expects to write.</p>
+    <ul>
+      <li>Read-only data or log directories usually mean a bind mount or permission issue.</li>
+      <li>The SQLite file check appears only when SQLite is the active backend.</li>
+      <li>Use these checks first when uploads, logging, or startup state looks odd.</li>
+    </ul>
+  </div>
+</dialog>
 {% endblock %}

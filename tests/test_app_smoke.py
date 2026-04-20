@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from unittest import mock
 
+from openpyxl import Workbook
+
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 from app import create_app
@@ -586,6 +588,127 @@ class ImportSmokeTests(SmokeBaseTest):
             self.assertEqual(ownership.status, "Owned")
             self.assertEqual(ownership.notes, "Imported ownership")
 
+    def test_import_confirm_creates_catalog_item_and_set_from_item_rows(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        response = self.client.post(
+            "/import/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_count": "1",
+                "own_count": "0",
+                "total_rows": "1",
+                "item_accept_0": "on",
+                "item_row_0": "2",
+                "item_name_0": "Imported Knife",
+                "item_sku_0": "IM-2",
+                "item_color_0": "Pearl White",
+                "item_edge_0": "Straight",
+                "item_category_0": "Kitchen Knives",
+                "item_notes_0": "Imported note",
+                "item_person_0": "Importer",
+                "item_status_0": "Owned",
+                "item_sets_0": "Imported Set",
+                "item_sku_unicorn_0": "on",
+                "item_variant_unicorn_0": "on",
+                "item_edge_unicorn_0": "on",
+                "error_count": "0",
+                "conflict_count": "0",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Import complete", response.data)
+        with self.app.app_context():
+            item = db.session.execute(db.select(Item).filter_by(sku="IM-2")).scalar_one()
+            variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=item.id, color="Pearl White")
+            ).scalar_one()
+            person = db.session.execute(db.select(Person).filter_by(name="Importer")).scalar_one()
+            item_set = db.session.execute(db.select(Set).filter_by(name="Imported Set")).scalar_one()
+            membership = db.session.execute(
+                db.select(ItemSetMember).filter_by(item_id=item.id, set_id=item_set.id)
+            ).scalar_one()
+            ownership = db.session.execute(
+                db.select(Ownership).filter_by(person_id=person.id, variant_id=variant.id)
+            ).scalar_one()
+
+            self.assertEqual(item.notes, "Imported note")
+            self.assertEqual(membership.quantity, 1)
+            self.assertIn(item, item_set.items)
+            self.assertEqual(ownership.status, "Owned")
+
+    def test_import_preview_renders_xlsx_rows(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        self._add_catalog_item(name="Preview Knife", sku="PR-1")
+        self._add_person(name="Anthony", notes="")
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append([
+            "Name",
+            "Model #",
+            "COLOR",
+            "Owned?",
+            "person",
+            "Price",
+            "Gift Box",
+            "Sheath",
+            "Quantity Purchased",
+            "Given Away",
+            "Beast",
+        ])
+        sheet.append([
+            "Preview Knife",
+            "PR-1",
+            "Classic Brown",
+            "Anthony",
+            "",
+            "12.50",
+            "yes",
+            "Leather",
+            "2",
+            "n/a",
+            "",
+        ])
+        sheet.append([
+            "Preview New Knife",
+            "PN-1",
+            "Pearl White",
+            "Wishlist",
+            "Collector Two",
+            "34.00",
+            "",
+            "",
+            "",
+            "",
+            "yes",
+        ])
+        upload = BytesIO()
+        workbook.save(upload)
+        upload.seek(0)
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (upload, "preview.xlsx"),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Import Preview", response.data)
+        self.assertIn(b"Ownership Entries (1)", response.data)
+        self.assertIn(b"New Catalog Items (1)", response.data)
+        self.assertIn(b"Preview Knife", response.data)
+        self.assertIn(b"Preview New Knife", response.data)
+        self.assertIn(b"Price: 12.50", response.data)
+
     def test_import_check_reports_header_warnings(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -734,6 +857,162 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual(item.notes, "Updated note")
             self.assertTrue(item.is_unicorn)
             self.assertTrue(item.edge_is_unicorn)
+
+    def test_catalog_set_and_variant_management_routes(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, variant_id = self._add_catalog_item(name="Set Knife", sku="SK-1")
+
+        set_add_response = self.client.post(
+            "/sets/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "name": "Set Group",
+                "sku": "SG-1",
+                "notes": "Initial set",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(set_add_response.status_code, 302)
+        with self.app.app_context():
+            item_set = db.session.execute(db.select(Set).filter_by(name="Set Group")).scalar_one()
+
+        sets_page = self.client.get("/sets")
+        set_detail_page = self.client.get(f"/sets/{item_set.id}")
+        set_edit_page = self.client.get(f"/sets/{item_set.id}/edit")
+
+        self.assertEqual(sets_page.status_code, 200)
+        self.assertIn(b"Set Group", sets_page.data)
+        self.assertEqual(set_detail_page.status_code, 200)
+        self.assertIn(b"Set Group", set_detail_page.data)
+        self.assertEqual(set_edit_page.status_code, 200)
+        self.assertIn(b"Set Members", set_edit_page.data)
+
+        edit_response = self.client.post(
+            f"/sets/{item_set.id}/edit",
+            data={
+                "csrf_token": "test-csrf-token",
+                "name": "Set Group Updated",
+                "sku": "SG-2",
+                "notes": "Updated set",
+                "member_item_ids": [str(item_id)],
+                f"member_qty_{item_id}": "2",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(edit_response.status_code, 302)
+        with self.app.app_context():
+            item_set = db.session.get(Set, item_set.id)
+            self.assertIsNotNone(item_set)
+            self.assertEqual(item_set.name, "Set Group Updated")
+            self.assertEqual(item_set.sku, "SG-2")
+            self.assertEqual(item_set.notes, "Updated set")
+            self.assertEqual(item_set.members[0].quantity, 2)
+
+        add_variant_response = self.client.post(
+            f"/catalog/{item_id}/variants/add",
+            data={"csrf_token": "test-csrf-token", "color": "Pearl White", "notes": "Alt color"},
+            follow_redirects=False,
+        )
+        self.assertEqual(add_variant_response.status_code, 302)
+        with self.app.app_context():
+            new_variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=item_id, color="Pearl White")
+            ).scalar_one()
+
+        delete_variant_response = self.client.post(
+            f"/variants/{new_variant.id}/delete",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(delete_variant_response.status_code, 302)
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(ItemVariant, new_variant.id))
+
+        delete_set_response = self.client.post(
+            f"/sets/{item_set.id}/delete",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(delete_set_response.status_code, 302)
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(Set, item_set.id))
+
+    def test_catalog_sync_preview_renders_with_mocked_scrapes(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        self._add_catalog_item(name="Existing Sync Knife", sku="EX-1")
+
+        scraped_items = [
+            {
+                "name": "Existing Sync Knife",
+                "sku": "EX-1",
+                "category": "Kitchen Knives",
+                "url": "https://example.com/existing",
+            },
+            {
+                "name": "New Sync Knife",
+                "sku": "NS-1",
+                "category": "Kitchen Knives",
+                "url": "https://example.com/new-sync",
+            },
+        ]
+        scraped_sets = [
+            {
+                "name": "New Sync Set",
+                "sku": "NSS-1",
+                "url": "https://example.com/new-set",
+                "member_skus": ["NS-1"],
+                "member_quantities": {"NS-1": 2},
+            }
+        ]
+
+        with mock.patch("blueprints.catalog.scrape_catalog", return_value=(scraped_items, [])), \
+             mock.patch("blueprints.catalog.scrape_sets", return_value=scraped_sets), \
+             mock.patch(
+                 "blueprints.catalog.scrape_item_specs",
+                 return_value={
+                     "edge_type": "Straight",
+                     "msrp": 49.99,
+                     "blade_length": "4 in",
+                     "overall_length": "8 in",
+                     "weight": "1 lb",
+                 },
+             ):
+            response = self.client.get("/catalog/sync")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Catalog Sync Preview", response.data)
+        self.assertIn(b"New Items", response.data)
+        self.assertIn(b"New Sync Knife", response.data)
+        self.assertIn(b"New Sets", response.data)
+        self.assertIn(b"New Sync Set", response.data)
+
+    def test_catalog_sync_uses_populates_tasks(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        item_id, _variant_id = self._add_catalog_item(name="Use Sync Knife", sku="US-1")
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            item.cutco_url = "https://example.com/use-sync"
+            db.session.commit()
+
+        with mock.patch("blueprints.catalog.scrape_item_uses", return_value=["Slice onions", "Peel potatoes"]):
+            response = self.client.post(
+                "/catalog/sync-uses",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/tasks/manage", response.headers["Location"])
+        with self.app.app_context():
+            refreshed_item = db.session.get(Item, item_id)
+            task_names = [task.name for task in refreshed_item.suggested_tasks]
+            self.assertIn("Slice onions", task_names)
+            self.assertIn("Peel potatoes", task_names)
 
     def test_catalog_purge_and_delete_routes(self):
         self._login_as_admin()

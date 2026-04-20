@@ -988,6 +988,9 @@ textarea { resize: vertical; }
   font-family: var(--mono);
   font-size: .8rem;
 }
+.diag-dialog {
+  max-width: 640px;
+}
 
 /* Purge dialog */
 .purge-dialog {

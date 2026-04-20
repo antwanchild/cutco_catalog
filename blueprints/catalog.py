@@ -118,7 +118,19 @@ def catalog_edit(item_id):
                 invalid_set_id_seen = True
         if invalid_set_id_seen:
             flash("Some set selections were invalid and were ignored.", "warning")
-        item.sets = Set.query.filter(Set.id.in_(selected_set_ids)).all() if selected_set_ids else []
+        current_memberships = {membership.set_id: membership for membership in item.set_memberships}
+        selected_sets = {
+            selected_set.id: selected_set
+            for selected_set in Set.query.filter(Set.id.in_(selected_set_ids)).all()
+        } if selected_set_ids else {}
+
+        for existing_set_id, existing_member in list(current_memberships.items()):
+            if existing_set_id not in selected_sets:
+                db.session.delete(existing_member)
+
+        for set_id in selected_sets:
+            if set_id not in current_memberships:
+                db.session.add(ItemSetMember(item_id=item.id, set_id=set_id, quantity=1))
 
         if db_commit(db.session):
             logger.info("Item updated: %s (SKU: %s)", item.name, item.sku or "none")

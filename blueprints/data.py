@@ -13,7 +13,7 @@ from constants import (
 )
 from extensions import db
 from helpers import admin_required, db_commit
-from models import Item, ItemVariant, Ownership, Person, get_or_create_set, reconcile_unknown_variant
+from models import Item, ItemSetMember, ItemVariant, Ownership, Person, get_or_create_set, reconcile_unknown_variant
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
@@ -476,10 +476,12 @@ def import_confirm():
                 if is_edge_unicorn and not item.edge_is_unicorn:
                     item.edge_is_unicorn = True
 
+            existing_memberships = {membership.set_id: membership for membership in item.set_memberships}
             for set_name in set_names:
                 item_set = get_or_create_set(set_name)
-                if item_set not in item.sets:
-                    item.sets.append(item_set)
+                if item_set.id not in existing_memberships:
+                    db.session.add(ItemSetMember(item_id=item.id, set_id=item_set.id, quantity=1))
+                    existing_memberships[item_set.id] = True
 
             is_cookware = (item.category or "") in COOKWARE_CATEGORIES
             target_color = UNKNOWN_COLOR if is_cookware else (color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR)
