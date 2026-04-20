@@ -107,9 +107,17 @@ class PublicSmokeTests(SmokeBaseTest):
     def test_public_pages_load(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["Strict-Transport-Security"], "max-age=31536000; includeSubDomains")
         self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
+        self.assertNotIn("Strict-Transport-Security", response.headers)
         self.assertEqual(self.client.get("/robots.txt").status_code, 200)
+
+    def test_public_pages_include_hsts_when_cookie_secure_enabled(self):
+        self.app.config["SESSION_COOKIE_SECURE"] = True
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Strict-Transport-Security"], "max-age=31536000; includeSubDomains")
 
     def test_health_endpoint_reports_ok(self):
         response = self.client.get("/health")
@@ -133,6 +141,7 @@ class PublicSmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual(response.status_code, 302)
+        self.assertNotIn("Secure", response.headers.get("Set-Cookie", ""))
         with self.client.session_transaction() as session:
             self.assertTrue(session.get("is_admin"))
 

@@ -213,8 +213,6 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.permanent_session_lifetime = timedelta(seconds=ADMIN_SESSION_SECONDS)
 
     _is_prod = os.environ.get("FLASK_ENV", "production").lower() == "production"
-    if "SESSION_COOKIE_SECURE" not in os.environ and _is_prod:
-        app.config["SESSION_COOKIE_SECURE"] = True
     _allow_insecure = _env_flag("ALLOW_INSECURE_DEFAULTS")
     if _is_prod and not _allow_insecure and not app.testing:
         if app.secret_key == "cutco-vault-dev-key" or ADMIN_TOKEN == "admin":
