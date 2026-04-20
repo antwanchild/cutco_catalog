@@ -50,11 +50,18 @@ def _read_git_sha_from_repo() -> str | None:
 
 
 @lru_cache(maxsize=1)
-def get_git_sha() -> str:
+def get_git_sha_info() -> tuple[str, str]:
     sha = os.environ.get("GIT_SHA", "").strip()
     if sha:
-        return sha
-    return _read_git_sha_from_repo() or "unknown"
+        return sha, "image"
+    repo_sha = _read_git_sha_from_repo()
+    if repo_sha:
+        return repo_sha, "repo"
+    return "unknown", "unknown"
+
+
+def get_git_sha() -> str:
+    return get_git_sha_info()[0]
 
 
 GIT_SHA = get_git_sha()

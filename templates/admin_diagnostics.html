@@ -42,6 +42,9 @@
   <div class="stat-card">
     <div class="stat-number mono">{{ details.git_sha[:7] if details.git_sha and details.git_sha != "unknown" else "unknown" }}</div>
     <div class="stat-label">Git SHA</div>
+    <div class="muted" style="font-size:.72rem;margin-top:.15rem">
+      {% if details.git_sha_source == "image" %}from image build{% elif details.git_sha_source == "repo" %}from local repo{% else %}source unavailable{% endif %}
+    </div>
   </div>
   <div class="stat-card">
     <div class="stat-number">{{ details.python_version }}</div>

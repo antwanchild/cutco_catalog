@@ -137,14 +137,15 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIn(b"Bootstrap History", response.data)
         self.assertIn(b"Storage &amp; Paths", response.data)
         self.assertIn(b"Bootstrap Version", response.data)
+        self.assertIn(b"from local repo", response.data)
         self.assertIn(b"UTC", response.data)
         self.assertIn(str(SCHEMA_VERSION).encode(), response.data)
         self.assertIn(str(BOOTSTRAP_VERSION).encode(), response.data)
 
     def test_admin_diagnostics_falls_back_to_git_sha(self):
         self._login_as_admin()
-        constants.get_git_sha.cache_clear()
-        self.addCleanup(constants.get_git_sha.cache_clear)
+        constants.get_git_sha_info.cache_clear()
+        self.addCleanup(constants.get_git_sha_info.cache_clear)
 
         with mock.patch.dict(os.environ, {"GIT_SHA": ""}, clear=False), \
              mock.patch("constants._read_git_sha_from_repo", return_value="0123456789abcdef0123456789abcdef01234567"):
@@ -152,6 +153,7 @@ class AdminJobSmokeTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"0123456", response.data)
+        self.assertIn(b"from local repo", response.data)
 
     def test_admin_routes_require_login(self):
         msrp_page = self.client.get("/admin/msrp-diff", follow_redirects=False)
@@ -193,6 +195,7 @@ class AdminJobSmokeTests(unittest.TestCase):
                  {"DATA_DIR": "", "LOG_DIR": "", "GIT_SHA": "abcdef1234567890"},
                  clear=False,
              ):
+            constants.get_git_sha_info.cache_clear()
             self.app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://user:secret@db.example.com:5432/cutco"
 
             msrp_page = self.client.get("/admin/msrp-diff")
@@ -211,6 +214,7 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIn(b"Schema Migrations", diagnostics_page.data)
         self.assertIn(b"Bootstrap History", diagnostics_page.data)
         self.assertIn(b"postgresql://user:***@db.example.com:5432/cutco", diagnostics_page.data)
+        self.assertIn(b"from image build", diagnostics_page.data)
         self.assertEqual(msrp_status.status_code, 200)
         self.assertEqual(msrp_status.get_json()["status"], "idle")
         self.assertEqual(specs_status.status_code, 200)
