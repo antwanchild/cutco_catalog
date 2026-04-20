@@ -1,5 +1,7 @@
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Callable
 
 from sqlalchemy import inspect as sa_inspect
 
@@ -10,7 +12,6 @@ from models import Item, KnifeTask, ensure_unknown_variant
 logger = logging.getLogger(__name__)
 
 BOOTSTRAP_STATE_NAME = "bootstrap"
-BOOTSTRAP_VERSION = 5
 
 
 class BootstrapState(db.Model):
@@ -19,6 +20,13 @@ class BootstrapState(db.Model):
     name = db.Column(db.String(40), primary_key=True)
     version = db.Column(db.Integer, nullable=False, default=0)
     updated_at = db.Column(db.String(32), nullable=False)
+
+
+@dataclass(frozen=True, slots=True)
+class BootstrapMigration:
+    version: int
+    name: str
+    apply: Callable[[], None]
 
 
 def _now_utc() -> str:
@@ -45,6 +53,17 @@ def _set_bootstrap_version(version: int) -> None:
     else:
         state.version = version
         state.updated_at = _now_utc()
+
+
+BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
+    BootstrapMigration(1, "schema", lambda: _apply_column_migrations()),
+    BootstrapMigration(2, "seed_tasks", lambda: _seed_default_tasks()),
+    BootstrapMigration(3, "cleanup_invalid_skus", lambda: _cleanup_invalid_items()),
+    BootstrapMigration(4, "normalize_categories", lambda: _normalize_categories()),
+    BootstrapMigration(5, "ensure_unknown_variants", lambda: _ensure_unknown_variants()),
+)
+
+BOOTSTRAP_VERSION = BOOTSTRAP_MIGRATIONS[-1].version
 
 
 def _apply_column_migrations() -> None:
@@ -114,18 +133,12 @@ def initialize_database() -> None:
     db.Model.metadata.create_all(db.engine, checkfirst=True)
 
     current_version = _get_bootstrap_version()
-    steps = [
-        (1, _apply_column_migrations),
-        (2, _seed_default_tasks),
-        (3, _cleanup_invalid_items),
-        (4, _normalize_categories),
-        (5, _ensure_unknown_variants),
-    ]
-
-    for version, step in steps:
+    for migration in BOOTSTRAP_MIGRATIONS:
+        version = migration.version
         if current_version >= version:
             continue
-        step()
+        logger.info("Bootstrap migration %s v%d", migration.name, version)
+        migration.apply()
         _set_bootstrap_version(version)
         db.session.commit()
         current_version = version
