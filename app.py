@@ -10,13 +10,12 @@ from constants import (
     ADMIN_TOKEN,
     APP_VERSION,
     GIT_SHA,
-    KNIFE_TASK_PRESETS,
     UNKNOWN_COLOR,
-    canonicalize_category,
 )
 from extensions import db, limiter
 from helpers import _csrf_token, is_admin, validate_csrf
-from models import Item, KnifeTask, ensure_unknown_variant
+from models import Item
+from startup import initialize_database
 
 logger = logging.getLogger(__name__)
 _LOG_FORMAT = logging.Formatter(
@@ -26,6 +25,13 @@ _LOG_FORMAT = logging.Formatter(
 _LOGGING_READY = False
 _FILE_LOG_PATHS: set[str] = set()
 CSRF_EXEMPT = {"/admin/login", "/admin/logout"}
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
 
 
 def _setup_logging(log_dir: str, log_level: str) -> None:
@@ -76,66 +82,6 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(admin_bp)
 
 
-def _initialize_database() -> None:
-    from sqlalchemy import inspect as sa_inspect
-
-    db.Model.metadata.create_all(db.engine, checkfirst=True)
-
-    inspector = sa_inspect(db.engine)
-    column_migrations = [
-        ("sets", "sku", "ALTER TABLE sets ADD COLUMN sku VARCHAR(20)"),
-        (
-            "item_variants",
-            "is_unicorn",
-            "ALTER TABLE item_variants ADD COLUMN is_unicorn BOOLEAN NOT NULL DEFAULT 0",
-        ),
-        ("items", "msrp", "ALTER TABLE items ADD COLUMN msrp REAL"),
-        ("ownership", "target_price", "ALTER TABLE ownership ADD COLUMN target_price REAL"),
-        ("item_sets", "quantity", "ALTER TABLE item_sets ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1"),
-        ("items", "blade_length", "ALTER TABLE items ADD COLUMN blade_length VARCHAR(20)"),
-        ("items", "overall_length", "ALTER TABLE items ADD COLUMN overall_length VARCHAR(20)"),
-        ("items", "weight", "ALTER TABLE items ADD COLUMN weight VARCHAR(20)"),
-        (
-            "items",
-            "edge_is_unicorn",
-            "ALTER TABLE items ADD COLUMN edge_is_unicorn BOOLEAN NOT NULL DEFAULT 0",
-        ),
-    ]
-    with db.engine.connect() as conn:
-        for table_name, column_name, statement in column_migrations:
-            existing = {column["name"] for column in inspector.get_columns(table_name)}
-            if column_name not in existing:
-                conn.execute(db.text(statement))
-                conn.commit()
-                logger.info("Schema migration: added %s.%s", table_name, column_name)
-
-    existing_task_names = {task.name for task in KnifeTask.query.all()}
-    for preset in KNIFE_TASK_PRESETS:
-        if preset not in existing_task_names:
-            db.session.add(KnifeTask(name=preset, is_preset=True))
-    db.session.flush()
-
-    invalid_items = Item.query.filter(Item.sku.op("GLOB")("[0-9]")).all()
-    for item in invalid_items:
-        logger.info("Removing item with invalid single-digit SKU: %s (sku=%s)", item.name, item.sku)
-        db.session.delete(item)
-
-    renamed_categories = 0
-    for item in Item.query.all():
-        canonical_category = canonicalize_category(item.category)
-        if canonical_category != item.category:
-            item.category = canonical_category
-            renamed_categories += 1
-    if renamed_categories:
-        logger.info("Category normalization: updated %d item category value(s)", renamed_categories)
-
-    for item in Item.query.all():
-        ensure_unknown_variant(item)
-
-    db.session.commit()
-    logger.info("Database ready")
-
-
 def _register_hooks(app: Flask) -> None:
     @app.before_request
     def csrf_protect():
@@ -147,6 +93,12 @@ def _register_hooks(app: Flask) -> None:
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        if app.config.get("SESSION_COOKIE_SECURE"):
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
         return response
 
     @app.context_processor
@@ -249,12 +201,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         MAX_CONTENT_LENGTH=10 * 1024 * 1024,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
-        SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "").lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        },
+        SESSION_COOKIE_SECURE=_env_flag("SESSION_COOKIE_SECURE"),
         LOG_DIR=os.environ.get("LOG_DIR", "/data/logs"),
         LOG_LEVEL=os.environ.get("LOG_LEVEL", "INFO").upper(),
         TESTING=False,
@@ -266,12 +213,9 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.permanent_session_lifetime = timedelta(seconds=ADMIN_SESSION_SECONDS)
 
     _is_prod = os.environ.get("FLASK_ENV", "production").lower() == "production"
-    _allow_insecure = os.environ.get("ALLOW_INSECURE_DEFAULTS", "").lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    if "SESSION_COOKIE_SECURE" not in os.environ and _is_prod:
+        app.config["SESSION_COOKIE_SECURE"] = True
+    _allow_insecure = _env_flag("ALLOW_INSECURE_DEFAULTS")
     if _is_prod and not _allow_insecure and not app.testing:
         if app.secret_key == "cutco-vault-dev-key" or ADMIN_TOKEN == "admin":
             raise RuntimeError(
@@ -289,7 +233,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     _register_routes(app)
 
     with app.app_context():
-        _initialize_database()
+        initialize_database()
 
     return app
 

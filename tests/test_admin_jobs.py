@@ -6,8 +6,10 @@ from unittest import mock
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 from app import create_app
+from constants import KNIFE_TASK_PRESETS
 from extensions import db
-from models import Item, ItemSetMember, Set
+from models import Item, ItemSetMember, KnifeTask, Set
+from startup import BOOTSTRAP_VERSION, BootstrapState, initialize_database
 
 
 class AdminJobSmokeTests(unittest.TestCase):
@@ -97,6 +99,28 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertEqual(write_mock.call_args.args[0]["status"], "running")
         thread_instance.start.assert_called_once()
 
+    def test_msrp_diff_run_starts_background_job(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with mock.patch("blueprints.admin._read_msrp_job", return_value={"status": "idle"}), \
+             mock.patch("blueprints.admin._write_msrp_job") as write_mock, \
+             mock.patch("blueprints.admin.threading.Thread") as thread_mock:
+            thread_instance = mock.Mock()
+            thread_mock.return_value = thread_instance
+
+            response = self.client.post(
+                "/admin/msrp-diff/run",
+                data={"csrf_token": "test-csrf-token", "update_db": "on"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        write_mock.assert_called_once()
+        self.assertEqual(write_mock.call_args.args[0]["status"], "running")
+        self.assertTrue(write_mock.call_args.args[0]["update_db"])
+        thread_instance.start.assert_called_once()
+
     def test_admin_diagnostics_shows_job_summaries(self):
         self._login_as_admin()
 
@@ -105,3 +129,27 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"MSRP Diff", response.data)
         self.assertIn(b"Specs Backfill", response.data)
+        self.assertIn(b"Bootstrap Version", response.data)
+        self.assertIn(str(BOOTSTRAP_VERSION).encode(), response.data)
+
+    def test_startup_bootstrap_is_idempotent(self):
+        with self.app.app_context():
+            initial_task_names = {
+                task.name for task in db.session.execute(db.select(KnifeTask)).scalars().all()
+            }
+            bootstrap_state = db.session.get(BootstrapState, "bootstrap")
+            self.assertIsNotNone(bootstrap_state)
+            self.assertEqual(bootstrap_state.version, BOOTSTRAP_VERSION)
+            initial_updated_at = bootstrap_state.updated_at
+            initial_version = bootstrap_state.version
+            initialize_database()
+            second_state = db.session.get(BootstrapState, "bootstrap")
+            second_task_names = {
+                task.name for task in db.session.execute(db.select(KnifeTask)).scalars().all()
+            }
+            self.assertEqual(initial_task_names, set(KNIFE_TASK_PRESETS))
+            self.assertIsNotNone(second_state)
+            self.assertEqual(second_task_names, initial_task_names)
+            self.assertEqual(second_state.version, initial_version)
+            self.assertEqual(second_state.updated_at, initial_updated_at)
+            self.assertEqual(len(second_task_names), len(KNIFE_TASK_PRESETS))

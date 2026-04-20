@@ -49,6 +49,10 @@
     <div class="stat-number">{{ details.puid }}:{{ details.pgid }}</div>
     <div class="stat-label">PUID:PGID</div>
   </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ details.bootstrap_state.version }}</div>
+    <div class="stat-label">Bootstrap Version</div>
+  </div>
 </div>
 
 <div class="stat-grid" style="margin-bottom:1.5rem">
@@ -124,6 +128,13 @@
       <tr>
         <th>PID 1 Command</th>
         <td class="mono">{{ details.pid1_cmdline or "Unavailable" }}</td>
+      </tr>
+      <tr>
+        <th>Bootstrap State</th>
+        <td class="mono">
+          v{{ details.bootstrap_state.version }}
+          {% if details.bootstrap_state.updated_at %}(updated {{ details.bootstrap_state.updated_at }}){% endif %}
+        </td>
       </tr>
     </tbody>
   </table>

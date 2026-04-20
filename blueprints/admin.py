@@ -14,6 +14,7 @@ from extensions import db
 from extensions import limiter
 from helpers import is_admin
 from models import Item
+from startup import BOOTSTRAP_VERSION, get_bootstrap_state
 from msrp_helpers import (
     _read_msrp_job, _run_msrp_diff_job, _write_msrp_job,
     _read_specs_job, _run_specs_backfill_job, _write_specs_job,
@@ -84,6 +85,8 @@ def _runtime_details():
         "puid": os.environ.get("PUID", "0"),
         "pgid": os.environ.get("PGID", "0"),
         "pid1_cmdline": _read_pid1_cmdline(),
+        "bootstrap_state": get_bootstrap_state(),
+        "bootstrap_version": BOOTSTRAP_VERSION,
         "path_checks": [
             {"label": "Data Directory", **_path_status(data_dir)},
             {"label": "Log Directory", **_path_status(log_dir)},

@@ -2,20 +2,24 @@ import os
 from io import BytesIO
 import tempfile
 import unittest
+from unittest import mock
 
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 from app import create_app
 from extensions import db
+from helpers import _collection_token, _gift_token
 from models import (
     CookwareSession,
     Item,
+    ItemSetMember,
     ItemVariant,
     KnifeTask,
     KnifeTaskLog,
     Ownership,
     Person,
     SharpeningLog,
+    Set,
 )
 
 
@@ -88,10 +92,23 @@ class SmokeBaseTest(unittest.TestCase):
             task = db.session.execute(db.select(KnifeTask).filter_by(name=name)).scalar_one()
         return task.id
 
+    def _add_set(self, name="Sample Set", sku="SS-1", item_ids=()):
+        with self.app.app_context():
+            item_set = Set(name=name, sku=sku)
+            db.session.add(item_set)
+            db.session.flush()
+            for item_id in item_ids:
+                db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1))
+            db.session.commit()
+            return item_set.id
+
 
 class PublicSmokeTests(SmokeBaseTest):
     def test_public_pages_load(self):
-        self.assertEqual(self.client.get("/").status_code, 200)
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Strict-Transport-Security"], "max-age=31536000; includeSubDomains")
+        self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
         self.assertEqual(self.client.get("/robots.txt").status_code, 200)
 
     def test_health_endpoint_reports_ok(self):
@@ -118,6 +135,148 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 302)
         with self.client.session_transaction() as session:
             self.assertTrue(session.get("is_admin"))
+
+    def test_gift_share_and_collection_card_pages_render(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        owned_item_id, owned_variant_id = self._add_catalog_item(name="Gift Knife Owned", sku="GL-1")
+        missing_item_id, _missing_variant_id = self._add_catalog_item(name="Gift Knife Missing", sku="GL-2")
+        person_id = self._add_person(name="Gift Recipient", notes="")
+        set_id = self._add_set(name="Gift Set", sku="GS-1", item_ids=(owned_item_id, missing_item_id))
+
+        ownership_response = self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(owned_variant_id),
+                "status": "Owned",
+                "target_price": "",
+                "notes": "Already owned",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(ownership_response.status_code, 302)
+
+        gift_share_response = self.client.get(f"/sets/{set_id}/gift-token?person={person_id}")
+        self.assertEqual(gift_share_response.status_code, 200)
+        self.assertIn(b"Share Gift List", gift_share_response.data)
+
+        with self.app.app_context():
+            gift_token = _gift_token(set_id, person_id)
+            card_token = _collection_token(person_id)
+
+        gift_list_response = self.client.get(f"/gifts/{gift_token}")
+        self.assertEqual(gift_list_response.status_code, 200)
+        self.assertIn(b"Gift Recipient", gift_list_response.data)
+        self.assertIn(b"Gift Knife Missing", gift_list_response.data)
+        self.assertIn(b"still needed", gift_list_response.data)
+
+        card_share_response = self.client.get(f"/people/{person_id}/collection-token")
+        self.assertEqual(card_share_response.status_code, 200)
+        self.assertIn(b"Share Collection Card", card_share_response.data)
+        self.assertIn(b"Gift Recipient", card_share_response.data)
+
+        collection_card_response = self.client.get(f"/collection-card/{card_token}")
+        self.assertEqual(collection_card_response.status_code, 200)
+        self.assertIn(b"Gift Recipient", collection_card_response.data)
+        self.assertIn(b"Gift Knife Owned", collection_card_response.data)
+
+    def test_wishlist_page_and_check_route(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, variant_id = self._add_catalog_item(name="Wishlist Knife", sku="WL-1")
+        person_id = self._add_person(name="Wishlist Person", notes="")
+
+        ownership_response = self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(variant_id),
+                "status": "Wishlist",
+                "target_price": "59.99",
+                "notes": "Waiting for a drop",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(ownership_response.status_code, 302)
+
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            self.assertIsNotNone(item)
+            item.msrp = 49.99
+            db.session.commit()
+
+        wishlist_response = self.client.get(f"/wishlist?person={person_id}")
+        self.assertEqual(wishlist_response.status_code, 200)
+        self.assertIn(b"Wishlist Knife", wishlist_response.data)
+        self.assertIn(b"target met", wishlist_response.data)
+
+        with mock.patch("blueprints.people.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
+             mock.patch("blueprints.people._notify_discord", return_value=True) as notify_mock:
+            check_response = self.client.post(
+                "/wishlist/check",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(check_response.status_code, 302)
+        self.assertIn("/wishlist", check_response.headers["Location"])
+        notify_mock.assert_called_once()
+
+
+class ErrorSmokeTests(SmokeBaseTest):
+    def test_forbidden_page_shows_access_denied(self):
+        self._login_as_admin()
+
+        response = self.client.post(
+            "/people/add",
+            data={"name": "No CSRF", "notes": "blocked"},
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn(b"Access denied.", response.data)
+
+    def test_rate_limited_login_returns_429(self):
+        for _ in range(10):
+            response = self.client.post(
+                "/admin/login",
+                data={"token": "wrong-token"},
+                follow_redirects=False,
+            )
+            self.assertIn(response.status_code, (200, 302))
+
+        response = self.client.post(
+            "/admin/login",
+            data={"token": "wrong-token"},
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertIn(b"Too many requests", response.data)
+
+    def test_large_upload_returns_413(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        oversized_csv = BytesIO(b"a" * (10 * 1024 * 1024 + 1))
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "check",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (oversized_csv, "too-big.csv"),
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertIn(b"File too large", response.data)
 
 
 class ImportSmokeTests(SmokeBaseTest):
