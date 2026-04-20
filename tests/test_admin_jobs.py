@@ -130,6 +130,8 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIn(b"MSRP Diff", response.data)
         self.assertIn(b"Specs Backfill", response.data)
         self.assertIn(b"Bootstrap Version", response.data)
+        self.assertIn(b"Bootstrap History", response.data)
+        self.assertIn(b"schema", response.data)
         self.assertIn(str(BOOTSTRAP_VERSION).encode(), response.data)
 
     def test_startup_bootstrap_is_idempotent(self):

@@ -22,6 +22,14 @@ class BootstrapState(db.Model):
     updated_at = db.Column(db.String(32), nullable=False)
 
 
+class BootstrapHistory(db.Model):
+    __tablename__ = "bootstrap_history"
+
+    version = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    applied_at = db.Column(db.String(32), nullable=False)
+
+
 @dataclass(frozen=True, slots=True)
 class BootstrapMigration:
     version: int
@@ -45,6 +53,20 @@ def get_bootstrap_state() -> dict:
     return {"name": state.name, "version": state.version, "updated_at": state.updated_at}
 
 
+def get_bootstrap_history(limit: int = 10) -> list[dict]:
+    history = (
+        db.session.execute(
+            db.select(BootstrapHistory).order_by(BootstrapHistory.version.desc()).limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        {"version": row.version, "name": row.name, "applied_at": row.applied_at}
+        for row in history
+    ]
+
+
 def _set_bootstrap_version(version: int) -> None:
     state = db.session.get(BootstrapState, BOOTSTRAP_STATE_NAME)
     if state is None:
@@ -53,6 +75,34 @@ def _set_bootstrap_version(version: int) -> None:
     else:
         state.version = version
         state.updated_at = _now_utc()
+
+
+def _record_history(version: int, name: str) -> None:
+    history = db.session.get(BootstrapHistory, version)
+    if history is None:
+        db.session.add(BootstrapHistory(version=version, name=name, applied_at=_now_utc()))
+    else:
+        history.name = name
+        history.applied_at = _now_utc()
+
+
+def _backfill_history(current_version: int) -> None:
+    if current_version <= 0:
+        return
+
+    state = db.session.get(BootstrapState, BOOTSTRAP_STATE_NAME)
+    applied_at = state.updated_at if state else _now_utc()
+    for migration in BOOTSTRAP_MIGRATIONS:
+        if migration.version > current_version:
+            break
+        if db.session.get(BootstrapHistory, migration.version) is None:
+            db.session.add(
+                BootstrapHistory(
+                    version=migration.version,
+                    name=migration.name,
+                    applied_at=applied_at,
+                )
+            )
 
 
 BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
@@ -133,12 +183,14 @@ def initialize_database() -> None:
     db.Model.metadata.create_all(db.engine, checkfirst=True)
 
     current_version = _get_bootstrap_version()
+    _backfill_history(current_version)
     for migration in BOOTSTRAP_MIGRATIONS:
         version = migration.version
         if current_version >= version:
             continue
         logger.info("Bootstrap migration %s v%d", migration.name, version)
         migration.apply()
+        _record_history(version, migration.name)
         _set_bootstrap_version(version)
         db.session.commit()
         current_version = version
