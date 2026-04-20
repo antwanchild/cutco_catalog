@@ -137,6 +137,7 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIn(b"Bootstrap History", response.data)
         self.assertIn(b"Storage &amp; Paths", response.data)
         self.assertIn(b"Bootstrap Version", response.data)
+        self.assertIn(b"UTC", response.data)
         self.assertIn(str(SCHEMA_VERSION).encode(), response.data)
         self.assertIn(str(BOOTSTRAP_VERSION).encode(), response.data)
 

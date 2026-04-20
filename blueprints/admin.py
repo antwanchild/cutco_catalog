@@ -3,9 +3,10 @@ import os
 import platform
 import sys
 import threading
+from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
-from datetime import date
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
@@ -62,6 +63,19 @@ def _path_status(path):
     }
 
 
+def _format_applied_at(value: str | None) -> str:
+    if not value:
+        return "—"
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    dt = dt.astimezone(timezone.utc)
+    date_part = dt.strftime("%b %d, %Y").replace(" 0", " ")
+    time_part = dt.strftime("%I:%M %p").lstrip("0")
+    return f"{date_part}, {time_part} UTC"
+
+
 def _runtime_details():
     db_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
     sqlite_file = db_uri.removeprefix("sqlite:////") if db_uri.startswith("sqlite:////") else None
@@ -87,10 +101,16 @@ def _runtime_details():
         "pgid": os.environ.get("PGID", "0"),
         "pid1_cmdline": _read_pid1_cmdline(),
         "schema_state": get_schema_state(),
-        "schema_history": get_schema_history(),
+        "schema_history": [
+            {**entry, "formatted_applied_at": _format_applied_at(entry.get("applied_at"))}
+            for entry in get_schema_history()
+        ],
         "schema_version": SCHEMA_VERSION,
         "bootstrap_state": get_bootstrap_state(),
-        "bootstrap_history": get_bootstrap_history(),
+        "bootstrap_history": [
+            {**entry, "formatted_applied_at": _format_applied_at(entry.get("applied_at"))}
+            for entry in get_bootstrap_history()
+        ],
         "bootstrap_version": BOOTSTRAP_VERSION,
         "path_checks": [
             {"label": "Data Directory", **_path_status(data_dir)},

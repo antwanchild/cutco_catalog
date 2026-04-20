@@ -138,7 +138,7 @@
           <tr>
             <td class="mono">v{{ entry.version }}</td>
             <td>{{ entry.name }}</td>
-            <td class="mono">{{ entry.applied_at }}</td>
+            <td class="mono" title="{{ entry.applied_at }}">{{ entry.formatted_applied_at }}</td>
           </tr>
           {% endfor %}
           {% if not details.schema_history %}
@@ -180,7 +180,7 @@
           <tr>
             <td class="mono">v{{ entry.version }}</td>
             <td>{{ entry.name }}</td>
-            <td class="mono">{{ entry.applied_at }}</td>
+            <td class="mono" title="{{ entry.applied_at }}">{{ entry.formatted_applied_at }}</td>
           </tr>
           {% endfor %}
           {% if not details.bootstrap_history %}
