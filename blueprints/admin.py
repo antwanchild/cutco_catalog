@@ -9,7 +9,7 @@ from datetime import date
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
-from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION
+from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION, get_git_sha
 from extensions import db
 from extensions import limiter
 from helpers import is_admin
@@ -69,7 +69,7 @@ def _runtime_details():
     log_dir = os.environ.get("LOG_DIR", "/data/logs")
     return {
         "app_version": APP_VERSION,
-        "git_sha": os.environ.get("GIT_SHA", "unknown"),
+        "git_sha": get_git_sha(),
         "python_version": sys.version.split()[0],
         "platform": platform.platform(),
         "cwd": os.getcwd(),

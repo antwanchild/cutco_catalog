@@ -6,6 +6,7 @@ from unittest import mock
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 from app import create_app
+import constants
 from constants import KNIFE_TASK_PRESETS
 from extensions import db
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Set
@@ -138,6 +139,18 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIn(b"Bootstrap Version", response.data)
         self.assertIn(str(SCHEMA_VERSION).encode(), response.data)
         self.assertIn(str(BOOTSTRAP_VERSION).encode(), response.data)
+
+    def test_admin_diagnostics_falls_back_to_git_sha(self):
+        self._login_as_admin()
+        constants.get_git_sha.cache_clear()
+        self.addCleanup(constants.get_git_sha.cache_clear)
+
+        with mock.patch.dict(os.environ, {"GIT_SHA": ""}, clear=False), \
+             mock.patch("constants._read_git_sha_from_repo", return_value="0123456789abcdef0123456789abcdef01234567"):
+            response = self.client.get("/admin/diagnostics")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"0123456", response.data)
 
     def test_admin_routes_require_login(self):
         msrp_page = self.client.get("/admin/msrp-diff", follow_redirects=False)

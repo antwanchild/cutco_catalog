@@ -1,5 +1,8 @@
 import os
 import re
+import subprocess
+from functools import lru_cache
+from pathlib import Path
 
 EDGE_TYPES = ["Straight", "Double-D", "Micro Double-D", "Serrated", "Micro-D", "Tec Edge", "N/A", "Unknown"]
 STATUS_OPTIONS = ["Owned", "Wishlist", "Sold", "Traded"]
@@ -28,7 +31,33 @@ KNIFE_TASK_PRESETS = [
 ]
 UNKNOWN_COLOR = "Unknown / Unspecified"
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
-GIT_SHA = os.environ.get("GIT_SHA", "unknown")
+
+
+def _read_git_sha_from_repo() -> str | None:
+    repo_root = Path(__file__).resolve().parent
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    sha = result.stdout.strip()
+    return sha or None
+
+
+@lru_cache(maxsize=1)
+def get_git_sha() -> str:
+    sha = os.environ.get("GIT_SHA", "").strip()
+    if sha:
+        return sha
+    return _read_git_sha_from_repo() or "unknown"
+
+
+GIT_SHA = get_git_sha()
 
 SCRAPE_CATEGORIES = [
     ("Utility Knives",  "https://www.cutco.com/shop/utility-knives"),
