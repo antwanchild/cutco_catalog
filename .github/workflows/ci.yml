@@ -196,6 +196,7 @@ jobs:
           labels: ${{ steps.docker_meta.outputs.labels }}
           build-args: |
             APP_VERSION=${{ steps.version.outputs.version }}
+            GIT_SHA=${{ github.sha }}
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2.6.1
