@@ -116,16 +116,13 @@ def _build_set_member_entries(
             if matched_index is not None:
                 used_visible.add(matched_index)
             visible_sku = _normalize_set_member_sku(matched_visible.get("sku")) if matched_visible else None
-            inferred_sku = _infer_visible_member_sku_from_name(matched_visible.get("name") if matched_visible else structured.get("name"))
             structured_sku = _normalize_set_member_sku(structured.get("sku"))
             fallback_sku = _normalize_set_member_sku(
                 member_skus[matched_index]
                 if matched_index is not None and matched_index < len(member_skus)
                 else structured.get("sku"),
             )
-            chosen_sku = visible_sku or inferred_sku or structured_sku or fallback_sku
-            if chosen_sku and chosen_sku == structured_sku and inferred_sku:
-                chosen_sku = inferred_sku
+            chosen_sku = visible_sku or structured_sku or fallback_sku
             member_entries.append({
                 "sku": chosen_sku,
                 "name": matched_visible.get("name") if matched_visible and matched_visible.get("name") else structured.get("name") or None,
@@ -143,9 +140,8 @@ def _build_set_member_entries(
             if visible_index in used_visible:
                 continue
             visible_sku = _normalize_set_member_sku(visible_row.get("sku"))
-            inferred_sku = _infer_visible_member_sku_from_name(visible_row.get("name"))
             fallback_sku = _normalize_set_member_sku(member_skus[visible_index]) if visible_index < len(member_skus) else None
-            chosen_sku = visible_sku or inferred_sku or fallback_sku
+            chosen_sku = visible_sku or fallback_sku
             if not chosen_sku:
                 continue
             normalized_sku = _norm_member_name(chosen_sku)
@@ -214,21 +210,6 @@ def _infer_visible_member_sku(member_name: str | None, *, context_url: str | Non
             return inferred_sku
     if context_url and "box" in lower:
         inferred_sku, _ = _fetch_sku_from_page(context_url, preserve_lettered_code=True)
-        if inferred_sku:
-            return inferred_sku
-    return None
-
-
-@lru_cache(maxsize=1024)
-def _infer_visible_member_sku_from_name(member_name: str | None) -> str | None:
-    name = str(member_name or "").strip()
-    if not name:
-        return None
-    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    if not slug:
-        return None
-    for candidate_slug in (slug, slug.replace("-inch-", "-")):
-        inferred_sku, _ = _fetch_sku_from_page(f"https://www.cutco.com/p/{candidate_slug}")
         if inferred_sku:
             return inferred_sku
     return None
@@ -818,16 +799,15 @@ def scrape_sets(
                     if matched_index is not None:
                         used_structured.add(matched_index)
                     visible_sku = _normalize_set_member_sku(visible_row.get("sku"))
-                    inferred_sku = _infer_visible_member_sku_from_name(visible_name)
                     structured_sku = _normalize_set_member_sku(matched_structured.get("sku")) if matched_structured else None
                     fallback_sku = _normalize_set_member_sku(member_skus[idx]) if idx < len(member_skus) else None
                     fallback_qty = member_quantities.get(
-                        visible_sku or inferred_sku or structured_sku or fallback_sku,
+                        visible_sku or structured_sku or fallback_sku,
                         1,
                     )
-                    chosen_sku = visible_sku or inferred_sku or structured_sku or fallback_sku
+                    chosen_sku = visible_sku or structured_sku or fallback_sku
                     if chosen_sku and set_sku and chosen_sku == set_sku:
-                        chosen_sku = inferred_sku or visible_sku or structured_sku or fallback_sku
+                        chosen_sku = visible_sku or structured_sku or fallback_sku
                     member_entries.append(dict(
                         sku=chosen_sku,
                         name=visible_name,

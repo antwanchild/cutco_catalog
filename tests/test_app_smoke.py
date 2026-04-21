@@ -28,7 +28,6 @@ from scraping import (
     _build_set_member_entries,
     _member_hover_title,
     _infer_visible_member_sku,
-    _infer_visible_member_sku_from_name,
     _normalize_set_member_sku,
 )
 from blueprints.catalog import _load_member_snapshot
@@ -707,15 +706,6 @@ class UtilitySmokeTests(SmokeBaseTest):
                 "2130CD",
             )
 
-    def test_infer_visible_member_sku_from_name_supports_regular_product_pages(self):
-        response = mock.Mock()
-        response.status_code = 200
-        response.text = """
-            <html><body><h1>#1708</h1><h1>Salad Tongs</h1></body></html>
-        """
-        with mock.patch("scraping.requests.get", return_value=response):
-            self.assertEqual(_infer_visible_member_sku_from_name("Salad Tongs"), "1708")
-
     def test_build_set_member_entries_uses_visible_row_skus(self):
         structured_members = [{"sku": "777", "name": "Super Shears", "quantity": 1}]
         visible_rows = [
@@ -723,13 +713,12 @@ class UtilitySmokeTests(SmokeBaseTest):
             {"name": "Gift Box", "sku": "123", "is_set_only": True},
         ]
 
-        with mock.patch("scraping._infer_visible_member_sku_from_name", return_value=None):
-            member_entries = _build_set_member_entries(
-                structured_members,
-                visible_rows,
-                ["777", "123"],
-                {"777": 1, "123": 1},
-            )
+        member_entries = _build_set_member_entries(
+            structured_members,
+            visible_rows,
+            ["777", "123"],
+            {"777": 1, "123": 1},
+        )
 
         self.assertEqual(member_entries[0]["sku"], "777")
         self.assertEqual(member_entries[0]["name"], "Super Shears")
