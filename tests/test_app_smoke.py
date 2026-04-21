@@ -723,12 +723,13 @@ class UtilitySmokeTests(SmokeBaseTest):
             {"name": "Gift Box", "sku": "123", "is_set_only": True},
         ]
 
-        member_entries = _build_set_member_entries(
-            structured_members,
-            visible_rows,
-            ["777", "123"],
-            {"777": 1, "123": 1},
-        )
+        with mock.patch("scraping._infer_visible_member_sku_from_name", return_value=None):
+            member_entries = _build_set_member_entries(
+                structured_members,
+                visible_rows,
+                ["777", "123"],
+                {"777": 1, "123": 1},
+            )
 
         self.assertEqual(member_entries[0]["sku"], "777")
         self.assertEqual(member_entries[0]["name"], "Super Shears")
