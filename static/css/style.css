@@ -350,6 +350,7 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--border);
   text-align: left;
 }
+.data-table td { vertical-align: top; }
 .data-table th {
   background: var(--bg2);
   color: var(--muted);
@@ -363,12 +364,6 @@ a:hover { text-decoration: underline; }
 .data-table th a:hover { color: var(--text); }
 .data-table tbody tr:hover { background: var(--bg2); }
 .data-table.compact th, .data-table.compact td { padding: .35rem .6rem; }
-.catalog-table td,
-.sets-table td,
-.data-table td.sets-cell,
-.data-table td.actions {
-  vertical-align: top;
-}
 .member-sort-btn {
   background: transparent;
   border: 0;
