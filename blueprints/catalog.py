@@ -600,7 +600,7 @@ def catalog_sync():
         for item in Item.query.all()
         if item.name
     }
-    set_only_members = []
+    set_only_member_map: OrderedDict[str, dict] = OrderedDict()
     for item_set in scraped_sets:
         member_entries = item_set.get("member_entries") or [
             {
@@ -625,14 +625,26 @@ def catalog_sync():
                 continue
             if not member_name:
                 continue
-            set_only_members.append({
-                "set_name": item_set["name"],
-                "set_sku": item_set.get("sku"),
-                "set_url": item_set["url"],
-                "member_name": member_name,
-                "member_sku": member_sku or None,
-                "quantity": member.get("quantity", 1) or 1,
-            })
+            member_key = member_sku.upper() if member_sku else re.sub(r"[^a-z0-9]+", " ", member_name.lower()).strip()
+            existing = set_only_member_map.get(member_key)
+            if existing is None:
+                set_only_member_map[member_key] = {
+                    "set_name": item_set["name"],
+                    "set_sku": item_set.get("sku"),
+                    "set_url": item_set["url"],
+                    "member_name": member_name,
+                    "member_sku": member_sku or None,
+                    "quantity": member.get("quantity", 1) or 1,
+                    "occurrences": 1,
+                }
+            else:
+                existing["occurrences"] += 1
+                if not existing.get("member_sku") and member_sku:
+                    existing["member_sku"] = member_sku
+                if item_set["name"] != existing["set_name"]:
+                    existing.setdefault("source_sets", []).append(item_set["name"])
+
+    set_only_members = list(set_only_member_map.values())
 
     # Fetch specs (edge, msrp, lengths, weight) for new items in parallel
     if new_items:

@@ -165,6 +165,9 @@
           {% if member.member_sku %}
             <span class="badge badge-info mono" style="margin-left:.35rem">{{ member.member_sku }}</span>
           {% endif %}
+          {% if member.occurrences and member.occurrences > 1 %}
+            <span class="badge badge-muted" style="margin-left:.35rem">×{{ member.occurrences }}</span>
+          {% endif %}
         </td>
         <td class="mono">{{ member.quantity }}</td>
         <td><span class="badge badge-off-catalog">Set-only</span></td>
