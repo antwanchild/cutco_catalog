@@ -153,7 +153,7 @@ def _build_member_status_rows(
             "sku": sku,
             "name": entry.get("name") or None,
             "hover_title": _member_hover_title(
-                item.name if item is not None else entry.get("name")
+                _get_item_field(item, "name") if item is not None else entry.get("name")
             ),
             "quantity": quantity,
             "status": status,
