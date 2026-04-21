@@ -37,6 +37,15 @@ def _extract_sku_from_href(href: str) -> str | None:
     return candidate or None
 
 
+def _extract_sku_from_image_src(src: str | None) -> str | None:
+    if not src:
+        return None
+    match = re.search(r"/rolo/([0-9]+(?:-[0-9]+)?[A-Z]{0,3})-h\.", src, re.IGNORECASE)
+    if match:
+        return match.group(1).upper()
+    return None
+
+
 def _discover_categories() -> list[tuple[str, str]]:
     """Scrape the Cutco shop index to discover all category pages automatically."""
     discovery_urls = [
@@ -273,7 +282,9 @@ def _collect_visible_set_piece_rows(pieces_list, *, context_url: str | None = No
             visible_name = image.get("alt", "").strip() if image else ""
         if not visible_name:
             continue
-        visible_sku = _resolve_visible_member_sku(None, visible_name, context_url=context_url, set_sku=set_sku)
+        visible_sku = _extract_sku_from_image_src(li.find("img", src=True).get("src") if li.find("img", src=True) else None)
+        if not visible_sku:
+            visible_sku = _resolve_visible_member_sku(None, visible_name, context_url=context_url, set_sku=set_sku)
         visible_rows.append({
             "name": visible_name,
             "sku": visible_sku,

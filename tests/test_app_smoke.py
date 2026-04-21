@@ -764,6 +764,7 @@ class UtilitySmokeTests(SmokeBaseTest):
         rows = _collect_visible_set_piece_rows(soup.ul, context_url="https://www.cutco.com/p/salad-mates", set_sku="1820CD")
         self.assertEqual([row["sku"] for row in rows[:2]], ["1720", "1721"])
         self.assertEqual([row["name"] for row in rows[:2]], ['2-3/4" Paring Knife', "Trimmer"])
+        self.assertEqual(rows[2]["sku"], "2111D")
 
     def test_build_set_member_entries_uses_visible_row_skus(self):
         structured_members = [{"sku": "777", "name": "Super Shears", "quantity": 1}]
