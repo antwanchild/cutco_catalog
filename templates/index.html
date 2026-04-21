@@ -40,29 +40,29 @@
     <a class="btn btn-ghost btn-sm" href="{{ url_for('search') }}">Search</a>
   </div>
   <div class="quick-action-grid">
-    <div class="quick-action-card">
+    <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">Add item</span>
       <span class="quick-action-note">Create a new catalog item.</span>
       <a class="btn btn-primary btn-sm quick-action-btn" href="{{ url_for('catalog.catalog_add') }}">+ Add Item</a>
     </div>
-    <div class="quick-action-card">
+    <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">Add collector</span>
       <span class="quick-action-note">Create a person record.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('people.people_add') }}">+ Add Collector</a>
     </div>
-    <div class="quick-action-card">
+    <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">Diagnostics</span>
       <span class="quick-action-note">Check runtime, migrations, and storage.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('admin.diagnostics_page') }}">Open Diagnostics</a>
     </div>
     {% if is_admin() %}
-    <div class="quick-action-card">
+    <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">Catalog sync</span>
       <span class="quick-action-note">Preview and import Cutco updates.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" id="dashboard-sync-btn" href="{{ url_for('catalog.catalog_sync') }}">Run Sync</a>
       <span class="quick-action-status" id="dashboard-sync-status" hidden>Preparing sync preview...</span>
     </div>
-    <div class="quick-action-card">
+    <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">MSRP diff</span>
       <span class="quick-action-note">Review price changes before applying them.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('admin.msrp_diff_page') }}">Open MSRP Diff</a>
@@ -84,7 +84,7 @@
     <span class="muted small">Latest records by type</span>
   </div>
   <div class="changes-grid">
-    <div class="changes-card">
+    <div class="dashboard-card changes-card">
       <h3>Catalog Items</h3>
       {% for item in recent_changes['items'] %}
         <div class="change-item">
@@ -98,7 +98,7 @@
         <div class="muted">No items yet.</div>
       {% endfor %}
     </div>
-    <div class="changes-card">
+    <div class="dashboard-card changes-card">
       <h3>Collectors</h3>
       {% for person in recent_changes['people'] %}
         <div class="change-item">
@@ -111,7 +111,7 @@
         <div class="muted">No collectors yet.</div>
       {% endfor %}
     </div>
-    <div class="changes-card">
+    <div class="dashboard-card changes-card">
       <h3>Ownership Entries</h3>
       {% for ownership in recent_changes['entries'] %}
         <div class="change-item">
@@ -136,7 +136,7 @@
   </div>
   <div class="activity-grid">
     {% for entry in recent_activity %}
-      <article class="activity-card">
+      <article class="dashboard-card activity-card">
         <div class="activity-label-row">
           <span class="activity-label">{{ entry.label }}</span>
           <span class="activity-time">{{ entry.time }}</span>
@@ -158,19 +158,19 @@
     <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.diagnostics_page') }}">Open diagnostics</a>
   </div>
   <div class="release-grid">
-    <div class="release-card">
+    <div class="dashboard-card release-card">
       <div class="release-label">App Version</div>
       <div class="release-value">v{{ release_snapshot.app_version }}</div>
       <div class="release-note">Current application release</div>
     </div>
-    <div class="release-card">
+    <div class="dashboard-card release-card">
       <div class="release-label">Git SHA</div>
       <div class="release-value mono">{{ release_snapshot.git_sha[:7] if release_snapshot.git_sha and release_snapshot.git_sha != "unknown" else "unknown" }}</div>
       <div class="release-note">
         {% if release_snapshot.git_sha_source == "image" %}from image build{% elif release_snapshot.git_sha_source == "repo" %}from local repo{% else %}source unavailable{% endif %}
       </div>
     </div>
-    <div class="release-card">
+    <div class="dashboard-card release-card">
       <div class="release-label">Schema / Bootstrap</div>
       <div class="release-value">v{{ release_snapshot.schema_version }} / v{{ release_snapshot.bootstrap_version }}</div>
       <div class="release-note">Current migration and bootstrap baselines</div>

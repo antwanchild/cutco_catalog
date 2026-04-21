@@ -545,7 +545,7 @@ textarea { resize: vertical; }
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: .75rem;
 }
-.quick-action-card {
+.dashboard-card {
   display: flex;
   flex-direction: column;
   gap: .35rem;
@@ -553,6 +553,8 @@ textarea { resize: vertical; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: .9rem 1rem;
+}
+.quick-action-card {
   min-height: 88px;
 }
 .quick-action-card.is-loading {
@@ -595,12 +597,6 @@ textarea { resize: vertical; }
   gap: .75rem;
 }
 .changes-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: .9rem 1rem;
-  display: flex;
-  flex-direction: column;
   gap: .35rem;
 }
 .changes-card h3 {
@@ -642,14 +638,7 @@ textarea { resize: vertical; }
   gap: .75rem;
 }
 .activity-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: .9rem 1rem;
   min-height: 92px;
-  display: flex;
-  flex-direction: column;
-  gap: .35rem;
 }
 .activity-label-row {
   display: flex;
@@ -685,14 +674,7 @@ textarea { resize: vertical; }
   gap: .75rem;
 }
 .release-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: .9rem 1rem;
   min-height: 92px;
-  display: flex;
-  flex-direction: column;
-  gap: .35rem;
 }
 .release-label {
   font-size: .68rem;
