@@ -160,6 +160,8 @@ def _member_hover_title(member_name: str | None) -> str | None:
     for separator in (",", ";", " / "):
         if separator in title:
             title = title.split(separator, 1)[0].strip()
+    if re.search(r"\s+[—–-]\s+", title):
+        title = re.split(r"\s+[—–-]\s+", title, maxsplit=1)[0].strip()
     return title or None
 
 
