@@ -77,6 +77,7 @@ class Set(db.Model):
     name  = db.Column(db.String(120), nullable=False, unique=True)
     sku   = db.Column(db.String(20),  nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    member_data = db.Column(db.Text, nullable=True)
 
     members = db.relationship("ItemSetMember", back_populates="set",
                              cascade="all, delete-orphan")

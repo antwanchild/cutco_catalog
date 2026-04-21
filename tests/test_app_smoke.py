@@ -1,3 +1,4 @@
+import json
 import os
 from io import BytesIO
 import tempfile
@@ -1358,10 +1359,11 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "name": "New Sync Set",
                 "sku": "NSS-1",
                 "url": "https://example.com/new-set",
-                "member_skus": ["NS-1"],
-                "member_quantities": {"NS-1": 2},
+                "member_skus": ["EX-1", "NS-2"],
+                "member_quantities": {"EX-1": 2, "NS-2": 1},
                 "member_entries": [
-                    {"sku": "NS-1", "name": "New Sync Knife", "quantity": 2},
+                    {"sku": "EX-1", "name": "Existing Sync Knife", "quantity": 2},
+                    {"sku": "NS-2", "name": "Missing Sync Knife", "quantity": 1},
                 ],
             }
         ]
@@ -1386,6 +1388,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Sync Knife", response.data)
         self.assertIn(b"New Sets", response.data)
         self.assertIn(b"New Sync Set", response.data)
+        self.assertIn(b"In catalog", response.data)
+        self.assertIn(b"Missing from catalog", response.data)
 
     def test_catalog_sync_uses_populates_tasks(self):
         self._login_as_admin()
@@ -1437,9 +1441,18 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "set_sku_0": "SX-SET-NEW",
                 "set_members_0": "SX-NEW-1",
                 "set_member_qtys_0": "SX-NEW-1:2",
+                "set_member_data_0": json.dumps(
+                    [
+                        {"sku": "SX-NEW-1", "name": "Sync New Knife", "quantity": 2},
+                        {"sku": "SX-MISS-1", "name": "Sync Missing Knife", "quantity": 1},
+                    ]
+                ),
                 "existing_set_count": "1",
                 "existing_set_name_0": "Sync Existing Set",
                 "existing_set_member_qtys_0": "SX-EX-1:3",
+                "existing_set_member_data_0": json.dumps(
+                    [{"sku": "SX-EX-1", "name": "Sync Existing Knife", "quantity": 3}]
+                ),
             },
             follow_redirects=False,
         )
@@ -1450,8 +1463,17 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIsNone(new_item.msrp)
             new_set = db.session.execute(db.select(Set).filter_by(name="Sync New Set")).scalar_one()
             self.assertEqual(new_set.members[0].quantity, 2)
+            self.assertIsNotNone(new_set.member_data)
+            self.assertIn("SX-MISS-1", new_set.member_data)
             existing_set = db.session.get(Set, existing_set_id)
             self.assertEqual(existing_set.members[0].quantity, 3)
+            self.assertIsNotNone(existing_set.member_data)
+
+        set_detail_response = self.client.get(f"/sets/{new_set.id}")
+        self.assertEqual(set_detail_response.status_code, 200)
+        self.assertIn(b"Imported Members", set_detail_response.data)
+        self.assertIn(b"Missing item numbers", set_detail_response.data)
+        self.assertIn(b"SX-MISS-1", set_detail_response.data)
 
     def test_catalog_purge_and_delete_routes(self):
         self._login_as_admin()

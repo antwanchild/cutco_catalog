@@ -48,6 +48,48 @@
 </div>
 {% endif %}
 
+{% if member_snapshot_rows %}
+<h2 class="section-heading">📋 Imported Members ({{ member_snapshot_rows | length }})</h2>
+<p class="muted">These are the item numbers captured when this set was imported. Missing numbers are not currently in the catalog.</p>
+<div class="table-wrap">
+<table class="data-table compact">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Item</th>
+      <th>SKU</th>
+      <th>Qty</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for member in member_snapshot_rows %}
+    <tr class="{% if member.status == 'missing' %}row-missing{% endif %}">
+      <td class="mono">{{ member.index }}</td>
+      <td>
+        {% if member.matched_item %}
+          <a href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}">{{ member.name or member.matched_item.name }}</a>
+        {% else %}
+          {{ member.name or '—' }}
+        {% endif %}
+      </td>
+      <td class="mono">{{ member.sku or '—' }}</td>
+      <td>{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% else %}<span class="muted">1</span>{% endif %}</td>
+      <td>
+        <span class="badge {% if member.status == 'present' %}badge-present{% elif member.status == 'missing' %}badge-missing{% else %}badge-info{% endif %}">
+          {{ member.status_label }}
+        </span>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if missing_member_skus %}
+<p class="muted">Missing item numbers: {% for sku in missing_member_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</p>
+{% endif %}
+{% endif %}
+
 {% if owned_items %}
 <h2 class="section-heading">✅ Owned ({{ owned_items | length }})</h2>
 <div class="table-wrap">

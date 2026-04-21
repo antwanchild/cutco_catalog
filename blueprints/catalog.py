@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from collections import OrderedDict
@@ -15,6 +16,69 @@ from scraping import scrape_catalog, scrape_item_specs, scrape_item_uses, scrape
 
 catalog_bp = Blueprint("catalog", __name__)
 logger = logging.getLogger(__name__)
+
+
+def _normalize_member_sku(value: str | None) -> str | None:
+    sku = (str(value).strip().upper() if value is not None else "")
+    return sku or None
+
+
+def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
+    if not raw_member_data:
+        return []
+    try:
+        payload = json.loads(raw_member_data)
+    except (TypeError, json.JSONDecodeError):
+        return []
+    if isinstance(payload, dict):
+        payload = payload.get("members") or payload.get("member_entries") or []
+    if not isinstance(payload, list):
+        return []
+    rows: list[dict] = []
+    for entry in payload:
+        if not isinstance(entry, dict):
+            continue
+        sku = _normalize_member_sku(entry.get("sku"))
+        name = str(entry.get("name") or "").strip() or None
+        try:
+            quantity = max(1, int(entry.get("quantity") or 1))
+        except (TypeError, ValueError):
+            quantity = 1
+        rows.append({"sku": sku, "name": name, "quantity": quantity})
+    return rows
+
+
+def _build_member_status_rows(member_entries: list[dict], catalog_sku_lookup: dict[str, Item]) -> tuple[list[dict], list[str]]:
+    rows: list[dict] = []
+    missing_skus: list[str] = []
+    for index, entry in enumerate(member_entries, start=1):
+        sku = _normalize_member_sku(entry.get("sku"))
+        item = catalog_sku_lookup.get(sku) if sku else None
+        quantity = entry.get("quantity", 1)
+        try:
+            quantity = max(1, int(quantity))
+        except (TypeError, ValueError):
+            quantity = 1
+        if item is not None:
+            status = "present"
+            status_label = "In catalog"
+        elif sku:
+            status = "missing"
+            status_label = "Missing from catalog"
+            missing_skus.append(sku)
+        else:
+            status = "no_sku"
+            status_label = "No item number"
+        rows.append({
+            "index": index,
+            "sku": sku,
+            "name": entry.get("name") or None,
+            "quantity": quantity,
+            "status": status,
+            "status_label": status_label,
+            "matched_item": item,
+        })
+    return rows, missing_skus
 
 
 @catalog_bp.route("/catalog")
@@ -447,6 +511,16 @@ def set_detail(set_id=None, sid=None):
             if ownership.variant is not None and ownership.variant.item is not None
         }
 
+    catalog_sku_lookup = {
+        _normalize_member_sku(item.sku): item
+        for item in Item.query.filter(Item.sku.isnot(None)).all()
+        if _normalize_member_sku(item.sku)
+    }
+    member_snapshot_rows, missing_member_skus = _build_member_status_rows(
+        _load_member_snapshot(item_set.member_data),
+        catalog_sku_lookup,
+    )
+
     def _sort_items(items: list[Item]) -> list[Item]:
         if sort_field == "msrp":
             if direction == "desc":
@@ -491,6 +565,8 @@ def set_detail(set_id=None, sid=None):
                            direction=direction,
                            wishlisted_item_ids=wishlisted_item_ids,
                            qty_map=qty_map,
+                           member_snapshot_rows=member_snapshot_rows,
+                           missing_member_skus=missing_member_skus,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
@@ -614,6 +690,18 @@ def catalog_sync():
     # Pass existing sets too so confirm can update member quantities
     existing_sets_data = [scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() in existing_sets]
 
+    catalog_sku_lookup = {
+        _normalize_member_sku(item.sku): item
+        for item in Item.query.filter(Item.sku.isnot(None)).all()
+        if _normalize_member_sku(item.sku)
+    }
+    for item_set in (*new_sets, *existing_sets_data):
+        member_entries = item_set.get("member_entries") or []
+        member_snapshot_rows, missing_member_skus = _build_member_status_rows(member_entries, catalog_sku_lookup)
+        item_set["member_snapshot_rows"] = member_snapshot_rows
+        item_set["missing_member_skus"] = missing_member_skus
+        item_set["member_data_json"] = json.dumps(member_entries, ensure_ascii=False)
+
     return render_template("sync_preview.html",
                            grouped=grouped,
                            new_items=new_items,
@@ -685,6 +773,8 @@ def catalog_sync_confirm():
                 except ValueError:
                     pass
         set_sku = request.form.get(f"set_sku_{index}", "").strip() or None
+        member_data_raw = request.form.get(f"set_member_data_{index}", "").strip()
+        member_data = _load_member_snapshot(member_data_raw) if member_data_raw else []
 
         pre_existing_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         item_set = get_or_create_set(set_name)
@@ -692,6 +782,8 @@ def catalog_sync_confirm():
             added_sets += 1
         if set_sku and not item_set.sku:
             item_set.sku = set_sku
+        if member_data_raw:
+            item_set.member_data = json.dumps(member_data, ensure_ascii=False)
 
         existing_members = {membership.item_id: membership for membership in item_set.members}
         for member_sku in member_skus:
@@ -716,6 +808,8 @@ def catalog_sync_confirm():
         item_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         if not item_set:
             continue
+        member_data_raw = request.form.get(f"existing_set_member_data_{index}", "").strip()
+        member_data = _load_member_snapshot(member_data_raw) if member_data_raw else []
         member_qtys = {}
         for raw_pair in request.form.get(f"existing_set_member_qtys_{index}", "").split("|"):
             if ":" in raw_pair:
@@ -731,6 +825,8 @@ def catalog_sync_confirm():
                 if member.quantity != new_qty:
                     member.quantity = new_qty
                     qty_updates += 1
+        if member_data_raw:
+            item_set.member_data = json.dumps(member_data, ensure_ascii=False)
 
     db_commit(db.session)
     logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates",

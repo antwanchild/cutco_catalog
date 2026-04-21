@@ -142,9 +142,14 @@ def _schema_set_only_migrations() -> None:
     )
 
 
+def _schema_set_member_snapshot_migrations() -> None:
+    _add_column("sets", "member_data", "ALTER TABLE sets ADD COLUMN member_data TEXT")
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
+    SchemaMigration(3, "set_member_snapshot", _schema_set_member_snapshot_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

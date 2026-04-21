@@ -25,6 +25,7 @@
   {% for item_set in existing_sets_data %}
   <input type="hidden" name="existing_set_name_{{ loop.index0 }}" value="{{ item_set.name }}">
   <input type="hidden" name="existing_set_member_qtys_{{ loop.index0 }}" value="{{ item_set.member_quantities.items() | map('join', ':') | join('|') }}">
+  <input type="hidden" name="existing_set_member_data_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
   {% endfor %}
 
   {# ── New Items #}
@@ -117,10 +118,25 @@
         <td>{{ item_set.name }}</td>
         <td class="mono">{{ item_set.sku or '—' }}</td>
         <td>
-          <span class="muted small">{{ item_set.member_skus | length }} item(s):</span>
-          {% for sku in item_set.member_skus %}
-            <span class="mono small">{{ sku }}{% set qty = item_set.member_quantities.get(sku, 1) %}{% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}</span>{% if not loop.last %}, {% endif %}
+          <span class="muted small">{{ item_set.member_snapshot_rows | length }} item(s):</span>
+          {% for member in item_set.member_snapshot_rows %}
+            <span class="mono small">
+              {{ member.sku or '—' }}
+              {% set qty = member.quantity or 1 %}
+              {% if member.name %}<span class="muted"> {{ member.name }}</span>{% endif %}
+              {% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}
+              {% if member.status == 'present' %}
+                <span class="badge badge-present">In catalog</span>
+              {% elif member.status == 'missing' %}
+                <span class="badge badge-missing">Missing from catalog</span>
+              {% else %}
+                <span class="badge badge-info">No item #</span>
+              {% endif %}
+            </span>{% if not loop.last %}, {% endif %}
           {% endfor %}
+          {% if item_set.missing_member_skus %}
+            <div class="muted small">Missing item numbers: {% for sku in item_set.missing_member_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</div>
+          {% endif %}
         </td>
         <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
       </tr>
@@ -148,9 +164,18 @@
       <tr>
         <td>{{ item_set.name }}</td>
         <td>
-          {% for sku in item_set.member_skus %}
-            {% set qty = item_set.member_quantities.get(sku, 1) %}
-            <span class="mono small">{{ sku }}{% if qty > 1 %} <span class="badge badge-info">×{{ qty }}</span>{% endif %}</span>{% if not loop.last %}, {% endif %}
+          {% for member in item_set.member_snapshot_rows %}
+            <span class="mono small">
+              {{ member.sku or '—' }}
+              {% if member.quantity > 1 %} <span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}
+              {% if member.status == 'present' %}
+                <span class="badge badge-present">In catalog</span>
+              {% elif member.status == 'missing' %}
+                <span class="badge badge-missing">Missing from catalog</span>
+              {% else %}
+                <span class="badge badge-info">No item #</span>
+              {% endif %}
+            </span>{% if not loop.last %}, {% endif %}
           {% endfor %}
         </td>
         <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
