@@ -387,7 +387,17 @@ a:hover { text-decoration: underline; }
   min-width: .9em;
 }
 .table-count { margin-top: .6rem; font-size: .8rem; color: var(--muted); }
-.actions { display: flex; gap: .3rem; align-items: flex-start; white-space: nowrap; }
+td.actions {
+  white-space: nowrap;
+  vertical-align: top;
+}
+td.actions > * {
+  display: inline-flex;
+  align-items: center;
+  margin-right: .3rem;
+  vertical-align: top;
+}
+td.actions > *:last-child { margin-right: 0; }
 .ext-link { font-size: .8rem; color: var(--muted); margin-left: .25rem; }
 .ext-link:hover { color: var(--accent); }
 td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
