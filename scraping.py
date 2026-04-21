@@ -168,11 +168,27 @@ def _member_hover_title(member_name: str | None) -> str | None:
     return title or None
 
 
+def _infer_visible_member_sku(member_name: str | None) -> str | None:
+    name = str(member_name or "").strip()
+    if not name:
+        return None
+    lower = name.lower()
+    if "gift box" not in lower:
+        return None
+    slug = re.sub(r"[^a-z0-9]+", "-", lower).strip("-")
+    if not slug:
+        return None
+    inferred_sku, _ = _fetch_sku_from_page(f"https://www.cutco.com/p/{slug}")
+    return _normalize_set_member_sku(inferred_sku)
+
+
 def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
     sku = (str(raw_sku or "").upper().strip().split("/")[0] if raw_sku is not None else "")
     if not sku:
         return None
     sku = re.sub(r"[\s\-]+$", "", sku)
+    if re.fullmatch(r"\d{4}[A-Z]", sku):
+        return sku
     variant_match = re.fullmatch(r"(\d{3,})(?:[A-Z]+)?-\d+", sku)
     if variant_match:
         base = variant_match.group(1)
@@ -275,10 +291,12 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                 sku = sku_match.group(1).upper()
                 strategy_log.append(f"keyword={sku}")
 
-        # Normalise: strip all trailing color/variant letters
-        stripped = re.sub(r"[A-Z]+$", "", sku or "")
-        if stripped and stripped.isdigit() and len(stripped) >= 2:
-            sku = stripped
+        # Normalise: strip trailing color/variant letters, but keep
+        # four-digit lettered item codes such as 2026D.
+        if not re.fullmatch(r"\d{4}[A-Z]", sku or ""):
+            stripped = re.sub(r"[A-Z]+$", "", sku or "")
+            if stripped and stripped.isdigit() and len(stripped) >= 2:
+                sku = stripped
 
         # Reject CSS hex colors
         if sku and re.fullmatch(r"[0-9A-F]{6}", sku, re.IGNORECASE):
@@ -713,14 +731,12 @@ def scrape_sets(
                                 visible_sku = _extract_sku_from_href(href)
                                 if visible_sku:
                                     break
-                        has_standalone_product = any(
-                            "/p/" in (anchor.get("href") or "")
-                            for anchor in li.find_all("a", href=True)
-                        )
+                        if not visible_sku:
+                            visible_sku = _infer_visible_member_sku(visible_name)
                         visible_rows.append({
                             "name": visible_name,
                             "sku": visible_sku,
-                            "is_set_only": not has_standalone_product,
+                            "is_set_only": not visible_sku,
                         })
             if visible_rows:
                 logger.debug("Set '%s': visible Set Pieces labels → %d names", set_link["name"], len(visible_rows))

@@ -27,6 +27,7 @@ from models import (
 from scraping import (
     _build_set_member_entries,
     _member_hover_title,
+    _infer_visible_member_sku,
     _normalize_set_member_sku,
 )
 from blueprints.catalog import _load_member_snapshot
@@ -630,6 +631,7 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(_normalize_set_member_sku("1737C-1"), "1737")
         self.assertEqual(_normalize_set_member_sku("1737/1"), "1737")
         self.assertEqual(_normalize_set_member_sku("77-"), "77")
+        self.assertEqual(_normalize_set_member_sku("2026D"), "2026D")
         self.assertEqual(_normalize_set_member_sku("1737"), "1737")
         self.assertIsNone(_normalize_set_member_sku(""))
 
@@ -648,6 +650,16 @@ class UtilitySmokeTests(SmokeBaseTest):
         )
         self.assertEqual(_member_hover_title("Super Shears"), "Super Shears")
         self.assertIsNone(_member_hover_title(""))
+
+    def test_infer_visible_member_sku_supports_gift_box_pages(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body><h1>#2026D</h1><h1>Gift Box for Super Shears</h1></body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            self.assertEqual(_infer_visible_member_sku("Gift Box for Super Shears"), "2026D")
+            self.assertIsNone(_infer_visible_member_sku("Super Shears"))
 
     def test_build_set_member_entries_uses_visible_row_skus(self):
         structured_members = [{"sku": "777", "name": "Super Shears", "quantity": 1}]
