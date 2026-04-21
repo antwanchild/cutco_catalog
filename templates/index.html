@@ -137,8 +137,8 @@
   <div class="activity-grid">
     {% for entry in recent_activity %}
       <article class="dashboard-card activity-card">
-        <div class="activity-label-row">
-          <span class="activity-label">{{ entry.label }}</span>
+        <div class="activity-head">
+          <h3>{{ entry.label }}</h3>
           <span class="activity-time">{{ entry.time }}</span>
         </div>
         <div class="activity-title">
@@ -159,19 +159,19 @@
   </div>
   <div class="release-grid">
     <div class="dashboard-card release-card">
-      <div class="release-label">App Version</div>
+      <h3>App Version</h3>
       <div class="release-value">v{{ release_snapshot.app_version }}</div>
       <div class="release-note">Current application release</div>
     </div>
     <div class="dashboard-card release-card">
-      <div class="release-label">Git SHA</div>
+      <h3>Git SHA</h3>
       <div class="release-value mono">{{ release_snapshot.git_sha[:7] if release_snapshot.git_sha and release_snapshot.git_sha != "unknown" else "unknown" }}</div>
       <div class="release-note">
         {% if release_snapshot.git_sha_source == "image" %}from image build{% elif release_snapshot.git_sha_source == "repo" %}from local repo{% else %}source unavailable{% endif %}
       </div>
     </div>
     <div class="dashboard-card release-card">
-      <div class="release-label">Schema / Bootstrap</div>
+      <h3>Schema / Bootstrap</h3>
       <div class="release-value">v{{ release_snapshot.schema_version }} / v{{ release_snapshot.bootstrap_version }}</div>
       <div class="release-note">Current migration and bootstrap baselines</div>
     </div>

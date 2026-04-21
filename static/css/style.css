@@ -587,11 +587,11 @@ textarea { resize: vertical; }
   line-height: 1.2;
 }
 .changes-card h3,
-.activity-label,
-.release-label {
-  color: var(--muted);
-  letter-spacing: .08em;
-  text-transform: uppercase;
+.activity-head h3,
+.release-card h3 {
+  color: var(--text);
+  letter-spacing: 0;
+  text-transform: none;
 }
 .changes-grid {
   display: grid;
@@ -645,16 +645,18 @@ textarea { resize: vertical; }
 .activity-card {
   min-height: 92px;
 }
-.activity-label-row {
+.activity-head {
   display: flex;
   justify-content: space-between;
   gap: .5rem;
   align-items: center;
   flex-wrap: wrap;
 }
-.activity-label {
-  font-size: .68rem;
+.activity-head h3 {
+  font-size: .9rem;
   font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
 }
 .activity-time {
   font-size: .72rem;
@@ -681,13 +683,11 @@ textarea { resize: vertical; }
 .release-card {
   min-height: 92px;
 }
-.release-label {
-  font-size: .68rem;
+.release-card h3 {
+  font-size: .9rem;
   font-weight: 700;
-  color: var(--muted);
-  letter-spacing: .08em;
-  text-transform: uppercase;
   margin: 0;
+  line-height: 1.2;
 }
 .release-value {
   font-size: .95rem;
