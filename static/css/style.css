@@ -398,6 +398,10 @@ td.actions > * {
   vertical-align: top;
 }
 td.actions > *:last-child { margin-right: 0; }
+td.actions .btn-xs {
+  min-height: 1.75rem;
+  line-height: 1;
+}
 .ext-link { font-size: .8rem; color: var(--muted); margin-left: .25rem; }
 .ext-link:hover { color: var(--accent); }
 td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
