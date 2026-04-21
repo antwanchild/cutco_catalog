@@ -132,6 +132,9 @@ def _schema_column_migrations() -> None:
         "edge_is_unicorn",
         "ALTER TABLE items ADD COLUMN edge_is_unicorn BOOLEAN NOT NULL DEFAULT 0",
     )
+
+
+def _schema_set_only_migrations() -> None:
     _add_column(
         "items",
         "set_only",
@@ -141,6 +144,7 @@ def _schema_column_migrations() -> None:
 
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
+    SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version
