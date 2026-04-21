@@ -1380,4 +1380,8 @@ textarea { resize: vertical; }
 .form-inline { display: inline; }
 .flex-center { display: flex; align-items: center; gap: .5rem; }
 .section-heading-actions { display: flex; justify-content: space-between; align-items: center; }
+.section-heading-actions .btn {
+  min-width: 8.5rem;
+  justify-content: center;
+}
 .mono-sm { font-family: var(--mono); font-size: .82rem; }
