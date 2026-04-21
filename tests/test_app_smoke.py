@@ -10,7 +10,7 @@ os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 from app import create_app
 from extensions import db
-from helpers import _collection_token, _gift_token
+from helpers import _collection_token, _gift_token, _notify_discord, _verify_collection_token, _verify_gift_token, check_wishlist_targets
 from models import (
     CookwareSession,
     Item,
@@ -23,6 +23,7 @@ from models import (
     SharpeningLog,
     Set,
 )
+from time_utils import container_timezone, format_container_time
 
 
 class SmokeBaseTest(unittest.TestCase):
@@ -518,6 +519,97 @@ class ErrorSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 413)
         self.assertIn(b"File too large", response.data)
+
+
+class UtilitySmokeTests(SmokeBaseTest):
+    def test_token_helpers_validate_and_reject_tampering(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with self.app.app_context():
+            gift_token = _gift_token(12, 34)
+            collection_token = _collection_token(56)
+            self.assertEqual(_verify_gift_token(gift_token), (12, 34))
+            self.assertEqual(_verify_collection_token(collection_token), 56)
+            self.assertIsNone(_verify_gift_token("not-a-token"))
+            self.assertIsNone(_verify_collection_token("not-a-token"))
+            self.assertIsNone(_verify_gift_token(gift_token + "x"))
+            self.assertIsNone(_verify_collection_token(collection_token + "x"))
+
+    def test_notify_discord_handles_success_and_failure(self):
+        with mock.patch("helpers.DISCORD_WEBHOOK_URL", None):
+            self.assertFalse(_notify_discord("No webhook"))
+
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        with mock.patch("helpers.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
+             mock.patch("helpers.requests.post", return_value=response) as post_mock:
+            self.assertTrue(_notify_discord("Webhook works"))
+            post_mock.assert_called_once()
+
+        with mock.patch("helpers.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
+             mock.patch("helpers.requests.post", side_effect=RuntimeError("boom")):
+            self.assertFalse(_notify_discord("Webhook fails"))
+
+    def test_check_wishlist_targets_returns_hits(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, variant_id = self._add_catalog_item(name="Target Knife", sku="WT-1")
+        person_id = self._add_person(name="Target Person", notes="")
+
+        add_response = self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(variant_id),
+                "status": "Wishlist",
+                "target_price": "59.99",
+                "notes": "Waiting for a sale",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(add_response.status_code, 302)
+
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            self.assertIsNotNone(item)
+            item.msrp = 49.99
+            db.session.commit()
+
+            hits = check_wishlist_targets()
+
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0]["person"], "Target Person")
+        self.assertEqual(hits[0]["item"], "Target Knife")
+        self.assertEqual(hits[0]["sku"], "WT-1")
+        self.assertEqual(hits[0]["target"], 59.99)
+        self.assertEqual(hits[0]["msrp"], 49.99)
+        self.assertEqual(hits[0]["savings"], 10.0)
+
+    def test_time_utils_format_in_container_timezone(self):
+        with mock.patch.dict(os.environ, {"TZ": "America/Boise"}, clear=False):
+            tz, tz_name = container_timezone()
+            self.assertEqual(tz_name, "America/Boise")
+            self.assertEqual(format_container_time(None), "—")
+            self.assertEqual(format_container_time("not-a-time"), "not-a-time")
+            self.assertEqual(
+                format_container_time("2026-04-20T19:18:00+00:00"),
+                "Apr 20, 2026, 1:18 PM MDT",
+            )
+            self.assertEqual(
+                format_container_time("2026-04-20T19:18:00"),
+                "Apr 20, 2026, 1:18 PM MDT",
+            )
+
+        self.assertEqual(tz.key, "America/Boise")
+
+    def test_time_utils_invalid_timezone_falls_back_to_utc(self):
+        with mock.patch.dict(os.environ, {"TZ": "Not/AZone"}, clear=False):
+            tz, tz_name = container_timezone()
+            self.assertEqual(tz_name, "UTC")
+            self.assertEqual(format_container_time("2026-04-20T19:18:00+00:00"), "Apr 20, 2026, 7:18 PM UTC")
 
 
 class ImportSmokeTests(SmokeBaseTest):
