@@ -174,6 +174,9 @@ def _member_hover_title(member_name: str | None) -> str | None:
             title = title.split(separator, 1)[0].strip()
     if re.search(r"\s+[—–-]\s+", title):
         title = re.split(r"\s+[—–-]\s+", title, maxsplit=1)[0].strip()
+    words = title.split()
+    if len(words) > 4 and not any(separator in title for separator in (",", ";", " / ")) and not re.search(r"\s+[—–]\s+", title):
+        title = " ".join(words[:2]).strip()
     return title or None
 
 

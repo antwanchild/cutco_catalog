@@ -631,6 +631,10 @@ class UtilitySmokeTests(SmokeBaseTest):
             _member_hover_title("Super Shears - 77, 78"),
             "Super Shears",
         )
+        self.assertEqual(
+            _member_hover_title("Basting Spoon Slotted Spoon Ladle Mix-Stir Kitchen Tool Holder"),
+            "Basting Spoon",
+        )
         self.assertEqual(_member_hover_title("Super Shears"), "Super Shears")
         self.assertIsNone(_member_hover_title(""))
 
