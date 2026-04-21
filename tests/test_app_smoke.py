@@ -610,6 +610,26 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(member_entries[2]["name"], "Extra Piece")
         self.assertTrue(member_entries[2]["is_set_only"])
 
+    def test_set_member_entries_prefer_visible_individual_skus_over_set_sku(self):
+        structured_members = [
+            {"sku": "1820", "name": "Salad Tongs", "quantity": 1},
+            {"sku": "1820", "name": "Salad Fork", "quantity": 1},
+        ]
+        visible_rows = [
+            {"name": "Salad Tongs", "sku": "1708", "is_set_only": False},
+            {"name": "Salad Fork", "sku": "1707", "is_set_only": False},
+        ]
+
+        member_entries = _build_set_member_entries(
+            structured_members,
+            visible_rows,
+            ["1820", "1820"],
+            {"1820": 1},
+        )
+
+        self.assertEqual([entry["sku"] for entry in member_entries], ["1708", "1707"])
+        self.assertEqual([entry["name"] for entry in member_entries], ["Salad Tongs", "Salad Fork"])
+
     def test_load_member_snapshot_dedupes_duplicate_skus(self):
         rows = _load_member_snapshot(
             json.dumps(

@@ -115,8 +115,16 @@ def _build_set_member_entries(
                     break
             if matched_index is not None:
                 used_visible.add(matched_index)
+            visible_sku = _normalize_set_member_sku(matched_visible.get("sku")) if matched_visible else None
+            structured_sku = _normalize_set_member_sku(structured.get("sku"))
+            fallback_sku = _normalize_set_member_sku(
+                member_skus[matched_index]
+                if matched_index is not None and matched_index < len(member_skus)
+                else structured.get("sku"),
+            )
+            chosen_sku = visible_sku or structured_sku or fallback_sku
             member_entries.append({
-                "sku": structured.get("sku"),
+                "sku": chosen_sku,
                 "name": matched_visible.get("name") if matched_visible and matched_visible.get("name") else structured.get("name") or None,
                 "quantity": structured.get("quantity", 1),
                 "is_set_only": matched_visible.get("is_set_only", False) if matched_visible else False,
@@ -131,16 +139,18 @@ def _build_set_member_entries(
         for visible_index, visible_row in enumerate(visible_rows):
             if visible_index in used_visible:
                 continue
-            fallback_sku = member_skus[visible_index] if visible_index < len(member_skus) else None
-            if not fallback_sku:
+            visible_sku = _normalize_set_member_sku(visible_row.get("sku"))
+            fallback_sku = _normalize_set_member_sku(member_skus[visible_index]) if visible_index < len(member_skus) else None
+            chosen_sku = visible_sku or fallback_sku
+            if not chosen_sku:
                 continue
-            normalized_sku = _norm_member_name(fallback_sku)
+            normalized_sku = _norm_member_name(chosen_sku)
             if normalized_sku in seen_skus:
                 continue
             member_entries.append({
-                "sku": fallback_sku,
+                "sku": chosen_sku,
                 "name": visible_row.get("name") or None,
-                "quantity": member_quantities.get(fallback_sku, 1),
+                "quantity": member_quantities.get(chosen_sku, 1),
                 "is_set_only": visible_row.get("is_set_only", False),
             })
     else:
@@ -788,10 +798,18 @@ def scrape_sets(
                             break
                     if matched_index is not None:
                         used_structured.add(matched_index)
-                    fallback_sku = visible_row.get("sku") or (member_skus[idx] if idx < len(member_skus) else None)
-                    fallback_qty = member_quantities.get(fallback_sku, 1) if fallback_sku else 1
+                    visible_sku = _normalize_set_member_sku(visible_row.get("sku"))
+                    structured_sku = _normalize_set_member_sku(matched_structured.get("sku")) if matched_structured else None
+                    fallback_sku = _normalize_set_member_sku(member_skus[idx]) if idx < len(member_skus) else None
+                    fallback_qty = member_quantities.get(
+                        visible_sku or structured_sku or fallback_sku,
+                        1,
+                    )
+                    chosen_sku = visible_sku or structured_sku or fallback_sku
+                    if chosen_sku and set_sku and chosen_sku == set_sku:
+                        chosen_sku = structured_sku or visible_sku or fallback_sku
                     member_entries.append(dict(
-                        sku=matched_structured["sku"] if matched_structured else fallback_sku,
+                        sku=chosen_sku,
                         name=visible_name,
                         quantity=matched_structured["quantity"] if matched_structured else fallback_qty,
                         is_set_only=visible_row["is_set_only"] if matched_structured is None else False,
