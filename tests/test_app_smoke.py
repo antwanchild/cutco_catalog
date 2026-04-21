@@ -291,6 +291,7 @@ class PublicSmokeTests(SmokeBaseTest):
 
         self.assertEqual(catalog_response.status_code, 200)
         self.assertIn(b"Catalog Knife", catalog_response.data)
+        self.assertIn(b"data-confirm-title=\"Delete item\"", catalog_response.data)
         self.assertEqual(variants_response.status_code, 200)
         self.assertIn(b"Variants", variants_response.data)
         self.assertEqual(sets_response.status_code, 200)

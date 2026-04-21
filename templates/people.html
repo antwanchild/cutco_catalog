@@ -21,8 +21,12 @@
       <td class="actions">
         <a href="{{ url_for('people.people_edit', person_id=person.id) }}" class="btn btn-xs">Edit</a>
         <form method="post" action="{{ url_for('people.people_delete', person_id=person.id) }}"
-              onsubmit="return confirm('Remove {{ person.name }}?')" class="form-inline">
-          <button class="btn btn-xs btn-danger">Del</button>
+              class="form-inline">
+          <button class="btn btn-xs btn-danger"
+                  data-confirm-title="Delete collector"
+                  data-confirm-message="This collector will be removed."
+                  data-confirm-preview="Collector: {{ person.name | e }} | Entries: {{ counts[person.id] }}"
+                  data-confirm-button="Delete collector">Del</button>
         </form>
       </td>
     </tr>

@@ -92,8 +92,12 @@
         {% if is_admin() %}
           <a href="{{ url_for('catalog.catalog_edit', item_id=item.id) }}" class="btn btn-xs">Edit</a>
           <form method="post" action="{{ url_for('catalog.catalog_delete', item_id=item.id) }}"
-                onsubmit="return confirm('Delete {{ item.name }}?')" class="form-inline">
-            <button class="btn btn-xs btn-danger">Del</button>
+                class="form-inline">
+            <button class="btn btn-xs btn-danger"
+                    data-confirm-title="Delete item"
+                    data-confirm-message="This item will be removed from the catalog."
+                    data-confirm-preview="Item: {{ item.name | e }}{% if item.sku %} | SKU: {{ item.sku | e }}{% endif %}{% if item.sets %} | Sets: {{ item.sets | length }}{% endif %}{% if item.variants %} | Variants: {{ item.variants | length }}{% endif %}"
+                    data-confirm-button="Delete item">Del</button>
           </form>
         {% endif %}
         <a href="{{ url_for('people.ownership_add', item_id=item.id) }}" class="btn btn-xs btn-success">+ Own</a>
@@ -154,14 +158,20 @@ document.getElementById('sync-btn').addEventListener('click', function(e) {
     <p class="purge-intro">Choose a purge option. <strong>This cannot be undone.</strong></p>
     <form method="post" action="{{ url_for('catalog.catalog_purge_unreferenced') }}" class="purge-form">
       <button type="submit" class="btn btn-secondary purge-btn"
-              onclick="return confirm('Remove all items with no ownership records?')">
+              data-confirm-title="Remove unreferenced items"
+              data-confirm-message="This will delete items that have no ownership records."
+              data-confirm-preview="Items with no ownership records will be removed. Ownership data is preserved."
+              data-confirm-button="Remove items">
         <span class="purge-title">🧹 Remove unreferenced items</span>
         <span class="purge-desc">Deletes items no collector owns and keeps all ownership data intact.</span>
       </button>
     </form>
     <form method="post" action="{{ url_for('catalog.catalog_purge_all') }}">
       <button type="submit" class="btn btn-danger purge-btn"
-              onclick="return confirm('DELETE THE ENTIRE CATALOG including all ownership, sharpening, cookware, and task records? This cannot be undone.')">
+              data-confirm-title="Purge entire catalog"
+              data-confirm-message="This will permanently remove every catalog record."
+              data-confirm-preview="All items, variants, ownership, sharpening, cookware, and task records will be deleted."
+              data-confirm-button="Purge catalog">
         <span class="purge-title">💥 Purge everything</span>
         <span class="purge-desc">Deletes all items, variants, ownership, sharpening, cookware, and task logs.</span>
       </button>

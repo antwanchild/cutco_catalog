@@ -75,17 +75,64 @@
     });
   });
 
-  document.querySelector('.nav-toggle').addEventListener('click', function() {
-    var links = document.querySelector('.nav-links');
-    var open = links.classList.toggle('open');
-    this.setAttribute('aria-expanded', open);
-    this.textContent = open ? '✕' : '☰';
-  });
+    document.querySelector('.nav-toggle').addEventListener('click', function() {
+      var links = document.querySelector('.nav-links');
+      var open = links.classList.toggle('open');
+      this.setAttribute('aria-expanded', open);
+      this.textContent = open ? '✕' : '☰';
+    });
 
-  /* Close help dialogs when clicking outside (backdrop) */
-  document.addEventListener('click', function(e) {
-    if (e.target.tagName === 'DIALOG') e.target.close();
-  });
+    var confirmDialog = document.getElementById('confirm-action-dialog');
+    var confirmTitle = document.getElementById('confirm-action-title');
+    var confirmMessage = document.getElementById('confirm-action-message');
+    var confirmPreview = document.getElementById('confirm-action-preview');
+    var confirmContinue = document.getElementById('confirm-action-continue');
+    var pendingForm = null;
+
+    function resetConfirmDialog() {
+      pendingForm = null;
+      confirmTitle.textContent = 'Confirm action';
+      confirmMessage.textContent = '';
+      confirmPreview.textContent = '';
+      confirmPreview.hidden = true;
+      confirmContinue.disabled = false;
+    }
+
+    function openConfirmDialog(form, submitter) {
+      pendingForm = form;
+      confirmTitle.textContent = submitter.dataset.confirmTitle || 'Confirm action';
+      confirmMessage.textContent = submitter.dataset.confirmMessage || 'This action cannot be undone.';
+      confirmPreview.textContent = submitter.dataset.confirmPreview || '';
+      confirmPreview.hidden = !confirmPreview.textContent;
+      confirmContinue.textContent = submitter.dataset.confirmButton || 'Continue';
+      confirmDialog.dataset.destructive = submitter.dataset.confirmDanger || '1';
+      confirmDialog.showModal();
+    }
+
+    document.addEventListener('submit', function(e) {
+      var submitter = e.submitter;
+      if (!submitter || !submitter.dataset.confirmTitle) return;
+      e.preventDefault();
+      openConfirmDialog(e.target, submitter);
+    }, true);
+
+    if (confirmContinue) {
+      confirmContinue.addEventListener('click', function() {
+        if (!pendingForm) return;
+        var form = pendingForm;
+        confirmDialog.close();
+        form.submit();
+      });
+    }
+
+    if (confirmDialog) {
+      confirmDialog.addEventListener('close', resetConfirmDialog);
+    }
+
+    /* Close help dialogs when clicking outside (backdrop) */
+    document.addEventListener('click', function(e) {
+      if (e.target.tagName === 'DIALOG') e.target.close();
+    });
 
   (function() {
     var btn = document.getElementById('theme-toggle');
@@ -126,6 +173,21 @@
 
   {% block content %}{% endblock %}
 </main>
+
+<dialog id="confirm-action-dialog" class="help-dialog confirm-dialog">
+  <div class="help-header">
+    <span id="confirm-action-title">Confirm action</span>
+    <button type="button" class="help-close" onclick="document.getElementById('confirm-action-dialog').close()">✕</button>
+  </div>
+  <div class="help-body">
+    <p id="confirm-action-message" class="confirm-message"></p>
+    <div id="confirm-action-preview" class="confirm-preview" hidden></div>
+    <div class="confirm-actions">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('confirm-action-dialog').close()">Cancel</button>
+      <button type="button" class="btn btn-danger btn-sm" id="confirm-action-continue">Continue</button>
+    </div>
+  </div>
+</dialog>
 
 <footer class="site-footer">
   <span>Cutco Vault</span>

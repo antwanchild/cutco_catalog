@@ -7,8 +7,12 @@
     <a href="{{ url_for('logs.tasks_manage') }}" class="btn btn-secondary btn-sm">Manage Tasks</a>
     {% if is_admin() and recent_entries %}
     <form method="post" action="{{ url_for('logs.task_log_purge_all') }}"
-          onsubmit="return confirm('Delete ALL task log entries? This cannot be undone.')">
-      <button class="btn btn-danger btn-sm">🗑 Purge All</button>
+          class="form-inline">
+      <button class="btn btn-danger btn-sm"
+              data-confirm-title="Purge all task logs"
+              data-confirm-message="This will delete every task log entry."
+              data-confirm-preview="All task log entries will be deleted."
+              data-confirm-button="Purge logs">🗑 Purge All</button>
     </form>
     {% endif %}
   </div>
@@ -152,8 +156,12 @@
       <td class="muted">{{ entry.notes or '' }}</td>
       <td>
         <form method="post" action="{{ url_for('logs.task_log_delete', lid=entry.id) }}"
-              onsubmit="return confirm('Remove this entry?')">
-          <button class="btn btn-xs btn-danger">✕</button>
+              class="form-inline">
+          <button class="btn btn-xs btn-danger"
+                  data-confirm-title="Delete task log entry"
+                  data-confirm-message="This log entry will be removed."
+                  data-confirm-preview="Date: {{ entry.logged_on }} | Knife: {{ entry.item.name | e }} | Task: {{ entry.task.name | e }}"
+                  data-confirm-button="Delete entry">✕</button>
         </form>
       </td>
     </tr>

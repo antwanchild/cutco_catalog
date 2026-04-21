@@ -72,8 +72,12 @@
         <td class="actions">
           <a href="{{ url_for('people.ownership_edit', ownership_id=o.id) }}" class="btn btn-xs">Edit</a>
           <form method="post" action="{{ url_for('people.ownership_delete', ownership_id=o.id) }}"
-                onsubmit="return confirm('Remove this entry?')" class="form-inline">
-            <button class="btn btn-xs btn-danger">Del</button>
+                class="form-inline">
+            <button class="btn btn-xs btn-danger"
+                    data-confirm-title="Delete wishlist entry"
+                    data-confirm-message="This wishlist entry will be removed."
+                    data-confirm-preview="Item: {{ o.variant.item.name | e }} | Collector: {{ o.person.name | e }} | Target: {% if row.target %}${{ '%.2f'|format(row.target) }}{% else %}—{% endif %}"
+                    data-confirm-button="Delete entry">Del</button>
           </form>
         </td>
       </tr>

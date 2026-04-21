@@ -22,8 +22,12 @@
         <button class="btn btn-xs" onclick="toggleEdit({{ variant.id }})">Edit</button>
         {% if item.variants | length > 1 %}
         <form method="post" action="{{ url_for('catalog.variant_delete', vid=variant.id) }}"
-              onsubmit="return confirm('Remove this variant?')" class="form-inline">
-          <button class="btn btn-xs btn-danger">Del</button>
+              class="form-inline">
+          <button class="btn btn-xs btn-danger"
+                  data-confirm-title="Delete variant"
+                  data-confirm-message="This color variant will be removed."
+                  data-confirm-preview="Item: {{ item.name | e }} | Color: {{ variant.color | e }} | Ownerships: {{ variant.ownerships | length }}"
+                  data-confirm-button="Delete variant">Del</button>
         </form>
         {% endif %}
         {% else %}

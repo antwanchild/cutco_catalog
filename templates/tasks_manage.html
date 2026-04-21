@@ -41,8 +41,12 @@
       <td>
         {% if not task.is_preset and not task.log_entries %}
         <form method="post" action="{{ url_for('logs.task_delete', tid=task.id) }}"
-              onsubmit="return confirm('Delete this task?')">
-          <button class="btn btn-xs btn-danger">Delete</button>
+              class="form-inline">
+          <button class="btn btn-xs btn-danger"
+                  data-confirm-title="Delete task"
+                  data-confirm-message="This custom task will be removed."
+                  data-confirm-preview="Task: {{ task.name | e }} | Suggested knives: {{ task.suggested_items | length }} | Logged uses: {{ task.log_entries | length }}"
+                  data-confirm-button="Delete task">Delete</button>
         </form>
         {% else %}
         <span class="muted">—</span>

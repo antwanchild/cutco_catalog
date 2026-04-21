@@ -118,8 +118,12 @@
             <td class="actions">
               <a href="{{ url_for('people.ownership_edit', ownership_id=ownership.id) }}" class="btn btn-xs">Edit</a>
               <form method="post" action="{{ url_for('people.ownership_delete', ownership_id=ownership.id) }}"
-                    onsubmit="return confirm('Remove this entry?')" class="form-inline">
-                <button class="btn btn-xs btn-danger">Del</button>
+                    class="form-inline">
+                <button class="btn btn-xs btn-danger"
+                        data-confirm-title="Delete ownership entry"
+                        data-confirm-message="This ownership record will be removed."
+                        data-confirm-preview="Item: {{ item.name | e }} | Collector: {{ ownership.person.name | e }} | Color: {{ ownership.variant.color | e }} | Status: {{ ownership.status | e }}"
+                        data-confirm-button="Delete entry">Del</button>
               </form>
             </td>
           </tr>
@@ -149,9 +153,12 @@
   <h2 class="section-heading section-heading-actions">
     Sharpening History ({{ sharpening | length }})
     {% if is_admin() %}
-    <form method="post" action="{{ url_for('logs.sharpening_purge_item', item_id=item.id) }}" class="form-inline"
-          onsubmit="return confirm('Remove all sharpening history for {{ item.name }}?')">
-      <button type="submit" class="btn btn-xs btn-danger">🗑 Purge</button>
+    <form method="post" action="{{ url_for('logs.sharpening_purge_item', item_id=item.id) }}" class="form-inline">
+      <button type="submit" class="btn btn-xs btn-danger"
+              data-confirm-title="Purge sharpening history"
+              data-confirm-message="This will remove every sharpening record for this item."
+              data-confirm-preview="Item: {{ item.name | e }} | Events: {{ sharpening | length }}"
+              data-confirm-button="Purge history">🗑 Purge</button>
     </form>
     {% endif %}
   </h2>
@@ -178,9 +185,12 @@
   <h2 class="section-heading section-heading-actions">
     Task Log ({{ task_log | length }})
     {% if is_admin() %}
-    <form method="post" action="{{ url_for('logs.task_log_purge_item', item_id=item.id) }}" class="form-inline"
-          onsubmit="return confirm('Remove all task log entries for {{ item.name }}?')">
-      <button type="submit" class="btn btn-xs btn-danger">🗑 Purge</button>
+    <form method="post" action="{{ url_for('logs.task_log_purge_item', item_id=item.id) }}" class="form-inline">
+      <button type="submit" class="btn btn-xs btn-danger"
+              data-confirm-title="Purge task log"
+              data-confirm-message="This will remove every task log entry for this item."
+              data-confirm-preview="Item: {{ item.name | e }} | Events: {{ task_log | length }}"
+              data-confirm-button="Purge log">🗑 Purge</button>
     </form>
     {% endif %}
   </h2>

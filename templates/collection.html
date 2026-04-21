@@ -7,9 +7,12 @@
     <a href="{{ url_for('people.ownership_add', person_id=person.id) }}" class="btn btn-primary">+ Add Entry</a>
     <a href="{{ url_for('views.collection_token', person_id=person.id) }}" class="btn btn-secondary">🃏 Share Card</a>
     {% if is_admin() %}
-    <form method="post" action="{{ url_for('people.purge_collection', person_id=person.id) }}" class="form-inline"
-          onsubmit="return confirm('Delete ALL ownership entries for {{ person.name }}? This cannot be undone.')">
-      <button type="submit" class="btn btn-danger btn-sm">🗑 Purge Collection</button>
+    <form method="post" action="{{ url_for('people.purge_collection', person_id=person.id) }}" class="form-inline">
+      <button type="submit" class="btn btn-danger btn-sm"
+              data-confirm-title="Purge collection"
+              data-confirm-message="This will remove every ownership entry for this collector."
+              data-confirm-preview="Collector: {{ person.name | e }} | Ownership entries: {{ ownerships | length }} | Missing items: {{ item_gaps | length if item_gaps else 0 }}"
+              data-confirm-button="Purge collection">🗑 Purge Collection</button>
     </form>
     {% endif %}
     <a href="{{ url_for('people.people') }}" class="btn btn-ghost">← People</a>
@@ -47,8 +50,12 @@
       <td class="actions">
         <a href="{{ url_for('people.ownership_edit', ownership_id=ownership.id) }}" class="btn btn-xs">Edit</a>
         <form method="post" action="{{ url_for('people.ownership_delete', ownership_id=ownership.id) }}"
-              onsubmit="return confirm('Remove this entry?')" class="form-inline">
-          <button class="btn btn-xs btn-danger">Del</button>
+              class="form-inline">
+          <button class="btn btn-xs btn-danger"
+                  data-confirm-title="Delete ownership entry"
+                  data-confirm-message="This ownership record will be removed."
+                  data-confirm-preview="Collector: {{ person.name | e }} | Item: {{ ownership.variant.item.name | e }} | Color: {{ ownership.variant.color | e }} | Status: {{ ownership.status | e }}"
+                  data-confirm-button="Delete entry">Del</button>
         </form>
       </td>
     </tr>
