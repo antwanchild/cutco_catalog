@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
 
 from flask import Flask, Response, jsonify, render_template, request, url_for
@@ -109,6 +109,7 @@ def _register_hooks(app: Flask) -> None:
     def inject_globals():
         return dict(
             app_version=APP_VERSION,
+            current_year=datetime.now().year,
             is_admin=is_admin,
             UNKNOWN_COLOR=UNKNOWN_COLOR,
             csrf_token=_csrf_token,

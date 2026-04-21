@@ -114,6 +114,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Quick Actions", response.data)
         self.assertIn(b"Recently Changed", response.data)
         self.assertIn(b"Release &amp; Diagnostics", response.data)
+        self.assertIn(b"\xc2\xa9", response.data)
         self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
         self.assertNotIn("Strict-Transport-Security", response.headers)
         self.assertEqual(self.client.get("/robots.txt").status_code, 200)
