@@ -226,6 +226,23 @@ def diagnostics_page():
     )
 
 
+@admin_bp.context_processor
+def inject_admin_status_strip():
+    if not is_admin() or not request.endpoint or not request.endpoint.startswith("admin."):
+        return {}
+    git_sha, git_sha_source = get_git_sha_info()
+    return {
+        "admin_status_strip": {
+            "app_version": APP_VERSION,
+            "git_sha": git_sha,
+            "git_sha_source": git_sha_source,
+            "tz": os.environ.get("TZ", "UTC"),
+            "msrp_status": _read_msrp_job().get("status", "unknown"),
+            "specs_status": _read_specs_job().get("status", "unknown"),
+        }
+    }
+
+
 @admin_bp.route("/admin/login", methods=["GET", "POST"])
 @limiter.limit("10 per minute; 30 per hour")
 def admin_login():

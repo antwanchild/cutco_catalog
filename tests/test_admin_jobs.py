@@ -245,9 +245,11 @@ class AdminJobSmokeTests(unittest.TestCase):
 
         self.assertEqual(msrp_page.status_code, 200)
         self.assertIn(b"MSRP Diff", msrp_page.data)
+        self.assertIn(b"Admin Snapshot", msrp_page.data)
         self.assertIn(b"12:02 PM MDT", msrp_page.data)
         self.assertEqual(specs_page.status_code, 200)
         self.assertIn(b"Specs Backfill", specs_page.data)
+        self.assertIn(b"Admin Snapshot", specs_page.data)
         self.assertIn(b"12:02 PM MDT", specs_page.data)
         self.assertEqual(diagnostics_page.status_code, 200)
         self.assertIn(b"Schema Migrations", diagnostics_page.data)

@@ -104,6 +104,20 @@
 </script>
 
 <main class="container">
+  {% if admin_status_strip %}
+    <div class="admin-status-strip">
+      <div class="admin-status-strip-left">
+        <span class="admin-status-title">Admin Snapshot</span>
+        <span class="admin-status-pill">v{{ admin_status_strip.app_version }}</span>
+        <span class="admin-status-pill" title="Git SHA source: {{ admin_status_strip.git_sha_source }}">SHA {{ admin_status_strip.git_sha[:7] if admin_status_strip.git_sha and admin_status_strip.git_sha != "unknown" else "unknown" }}</span>
+        <span class="admin-status-pill">TZ {{ admin_status_strip.tz }}</span>
+        <span class="admin-status-pill">MSRP {{ admin_status_strip.msrp_status | capitalize }}</span>
+        <span class="admin-status-pill">Specs {{ admin_status_strip.specs_status | capitalize }}</span>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.diagnostics_page') }}">Diagnostics</a>
+    </div>
+  {% endif %}
+
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for cat, msg in messages %}
       <div class="flash flash-{{ cat }}">{{ msg }}</div>

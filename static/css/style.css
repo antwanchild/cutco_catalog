@@ -220,6 +220,46 @@ a:hover { text-decoration: underline; }
 .page-title { font-size: 1.4rem; font-weight: 700; }
 .page-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 
+/* ── Admin snapshot strip ───────────────────────────────────────────────── */
+.admin-status-strip {
+  margin: 0 0 1rem;
+  padding: .7rem .9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(255,255,255,.02), transparent), var(--bg2);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem 1rem;
+  flex-wrap: wrap;
+}
+.admin-status-strip-left {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+}
+.admin-status-title {
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.admin-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: .18rem .55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text);
+  font-size: .72rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 /* ── Flash messages ─────────────────────────────────────────────────────── */
 .flash {
   padding: .6rem 1rem;
