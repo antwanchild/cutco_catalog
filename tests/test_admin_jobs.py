@@ -138,6 +138,8 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIn(b"Bootstrap History", response.data)
         self.assertIn(b"Storage &amp; Paths", response.data)
         self.assertIn(b"Bootstrap Version", response.data)
+        self.assertIn(b"Recorded At", response.data)
+        self.assertIn(b"Older entries may reflect the time this database first recorded the migration.", response.data)
         self.assertIn(b"from local repo", response.data)
         self.assertIn(b"UTC", response.data)
         self.assertIn(str(SCHEMA_VERSION).encode(), response.data)
