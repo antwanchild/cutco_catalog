@@ -282,6 +282,7 @@
     <p>This history shows structural database migrations that have been applied.</p>
     <ul>
       <li>The current version tells you what schema shape the database should have.</li>
+      <li>The recorded time shows when this database first captured the migration entry.</li>
       <li>Each history entry is a numbered table change, applied once in order.</li>
       <li>If this lags behind code, startup may still need to finish a migration step.</li>
     </ul>
@@ -297,6 +298,7 @@
     <p>Bootstrap history tracks one-time startup data fixes and seed work.</p>
     <ul>
       <li>These steps seed defaults, clean bad data, and normalize the collection.</li>
+      <li>The recorded time shows when this database first captured the bootstrap step.</li>
       <li>This is separate from schema migrations because it changes data behavior, not tables.</li>
       <li>It helps explain why startup may touch the database even when the schema is already current.</li>
     </ul>
