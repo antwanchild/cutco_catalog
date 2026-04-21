@@ -506,6 +506,50 @@ textarea { resize: vertical; }
 .link-list { list-style: none; display: flex; flex-direction: column; gap: .35rem; }
 .link-list a { color: var(--text); font-size: .875rem; }
 .link-list a:hover { color: var(--accent); text-decoration: none; }
+.dashboard-activity { margin-bottom: 1rem; }
+.activity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: .75rem;
+}
+.activity-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem .85rem;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.activity-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: .5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.activity-label {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.activity-time {
+  font-size: .72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.activity-title {
+  font-size: .92rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.activity-details {
+  font-size: .8rem;
+  color: var(--muted);
+}
 .muted { color: var(--muted); }
 .small { font-size: .8rem; }
 

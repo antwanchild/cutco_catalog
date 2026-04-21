@@ -10,7 +10,7 @@ from constants import (
 )
 from extensions import db
 from helpers import admin_required, db_commit, is_admin
-from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, get_or_create_set, reconcile_unknown_variant
+from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, get_or_create_set, record_activity, reconcile_unknown_variant
 from scraping import scrape_catalog, scrape_item_specs, scrape_item_uses, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
@@ -726,6 +726,12 @@ def catalog_sync_confirm():
     db_commit(db.session)
     logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates",
                 added_items, added_sets, linked_items, qty_updates)
+    record_activity(
+        "sync",
+        "Catalog sync complete",
+        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates.",
+    )
+    db.session.commit()
 
     parts = []
     if added_items:

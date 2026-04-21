@@ -224,7 +224,7 @@ class AdminJobSmokeTests(unittest.TestCase):
                 },
             ), \
              mock.patch(
-                "blueprints.admin._container_timezone",
+                "time_utils.container_timezone",
                 return_value=(timezone(timedelta(hours=-6), "MDT"), "MDT"),
             ), \
              mock.patch.dict(

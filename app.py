@@ -14,7 +14,10 @@ from constants import (
 )
 from extensions import db, limiter
 from helpers import _csrf_token, is_admin, validate_csrf
-from models import Item
+from models import Item, get_latest_activity
+from schema_migrations import get_schema_history, get_schema_state
+from startup import get_bootstrap_history, get_bootstrap_state
+from time_utils import format_container_time
 from startup import initialize_database
 
 logger = logging.getLogger(__name__)
@@ -151,6 +154,67 @@ def _register_error_handlers(app: Flask) -> None:
 
 
 def _register_routes(app: Flask) -> None:
+    def _recent_activity() -> list[dict]:
+        activity_rows: list[dict] = []
+
+        def _event_row(label: str, kind: str, empty_text: str) -> dict:
+            event = get_latest_activity(kind)
+            if event:
+                return {
+                    "label": label,
+                    "title": event["title"],
+                    "details": event.get("details"),
+                    "time": format_container_time(event.get("occurred_at")),
+                }
+            return {
+                "label": label,
+                "title": empty_text,
+                "details": None,
+                "time": "—",
+            }
+
+        activity_rows.append(_event_row("Last Import", "import", "No imports yet."))
+        activity_rows.append(_event_row("Last Catalog Sync", "sync", "No catalog sync yet."))
+        activity_rows.append(_event_row("Last MSRP Diff", "msrp_diff", "No MSRP diff yet."))
+
+        schema_history = get_schema_history(limit=1)
+        schema_state = get_schema_state()
+        if schema_history:
+            latest_schema = schema_history[0]
+            activity_rows.append({
+                "label": "Schema Update",
+                "title": f"v{schema_state['version']}",
+                "details": latest_schema["name"],
+                "time": format_container_time(latest_schema["applied_at"]),
+            })
+        else:
+            activity_rows.append({
+                "label": "Schema Update",
+                "title": "No schema updates yet.",
+                "details": None,
+                "time": "—",
+            })
+
+        bootstrap_history = get_bootstrap_history(limit=1)
+        bootstrap_state = get_bootstrap_state()
+        if bootstrap_history:
+            latest_bootstrap = bootstrap_history[0]
+            activity_rows.append({
+                "label": "Bootstrap Update",
+                "title": f"v{bootstrap_state['version']}",
+                "details": latest_bootstrap["name"],
+                "time": format_container_time(latest_bootstrap["applied_at"]),
+            })
+        else:
+            activity_rows.append({
+                "label": "Bootstrap Update",
+                "title": "No bootstrap updates yet.",
+                "details": None,
+                "time": "—",
+            })
+
+        return activity_rows
+
     @app.route("/")
     def index():
         from models import ItemVariant, Ownership, Person, Set
@@ -172,7 +236,13 @@ def _register_routes(app: Flask) -> None:
         )
         people = Person.query.order_by(Person.name).all()
         recent = Ownership.query.order_by(Ownership.id.desc()).limit(10).all()
-        return render_template("index.html", stats=stats, people=people, recent=recent)
+        return render_template(
+            "index.html",
+            stats=stats,
+            people=people,
+            recent=recent,
+            recent_activity=_recent_activity(),
+        )
 
     @app.route("/health")
     def health():

@@ -14,7 +14,7 @@ from constants import (
 )
 from extensions import db
 from helpers import _notify_discord, check_wishlist_targets
-from models import Item
+from models import Item, record_activity
 from scraping import scrape_catalog
 
 logger = logging.getLogger(__name__)
@@ -105,6 +105,13 @@ def _run_specs_backfill_job(app) -> None:
         _log(f"Done — {updated} updated, {skipped} already complete, {errors} errors.")
         _write_specs_job({"status": "done", "progress": progress, "results": results,
                           "error": None, "started_at": started_at, "finished_at": finished_at})
+        record_activity(
+            "specs_backfill",
+            "Specs backfill complete",
+            f"Updated {updated} items, skipped {skipped}, {errors} errors.",
+            occurred_at=finished_at,
+        )
+        db.session.commit()
 
 
 def _read_msrp_job() -> dict:
@@ -293,6 +300,13 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
             job.update({"status": "done", "results": diff,
                         "finished_at": datetime.now(UTC).isoformat(timespec="seconds")})
             _write_msrp_job(job)
+            record_activity(
+                "msrp_diff",
+                "MSRP diff complete",
+                f"{len(diff['increased']) + len(diff['decreased'])} changed prices, {len(diff['new'])} new, {len(diff['removed'])} removed.",
+                occurred_at=job["finished_at"],
+            )
+            db.session.commit()
 
     except Exception as exc:
         logger.error("MSRP diff job failed: %s", exc)
@@ -300,3 +314,10 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
         job.update({"status": "error", "error": str(exc),
                     "finished_at": datetime.now(UTC).isoformat(timespec="seconds")})
         _write_msrp_job(job)
+        record_activity(
+            "msrp_diff",
+            "MSRP diff failed",
+            str(exc),
+            occurred_at=job["finished_at"],
+        )
+        db.session.commit()

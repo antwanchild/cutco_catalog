@@ -34,6 +34,26 @@
   </div>
 </div>
 
+<section class="dash-panel dash-panel-wide dashboard-activity">
+  <div class="section-heading-actions" style="margin-bottom:.6rem">
+    <h2>Recent Activity</h2>
+  </div>
+  <div class="activity-grid">
+    {% for entry in recent_activity %}
+      <article class="activity-card">
+        <div class="activity-card-top">
+          <span class="activity-label">{{ entry.label }}</span>
+          <span class="activity-time">{{ entry.time }}</span>
+        </div>
+        <div class="activity-title">{{ entry.title }}</div>
+        {% if entry.details %}
+          <div class="activity-details">{{ entry.details }}</div>
+        {% endif %}
+      </article>
+    {% endfor %}
+  </div>
+</section>
+
 <div class="dash-row">
   <section class="dash-panel">
     <h2>Quick Links</h2>

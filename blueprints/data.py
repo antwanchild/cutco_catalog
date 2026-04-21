@@ -13,7 +13,7 @@ from constants import (
 )
 from extensions import db
 from helpers import admin_required, db_commit
-from models import Item, ItemSetMember, ItemVariant, Ownership, Person, get_or_create_set, reconcile_unknown_variant
+from models import Item, ItemSetMember, ItemVariant, Ownership, Person, get_or_create_set, record_activity, reconcile_unknown_variant
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
@@ -637,6 +637,12 @@ def import_confirm():
         if added_ownership:
             parts.append(f"{added_ownership} ownership entr{'ies' if added_ownership != 1 else 'y'}")
         summary = "Import complete — added " + (", ".join(parts) if parts else "nothing new") + "."
+        record_activity(
+            "import",
+            "Import complete",
+            f"Imported {imported_rows} rows, added {added_items} items, {added_persons} collectors, {added_ownership} ownership entries.",
+        )
+        db.session.commit()
         return render_template(
             "import_result.html",
             summary=summary,

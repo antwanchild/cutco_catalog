@@ -6,7 +6,6 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
@@ -17,6 +16,7 @@ from helpers import is_admin
 from models import Item
 from schema_migrations import get_schema_history, get_schema_state, SCHEMA_VERSION
 from startup import BOOTSTRAP_VERSION, get_bootstrap_history, get_bootstrap_state
+from time_utils import format_container_time
 from msrp_helpers import (
     _read_msrp_job, _run_msrp_diff_job, _write_msrp_job,
     _read_specs_job, _run_specs_backfill_job, _write_specs_job,
@@ -63,31 +63,7 @@ def _path_status(path):
     }
 
 
-def _container_timezone():
-    tz_name = os.environ.get("TZ", "UTC").strip() or "UTC"
-    try:
-        return ZoneInfo(tz_name), tz_name
-    except ZoneInfoNotFoundError:
-        return timezone.utc, "UTC"
-
-
-def _format_container_time(value: str | None) -> str:
-    if not value:
-        return "—"
-    try:
-        dt = datetime.fromisoformat(value)
-    except ValueError:
-        return value
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    tz, tz_name = _container_timezone()
-    dt = dt.astimezone(tz)
-    date_part = dt.strftime("%b %d, %Y").replace(" 0", " ")
-    time_part = dt.strftime("%I:%M %p").lstrip("0")
-    return f"{date_part}, {time_part} {dt.strftime('%Z') or tz_name}"
-
-
-_format_applied_at = _format_container_time
+_format_applied_at = format_container_time
 
 
 def _runtime_details():
@@ -118,13 +94,13 @@ def _runtime_details():
         "pid1_cmdline": _read_pid1_cmdline(),
         "schema_state": get_schema_state(),
         "schema_history": [
-            {**entry, "formatted_applied_at": _format_container_time(entry.get("applied_at"))}
+            {**entry, "formatted_applied_at": format_container_time(entry.get("applied_at"))}
             for entry in get_schema_history()
         ],
         "schema_version": SCHEMA_VERSION,
         "bootstrap_state": get_bootstrap_state(),
         "bootstrap_history": [
-            {**entry, "formatted_applied_at": _format_container_time(entry.get("applied_at"))}
+            {**entry, "formatted_applied_at": format_container_time(entry.get("applied_at"))}
             for entry in get_bootstrap_history()
         ],
         "bootstrap_version": BOOTSTRAP_VERSION,
@@ -144,7 +120,7 @@ def msrp_diff_page():
     return render_template(
         "msrp_diff_ui.html",
         job=_read_msrp_job(),
-        format_container_time=_format_container_time,
+        format_container_time=format_container_time,
     )
 
 
@@ -184,7 +160,7 @@ def specs_backfill_page():
     return render_template(
         "specs_backfill_ui.html",
         job=_read_specs_job(),
-        format_container_time=_format_container_time,
+        format_container_time=format_container_time,
     )
 
 

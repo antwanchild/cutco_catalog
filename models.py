@@ -1,5 +1,6 @@
 from extensions import db
 from constants import COOKWARE_CATEGORIES, UNKNOWN_COLOR
+from datetime import UTC, datetime
 
 
 # Association object: items <-> sets (with quantity per member)
@@ -107,6 +108,16 @@ class Ownership(db.Model):
                                           name="uq_variant_person"),)
 
 
+class ActivityEvent(db.Model):
+    __tablename__ = "activity_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    kind = db.Column(db.String(40), nullable=False, index=True)
+    title = db.Column(db.String(160), nullable=False)
+    details = db.Column(db.Text, nullable=True)
+    occurred_at = db.Column(db.String(32), nullable=False, index=True)
+
+
 class CookwareSession(db.Model):
     __tablename__ = "cookware_sessions"
 
@@ -212,3 +223,37 @@ def get_or_create_set(name: str) -> Set:
         db.session.add(item_set)
         db.session.flush()
     return item_set
+
+
+def _now_utc() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def record_activity(kind: str, title: str, details: str | None = None, occurred_at: str | None = None) -> None:
+    db.session.add(ActivityEvent(
+        kind=kind,
+        title=title,
+        details=details,
+        occurred_at=occurred_at or _now_utc(),
+    ))
+
+
+def get_latest_activity(kind: str) -> dict | None:
+    event = (
+        db.session.execute(
+            db.select(ActivityEvent)
+            .filter_by(kind=kind)
+            .order_by(ActivityEvent.occurred_at.desc(), ActivityEvent.id.desc())
+            .limit(1)
+        )
+        .scalars()
+        .first()
+    )
+    if event is None:
+        return None
+    return {
+        "kind": event.kind,
+        "title": event.title,
+        "details": event.details,
+        "occurred_at": event.occurred_at,
+    }
