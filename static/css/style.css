@@ -563,8 +563,11 @@ textarea { resize: vertical; }
   font-size: .8rem;
   color: var(--muted);
 }
-.quick-action-card .btn {
-  align-self: flex-start;
+.quick-action-card .btn.quick-action-btn {
+  align-self: stretch;
+  width: 100%;
+  justify-content: center;
+  margin-top: auto;
 }
 .changes-grid {
   display: grid;

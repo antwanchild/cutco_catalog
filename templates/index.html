@@ -43,28 +43,28 @@
     <div class="quick-action-card">
       <span class="quick-action-title">Add item</span>
       <span class="quick-action-note">Create a new catalog item.</span>
-      <a class="btn btn-primary btn-sm" href="{{ url_for('catalog.catalog_add') }}">+ Add Item</a>
+      <a class="btn btn-primary btn-sm quick-action-btn" href="{{ url_for('catalog.catalog_add') }}">+ Add Item</a>
     </div>
     <div class="quick-action-card">
       <span class="quick-action-title">Add collector</span>
       <span class="quick-action-note">Create a person record.</span>
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('people.people_add') }}">+ Add Collector</a>
+      <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('people.people_add') }}">+ Add Collector</a>
     </div>
     <div class="quick-action-card">
       <span class="quick-action-title">Diagnostics</span>
       <span class="quick-action-note">Check runtime, migrations, and storage.</span>
-      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.diagnostics_page') }}">Open Diagnostics</a>
+      <a class="btn btn-ghost btn-sm quick-action-btn" href="{{ url_for('admin.diagnostics_page') }}">Open Diagnostics</a>
     </div>
     {% if is_admin() %}
     <div class="quick-action-card">
       <span class="quick-action-title">Catalog sync</span>
       <span class="quick-action-note">Preview and import Cutco updates.</span>
-      <a class="btn btn-secondary btn-sm" id="dashboard-sync-btn" href="{{ url_for('catalog.catalog_sync') }}">Run Sync</a>
+      <a class="btn btn-secondary btn-sm quick-action-btn" id="dashboard-sync-btn" href="{{ url_for('catalog.catalog_sync') }}">Run Sync</a>
     </div>
     <div class="quick-action-card">
       <span class="quick-action-title">MSRP diff</span>
       <span class="quick-action-note">Review price changes before applying them.</span>
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('admin.msrp_diff_page') }}">Open MSRP Diff</a>
+      <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('admin.msrp_diff_page') }}">Open MSRP Diff</a>
     </div>
     {% endif %}
   </div>
