@@ -87,6 +87,72 @@ def _build_category_list() -> list[tuple[str, str]]:
     return list(known.values())
 
 
+def _norm_member_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
+def _build_set_member_entries(
+    structured_members: list[dict[str, str | int | None]],
+    visible_rows: list[dict],
+    member_skus: list[str],
+    member_quantities: dict[str, int],
+) -> list[dict]:
+    member_entries: list[dict] = []
+    if structured_members:
+        used_visible: set[int] = set()
+        for structured in structured_members:
+            structured_norm = _norm_member_name(str(structured.get("name") or ""))
+            matched_visible = None
+            matched_index = None
+            for visible_index, visible_row in enumerate(visible_rows):
+                if visible_index in used_visible:
+                    continue
+                visible_norm = _norm_member_name(str(visible_row.get("name") or ""))
+                if visible_norm and structured_norm and visible_norm == structured_norm:
+                    matched_visible = visible_row
+                    matched_index = visible_index
+                    break
+            if matched_index is not None:
+                used_visible.add(matched_index)
+            member_entries.append({
+                "sku": structured.get("sku"),
+                "name": matched_visible.get("name") if matched_visible and matched_visible.get("name") else structured.get("name") or None,
+                "quantity": structured.get("quantity", 1),
+                "is_set_only": matched_visible.get("is_set_only", False) if matched_visible else False,
+            })
+
+        # Preserve any remaining visible rows that have a fallback SKU from the structured list.
+        seen_skus = {
+            _norm_member_name(str(entry.get("sku") or ""))
+            for entry in member_entries
+            if entry.get("sku")
+        }
+        for visible_index, visible_row in enumerate(visible_rows):
+            if visible_index in used_visible:
+                continue
+            fallback_sku = member_skus[visible_index] if visible_index < len(member_skus) else None
+            if not fallback_sku:
+                continue
+            normalized_sku = _norm_member_name(fallback_sku)
+            if normalized_sku in seen_skus:
+                continue
+            member_entries.append({
+                "sku": fallback_sku,
+                "name": visible_row.get("name") or None,
+                "quantity": member_quantities.get(fallback_sku, 1),
+                "is_set_only": visible_row.get("is_set_only", False),
+            })
+    else:
+        for idx, sku in enumerate(member_skus):
+            member_entries.append({
+                "sku": sku,
+                "name": None,
+                "quantity": member_quantities.get(sku, 1),
+                "is_set_only": False,
+            })
+    return member_entries
+
+
 def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
     """Fetch a product page and return (sku, name) from on-page content."""
     try:
@@ -630,25 +696,27 @@ def scrape_sets(
             member_entries = []
             if visible_rows:
                 used_structured: set[int] = set()
-                for visible_row in visible_rows:
+                for idx, visible_row in enumerate(visible_rows):
                     visible_name = visible_row.get("name") or None
                     visible_norm = _norm_member_name(visible_name or "")
                     matched_structured = None
                     matched_index = None
-                    for idx, structured in enumerate(structured_members):
-                        if idx in used_structured:
+                    for inner_idx, structured in enumerate(structured_members):
+                        if inner_idx in used_structured:
                             continue
                         structured_name = _norm_member_name(str(structured.get("name") or ""))
                         if visible_norm and structured_name == visible_norm:
                             matched_structured = structured
-                            matched_index = idx
+                            matched_index = inner_idx
                             break
                     if matched_index is not None:
                         used_structured.add(matched_index)
+                    fallback_sku = member_skus[idx] if idx < len(member_skus) else None
+                    fallback_qty = member_quantities.get(fallback_sku, 1) if fallback_sku else 1
                     member_entries.append(dict(
-                        sku=matched_structured["sku"] if matched_structured else None,
+                        sku=matched_structured["sku"] if matched_structured else fallback_sku,
                         name=visible_name,
-                        quantity=matched_structured["quantity"] if matched_structured else 1,
+                        quantity=matched_structured["quantity"] if matched_structured else fallback_qty,
                         is_set_only=visible_row["is_set_only"] if matched_structured is None else False,
                     ))
             else:

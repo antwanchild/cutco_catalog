@@ -24,6 +24,7 @@ from models import (
     SharpeningLog,
     Set,
 )
+from scraping import _build_set_member_entries
 from time_utils import container_timezone, format_container_time
 
 
@@ -576,6 +577,32 @@ class UtilitySmokeTests(SmokeBaseTest):
         with mock.patch("helpers.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
              mock.patch("helpers.requests.post", side_effect=RuntimeError("boom")):
             self.assertFalse(_notify_discord("Webhook fails"))
+
+    def test_set_member_entries_preserve_structured_skus(self):
+        structured_members = [
+            {"sku": "BBQ-1", "name": "Barbecue Tongs", "quantity": 1},
+            {"sku": "BBQ-2", "name": "Barbecue Turner", "quantity": 2},
+        ]
+        visible_rows = [
+            {"name": "Barbecue Tongs", "is_set_only": False},
+            {"name": "Barbecue Turner", "is_set_only": False},
+            {"name": "Extra Piece", "is_set_only": True},
+        ]
+
+        member_entries = _build_set_member_entries(
+            structured_members,
+            visible_rows,
+            ["BBQ-1", "BBQ-2", "BBQ-3"],
+            {"BBQ-1": 1, "BBQ-2": 2, "BBQ-3": 1},
+        )
+
+        self.assertEqual(member_entries[0]["sku"], "BBQ-1")
+        self.assertEqual(member_entries[0]["name"], "Barbecue Tongs")
+        self.assertEqual(member_entries[1]["sku"], "BBQ-2")
+        self.assertEqual(member_entries[1]["quantity"], 2)
+        self.assertEqual(member_entries[2]["sku"], "BBQ-3")
+        self.assertEqual(member_entries[2]["name"], "Extra Piece")
+        self.assertTrue(member_entries[2]["is_set_only"])
 
     def test_admin_diagnostics_shows_schema_target(self):
         self._login_as_admin()
