@@ -53,13 +53,14 @@
     <div class="quick-action-card">
       <span class="quick-action-title">Diagnostics</span>
       <span class="quick-action-note">Check runtime, migrations, and storage.</span>
-      <a class="btn btn-ghost btn-sm quick-action-btn" href="{{ url_for('admin.diagnostics_page') }}">Open Diagnostics</a>
+      <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('admin.diagnostics_page') }}">Open Diagnostics</a>
     </div>
     {% if is_admin() %}
     <div class="quick-action-card">
       <span class="quick-action-title">Catalog sync</span>
       <span class="quick-action-note">Preview and import Cutco updates.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" id="dashboard-sync-btn" href="{{ url_for('catalog.catalog_sync') }}">Run Sync</a>
+      <span class="quick-action-status" id="dashboard-sync-status" hidden>Preparing sync preview…</span>
     </div>
     <div class="quick-action-card">
       <span class="quick-action-title">MSRP diff</span>
@@ -233,11 +234,13 @@ if (dashboardSyncBtn && dashboardSyncOverlay) {
   dashboardSyncBtn.addEventListener('click', function(e) {
     e.preventDefault();
     const url = this.href;
+    const status = document.getElementById('dashboard-sync-status');
 
     this.textContent = 'Syncing…';
     this.classList.add('btn-disabled');
     this.style.pointerEvents = 'none';
     dashboardSyncOverlay.style.display = 'flex';
+    if (status) status.hidden = false;
 
     fetch(url)
       .then(res => {
