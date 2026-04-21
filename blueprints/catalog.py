@@ -886,8 +886,15 @@ def catalog_sync_confirm():
         item_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         if not item_set:
             continue
+        member_skus = [raw.strip() for raw in
+                       request.form.get(f"existing_set_member_skus_{index}", "").split("|") if raw.strip()]
         member_data_raw = request.form.get(f"existing_set_member_data_{index}", "").strip()
         member_data = _load_member_snapshot(member_data_raw) if member_data_raw else []
+        member_data_lookup = {
+            _normalize_member_sku(member.get("sku")): member
+            for member in member_data
+            if _normalize_member_sku(member.get("sku"))
+        }
         member_qtys = {}
         for raw_pair in request.form.get(f"existing_set_member_qtys_{index}", "").split("|"):
             if ":" in raw_pair:
@@ -903,19 +910,22 @@ def catalog_sync_confirm():
                 if member.quantity != new_qty:
                     member.quantity = new_qty
                     qty_updates += 1
-        if create_missing_set_members and member_data:
+        if create_missing_set_members and member_skus:
             existing_member_ids = {member.item_id for member in item_set.members}
-            for member in member_data:
-                sku = _normalize_member_sku(member.get("sku"))
-                if not sku or sku in member_qtys:
+            for member_sku in member_skus:
+                sku = _normalize_member_sku(member_sku)
+                if not sku:
                     continue
                 item = sku_to_item.get(sku)
                 if not item:
+                    member = member_data_lookup.get(sku)
+                    if not member:
+                        member = {"sku": sku, "name": None, "quantity": member_qtys.get(sku, 1)}
                     item = _create_missing_set_member_item(member, set_name)
                     sku_to_item[item.sku.upper()] = item
                     created_existing_missing_items += 1
                 if item.id not in existing_member_ids:
-                    db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=member.get("quantity", 1) or 1))
+                    db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=member_qtys.get(sku, 1) or 1))
         if member_data_raw:
             item_set.member_data = json.dumps(member_data, ensure_ascii=False)
 

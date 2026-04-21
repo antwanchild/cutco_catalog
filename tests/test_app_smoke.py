@@ -1565,9 +1565,13 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "create_missing_set_members": "on",
                 "existing_set_count": "1",
                 "existing_set_name_0": "Sync Existing Set",
-                "existing_set_member_qtys_0": "SX-EX-1:3",
+                "existing_set_member_skus_0": "SX-EX-1|SX-EX-MISS-1",
+                "existing_set_member_qtys_0": "SX-EX-1:3|SX-EX-MISS-1:1",
                 "existing_set_member_data_0": json.dumps(
-                    [{"sku": "SX-EX-1", "name": "Sync Existing Knife", "quantity": 3}]
+                    [
+                        {"sku": "SX-EX-1", "name": "Sync Existing Knife", "quantity": 3},
+                        {"sku": "SX-EX-MISS-1", "name": "Sync Existing Missing Knife", "quantity": 1},
+                    ]
                 ),
             },
             follow_redirects=False,
@@ -1586,7 +1590,11 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIsNotNone(new_set.member_data)
             self.assertIn("SX-MISS-1", new_set.member_data)
             existing_set = db.session.get(Set, existing_set_id)
+            self.assertEqual(len(existing_set.members), 2)
             self.assertEqual(existing_set.members[0].quantity, 3)
+            created_existing_member = db.session.execute(db.select(Item).filter_by(sku="SX-EX-MISS-1")).scalar_one()
+            self.assertFalse(created_existing_member.in_catalog)
+            self.assertTrue(created_existing_member.set_only)
             self.assertIsNotNone(existing_set.member_data)
 
         set_detail_response = self.client.get(f"/sets/{new_set.id}")
