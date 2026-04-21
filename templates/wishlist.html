@@ -76,6 +76,7 @@
             <button class="btn btn-xs btn-danger"
                     data-confirm-title="Delete wishlist entry"
                     data-confirm-message="This wishlist entry will be removed."
+                    data-confirm-count="1 entry"
                     data-confirm-preview="Item: {{ o.variant.item.name | e }} | Collector: {{ o.person.name | e }} | Target: {% if row.target %}${{ '%.2f'|format(row.target) }}{% else %}—{% endif %}"
                     data-confirm-button="Delete entry">Del</button>
           </form>

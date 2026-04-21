@@ -34,6 +34,94 @@
   </div>
 </div>
 
+<section class="dash-panel dash-panel-wide dashboard-shortcuts">
+  <div class="section-heading-actions" style="margin-bottom:.6rem">
+    <h2>Quick Actions</h2>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('search') }}">Search</a>
+  </div>
+  <div class="quick-action-grid">
+    <div class="quick-action-card">
+      <span class="quick-action-title">Add item</span>
+      <span class="quick-action-note">Create a new catalog item.</span>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('catalog.catalog_add') }}">+ Add Item</a>
+    </div>
+    <div class="quick-action-card">
+      <span class="quick-action-title">Add collector</span>
+      <span class="quick-action-note">Create a person record.</span>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('people.people_add') }}">+ Add Collector</a>
+    </div>
+    <div class="quick-action-card">
+      <span class="quick-action-title">Diagnostics</span>
+      <span class="quick-action-note">Check runtime, migrations, and storage.</span>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.diagnostics_page') }}">Open Diagnostics</a>
+    </div>
+    {% if is_admin() %}
+    <div class="quick-action-card">
+      <span class="quick-action-title">Catalog sync</span>
+      <span class="quick-action-note">Preview and import Cutco updates.</span>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('catalog.catalog_sync') }}">Run Sync</a>
+    </div>
+    <div class="quick-action-card">
+      <span class="quick-action-title">MSRP diff</span>
+      <span class="quick-action-note">Review price changes before applying them.</span>
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('admin.msrp_diff_page') }}">Open MSRP Diff</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="dash-panel dash-panel-wide dashboard-changes">
+  <div class="section-heading-actions" style="margin-bottom:.6rem">
+    <h2>Recently Changed</h2>
+    <span class="muted small">Latest records by type</span>
+  </div>
+  <div class="changes-grid">
+    <div class="changes-card">
+      <h3>Catalog Items</h3>
+      {% for item in recent_changes['items'] %}
+        <div class="change-item">
+          <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
+          <span class="change-meta">
+            {% if item.sku %}<span class="change-badge">{{ item.sku }}</span>{% endif %}
+            {% if item.category %}<span class="change-badge">{{ item.category }}</span>{% endif %}
+          </span>
+        </div>
+      {% else %}
+        <div class="muted">No items yet.</div>
+      {% endfor %}
+    </div>
+    <div class="changes-card">
+      <h3>Collectors</h3>
+      {% for person in recent_changes['people'] %}
+        <div class="change-item">
+          <a href="{{ url_for('people.person_collection', person_id=person.id) }}">{{ person.name }}</a>
+          <span class="change-meta">
+            <span class="change-badge">{{ person.ownerships | length }} entries</span>
+          </span>
+        </div>
+      {% else %}
+        <div class="muted">No collectors yet.</div>
+      {% endfor %}
+    </div>
+    <div class="changes-card">
+      <h3>Ownership Entries</h3>
+      {% for ownership in recent_changes['entries'] %}
+        <div class="change-item">
+          <a href="{{ url_for('people.person_collection', person_id=ownership.person_id) }}">
+            {{ ownership.person.name }} · {{ ownership.variant.item.name }}
+          </a>
+          <span class="change-meta">
+            <span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span>
+            {% if ownership.variant.color != UNKNOWN_COLOR %}<span class="change-badge">{{ ownership.variant.color }}</span>{% endif %}
+          </span>
+        </div>
+      {% else %}
+        <div class="muted">No ownership entries yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
 <section class="dash-panel dash-panel-wide dashboard-activity">
   <div class="section-heading-actions" style="margin-bottom:.6rem">
     <h2>Recent Activity</h2>
@@ -45,7 +133,9 @@
           <span class="activity-label">{{ entry.label }}</span>
           <span class="activity-time">{{ entry.time }}</span>
         </div>
-        <div class="activity-title">{{ entry.title }}</div>
+        <div class="activity-title">
+          {% if entry.url %}<a href="{{ entry.url }}">{{ entry.title }}</a>{% else %}{{ entry.title }}{% endif %}
+        </div>
         {% if entry.details %}
           <div class="activity-details">{{ entry.details }}</div>
         {% endif %}

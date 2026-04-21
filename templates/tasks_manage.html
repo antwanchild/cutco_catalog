@@ -45,6 +45,7 @@
           <button class="btn btn-xs btn-danger"
                   data-confirm-title="Delete task"
                   data-confirm-message="This custom task will be removed."
+                  data-confirm-count="1 task"
                   data-confirm-preview="Task: {{ task.name | e }} | Suggested knives: {{ task.suggested_items | length }} | Logged uses: {{ task.log_entries | length }}"
                   data-confirm-button="Delete task">Delete</button>
         </form>

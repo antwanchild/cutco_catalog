@@ -19,6 +19,10 @@
 
 <nav class="navbar">
   <a class="brand" href="{{ url_for('index') }}">⚔️ Cutco Vault</a>
+  <form class="nav-search" method="get" action="{{ url_for('search') }}">
+    <input type="search" name="q" placeholder="Search catalog, people, tasks…" value="{{ request.args.get('q', '') }}" aria-label="Search">
+    <button type="submit" class="btn btn-sm">Search</button>
+  </form>
   <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">🌙</button>
   <button class="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
   <div class="nav-links">
@@ -84,6 +88,7 @@
 
     var confirmDialog = document.getElementById('confirm-action-dialog');
     var confirmTitle = document.getElementById('confirm-action-title');
+    var confirmCount = document.getElementById('confirm-action-count');
     var confirmMessage = document.getElementById('confirm-action-message');
     var confirmPreview = document.getElementById('confirm-action-preview');
     var confirmContinue = document.getElementById('confirm-action-continue');
@@ -92,6 +97,8 @@
     function resetConfirmDialog() {
       pendingForm = null;
       confirmTitle.textContent = 'Confirm action';
+      confirmCount.textContent = '';
+      confirmCount.hidden = true;
       confirmMessage.textContent = '';
       confirmPreview.textContent = '';
       confirmPreview.hidden = true;
@@ -101,6 +108,8 @@
     function openConfirmDialog(form, submitter) {
       pendingForm = form;
       confirmTitle.textContent = submitter.dataset.confirmTitle || 'Confirm action';
+      confirmCount.textContent = submitter.dataset.confirmCount || '';
+      confirmCount.hidden = !confirmCount.textContent;
       confirmMessage.textContent = submitter.dataset.confirmMessage || 'This action cannot be undone.';
       confirmPreview.textContent = submitter.dataset.confirmPreview || '';
       confirmPreview.hidden = !confirmPreview.textContent;
@@ -176,7 +185,10 @@
 
 <dialog id="confirm-action-dialog" class="help-dialog confirm-dialog">
   <div class="help-header">
-    <span id="confirm-action-title">Confirm action</span>
+    <div class="confirm-title-wrap">
+      <span id="confirm-action-title">Confirm action</span>
+      <span id="confirm-action-count" class="confirm-count" hidden></span>
+    </div>
     <button type="button" class="help-close" onclick="document.getElementById('confirm-action-dialog').close()">✕</button>
   </div>
   <div class="help-body">

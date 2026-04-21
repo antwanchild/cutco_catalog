@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Search – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🔎 Search</h1>
+</div>
+
+{% if query %}
+  <p class="search-kicker">Results for <strong>{{ query }}</strong></p>
+{% else %}
+  <p class="search-kicker">Search items, collectors, sets, and tasks from one place.</p>
+{% endif %}
+
+{% if shortcuts %}
+<section class="search-section">
+  <h2>Shortcuts</h2>
+  <div class="search-shortcuts">
+    {% for shortcut in shortcuts %}
+      <div class="search-shortcut">
+        <div class="search-shortcut-title"><a href="{{ shortcut.url }}">{{ shortcut.label }}</a></div>
+        <div class="search-shortcut-desc">{{ shortcut.description }}</div>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if query %}
+<div class="search-results">
+  <section class="search-section">
+    <h2>Catalog Items ({{ results['items'] | length }})</h2>
+    <div class="search-list">
+      {% for item in results['items'] %}
+        <div class="search-result">
+          <div>
+            <div class="search-result-main">
+              <a class="search-result-title" href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
+              {% if item.sku %}<span class="badge badge-info mono">{{ item.sku }}</span>{% endif %}
+              {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+            </div>
+            <div class="search-result-detail">{{ item.category or 'Uncategorized' }}</div>
+          </div>
+          <div class="search-result-badges">
+            {% if not item.in_catalog %}<span class="badge badge-off-catalog">Off-catalog</span>{% endif %}
+            <a class="btn btn-xs btn-ghost" href="{{ url_for('catalog.variants', item_id=item.id) }}">Variants</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="muted">No matching catalog items.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="search-section">
+    <h2>Collectors ({{ results['people'] | length }})</h2>
+    <div class="search-list">
+      {% for person in results['people'] %}
+        <div class="search-result">
+          <div>
+            <div class="search-result-main">
+              <a class="search-result-title" href="{{ url_for('people.person_collection', person_id=person.id) }}">{{ person.name }}</a>
+            </div>
+            <div class="search-result-detail">{{ person.notes or 'No notes' }}</div>
+          </div>
+          <div class="search-result-badges">
+            <span class="badge badge-info">{{ person.ownerships | length }} entries</span>
+            <a class="btn btn-xs btn-ghost" href="{{ url_for('people.people_edit', person_id=person.id) }}">Edit</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="muted">No matching collectors.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="search-section">
+    <h2>Sets ({{ results['sets'] | length }})</h2>
+    <div class="search-list">
+      {% for item_set in results['sets'] %}
+        <div class="search-result">
+          <div>
+            <div class="search-result-main">
+              <a class="search-result-title" href="{{ url_for('catalog.set_detail', set_id=item_set.id) }}">{{ item_set.name }}</a>
+              {% if item_set.sku %}<span class="badge badge-info mono">{{ item_set.sku }}</span>{% endif %}
+            </div>
+            <div class="search-result-detail">{{ item_set.notes or 'No notes' }}</div>
+          </div>
+          <div class="search-result-badges">
+            <span class="badge badge-info">{{ item_set.items | length }} items</span>
+            <a class="btn btn-xs btn-ghost" href="{{ url_for('catalog.set_edit', set_id=item_set.id) }}">Edit</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="muted">No matching sets.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="search-section">
+    <h2>Tasks ({{ results['tasks'] | length }})</h2>
+    <div class="search-list">
+      {% for task in results['tasks'] %}
+        <div class="search-result">
+          <div>
+            <div class="search-result-main">
+              <a class="search-result-title" href="{{ url_for('logs.task_detail', tid=task.id) }}">{{ task.name }}</a>
+            </div>
+            <div class="search-result-detail">{% if task.is_preset %}Preset task{% else %}Custom task{% endif %}</div>
+          </div>
+          <div class="search-result-badges">
+            {% if task.is_preset %}<span class="badge badge-info">Preset</span>{% endif %}
+            <a class="btn btn-xs btn-ghost" href="{{ url_for('logs.task_detail', tid=task.id) }}">Open</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="muted">No matching tasks.</div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

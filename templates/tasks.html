@@ -11,6 +11,7 @@
       <button class="btn btn-danger btn-sm"
               data-confirm-title="Purge all task logs"
               data-confirm-message="This will delete every task log entry."
+              data-confirm-count="{{ recent_entries | length }} log{{ 's' if recent_entries | length != 1 else '' }}"
               data-confirm-preview="All task log entries will be deleted."
               data-confirm-button="Purge logs">🗑 Purge All</button>
     </form>
@@ -160,6 +161,7 @@
           <button class="btn btn-xs btn-danger"
                   data-confirm-title="Delete task log entry"
                   data-confirm-message="This log entry will be removed."
+                  data-confirm-count="1 entry"
                   data-confirm-preview="Date: {{ entry.logged_on }} | Knife: {{ entry.item.name | e }} | Task: {{ entry.task.name | e }}"
                   data-confirm-button="Delete entry">✕</button>
         </form>

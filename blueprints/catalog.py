@@ -50,12 +50,19 @@ def catalog():
                   db.session.query(Item.category)
                   .filter(Item.category.isnot(None))
                   .distinct().order_by(Item.category).all()]
+    referenced_item_ids = {ownership.variant.item_id for ownership in Ownership.query.all()}
+    unreferenced_count = Item.query.filter(~Item.id.in_(referenced_item_ids)).count() if referenced_item_ids else Item.query.count()
+    all_item_count = Item.query.count()
+    set_count = Set.query.count()
 
     return render_template("catalog.html", items=items, categories=categories,
                            q=search_query, cat_filter=cat_filter, unicorn_f=unicorn_f,
                            sort=sort, direction=direction,
                            edge_types=EDGE_TYPES,
-                           UNKNOWN_COLOR=UNKNOWN_COLOR)
+                           UNKNOWN_COLOR=UNKNOWN_COLOR,
+                           unreferenced_count=unreferenced_count,
+                           all_item_count=all_item_count,
+                           set_count=set_count)
 
 
 @catalog_bp.route("/catalog/add", methods=["GET", "POST"])

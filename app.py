@@ -3,7 +3,7 @@ import os
 from datetime import timedelta
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request, url_for
 
 from constants import (
     ADMIN_SESSION_SECONDS,
@@ -15,7 +15,7 @@ from constants import (
 )
 from extensions import db, limiter
 from helpers import _csrf_token, is_admin, validate_csrf
-from models import Item, get_latest_activity
+from models import Item, KnifeTask, Ownership, Person, Set, get_latest_activity
 from schema_migrations import get_schema_history, get_schema_state
 from startup import get_bootstrap_history, get_bootstrap_state
 from time_utils import format_container_time
@@ -161,17 +161,28 @@ def _register_routes(app: Flask) -> None:
         def _event_row(label: str, kind: str, empty_text: str) -> dict:
             event = get_latest_activity(kind)
             if event:
+                url = None
+                if kind == "import":
+                    url = url_for("data.import_page")
+                elif kind == "sync":
+                    url = url_for("catalog.catalog_sync")
+                elif kind == "msrp_diff":
+                    url = url_for("admin.msrp_diff_page")
+                elif kind in {"schema", "bootstrap"}:
+                    url = url_for("admin.diagnostics_page")
                 return {
                     "label": label,
                     "title": event["title"],
                     "details": event.get("details"),
                     "time": format_container_time(event.get("occurred_at")),
+                    "url": url,
                 }
             return {
                 "label": label,
                 "title": empty_text,
                 "details": None,
                 "time": "—",
+                "url": None,
             }
 
         activity_rows.append(_event_row("Last Import", "import", "No imports yet."))
@@ -226,6 +237,18 @@ def _register_routes(app: Flask) -> None:
             "bootstrap_version": get_bootstrap_state()["version"],
         }
 
+    def _recent_changes() -> dict:
+        return {
+            "items": Item.query.order_by(Item.id.desc()).limit(5).all(),
+            "people": Person.query.order_by(Person.id.desc()).limit(5).all(),
+            "entries": (
+                Ownership.query
+                .order_by(Ownership.id.desc())
+                .limit(5)
+                .all()
+            ),
+        }
+
     @app.route("/")
     def index():
         from models import ItemVariant, Ownership, Person, Set
@@ -253,7 +276,60 @@ def _register_routes(app: Flask) -> None:
             people=people,
             recent=recent,
             recent_activity=_recent_activity(),
+            recent_changes=_recent_changes(),
             release_snapshot=_release_snapshot(),
+        )
+
+    @app.route("/search")
+    def search():
+        query = request.args.get("q", "").strip()
+        if not query:
+            return render_template("search.html", query="", results={}, shortcuts=[
+                {"label": "Catalog", "url": url_for("catalog.catalog"), "description": "Browse and filter items."},
+                {"label": "People", "url": url_for("people.people"), "description": "Open collector records."},
+                {"label": "Tasks", "url": url_for("logs.tasks_manage"), "description": "Manage knife tasks."},
+                {"label": "Diagnostics", "url": url_for("admin.diagnostics_page"), "description": "Check runtime health."},
+            ])
+
+        like = f"%{query}%"
+        item_results = Item.query.filter(
+            db.or_(
+                Item.name.ilike(like),
+                Item.sku.ilike(like),
+                Item.category.ilike(like),
+                Item.notes.ilike(like),
+            )
+        ).order_by(Item.name).limit(20).all()
+
+        person_results = Person.query.filter(
+            db.or_(
+                Person.name.ilike(like),
+                Person.notes.ilike(like),
+            )
+        ).order_by(Person.name).limit(20).all()
+
+        set_results = Set.query.filter(
+            db.or_(
+                Set.name.ilike(like),
+                Set.sku.ilike(like),
+                Set.notes.ilike(like),
+            )
+        ).order_by(Set.name).limit(20).all()
+
+        task_results = KnifeTask.query.filter(
+            KnifeTask.name.ilike(like)
+        ).order_by(KnifeTask.name).limit(20).all()
+
+        return render_template(
+            "search.html",
+            query=query,
+            results={
+                "items": item_results,
+                "people": person_results,
+                "sets": set_results,
+                "tasks": task_results,
+            },
+            shortcuts=[],
         )
 
     @app.route("/health")

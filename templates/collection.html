@@ -11,6 +11,7 @@
       <button type="submit" class="btn btn-danger btn-sm"
               data-confirm-title="Purge collection"
               data-confirm-message="This will remove every ownership entry for this collector."
+              data-confirm-count="{{ ownerships | length }} ownership{{ 's' if ownerships | length != 1 else '' }}"
               data-confirm-preview="Collector: {{ person.name | e }} | Ownership entries: {{ ownerships | length }} | Missing items: {{ item_gaps | length if item_gaps else 0 }}"
               data-confirm-button="Purge collection">🗑 Purge Collection</button>
     </form>
@@ -54,6 +55,7 @@
           <button class="btn btn-xs btn-danger"
                   data-confirm-title="Delete ownership entry"
                   data-confirm-message="This ownership record will be removed."
+                  data-confirm-count="1 entry"
                   data-confirm-preview="Collector: {{ person.name | e }} | Item: {{ ownership.variant.item.name | e }} | Color: {{ ownership.variant.color | e }} | Status: {{ ownership.status | e }}"
                   data-confirm-button="Delete entry">Del</button>
         </form>
@@ -132,6 +134,7 @@
       submitBtn.textContent = 'Delete selected';
       submitBtn.dataset.confirmTitle = 'Delete selected entries';
       submitBtn.dataset.confirmMessage = 'This will remove the selected ownership entries.';
+      submitBtn.dataset.confirmCount = document.querySelectorAll('.row-check:checked').length + ' selected entr' + (document.querySelectorAll('.row-check:checked').length === 1 ? 'y' : 'ies');
       submitBtn.dataset.confirmPreview = 'Selected ownership entries will be deleted.';
       submitBtn.dataset.confirmButton = 'Delete entries';
       statusInput.disabled = true;
@@ -145,6 +148,9 @@
     bar.classList.toggle('bulk-bar-visible', n > 0);
     selectAll.indeterminate = n > 0 && n < checks.length;
     selectAll.checked = n === checks.length;
+    if (actionSel.value === 'delete') {
+      submitBtn.dataset.confirmCount = n + ' selected entr' + (n === 1 ? 'y' : 'ies');
+    }
   }
 
   selectAll.addEventListener('change', function() {

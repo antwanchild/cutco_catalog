@@ -111,6 +111,8 @@ class PublicSmokeTests(SmokeBaseTest):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Recent Activity", response.data)
+        self.assertIn(b"Quick Actions", response.data)
+        self.assertIn(b"Recently Changed", response.data)
         self.assertIn(b"Release &amp; Diagnostics", response.data)
         self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
         self.assertNotIn("Strict-Transport-Security", response.headers)
@@ -137,6 +139,26 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn("version", payload)
         self.assertIn("git_sha", payload)
+
+    def test_search_page_renders_results_and_shortcuts(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _variant_id = self._add_catalog_item(name="Search Knife", sku="SRCH-1")
+        _person_id = self._add_person(name="Search Collector", notes="Search note")
+        _set_id = self._add_set(name="Search Set", sku="SET-S", item_ids=(item_id,))
+        self._add_task(name="Slice tomatoes")
+
+        empty_response = self.client.get("/search")
+        self.assertEqual(empty_response.status_code, 200)
+        self.assertIn(b"Shortcuts", empty_response.data)
+
+        response = self.client.get("/search?q=Search")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Search Knife", response.data)
+        self.assertIn(b"Search Collector", response.data)
+        self.assertIn(b"Search Set", response.data)
+        self.assertIn(b"Catalog Items", response.data)
 
     def test_admin_login_sets_session_flag(self):
         response = self.client.post(

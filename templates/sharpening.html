@@ -16,6 +16,7 @@
       <button class="btn btn-danger btn-sm"
               data-confirm-title="Purge all sharpening logs"
               data-confirm-message="This will delete every sharpening log entry."
+              data-confirm-count="{{ recent_entries | length }} event{{ 's' if recent_entries | length != 1 else '' }}"
               data-confirm-preview="All sharpening log entries will be deleted."
               data-confirm-button="Purge logs">🗑 Purge All</button>
     </form>
@@ -128,6 +129,7 @@
             <button class="btn btn-xs btn-danger"
                     data-confirm-title="Delete sharpening event"
                     data-confirm-message="This sharpening event will be removed."
+                    data-confirm-count="1 event"
                     data-confirm-preview="Date: {{ entry.sharpened_on }} | Item: {{ entry.item.name | e }} | Method: {{ entry.method | e }}"
                     data-confirm-button="Delete event">Del</button>
           </form>

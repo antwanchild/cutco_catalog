@@ -153,6 +153,7 @@
             <button class="btn btn-xs btn-danger"
                     data-confirm-title="Purge cookware history"
                     data-confirm-message="This will remove every cookware session for this item."
+                    data-confirm-count="{{ row.session_count }} session{{ 's' if row.session_count != 1 else '' }}"
                     data-confirm-preview="Item: {{ row.item.name | e }} | Sessions: {{ row.session_count }}"
                     data-confirm-button="Purge history">🗑 Purge</button>
           </form>
@@ -195,6 +196,7 @@
             <button class="btn btn-xs btn-danger"
                     data-confirm-title="Delete cookware session"
                     data-confirm-message="This cookware session will be removed."
+                    data-confirm-count="1 session"
                     data-confirm-preview="Date: {{ s.used_on }} | Item: {{ s.item.name | e }} | Made: {{ s.made_item | e }}"
                     data-confirm-button="Delete session">Del</button>
           </form>

@@ -96,6 +96,7 @@
             <button class="btn btn-xs btn-danger"
                     data-confirm-title="Delete item"
                     data-confirm-message="This item will be removed from the catalog."
+                    data-confirm-count="1 item"
                     data-confirm-preview="Item: {{ item.name | e }}{% if item.sku %} | SKU: {{ item.sku | e }}{% endif %}{% if item.sets %} | Sets: {{ item.sets | length }}{% endif %}{% if item.variants %} | Variants: {{ item.variants | length }}{% endif %}"
                     data-confirm-button="Delete item">Del</button>
           </form>
@@ -160,6 +161,7 @@ document.getElementById('sync-btn').addEventListener('click', function(e) {
       <button type="submit" class="btn btn-secondary purge-btn"
               data-confirm-title="Remove unreferenced items"
               data-confirm-message="This will delete items that have no ownership records."
+              data-confirm-count="{{ unreferenced_count }} item{{ 's' if unreferenced_count != 1 else '' }}"
               data-confirm-preview="Items with no ownership records will be removed. Ownership data is preserved."
               data-confirm-button="Remove items">
         <span class="purge-title">🧹 Remove unreferenced items</span>
@@ -170,6 +172,7 @@ document.getElementById('sync-btn').addEventListener('click', function(e) {
       <button type="submit" class="btn btn-danger purge-btn"
               data-confirm-title="Purge entire catalog"
               data-confirm-message="This will permanently remove every catalog record."
+              data-confirm-count="{{ all_item_count }} item{{ 's' if all_item_count != 1 else '' }} and {{ set_count }} set{{ 's' if set_count != 1 else '' }}"
               data-confirm-preview="All items, variants, ownership, sharpening, cookware, and task records will be deleted."
               data-confirm-button="Purge catalog">
         <span class="purge-title">💥 Purge everything</span>
