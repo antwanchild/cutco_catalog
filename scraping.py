@@ -514,6 +514,7 @@ def scrape_sets(
             detail = BeautifulSoup(raw_html, "html.parser")
 
             member_skus: list[str] = []
+            member_names: list[str] = []
             member_quantities: dict[str, int] = {}
             seen_member: set[str] = set()
 
@@ -556,11 +557,13 @@ def scrape_sets(
                         if base_sku not in seen_member:
                             seen_member.add(base_sku)
                             member_skus.append(base_sku)
+                            member_names.append(str(entry.get("name") or entry.get("itemName") or "").strip())
                             member_quantities[base_sku] = qty
                     logger.debug("Set '%s': itemSetList → %d members", set_link["name"], len(member_skus))
                 except (json.JSONDecodeError, ValueError, TypeError) as exc:
                     logger.debug("itemSetList parse failed for %s: %s", fetch_url, exc)
                     member_skus.clear()
+                    member_names.clear()
                     member_quantities.clear()
                     seen_member.clear()
 
@@ -576,8 +579,35 @@ def scrape_sets(
                         if base_sku not in seen_member:
                             seen_member.add(base_sku)
                             member_skus.append(base_sku)
+                            member_names.append("")
                             member_quantities[base_sku] = 1
                 logger.debug("Set '%s': image fallback → %d members", set_link["name"], len(member_skus))
+
+            # Strategy 3: visible Set Pieces labels, if present
+            if not any(member_names):
+                heading = None
+                for tag in detail.find_all(["h2", "h3", "h4"]):
+                    if tag.get_text(strip=True).lower().startswith("set pieces"):
+                        heading = tag
+                        break
+                if heading:
+                    pieces_list = heading.find_next("ul")
+                    if pieces_list:
+                        visible_names = [li.get_text(" ", strip=True) for li in pieces_list.find_all("li")]
+                        visible_names = [name for name in visible_names if name]
+                        if visible_names:
+                            for idx, name in enumerate(visible_names):
+                                if idx < len(member_names):
+                                    member_names[idx] = name
+                            logger.debug("Set '%s': visible Set Pieces labels → %d names", set_link["name"], len(visible_names))
+
+            member_entries = []
+            for idx, sku in enumerate(member_skus):
+                member_entries.append(dict(
+                    sku=sku,
+                    name=member_names[idx] if idx < len(member_names) and member_names[idx] else None,
+                    quantity=member_quantities.get(sku, 1),
+                ))
 
             logger.debug("Set '%s': sku=%s, %d members", set_link["name"], set_sku, len(member_skus))
             return dict(
@@ -586,6 +616,7 @@ def scrape_sets(
                 url              = set_link["url"],
                 member_skus      = member_skus,
                 member_quantities= member_quantities,
+                member_entries   = member_entries,
             )
         except Exception as exc:
             logger.warning("Scrape failed for set %s: %s", set_link["url"], exc)

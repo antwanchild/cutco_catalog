@@ -33,6 +33,7 @@ class Item(db.Model):
     is_unicorn = db.Column(db.Boolean,     nullable=False, default=False)
     edge_is_unicorn = db.Column(db.Boolean, nullable=False, default=False)
     in_catalog = db.Column(db.Boolean,     nullable=False, default=True)
+    set_only   = db.Column(db.Boolean,     nullable=False, default=False)
     cutco_url      = db.Column(db.String(300), nullable=True)
     msrp           = db.Column(db.Float,       nullable=True)
     blade_length   = db.Column(db.String(20),  nullable=True)

@@ -57,6 +57,10 @@
       <input type="checkbox" name="in_catalog" {% if not item or item.in_catalog %}checked{% endif %}>
       In Cutco catalog
     </label>
+    <label class="checkbox-label">
+      <input type="checkbox" name="set_only" {% if item and item.set_only %}checked{% endif %}>
+      Set-only item
+    </label>
   </div>
 
   {% if item %}

@@ -1351,6 +1351,10 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "url": "https://example.com/new-set",
                 "member_skus": ["NS-1"],
                 "member_quantities": {"NS-1": 2},
+                "member_entries": [
+                    {"sku": "NS-1", "name": "New Sync Knife", "quantity": 2},
+                    {"sku": "", "name": "Set Only Turner", "quantity": 1},
+                ],
             }
         ]
 
@@ -1374,6 +1378,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Sync Knife", response.data)
         self.assertIn(b"New Sets", response.data)
         self.assertIn(b"New Sync Set", response.data)
+        self.assertIn(b"Set-Only Members", response.data)
+        self.assertIn(b"Set Only Turner", response.data)
 
     def test_catalog_sync_uses_populates_tasks(self):
         self._login_as_admin()
@@ -1425,6 +1431,14 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "set_sku_0": "SX-SET-NEW",
                 "set_members_0": "SX-NEW-1",
                 "set_member_qtys_0": "SX-NEW-1:2",
+                "set_only_count": "1",
+                "selected_set_only_members": ["0"],
+                "set_only_set_name_0": "Sync New Set",
+                "set_only_set_sku_0": "SX-SET-NEW",
+                "set_only_set_url_0": "https://example.com/sync-new",
+                "set_only_member_name_0": "Sync Set Fork",
+                "set_only_member_sku_0": "",
+                "set_only_member_qty_0": "1",
                 "existing_set_count": "1",
                 "existing_set_name_0": "Sync Existing Set",
                 "existing_set_member_qtys_0": "SX-EX-1:3",
@@ -1438,6 +1452,10 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIsNone(new_item.msrp)
             new_set = db.session.execute(db.select(Set).filter_by(name="Sync New Set")).scalar_one()
             self.assertEqual(new_set.members[0].quantity, 2)
+            placeholder = db.session.execute(db.select(Item).filter_by(name="Sync Set Fork")).scalar_one()
+            self.assertTrue(placeholder.set_only)
+            self.assertFalse(placeholder.in_catalog)
+            self.assertIsNone(placeholder.sku)
             existing_set = db.session.get(Set, existing_set_id)
             self.assertEqual(existing_set.members[0].quantity, 3)
 

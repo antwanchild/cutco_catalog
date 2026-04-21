@@ -76,7 +76,8 @@ def catalog_add():
             edge_type  = request.form.get("edge_type", "Unknown"),
             is_unicorn = request.form.get("is_unicorn") == "on",
             edge_is_unicorn = request.form.get("edge_is_unicorn") == "on",
-            in_catalog = request.form.get("in_catalog") == "on",
+            set_only   = request.form.get("set_only") == "on",
+            in_catalog = request.form.get("in_catalog") == "on" and request.form.get("set_only") != "on",
             cutco_url  = request.form.get("cutco_url", "").strip() or None,
             notes      = request.form.get("notes", "").strip() or None,
         )
@@ -112,7 +113,8 @@ def catalog_edit(item_id):
         item.edge_type  = request.form.get("edge_type", "Unknown")
         item.is_unicorn = request.form.get("is_unicorn") == "on"
         item.edge_is_unicorn = request.form.get("edge_is_unicorn") == "on"
-        item.in_catalog = request.form.get("in_catalog") == "on"
+        item.set_only   = request.form.get("set_only") == "on"
+        item.in_catalog = request.form.get("in_catalog") == "on" and request.form.get("set_only") != "on"
         item.cutco_url  = request.form.get("cutco_url", "").strip() or None
         item.notes      = request.form.get("notes", "").strip() or None
 
@@ -588,6 +590,47 @@ def catalog_sync():
         logger.error("Sets scrape failed: %s", exc)
         scraped_sets = []
 
+    sku_lookup = {
+        item.sku.upper(): item
+        for item in Item.query.filter(Item.sku.isnot(None)).all()
+        if item.sku
+    }
+    name_lookup = {
+        item.name.lower(): item
+        for item in Item.query.all()
+        if item.name
+    }
+    set_only_members = []
+    for item_set in scraped_sets:
+        member_entries = item_set.get("member_entries") or [
+            {
+                "sku": sku,
+                "name": None,
+                "quantity": item_set.get("member_quantities", {}).get(sku, 1),
+            }
+            for sku in item_set.get("member_skus", [])
+        ]
+        for member in member_entries:
+            member_sku = (member.get("sku") or "").strip()
+            member_name = (member.get("name") or "").strip()
+            candidate = None
+            if member_sku:
+                candidate = sku_lookup.get(member_sku.upper())
+            if candidate is None and member_name:
+                candidate = name_lookup.get(member_name.lower())
+            if candidate is not None:
+                continue
+            if not member_name:
+                continue
+            set_only_members.append({
+                "set_name": item_set["name"],
+                "set_sku": item_set.get("sku"),
+                "set_url": item_set["url"],
+                "member_name": member_name,
+                "member_sku": member_sku or None,
+                "quantity": member.get("quantity", 1) or 1,
+            })
+
     # Fetch specs (edge, msrp, lengths, weight) for new items in parallel
     if new_items:
         from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
@@ -618,6 +661,7 @@ def catalog_sync():
                            scraped_total=len(scraped),
                            new_sets=new_sets,
                            existing_sets_data=existing_sets_data,
+                           set_only_members=set_only_members,
                            scraped_sets_total=len(scraped_sets),
                            blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES))
 
@@ -648,7 +692,7 @@ def catalog_sync_confirm():
             msrp = None
         item = Item(name=data.get("name", sku), sku=sku,
                     category=canonicalize_category(data.get("category")), cutco_url=data.get("url"),
-                    in_catalog=True, is_unicorn=False, edge_is_unicorn=False,
+                    in_catalog=True, set_only=False, is_unicorn=False, edge_is_unicorn=False,
                     edge_type=data.get("edge_type") or "Unknown",
                     msrp=msrp,
                     blade_length=data.get("blade_length") or None,
@@ -704,6 +748,58 @@ def catalog_sync_confirm():
                 # Update quantity if it changed
                 existing_members[item.id].quantity = qty
 
+    selected_set_only_members = set(request.form.getlist("selected_set_only_members"))
+    created_set_only_items = 0
+    linked_set_only_members = 0
+    set_only_count = int(request.form.get("set_only_count", 0))
+    for index in range(set_only_count):
+        if str(index) not in selected_set_only_members:
+            continue
+        set_name = request.form.get(f"set_only_set_name_{index}", "").strip()
+        member_name = request.form.get(f"set_only_member_name_{index}", "").strip()
+        if not set_name or not member_name:
+            continue
+        item_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
+        if not item_set:
+            continue
+        member_qty_raw = request.form.get(f"set_only_member_qty_{index}", "1").strip()
+        try:
+            member_qty = int(member_qty_raw)
+        except ValueError:
+            member_qty = 1
+        member_sku = request.form.get(f"set_only_member_sku_{index}", "").strip() or None
+        item = None
+        if member_sku:
+            item = Item.query.filter(db.func.lower(Item.sku) == member_sku.lower()).first()
+        if item is None:
+            item = Item.query.filter(db.func.lower(Item.name) == member_name.lower()).first()
+        if item is None:
+            item = Item(
+                name=member_name,
+                sku=None,
+                category=None,
+                in_catalog=False,
+                set_only=True,
+                cutco_url=request.form.get(f"set_only_set_url_{index}", "").strip() or None,
+                notes=f"Set-only member of {set_name}",
+            )
+            db.session.add(item)
+            db.session.flush()
+            reconcile_unknown_variant(item)
+            created_set_only_items += 1
+        else:
+            if item.sku is None:
+                item.set_only = True
+                item.in_catalog = False
+                if not item.notes:
+                    item.notes = f"Set-only member of {set_name}"
+        existing_members = {membership.item_id: membership for membership in item_set.members}
+        if item.id not in existing_members:
+            db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=member_qty))
+            linked_set_only_members += 1
+        elif existing_members[item.id].quantity != member_qty:
+            existing_members[item.id].quantity = member_qty
+
     # Update quantities on existing sets (no new rows, just qty backfill)
     existing_set_count = int(request.form.get("existing_set_count", 0))
     qty_updates = 0
@@ -731,12 +827,13 @@ def catalog_sync_confirm():
                     qty_updates += 1
 
     db_commit(db.session)
-    logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates",
-                added_items, added_sets, linked_items, qty_updates)
+    logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates, %d set-only items, %d set-only links",
+                added_items, added_sets, linked_items, qty_updates, created_set_only_items, linked_set_only_members)
     record_activity(
         "sync",
         "Catalog sync complete",
-        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates.",
+        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates, "
+        f"{created_set_only_items} set-only items, {linked_set_only_members} set-only links.",
     )
     db.session.commit()
 
@@ -747,5 +844,7 @@ def catalog_sync_confirm():
         parts.append(f"{added_sets} set{'s' if added_sets != 1 else ''}")
     if linked_items:
         parts.append(f"{linked_items} set membership{'s' if linked_items != 1 else ''}")
+    if created_set_only_items:
+        parts.append(f"{created_set_only_items} set-only item{'s' if created_set_only_items != 1 else ''}")
     flash("Sync complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
     return redirect(url_for("catalog.catalog"))

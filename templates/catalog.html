@@ -86,7 +86,8 @@
         {% if item.variants | selectattr('is_unicorn') | list | length %}
           <span class="badge badge-unicorn" title="Variant unicorn">Variant 🦄</span>
         {% endif %}
-        {% if not item.in_catalog %}<span class="badge badge-off-catalog" title="Off-catalog">⬛</span>{% endif %}
+        {% if item.set_only %}<span class="badge badge-off-catalog" title="Available only as part of a set">Set-only</span>{% endif %}
+        {% if not item.in_catalog and not item.set_only %}<span class="badge badge-off-catalog" title="Off-catalog">⬛</span>{% endif %}
       </td>
       <td class="actions">
         {% if is_admin() %}

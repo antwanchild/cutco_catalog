@@ -130,6 +130,47 @@
   </div>
   {% endif %}
 
+  {# ── Set-Only Members #}
+  {% if set_only_members %}
+  <h2 class="mt-section">Set-Only Members <span class="muted">({{ set_only_members | length }})</span></h2>
+  <p class="muted">These pieces do not appear to have solo catalog items. Select any rows you want to create as placeholder items.</p>
+  <input type="hidden" name="set_only_count" value="{{ set_only_members | length }}">
+  <div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:32px"></th>
+        <th>Set</th>
+        <th>Member</th>
+        <th>Qty</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for member in set_only_members %}
+      <tr>
+        <td>
+          <input type="checkbox" name="selected_set_only_members" value="{{ loop.index0 }}">
+          <input type="hidden" name="set_only_set_name_{{ loop.index0 }}" value="{{ member.set_name }}">
+          <input type="hidden" name="set_only_set_sku_{{ loop.index0 }}" value="{{ member.set_sku or '' }}">
+          <input type="hidden" name="set_only_set_url_{{ loop.index0 }}" value="{{ member.set_url }}">
+          <input type="hidden" name="set_only_member_name_{{ loop.index0 }}" value="{{ member.member_name }}">
+          <input type="hidden" name="set_only_member_sku_{{ loop.index0 }}" value="{{ member.member_sku or '' }}">
+          <input type="hidden" name="set_only_member_qty_{{ loop.index0 }}" value="{{ member.quantity }}">
+        </td>
+        <td>{{ member.set_name }}</td>
+        <td>{{ member.member_name }}</td>
+        <td class="mono">{{ member.quantity }}</td>
+        <td><span class="badge badge-off-catalog">Set-only</span></td>
+        <td>{% if member.set_sku %}<span class="mono small">{{ member.set_sku }}</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
   {# ── Existing Sets with Quantity Updates #}
   {% if existing_sets_data %}
   <h2 class="mt-section">Set Quantity Updates <span class="muted">({{ existing_sets_data | length }})</span></h2>

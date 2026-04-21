@@ -37,11 +37,12 @@
               <a class="search-result-title" href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
               {% if item.sku %}<span class="badge badge-info mono">{{ item.sku }}</span>{% endif %}
               {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+              {% if item.set_only %}<span class="badge badge-off-catalog">Set-only</span>{% endif %}
             </div>
             <div class="search-result-detail">{{ item.category or 'Uncategorized' }}</div>
           </div>
           <div class="search-result-badges">
-            {% if not item.in_catalog %}<span class="badge badge-off-catalog">Off-catalog</span>{% endif %}
+            {% if not item.in_catalog and not item.set_only %}<span class="badge badge-off-catalog">Off-catalog</span>{% endif %}
             <a class="btn btn-xs btn-ghost" href="{{ url_for('catalog.variants', item_id=item.id) }}">Variants</a>
           </div>
         </div>
