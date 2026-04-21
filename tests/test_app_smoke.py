@@ -1544,14 +1544,15 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "set_count": "1",
                 "set_name_0": "Sync New Set",
                 "set_sku_0": "SX-SET-NEW",
-                "set_members_0": "SX-NEW-1",
-                "set_member_qtys_0": "SX-NEW-1:2",
+                "set_members_0": "SX-NEW-1|SX-MISS-1",
+                "set_member_qtys_0": "SX-NEW-1:2|SX-MISS-1:1",
                 "set_member_data_0": json.dumps(
                     [
                         {"sku": "SX-NEW-1", "name": "Sync New Knife", "quantity": 2},
                         {"sku": "SX-MISS-1", "name": "Sync Missing Knife", "quantity": 1},
                     ]
                 ),
+                "create_missing_set_members": "on",
                 "existing_set_count": "1",
                 "existing_set_name_0": "Sync Existing Set",
                 "existing_set_member_qtys_0": "SX-EX-1:3",
@@ -1567,7 +1568,11 @@ class CatalogSmokeTests(SmokeBaseTest):
             new_item = db.session.execute(db.select(Item).filter_by(sku="SX-NEW-1")).scalar_one()
             self.assertIsNone(new_item.msrp)
             new_set = db.session.execute(db.select(Set).filter_by(name="Sync New Set")).scalar_one()
+            self.assertEqual(len(new_set.members), 2)
             self.assertEqual(new_set.members[0].quantity, 2)
+            created_member = db.session.execute(db.select(Item).filter_by(sku="SX-MISS-1")).scalar_one()
+            self.assertFalse(created_member.in_catalog)
+            self.assertTrue(created_member.set_only)
             self.assertIsNotNone(new_set.member_data)
             self.assertIn("SX-MISS-1", new_set.member_data)
             existing_set = db.session.get(Set, existing_set_id)
@@ -1577,7 +1582,6 @@ class CatalogSmokeTests(SmokeBaseTest):
         set_detail_response = self.client.get(f"/sets/{new_set.id}")
         self.assertEqual(set_detail_response.status_code, 200)
         self.assertIn(b"Imported Members", set_detail_response.data)
-        self.assertIn(b"Missing item numbers", set_detail_response.data)
         self.assertIn(b"SX-MISS-1", set_detail_response.data)
 
     def test_catalog_purge_and_delete_routes(self):

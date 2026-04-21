@@ -103,6 +103,31 @@ def _build_member_status_rows(
     return rows, missing_skus
 
 
+def _create_missing_set_member_item(member: dict, set_name: str) -> Item:
+    sku = _normalize_member_sku(member.get("sku"))
+    if not sku:
+        raise ValueError("Missing member SKU")
+    name = str(member.get("name") or "").strip() or f"Set Member {sku}"
+    item = Item(
+        name=name,
+        sku=sku,
+        category=None,
+        edge_type="Unknown",
+        in_catalog=False,
+        set_only=True,
+        cutco_url=None,
+        msrp=None,
+        blade_length=None,
+        overall_length=None,
+        weight=None,
+        notes=f"Placeholder imported from set {set_name}.",
+    )
+    db.session.add(item)
+    db.session.flush()
+    reconcile_unknown_variant(item)
+    return item
+
+
 @catalog_bp.route("/catalog")
 def catalog():
     search_query = request.args.get("q", "").strip()
@@ -785,6 +810,8 @@ def catalog_sync_confirm():
     selected_sets = set(request.form.getlist("selected_sets"))
     added_sets    = 0
     linked_items  = 0
+    created_missing_items = 0
+    create_missing_set_members = request.form.get("create_missing_set_members") == "on"
 
     sku_to_item = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
 
@@ -817,8 +844,19 @@ def catalog_sync_confirm():
             item_set.member_data = json.dumps(member_data, ensure_ascii=False)
 
         existing_members = {membership.item_id: membership for membership in item_set.members}
+        member_data_lookup = {
+            _normalize_member_sku(member.get("sku")): member
+            for member in member_data
+            if _normalize_member_sku(member.get("sku"))
+        }
         for member_sku in member_skus:
             item = sku_to_item.get(member_sku.upper())
+            if not item and create_missing_set_members:
+                member = member_data_lookup.get(_normalize_member_sku(member_sku))
+                if member:
+                    item = _create_missing_set_member_item(member, set_name)
+                    sku_to_item[item.sku.upper()] = item
+                    created_missing_items += 1
             if not item:
                 continue
             qty = member_qtys.get(member_sku, 1)
@@ -832,6 +870,7 @@ def catalog_sync_confirm():
     # Update quantities on existing sets (no new rows, just qty backfill)
     existing_set_count = int(request.form.get("existing_set_count", 0))
     qty_updates = 0
+    created_existing_missing_items = 0
     for index in range(existing_set_count):
         set_name = request.form.get(f"existing_set_name_{index}", "").strip()
         if not set_name:
@@ -856,16 +895,29 @@ def catalog_sync_confirm():
                 if member.quantity != new_qty:
                     member.quantity = new_qty
                     qty_updates += 1
+        if create_missing_set_members and member_data:
+            existing_member_ids = {member.item_id for member in item_set.members}
+            for member in member_data:
+                sku = _normalize_member_sku(member.get("sku"))
+                if not sku or sku in member_qtys:
+                    continue
+                item = sku_to_item.get(sku)
+                if not item:
+                    item = _create_missing_set_member_item(member, set_name)
+                    sku_to_item[item.sku.upper()] = item
+                    created_existing_missing_items += 1
+                if item.id not in existing_member_ids:
+                    db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=member.get("quantity", 1) or 1))
         if member_data_raw:
             item_set.member_data = json.dumps(member_data, ensure_ascii=False)
 
     db_commit(db.session)
-    logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates",
-                added_items, added_sets, linked_items, qty_updates)
+    logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates, %d placeholders",
+                added_items, added_sets, linked_items, qty_updates, created_missing_items + created_existing_missing_items)
     record_activity(
         "sync",
         "Catalog sync complete",
-        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates.",
+        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates, {created_missing_items + created_existing_missing_items} placeholder items.",
     )
     db.session.commit()
 
@@ -876,5 +928,8 @@ def catalog_sync_confirm():
         parts.append(f"{added_sets} set{'s' if added_sets != 1 else ''}")
     if linked_items:
         parts.append(f"{linked_items} set membership{'s' if linked_items != 1 else ''}")
+    placeholder_items = created_missing_items + created_existing_missing_items
+    if placeholder_items:
+        parts.append(f"{placeholder_items} placeholder item{'s' if placeholder_items != 1 else ''}")
     flash("Sync complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
     return redirect(url_for("catalog.catalog"))
