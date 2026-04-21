@@ -86,57 +86,59 @@
       this.textContent = open ? '✕' : '☰';
     });
 
-    var confirmDialog = document.getElementById('confirm-action-dialog');
-    var confirmTitle = document.getElementById('confirm-action-title');
-    var confirmCount = document.getElementById('confirm-action-count');
-    var confirmMessage = document.getElementById('confirm-action-message');
-    var confirmPreview = document.getElementById('confirm-action-preview');
-    var confirmContinue = document.getElementById('confirm-action-continue');
-    var pendingForm = null;
+    document.addEventListener('DOMContentLoaded', function() {
+      var confirmDialog = document.getElementById('confirm-action-dialog');
+      var confirmTitle = document.getElementById('confirm-action-title');
+      var confirmCount = document.getElementById('confirm-action-count');
+      var confirmMessage = document.getElementById('confirm-action-message');
+      var confirmPreview = document.getElementById('confirm-action-preview');
+      var confirmContinue = document.getElementById('confirm-action-continue');
+      var pendingForm = null;
 
-    function resetConfirmDialog() {
-      pendingForm = null;
-      confirmTitle.textContent = 'Confirm action';
-      confirmCount.textContent = '';
-      confirmCount.hidden = true;
-      confirmMessage.textContent = '';
-      confirmPreview.textContent = '';
-      confirmPreview.hidden = true;
-      confirmContinue.disabled = false;
-    }
+      if (!confirmDialog || !confirmTitle || !confirmCount || !confirmMessage || !confirmPreview || !confirmContinue) {
+        return;
+      }
 
-    function openConfirmDialog(form, submitter) {
-      pendingForm = form;
-      confirmTitle.textContent = submitter.dataset.confirmTitle || 'Confirm action';
-      confirmCount.textContent = submitter.dataset.confirmCount || '';
-      confirmCount.hidden = !confirmCount.textContent;
-      confirmMessage.textContent = submitter.dataset.confirmMessage || 'This action cannot be undone.';
-      confirmPreview.textContent = submitter.dataset.confirmPreview || '';
-      confirmPreview.hidden = !confirmPreview.textContent;
-      confirmContinue.textContent = submitter.dataset.confirmButton || 'Continue';
-      confirmDialog.dataset.destructive = submitter.dataset.confirmDanger || '1';
-      confirmDialog.showModal();
-    }
+      function resetConfirmDialog() {
+        pendingForm = null;
+        confirmTitle.textContent = 'Confirm action';
+        confirmCount.textContent = '';
+        confirmCount.hidden = true;
+        confirmMessage.textContent = '';
+        confirmPreview.textContent = '';
+        confirmPreview.hidden = true;
+        confirmContinue.disabled = false;
+      }
 
-    document.addEventListener('submit', function(e) {
-      var submitter = e.submitter;
-      if (!submitter || !submitter.dataset.confirmTitle) return;
-      e.preventDefault();
-      openConfirmDialog(e.target, submitter);
-    }, true);
+      function openConfirmDialog(form, submitter) {
+        pendingForm = form;
+        confirmTitle.textContent = submitter.dataset.confirmTitle || 'Confirm action';
+        confirmCount.textContent = submitter.dataset.confirmCount || '';
+        confirmCount.hidden = !confirmCount.textContent;
+        confirmMessage.textContent = submitter.dataset.confirmMessage || 'This action cannot be undone.';
+        confirmPreview.textContent = submitter.dataset.confirmPreview || '';
+        confirmPreview.hidden = !confirmPreview.textContent;
+        confirmContinue.textContent = submitter.dataset.confirmButton || 'Continue';
+        confirmDialog.dataset.destructive = submitter.dataset.confirmDanger || '1';
+        confirmDialog.showModal();
+      }
 
-    if (confirmContinue) {
+      document.addEventListener('submit', function(e) {
+        var submitter = e.submitter;
+        if (!submitter || !submitter.dataset.confirmTitle) return;
+        e.preventDefault();
+        openConfirmDialog(e.target, submitter);
+      }, true);
+
       confirmContinue.addEventListener('click', function() {
         if (!pendingForm) return;
         var form = pendingForm;
         confirmDialog.close();
         form.submit();
       });
-    }
 
-    if (confirmDialog) {
       confirmDialog.addEventListener('close', resetConfirmDialog);
-    }
+    });
 
     /* Close help dialogs when clicking outside (backdrop) */
     document.addEventListener('click', function(e) {
