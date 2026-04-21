@@ -28,6 +28,7 @@ from scraping import (
     _build_set_member_entries,
     _member_hover_title,
     _infer_visible_member_sku,
+    _infer_visible_member_sku_from_name,
     _normalize_set_member_sku,
 )
 from blueprints.catalog import _load_member_snapshot
@@ -705,6 +706,15 @@ class UtilitySmokeTests(SmokeBaseTest):
                 _infer_visible_member_sku("Gift Box", context_url="https://www.cutco.com/p/wine-cheese-gift-set"),
                 "2130CD",
             )
+
+    def test_infer_visible_member_sku_from_name_supports_regular_product_pages(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body><h1>#1708</h1><h1>Salad Tongs</h1></body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            self.assertEqual(_infer_visible_member_sku_from_name("Salad Tongs"), "1708")
 
     def test_build_set_member_entries_uses_visible_row_skus(self):
         structured_members = [{"sku": "777", "name": "Super Shears", "quantity": 1}]
