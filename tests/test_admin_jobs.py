@@ -122,6 +122,40 @@ class AdminJobSmokeTests(unittest.TestCase):
         ])
         self.assertTrue(all(member["is_set_only"] for member in set_data["member_entries"]))
 
+    def test_scrape_sets_does_not_mark_structured_matches_set_only(self):
+        listing_html = "<html><body></body></html>"
+        detail_html = """
+            <html><body>
+              <script>
+                var webItemsMap={"BBQ-SET-1":{"itemSetList":[
+                  {"childItemNumber":"BBQ-1","qty":1,"name":"Barbecue Tongs"},
+                  {"childItemNumber":"BBQ-2","qty":1,"name":"Barbecue Turner"},
+                  {"childItemNumber":"BBQ-3","qty":1,"name":"Barbecue Fork"}
+                ]}};
+              </script>
+              <h3>Set Pieces</h3>
+              <ul>
+                <li>Barbecue Tongs</li>
+                <li>Barbecue Turner</li>
+                <li>Barbecue Fork</li>
+              </ul>
+            </body></html>
+        """
+
+        def fake_get(url, headers=None, timeout=None):
+            response = mock.Mock()
+            response.status_code = 200
+            response.raise_for_status.return_value = None
+            response.text = listing_html if url == "https://www.cutco.com/shop/knife-sets" else detail_html
+            return response
+
+        with mock.patch("scraping.requests.get", side_effect=fake_get), \
+             mock.patch("scraping._fetch_sku_from_page", return_value=("BBQ-SET-1", "Barbecue Set")):
+            scraped_sets = scrape_sets(extra_candidates=[("Barbecue Set", "https://example.com/barbecue-set")])
+
+        self.assertEqual(len(scraped_sets), 1)
+        self.assertTrue(all(not member["is_set_only"] for member in scraped_sets[0]["member_entries"]))
+
     def test_specs_backfill_run_starts_background_job(self):
         self._login_as_admin()
         self._set_csrf_token()

@@ -649,7 +649,7 @@ def scrape_sets(
                         sku=matched_structured["sku"] if matched_structured else None,
                         name=visible_name,
                         quantity=matched_structured["quantity"] if matched_structured else 1,
-                        is_set_only=visible_row["is_set_only"],
+                        is_set_only=visible_row["is_set_only"] if matched_structured is None else False,
                     ))
             else:
                 for idx, sku in enumerate(member_skus):
