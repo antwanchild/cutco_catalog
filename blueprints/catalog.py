@@ -2,7 +2,6 @@ import json
 import logging
 import re
 from collections import OrderedDict
-
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from constants import (
@@ -21,6 +20,63 @@ logger = logging.getLogger(__name__)
 def _normalize_member_sku(value: str | None) -> str | None:
     sku = (str(value).strip().upper() if value is not None else "")
     return sku or None
+
+
+def _normalize_member_name(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
+def _get_item_field(item: object, field: str) -> object | None:
+    if isinstance(item, dict):
+        return item.get(field)
+    return getattr(item, field, None)
+
+
+def _build_member_name_lookup(items: list[object]) -> dict[str, object]:
+    lookup: dict[str, object] = {}
+    ambiguous: set[str] = set()
+    for item in items:
+        name = _normalize_member_name(_get_item_field(item, "name"))
+        if not name:
+            continue
+        if name in ambiguous:
+            continue
+        if name in lookup:
+            lookup.pop(name, None)
+            ambiguous.add(name)
+            continue
+        lookup[name] = item
+    return lookup
+
+
+def _get_item_identity(item: object) -> tuple[str | None, str | None]:
+    sku = _normalize_member_sku(_get_item_field(item, "sku"))
+    name = _get_item_field(item, "name")
+    return sku, _normalize_member_name(name)
+
+
+def _resolve_member_item(
+    entry: dict,
+    catalog_sku_lookup: dict[str, Item],
+    catalog_name_lookup: dict[str, object],
+    *,
+    set_sku: str | None = None,
+) -> object | None:
+    sku = _normalize_member_sku(entry.get("sku"))
+    name_key = _normalize_member_name(entry.get("name"))
+    sku_item = catalog_sku_lookup.get(sku) if sku else None
+    name_item = catalog_name_lookup.get(name_key) if name_key else None
+
+    if sku_item and set_sku:
+        item_sku, _ = _get_item_identity(sku_item)
+        if item_sku and item_sku == set_sku and name_item is not None:
+            sku_item = name_item
+    if sku_item and name_item:
+        sku_name = _normalize_member_name(_get_item_field(sku_item, "name"))
+        name_sku, _ = _get_item_identity(name_item)
+        if sku_name != name_key and name_sku != sku:
+            sku_item = name_item
+    return sku_item or name_item
 
 
 def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
@@ -62,14 +118,18 @@ def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
 def _build_member_status_rows(
     member_entries: list[dict],
     catalog_sku_lookup: dict[str, Item],
+    catalog_name_lookup: dict[str, object] | None = None,
+    *,
+    set_sku: str | None = None,
     found_skus: set[str] | None = None,
 ) -> tuple[list[dict], list[str]]:
     rows: list[dict] = []
     missing_skus: list[str] = []
     found_skus = {sku for sku in (found_skus or set()) if sku}
+    catalog_name_lookup = catalog_name_lookup or {}
     for index, entry in enumerate(member_entries, start=1):
         sku = _normalize_member_sku(entry.get("sku"))
-        item = catalog_sku_lookup.get(sku) if sku else None
+        item = _resolve_member_item(entry, catalog_sku_lookup, catalog_name_lookup, set_sku=set_sku)
         quantity = entry.get("quantity", 1)
         try:
             quantity = max(1, int(quantity))
@@ -750,6 +810,10 @@ def catalog_sync():
         for item in Item.query.filter(Item.sku.isnot(None)).all()
         if _normalize_member_sku(item.sku)
     }
+    preview_name_lookup = _build_member_name_lookup([
+        *Item.query.filter(Item.sku.isnot(None)).all(),
+        *new_items,
+    ])
     scraped_sku_lookup = {
         _normalize_member_sku(item["sku"])
         for item in new_items
@@ -760,7 +824,9 @@ def catalog_sync():
         member_snapshot_rows, missing_member_skus = _build_member_status_rows(
             member_entries,
             catalog_sku_lookup,
-            scraped_sku_lookup,
+            preview_name_lookup,
+            set_sku=_normalize_member_sku(item_set.get("sku")),
+            found_skus=scraped_sku_lookup,
         )
         item_set["member_snapshot_rows"] = member_snapshot_rows
         item_set["missing_member_skus"] = missing_member_skus
@@ -822,6 +888,7 @@ def catalog_sync_confirm():
     create_missing_set_members = request.form.get("create_missing_set_members") == "on"
 
     sku_to_item = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
+    name_to_item = _build_member_name_lookup(Item.query.filter(Item.sku.isnot(None)).all())
 
     set_count = int(request.form.get("set_count", 0))
     for index in range(set_count):
@@ -859,13 +926,17 @@ def catalog_sync_confirm():
         existing_members = {membership.item_id: membership for membership in item_set.members}
         incoming_member_ids: set[int] = set()
         for member in member_entries:
-            member_sku = _normalize_member_sku(member.get("sku"))
+            resolved_item = _resolve_member_item(member, sku_to_item, name_to_item, set_sku=set_sku)
+            member_sku = _normalize_member_sku(getattr(resolved_item, "sku", None) if resolved_item else member.get("sku"))
             if not member_sku:
                 continue
             item = sku_to_item.get(member_sku.upper())
+            if resolved_item is not None and getattr(resolved_item, "sku", None):
+                item = resolved_item
             if not item and create_missing_set_members:
                 item = _create_missing_set_member_item(member, set_name)
                 sku_to_item[item.sku.upper()] = item
+                name_to_item[_normalize_member_name(item.name)] = item
                 created_missing_items += 1
             if not item:
                 continue
@@ -928,13 +999,17 @@ def catalog_sync_confirm():
         if create_missing_set_members and member_entries:
             existing_member_ids = {member.item_id for member in item_set.members}
             for member in member_entries:
-                sku = _normalize_member_sku(member.get("sku"))
+                resolved_item = _resolve_member_item(member, sku_to_item, name_to_item, set_sku=set_sku)
+                sku = _normalize_member_sku(getattr(resolved_item, "sku", None) if resolved_item else member.get("sku"))
                 if not sku:
                     continue
                 item = sku_to_item.get(sku)
+                if resolved_item is not None and getattr(resolved_item, "sku", None):
+                    item = resolved_item
                 if not item:
                     item = _create_missing_set_member_item(member, set_name)
                     sku_to_item[item.sku.upper()] = item
+                    name_to_item[_normalize_member_name(item.name)] = item
                     created_existing_missing_items += 1
                 if item.id not in existing_member_ids:
                     db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=member_qtys.get(sku, 1) or 1))
