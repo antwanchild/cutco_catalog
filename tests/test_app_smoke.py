@@ -1663,6 +1663,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "set_member_entries_0": json.dumps(
                     [
                         {"sku": "SX-NEW-1", "name": "Sync New Knife", "quantity": 2},
+                        {"sku": "SX-NEW-1", "name": "Sync New Knife", "quantity": 1},
                         {"sku": "SX-MISS-1", "name": "Sync Missing Knife", "quantity": 1},
                     ]
                 ),
@@ -1672,6 +1673,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "existing_set_member_entries_0": json.dumps(
                     [
                         {"sku": "SX-EX-1", "name": "Sync Existing Knife", "quantity": 3},
+                        {"sku": "SX-EX-1", "name": "Sync Existing Knife", "quantity": 2},
                         {"sku": "SX-EX-MISS-1", "name": "Sync Existing Missing Knife", "quantity": 1},
                     ]
                 ),
@@ -1685,7 +1687,8 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIsNone(new_item.msrp)
             new_set = db.session.execute(db.select(Set).filter_by(name="Sync New Set")).scalar_one()
             self.assertEqual(len(new_set.members), 2)
-            self.assertEqual(new_set.members[0].quantity, 2)
+            new_member_quantities = {db.session.get(Item, membership.item_id).sku: membership.quantity for membership in new_set.members}
+            self.assertEqual(new_member_quantities["SX-NEW-1"], 3)
             created_member = db.session.execute(db.select(Item).filter_by(sku="SX-MISS-1")).scalar_one()
             self.assertFalse(created_member.in_catalog)
             self.assertTrue(created_member.set_only)
@@ -1693,7 +1696,8 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn("SX-MISS-1", new_set.member_data)
             existing_set = db.session.get(Set, existing_set_id)
             self.assertEqual(len(existing_set.members), 2)
-            self.assertEqual(existing_set.members[0].quantity, 3)
+            existing_member_quantities = {db.session.get(Item, membership.item_id).sku: membership.quantity for membership in existing_set.members}
+            self.assertEqual(existing_member_quantities["SX-EX-1"], 5)
             created_existing_member = db.session.execute(db.select(Item).filter_by(sku="SX-EX-MISS-1")).scalar_one()
             self.assertFalse(created_existing_member.in_catalog)
             self.assertTrue(created_existing_member.set_only)
