@@ -11,6 +11,7 @@ from constants import (
     APP_VERSION,
     GIT_SHA,
     UNKNOWN_COLOR,
+    get_git_sha_info,
 )
 from extensions import db, limiter
 from helpers import _csrf_token, is_admin, validate_csrf
@@ -215,6 +216,16 @@ def _register_routes(app: Flask) -> None:
 
         return activity_rows
 
+    def _release_snapshot() -> dict:
+        git_sha, git_sha_source = get_git_sha_info()
+        return {
+            "app_version": APP_VERSION,
+            "git_sha": git_sha,
+            "git_sha_source": git_sha_source,
+            "schema_version": get_schema_state()["version"],
+            "bootstrap_version": get_bootstrap_state()["version"],
+        }
+
     @app.route("/")
     def index():
         from models import ItemVariant, Ownership, Person, Set
@@ -242,6 +253,7 @@ def _register_routes(app: Flask) -> None:
             people=people,
             recent=recent,
             recent_activity=_recent_activity(),
+            release_snapshot=_release_snapshot(),
         )
 
     @app.route("/health")
