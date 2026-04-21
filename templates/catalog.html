@@ -77,7 +77,7 @@
           color{% if item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length != 1 %}s{% endif %}
         </a>
       </td>
-      <td>
+      <td class="sets-cell">
         {% if item.sets %}
           <span class="set-chips">
             {% for item_set in item.sets %}

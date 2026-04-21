@@ -363,6 +363,10 @@ a:hover { text-decoration: underline; }
 .data-table th a:hover { color: var(--text); }
 .data-table tbody tr:hover { background: var(--bg2); }
 .data-table.compact th, .data-table.compact td { padding: .35rem .6rem; }
+.data-table td.sets-cell,
+.data-table td.actions {
+  vertical-align: top;
+}
 .member-sort-btn {
   background: transparent;
   border: 0;
@@ -386,7 +390,7 @@ a:hover { text-decoration: underline; }
   min-width: .9em;
 }
 .table-count { margin-top: .6rem; font-size: .8rem; color: var(--muted); }
-.actions { display: flex; gap: .3rem; align-items: center; white-space: nowrap; }
+.actions { display: flex; gap: .3rem; align-items: flex-start; white-space: nowrap; }
 .ext-link { font-size: .8rem; color: var(--muted); margin-left: .25rem; }
 .ext-link:hover { color: var(--accent); }
 td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
