@@ -178,9 +178,9 @@
   </div>
 </section>
 
-<div class="dash-row">
-  <section class="dash-panel">
-    <h2>Quick Links</h2>
+<div class="dash-row dashboard-lower-grid">
+  <section class="dashboard-card lower-card">
+    <h3>Quick Links</h3>
     <ul class="link-list">
       <li><a href="{{ url_for('catalog.catalog') }}">📋 Browse Catalog</a></li>
       <li><a href="{{ url_for('catalog.sets_list') }}">🗂️ Browse Sets</a></li>
@@ -195,8 +195,8 @@
     </ul>
   </section>
 
-  <section class="dash-panel">
-    <h2>Collectors</h2>
+  <section class="dashboard-card lower-card">
+    <h3>Collectors</h3>
     <ul class="link-list">
       {% for person in people %}
         <li><a href="{{ url_for('people.person_collection', person_id=person.id) }}">👤 {{ person.name }}</a></li>
@@ -206,8 +206,8 @@
     </ul>
   </section>
 
-  <section class="dash-panel">
-    <h2>Recent Entries</h2>
+  <section class="dashboard-card lower-card">
+    <h3>Recent Entries</h3>
     <ul class="link-list">
       {% for ownership in recent %}
         <li>

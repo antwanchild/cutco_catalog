@@ -528,6 +528,9 @@ textarea { resize: vertical; }
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
 }
+.dashboard-lower-grid {
+  margin-top: 1rem;
+}
 .dash-panel {
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -699,6 +702,26 @@ textarea { resize: vertical; }
   font-size: .8rem;
   color: var(--muted);
   line-height: 1.35;
+}
+.lower-card {
+  min-height: 180px;
+}
+.lower-card h3 {
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 .6rem;
+  line-height: 1.2;
+}
+.lower-card .link-list {
+  gap: .45rem;
+}
+.lower-card .link-list a {
+  color: var(--text);
+  font-size: .9rem;
+}
+.lower-card .muted {
+  color: var(--muted);
 }
 .search-results {
   display: grid;
