@@ -142,6 +142,15 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIn(str(SCHEMA_VERSION).encode(), response.data)
         self.assertIn(str(BOOTSTRAP_VERSION).encode(), response.data)
 
+    def test_admin_diagnostics_formats_history_in_container_timezone(self):
+        self._login_as_admin()
+
+        with mock.patch.dict(os.environ, {"TZ": "America/Denver"}, clear=False):
+            response = self.client.get("/admin/diagnostics")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"MDT", response.data)
+
     def test_admin_diagnostics_falls_back_to_git_sha(self):
         self._login_as_admin()
         constants.get_git_sha_info.cache_clear()

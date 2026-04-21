@@ -7,6 +7,7 @@ from datetime import date
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
@@ -63,6 +64,14 @@ def _path_status(path):
     }
 
 
+def _container_timezone():
+    tz_name = os.environ.get("TZ", "UTC").strip() or "UTC"
+    try:
+        return ZoneInfo(tz_name), tz_name
+    except ZoneInfoNotFoundError:
+        return timezone.utc, "UTC"
+
+
 def _format_applied_at(value: str | None) -> str:
     if not value:
         return "—"
@@ -70,10 +79,11 @@ def _format_applied_at(value: str | None) -> str:
         dt = datetime.fromisoformat(value)
     except ValueError:
         return value
-    dt = dt.astimezone(timezone.utc)
+    tz, tz_name = _container_timezone()
+    dt = dt.astimezone(tz)
     date_part = dt.strftime("%b %d, %Y").replace(" 0", " ")
     time_part = dt.strftime("%I:%M %p").lstrip("0")
-    return f"{date_part}, {time_part} UTC"
+    return f"{date_part}, {time_part} {dt.strftime('%Z') or tz_name}"
 
 
 def _runtime_details():
