@@ -1014,6 +1014,85 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(edit_page_response.status_code, 200)
         self.assertIn(b"Filter Knife", edit_page_response.data)
 
+    def test_catalog_validation_and_sort_fallbacks(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, variant_id = self._add_catalog_item(name="Variant Knife", sku="VR-1")
+        cookware_item_id, cookware_variant_id = self._add_catalog_item(name="Cookware Variant", sku="CVR-1", category="Cookware")
+        set_id = self._add_set(name="Variant Set", sku="VS-1", item_ids=(item_id,))
+
+        duplicate_set_response = self.client.post(
+            "/sets/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "name": "Variant Set",
+                "sku": "VS-2",
+                "notes": "Duplicate set",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(duplicate_set_response.status_code, 302)
+
+        empty_variant_response = self.client.post(
+            f"/catalog/{item_id}/variants/add",
+            data={"csrf_token": "test-csrf-token", "color": "", "notes": ""},
+            follow_redirects=False,
+        )
+        duplicate_variant_response = self.client.post(
+            f"/catalog/{item_id}/variants/add",
+            data={"csrf_token": "test-csrf-token", "color": "Classic Brown", "notes": ""},
+            follow_redirects=False,
+        )
+        cookware_color_response = self.client.post(
+            f"/catalog/{cookware_item_id}/variants/add",
+            data={"csrf_token": "test-csrf-token", "color": "Pearl White", "notes": ""},
+            follow_redirects=False,
+        )
+        self.assertEqual(empty_variant_response.status_code, 302)
+        self.assertEqual(duplicate_variant_response.status_code, 302)
+        self.assertEqual(cookware_color_response.status_code, 302)
+
+        with self.app.app_context():
+            cookware_variant = db.session.get(ItemVariant, cookware_variant_id)
+
+        empty_edit_response = self.client.post(
+            f"/variants/{variant_id}/edit",
+            data={"csrf_token": "test-csrf-token", "color": "", "notes": ""},
+            follow_redirects=False,
+        )
+        cookware_edit_response = self.client.post(
+            f"/variants/{cookware_variant.id}/edit",
+            data={"csrf_token": "test-csrf-token", "color": "Classic Brown", "notes": ""},
+            follow_redirects=False,
+        )
+        self.assertEqual(empty_edit_response.status_code, 302)
+        self.assertEqual(cookware_edit_response.status_code, 302)
+
+        set_edit_response = self.client.post(
+            f"/sets/{set_id}/edit",
+            data={
+                "csrf_token": "test-csrf-token",
+                "name": "Variant Set Updated",
+                "sku": "VS-UPDATED",
+                "notes": "Updated set",
+                "member_item_ids": [str(item_id), "not-an-id"],
+                f"member_qty_{item_id}": "bogus",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(set_edit_response.status_code, 302)
+
+        set_detail_fallback = self.client.get(f"/sets/{set_id}?person=1&sort=bogus&dir=sideways")
+        self.assertEqual(set_detail_fallback.status_code, 200)
+        self.assertIn(b"Variant Set Updated", set_detail_fallback.data)
+
+        with self.app.app_context():
+            updated_set = db.session.get(Set, set_id)
+            self.assertIsNotNone(updated_set)
+            self.assertEqual(updated_set.members[0].quantity, 1)
+            self.assertEqual(updated_set.sku, "VS-UPDATED")
+
     def test_catalog_add_and_edit_item(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -1582,6 +1661,141 @@ class LogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(no_sharpen_notify.status_code, 302)
         self.assertEqual(no_cook_notify.status_code, 302)
+
+    def test_log_edit_and_task_validation_paths(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        sharpening_item_id, _ = self._add_catalog_item(name="Edit Sharpen Knife", sku="ED-1")
+        cookware_item_id, _ = self._add_catalog_item(name="Edit Cookware Knife", sku="ED-2", category="Cookware")
+        task_item_id, _ = self._add_catalog_item(name="Edit Task Knife", sku="ED-3")
+        task_id = self._add_task(name="Slice onions")
+
+        self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(sharpening_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/cookware/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(cookware_item_id),
+                "used_on": "2026-04-15",
+                "made_item": "Soup",
+                "rating": "4",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+
+        with self.app.app_context():
+            sharpen_entry = db.session.execute(db.select(SharpeningLog).filter_by(item_id=sharpening_item_id)).scalar_one()
+            cookware_entry = db.session.execute(db.select(CookwareSession).filter_by(item_id=cookware_item_id)).scalar_one()
+
+        bad_sharpen_edit = self.client.post(
+            f"/sharpening/{sharpen_entry.id}/edit",
+            data={
+                "csrf_token": "test-csrf-token",
+                "sharpened_on": "bad-date",
+                "method": "Whetstone",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        bad_cookware_edit = self.client.post(
+            f"/cookware/{cookware_entry.id}/edit",
+            data={
+                "csrf_token": "test-csrf-token",
+                "used_on": "bad-date",
+                "made_item": "Soup",
+                "rating": "not-a-number",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(bad_sharpen_edit.status_code, 302)
+        self.assertEqual(bad_cookware_edit.status_code, 302)
+
+        missing_task_name = self.client.post(
+            "/tasks/manage/add",
+            data={"csrf_token": "test-csrf-token", "name": ""},
+            follow_redirects=False,
+        )
+        duplicate_task_name = self.client.post(
+            "/tasks/manage/add",
+            data={"csrf_token": "test-csrf-token", "name": "Slice onions"},
+            follow_redirects=False,
+        )
+        self.assertEqual(missing_task_name.status_code, 302)
+        self.assertEqual(duplicate_task_name.status_code, 302)
+
+        missing_task_item = self.client.post(
+            "/tasks/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": "",
+                "task_id": str(task_id),
+                "logged_on": "2026-04-15",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        missing_task_task = self.client.post(
+            "/tasks/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(task_item_id),
+                "task_id": "",
+                "logged_on": "2026-04-15",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        bad_task_date = self.client.post(
+            "/tasks/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(task_item_id),
+                "task_id": str(task_id),
+                "logged_on": "bad-date",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        missing_task = self.client.post(
+            "/tasks/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": "999999",
+                "task_id": str(task_id),
+                "logged_on": "2026-04-15",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        missing_task_obj = self.client.post(
+            "/tasks/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(task_item_id),
+                "task_id": "999999",
+                "logged_on": "2026-04-15",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(missing_task_item.status_code, 302)
+        self.assertEqual(missing_task_task.status_code, 302)
+        self.assertEqual(bad_task_date.status_code, 302)
+        self.assertEqual(missing_task.status_code, 302)
+        self.assertEqual(missing_task_obj.status_code, 302)
 
     def test_sharpening_add_edit_and_delete(self):
         self._login_as_admin()
