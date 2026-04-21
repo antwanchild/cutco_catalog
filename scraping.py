@@ -153,6 +153,16 @@ def _build_set_member_entries(
     return member_entries
 
 
+def _member_hover_title(member_name: str | None) -> str | None:
+    title = re.sub(r"\s+", " ", str(member_name or "").strip())
+    if not title:
+        return None
+    for separator in (",", ";", " / "):
+        if separator in title:
+            title = title.split(separator, 1)[0].strip()
+    return title or None
+
+
 def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
     sku = (str(raw_sku or "").upper().strip().split("/")[0] if raw_sku is not None else "")
     if not sku:

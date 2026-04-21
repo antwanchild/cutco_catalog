@@ -12,7 +12,7 @@ from constants import (
 from extensions import db
 from helpers import admin_required, db_commit, is_admin
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, get_or_create_set, record_activity, reconcile_unknown_variant
-from scraping import scrape_catalog, scrape_item_specs, scrape_item_uses, scrape_sets
+from scraping import _member_hover_title, scrape_catalog, scrape_item_specs, scrape_item_uses, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
 logger = logging.getLogger(__name__)
@@ -81,6 +81,9 @@ def _build_member_status_rows(
             "index": index,
             "sku": sku,
             "name": entry.get("name") or None,
+            "hover_title": _member_hover_title(
+                item.name if item is not None else entry.get("name")
+            ),
             "quantity": quantity,
             "status": status,
             "status_label": status_label,

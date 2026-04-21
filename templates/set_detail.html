@@ -67,9 +67,9 @@
       <td>
         {% if member.sku %}
           {% if member.matched_item %}
-            <a class="mono" href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}" title="{{ member.name or member.matched_item.name }}">{{ member.sku }}</a>
+            <a class="mono" href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}" title="{{ member.hover_title or member.name or member.matched_item.name }}">{{ member.sku }}</a>
           {% else %}
-            <span class="mono" title="{{ member.name or '' }}">{{ member.sku }}</span>
+            <span class="mono" title="{{ member.hover_title or member.name or '' }}">{{ member.sku }}</span>
           {% endif %}
         {% else %}
           <span class="muted">—</span>
