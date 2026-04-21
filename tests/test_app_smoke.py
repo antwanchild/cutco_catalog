@@ -24,7 +24,12 @@ from models import (
     SharpeningLog,
     Set,
 )
-from scraping import _build_set_member_entries, _member_hover_title, _normalize_set_member_sku
+from scraping import (
+    _build_set_member_entries,
+    _extract_sku_from_text,
+    _member_hover_title,
+    _normalize_set_member_sku,
+)
 from time_utils import container_timezone, format_container_time
 
 
@@ -611,6 +616,11 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(_normalize_set_member_sku("77-"), "77")
         self.assertEqual(_normalize_set_member_sku("1737"), "1737")
         self.assertIsNone(_normalize_set_member_sku(""))
+
+    def test_extract_sku_from_text_picks_first_number(self):
+        self.assertEqual(_extract_sku_from_text("Super Shears - 77, 78"), "77")
+        self.assertEqual(_extract_sku_from_text("Gift Box 99120"), "99120")
+        self.assertIsNone(_extract_sku_from_text("Gift Box"))
 
     def test_member_hover_titles_trim_set_lists(self):
         self.assertEqual(

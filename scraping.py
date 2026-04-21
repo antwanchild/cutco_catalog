@@ -36,6 +36,18 @@ def _extract_sku_from_href(href: str) -> str | None:
     return candidate or None
 
 
+def _extract_sku_from_text(text: str | None) -> str | None:
+    """Pull the first SKU-like token from plain text."""
+    haystack = re.sub(r"\s+", " ", str(text or "").upper()).strip()
+    if not haystack:
+        return None
+    for match in re.finditer(r"\b\d{2,}[A-Z]{0,3}(?:-\d+)?\b", haystack):
+        candidate = _normalize_set_member_sku(match.group(0))
+        if candidate:
+            return candidate
+    return None
+
+
 def _discover_categories() -> list[tuple[str, str]]:
     """Scrape the Cutco shop index to discover all category pages automatically."""
     discovery_urls = [
@@ -710,6 +722,8 @@ def scrape_sets(
                                 visible_sku = _extract_sku_from_href(href)
                                 if visible_sku:
                                     break
+                        if not visible_sku:
+                            visible_sku = _extract_sku_from_text(visible_name)
                         has_standalone_product = any(
                             "/p/" in (anchor.get("href") or "")
                             for anchor in li.find_all("a", href=True)
