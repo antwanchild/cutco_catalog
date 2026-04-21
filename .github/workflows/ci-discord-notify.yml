@@ -62,19 +62,20 @@ jobs:
 
           short_sha=$(printf '%s' "$HEAD_SHA" | cut -c1-7)
 
-          version=$(git tag --points-at "$HEAD_SHA" | sort -V | tail -n1)
-          if [ -z "$version" ]; then
-            version="n/a"
-          fi
-          version_label=${version#v}
-          if [ -z "$version_label" ]; then
-            version_label="$version"
-          fi
-          if [ "$version_label" = "n/a" ]; then
-            version_display="$version_label"
+          last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          version=${last_tag#v}
+          IFS='.' read -r major minor patch <<< "$version"
+
+          if printf '%s' "$COMMIT_MESSAGE" | grep -qiE '^feat!|BREAKING CHANGE'; then
+            major=$((major + 1)); minor=0; patch=0
+          elif printf '%s' "$COMMIT_MESSAGE" | grep -qiE '^feat'; then
+            minor=$((minor + 1)); patch=0
           else
-            version_display="v${version_label}"
+            patch=$((patch + 1))
           fi
+
+          version_label="${major}.${minor}.${patch}"
+          version_display="v${version_label}"
 
           duration_seconds=$(
             python3 -c 'from datetime import datetime; import os; started = datetime.fromisoformat(os.environ["RUN_STARTED_AT"].replace("Z", "+00:00")); updated = datetime.fromisoformat(os.environ["RUN_UPDATED_AT"].replace("Z", "+00:00")); print(max(0, int((updated - started).total_seconds())))'
@@ -116,7 +117,7 @@ jobs:
           {
             echo "display_name=${display_name}"
             echo "short_sha=${short_sha}"
-            echo "version=${version}"
+            echo "version=${version_label}"
             echo "version_label=${version_label}"
             echo "version_display=${version_display}"
             echo "duration=${duration}"
