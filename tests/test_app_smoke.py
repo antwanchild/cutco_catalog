@@ -1432,6 +1432,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Sync Knife", response.data)
         self.assertIn(b"New Sets", response.data)
         self.assertIn(b"New Sync Set", response.data)
+        self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Missing item numbers", response.data)
 
     def test_catalog_sync_uses_populates_tasks(self):
