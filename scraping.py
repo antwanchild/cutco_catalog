@@ -518,6 +518,7 @@ def scrape_sets(
             member_quantities: dict[str, int] = {}
             member_is_set_only: list[bool] = []
             seen_member: set[str] = set()
+            structured_members: list[dict[str, str | int | None]] = []
 
             # Strategy 1: parse itemSetList JSON embedded in page JS
             # Page has webItemsMap with one itemSetList per variant — search
@@ -561,6 +562,11 @@ def scrape_sets(
                             member_names.append(str(entry.get("name") or entry.get("itemName") or "").strip())
                             member_quantities[base_sku] = qty
                             member_is_set_only.append(False)
+                            structured_members.append({
+                                "sku": base_sku,
+                                "name": str(entry.get("name") or entry.get("itemName") or "").strip(),
+                                "quantity": qty,
+                            })
                     logger.debug("Set '%s': itemSetList → %d members", set_link["name"], len(member_skus))
                 except (json.JSONDecodeError, ValueError, TypeError) as exc:
                     logger.debug("itemSetList parse failed for %s: %s", fetch_url, exc)
@@ -569,6 +575,7 @@ def scrape_sets(
                     member_quantities.clear()
                     member_is_set_only.clear()
                     seen_member.clear()
+                    structured_members.clear()
 
             # Strategy 2: fallback — image /rolo/ SKU extraction
             if not member_skus:
@@ -585,47 +592,73 @@ def scrape_sets(
                             member_names.append("")
                             member_quantities[base_sku] = 1
                             member_is_set_only.append(False)
+                            structured_members.append({
+                                "sku": base_sku,
+                                "name": "",
+                                "quantity": 1,
+                            })
                 logger.debug("Set '%s': image fallback → %d members", set_link["name"], len(member_skus))
 
             # Strategy 3: visible Set Pieces labels, if present
-            if not any(member_names):
-                heading = None
-                for tag in detail.find_all(["h2", "h3", "h4"]):
-                    if tag.get_text(strip=True).lower().startswith("set pieces"):
-                        heading = tag
-                        break
-                if heading:
-                    pieces_list = heading.find_next("ul")
-                    if pieces_list:
-                        visible_rows = []
-                        for li in pieces_list.find_all("li"):
-                            visible_name = li.get_text(" ", strip=True)
-                            if not visible_name:
-                                continue
-                            has_standalone_product = any(
-                                "/p/" in (anchor.get("href") or "")
-                                for anchor in li.find_all("a", href=True)
-                            )
-                            visible_rows.append({
-                                "name": visible_name,
-                                "is_set_only": not has_standalone_product,
-                            })
-                        if visible_rows:
-                            for idx, row in enumerate(visible_rows):
-                                if idx < len(member_names):
-                                    member_names[idx] = row["name"]
-                                if idx < len(member_is_set_only):
-                                    member_is_set_only[idx] = row["is_set_only"]
-                            logger.debug("Set '%s': visible Set Pieces labels → %d names", set_link["name"], len(visible_rows))
+            visible_rows: list[dict] = []
+            heading = None
+            for tag in detail.find_all(["h2", "h3", "h4"]):
+                if tag.get_text(strip=True).lower().startswith("set pieces"):
+                    heading = tag
+                    break
+            if heading:
+                pieces_list = heading.find_next("ul")
+                if pieces_list:
+                    for li in pieces_list.find_all("li"):
+                        visible_name = li.get_text(" ", strip=True)
+                        if not visible_name:
+                            continue
+                        has_standalone_product = any(
+                            "/p/" in (anchor.get("href") or "")
+                            for anchor in li.find_all("a", href=True)
+                        )
+                        visible_rows.append({
+                            "name": visible_name,
+                            "is_set_only": not has_standalone_product,
+                        })
+            if visible_rows:
+                logger.debug("Set '%s': visible Set Pieces labels → %d names", set_link["name"], len(visible_rows))
+
+            def _norm_member_name(value: str) -> str:
+                return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
 
             member_entries = []
-            for idx, sku in enumerate(member_skus):
-                member_entries.append(dict(
-                    sku=sku,
-                    name=member_names[idx] if idx < len(member_names) and member_names[idx] else None,
-                    quantity=member_quantities.get(sku, 1),
-                    is_set_only=member_is_set_only[idx] if idx < len(member_is_set_only) else False,
-                ))
+            if visible_rows:
+                used_structured: set[int] = set()
+                for visible_row in visible_rows:
+                    visible_name = visible_row.get("name") or None
+                    visible_norm = _norm_member_name(visible_name or "")
+                    matched_structured = None
+                    matched_index = None
+                    for idx, structured in enumerate(structured_members):
+                        if idx in used_structured:
+                            continue
+                        structured_name = _norm_member_name(str(structured.get("name") or ""))
+                        if visible_norm and structured_name == visible_norm:
+                            matched_structured = structured
+                            matched_index = idx
+                            break
+                    if matched_index is not None:
+                        used_structured.add(matched_index)
+                    member_entries.append(dict(
+                        sku=matched_structured["sku"] if matched_structured else None,
+                        name=visible_name,
+                        quantity=matched_structured["quantity"] if matched_structured else 1,
+                        is_set_only=visible_row["is_set_only"],
+                    ))
+            else:
+                for idx, sku in enumerate(member_skus):
+                    member_entries.append(dict(
+                        sku=sku,
+                        name=member_names[idx] if idx < len(member_names) and member_names[idx] else None,
+                        quantity=member_quantities.get(sku, 1),
+                        is_set_only=member_is_set_only[idx] if idx < len(member_is_set_only) else False,
+                    ))
 
             logger.debug("Set '%s': sku=%s, %d members", set_link["name"], set_sku, len(member_skus))
             return dict(
