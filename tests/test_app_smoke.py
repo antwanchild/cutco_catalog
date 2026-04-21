@@ -29,6 +29,7 @@ from scraping import (
     _member_hover_title,
     _normalize_set_member_sku,
 )
+from blueprints.catalog import _load_member_snapshot
 from time_utils import container_timezone, format_container_time
 
 
@@ -607,6 +608,22 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(member_entries[2]["sku"], "BBQ-3")
         self.assertEqual(member_entries[2]["name"], "Extra Piece")
         self.assertTrue(member_entries[2]["is_set_only"])
+
+    def test_load_member_snapshot_dedupes_duplicate_skus(self):
+        rows = _load_member_snapshot(
+            json.dumps(
+                [
+                    {"sku": "10", "name": "Knife One", "quantity": 1},
+                    {"sku": "10", "name": "Knife One", "quantity": 11},
+                    {"sku": "1741", "name": "Knife Two", "quantity": 1},
+                ]
+            )
+        )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["sku"], "10")
+        self.assertEqual(rows[0]["quantity"], 12)
+        self.assertEqual(rows[1]["sku"], "1741")
 
     def test_normalize_set_member_skus_strips_variant_suffixes(self):
         self.assertEqual(_normalize_set_member_sku("1737W-1"), "1737")

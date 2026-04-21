@@ -35,6 +35,7 @@ def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
     if not isinstance(payload, list):
         return []
     rows: list[dict] = []
+    seen: OrderedDict[str, dict] = OrderedDict()
     for entry in payload:
         if not isinstance(entry, dict):
             continue
@@ -44,7 +45,17 @@ def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
             quantity = max(1, int(entry.get("quantity") or 1))
         except (TypeError, ValueError):
             quantity = 1
+        if sku:
+            existing = seen.get(sku)
+            if existing is None:
+                seen[sku] = {"sku": sku, "name": name, "quantity": quantity}
+            else:
+                existing["quantity"] = max(1, int(existing.get("quantity") or 1)) + quantity
+                if not existing.get("name") and name:
+                    existing["name"] = name
+            continue
         rows.append({"sku": sku, "name": name, "quantity": quantity})
+    rows[:0] = list(seen.values())
     return rows
 
 
