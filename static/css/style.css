@@ -653,11 +653,8 @@ textarea { resize: vertical; }
   flex-wrap: wrap;
 }
 .activity-label {
-  font-size: .95rem;
+  font-size: .68rem;
   font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0;
-  text-transform: none;
 }
 .activity-time {
   font-size: .72rem;
@@ -685,11 +682,11 @@ textarea { resize: vertical; }
   min-height: 92px;
 }
 .release-label {
-  font-size: .95rem;
+  font-size: .68rem;
   font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0;
-  text-transform: none;
+  color: var(--muted);
+  letter-spacing: .08em;
+  text-transform: uppercase;
   margin: 0;
 }
 .release-value {
