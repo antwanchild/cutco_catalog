@@ -1393,6 +1393,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(sets_page.status_code, 200)
         self.assertIn(b"Set Group", sets_page.data)
+        self.assertIn(b"SG-1", sets_page.data)
         self.assertEqual(set_detail_page.status_code, 200)
         self.assertIn(b"Set Group", set_detail_page.data)
         self.assertEqual(set_edit_page.status_code, 200)

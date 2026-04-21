@@ -33,6 +33,9 @@
         <a href="{{ url_for('catalog.set_detail', set_id=item_set.id) }}{% if person_id %}?person={{ person_id }}{% endif %}">
           {{ item_set.name }}
         </a>
+        {% if item_set.sku %}
+          <div class="muted mono" style="margin-top:.2rem">SKU: {{ item_set.sku }}</div>
+        {% endif %}
       </td>
       <td>{{ c.total }}</td>
       <td>
