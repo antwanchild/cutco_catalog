@@ -153,6 +153,20 @@ def _build_set_member_entries(
     return member_entries
 
 
+def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
+    sku = (str(raw_sku or "").upper().strip().split("/")[0] if raw_sku is not None else "")
+    if not sku:
+        return None
+    variant_match = re.fullmatch(r"(\d{3,})(?:[A-Z]+)?-\d+", sku)
+    if variant_match:
+        base = variant_match.group(1)
+        return None if re.fullmatch(r"20\d{2}", base) else base
+    stripped = re.sub(r"[A-Z]+$", "", sku) if len(sku) > 2 else sku
+    if re.fullmatch(r"20\d{2}", stripped):
+        return None
+    return stripped or None
+
+
 def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
     """Fetch a product page and return (sku, name) from on-page content."""
     try:
@@ -615,11 +629,8 @@ def scrape_sets(
                 try:
                     set_list = json.loads(_set_list_json)
                     for entry in set_list:
-                        raw_sku = str(entry.get("childItemNumber") or "").upper().strip().split("/")[0]
-                        if not raw_sku:
-                            continue
-                        base_sku = re.sub(r"[A-Z]+$", "", raw_sku) if len(raw_sku) > 2 else raw_sku
-                        if re.fullmatch(r"20\d{2}", base_sku):
+                        base_sku = _normalize_set_member_sku(entry.get("childItemNumber"))
+                        if not base_sku:
                             continue
                         qty = int(entry.get("qty") or 1)
                         if base_sku not in seen_member:
@@ -648,9 +659,8 @@ def scrape_sets(
                 for img in detail.select("img[src*='/rolo/']"):
                     match = sku_pattern.search(img.get("src", ""))
                     if match:
-                        raw = match.group(1).upper()
-                        base_sku = re.sub(r"[A-Z]+$", "", raw) if len(raw) > 2 else raw
-                        if re.fullmatch(r"20\d{2}", base_sku):
+                        base_sku = _normalize_set_member_sku(match.group(1))
+                        if not base_sku:
                             continue
                         if base_sku not in seen_member:
                             seen_member.add(base_sku)

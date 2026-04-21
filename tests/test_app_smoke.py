@@ -24,7 +24,7 @@ from models import (
     SharpeningLog,
     Set,
 )
-from scraping import _build_set_member_entries
+from scraping import _build_set_member_entries, _normalize_set_member_sku
 from time_utils import container_timezone, format_container_time
 
 
@@ -603,6 +603,13 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(member_entries[2]["sku"], "BBQ-3")
         self.assertEqual(member_entries[2]["name"], "Extra Piece")
         self.assertTrue(member_entries[2]["is_set_only"])
+
+    def test_normalize_set_member_skus_strips_variant_suffixes(self):
+        self.assertEqual(_normalize_set_member_sku("1737W-1"), "1737")
+        self.assertEqual(_normalize_set_member_sku("1737C-1"), "1737")
+        self.assertEqual(_normalize_set_member_sku("1737/1"), "1737")
+        self.assertEqual(_normalize_set_member_sku("1737"), "1737")
+        self.assertIsNone(_normalize_set_member_sku(""))
 
     def test_admin_diagnostics_shows_schema_target(self):
         self._login_as_admin()
