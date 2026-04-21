@@ -363,6 +363,8 @@ a:hover { text-decoration: underline; }
 .data-table th a:hover { color: var(--text); }
 .data-table tbody tr:hover { background: var(--bg2); }
 .data-table.compact th, .data-table.compact td { padding: .35rem .6rem; }
+.catalog-table td,
+.sets-table td,
 .data-table td.sets-cell,
 .data-table td.actions {
   vertical-align: top;
