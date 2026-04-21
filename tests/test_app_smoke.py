@@ -608,6 +608,7 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(_normalize_set_member_sku("1737W-1"), "1737")
         self.assertEqual(_normalize_set_member_sku("1737C-1"), "1737")
         self.assertEqual(_normalize_set_member_sku("1737/1"), "1737")
+        self.assertEqual(_normalize_set_member_sku("77-"), "77")
         self.assertEqual(_normalize_set_member_sku("1737"), "1737")
         self.assertIsNone(_normalize_set_member_sku(""))
 

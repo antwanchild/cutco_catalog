@@ -157,11 +157,13 @@ def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
     sku = (str(raw_sku or "").upper().strip().split("/")[0] if raw_sku is not None else "")
     if not sku:
         return None
+    sku = re.sub(r"[\s\-]+$", "", sku)
     variant_match = re.fullmatch(r"(\d{3,})(?:[A-Z]+)?-\d+", sku)
     if variant_match:
         base = variant_match.group(1)
         return None if re.fullmatch(r"20\d{2}", base) else base
     stripped = re.sub(r"[A-Z]+$", "", sku) if len(sku) > 2 else sku
+    stripped = re.sub(r"[\s\-]+$", "", stripped)
     if re.fullmatch(r"20\d{2}", stripped):
         return None
     return stripped or None
