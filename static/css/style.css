@@ -598,12 +598,16 @@ textarea { resize: vertical; }
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: .85rem .9rem;
+  padding: .9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
 }
 .changes-card h3 {
   font-size: .72rem;
   font-weight: 700;
-  margin-bottom: .45rem;
+  margin: 0;
+  line-height: 1.2;
 }
 .change-item {
   display: flex;
@@ -641,17 +645,17 @@ textarea { resize: vertical; }
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: .75rem .85rem;
+  padding: .9rem 1rem;
   min-height: 92px;
   display: flex;
   flex-direction: column;
   gap: .35rem;
 }
-.activity-card-top {
+.activity-label-row {
   display: flex;
   justify-content: space-between;
   gap: .5rem;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
 }
 .activity-label {
@@ -667,10 +671,12 @@ textarea { resize: vertical; }
   font-size: .92rem;
   font-weight: 600;
   color: var(--text);
+  line-height: 1.35;
 }
 .activity-details {
   font-size: .8rem;
   color: var(--muted);
+  line-height: 1.35;
 }
 .dashboard-release { margin-bottom: 1rem; }
 .release-grid {
@@ -694,7 +700,7 @@ textarea { resize: vertical; }
   color: var(--muted);
   letter-spacing: .08em;
   text-transform: uppercase;
-  margin-bottom: .35rem;
+  margin: 0;
 }
 .release-value {
   font-size: .95rem;
