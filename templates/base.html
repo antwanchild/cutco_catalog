@@ -11,7 +11,9 @@
     /* Apply saved theme before paint to avoid flash */
     (function() {
       var t = localStorage.getItem('theme');
+      var a = localStorage.getItem('accent');
       if (t) document.documentElement.setAttribute('data-theme', t);
+      if (a) document.documentElement.setAttribute('data-accent', a);
     })();
   </script>
 </head>
@@ -24,6 +26,21 @@
     <button type="submit" class="btn btn-sm">Search</button>
   </form>
   <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">🌙</button>
+  <details class="nav-group accent-group">
+    <summary class="nav-group-toggle accent-toggle">
+      Accent <span class="accent-current" id="accent-current">Blue</span>
+    </summary>
+    <div class="nav-group-menu accent-menu">
+      <button type="button" class="accent-option" data-accent-option data-accent="blue" data-accent-label="Blue"><span class="accent-dot"></span> Blue</button>
+      <button type="button" class="accent-option" data-accent-option data-accent="teal" data-accent-label="Teal"><span class="accent-dot"></span> Teal</button>
+      <button type="button" class="accent-option" data-accent-option data-accent="green" data-accent-label="Green"><span class="accent-dot"></span> Green</button>
+      <button type="button" class="accent-option" data-accent-option data-accent="amber" data-accent-label="Amber"><span class="accent-dot"></span> Amber</button>
+      <button type="button" class="accent-option" data-accent-option data-accent="copper" data-accent-label="Copper"><span class="accent-dot"></span> Copper</button>
+      <button type="button" class="accent-option" data-accent-option data-accent="violet" data-accent-label="Violet"><span class="accent-dot"></span> Violet</button>
+      <button type="button" class="accent-option" data-accent-option data-accent="rose" data-accent-label="Rose"><span class="accent-dot"></span> Rose</button>
+      <button type="button" class="accent-option" data-accent-option data-accent="slate" data-accent-label="Slate"><span class="accent-dot"></span> Slate</button>
+    </div>
+  </details>
   <button class="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
   <div class="nav-links">
     <a href="{{ url_for('catalog.catalog') }}" {% if request.endpoint and request.endpoint.startswith('catalog.') %}class="active"{% endif %}>Catalog</a>
@@ -145,16 +162,47 @@
 
   (function() {
     var btn = document.getElementById('theme-toggle');
+    var accentLabel = document.getElementById('accent-current');
+    var accentButtons = document.querySelectorAll('[data-accent-option]');
+    var accentMap = {
+      blue: 'Blue',
+      teal: 'Teal',
+      green: 'Green',
+      amber: 'Amber',
+      copper: 'Copper',
+      violet: 'Violet',
+      rose: 'Rose',
+      slate: 'Slate'
+    };
+
     function applyTheme(t) {
       document.documentElement.setAttribute('data-theme', t);
       btn.textContent = t === 'light' ? '🌙' : '☀️';
       btn.title = t === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
       localStorage.setItem('theme', t);
     }
+    function applyAccent(accent) {
+      var value = accentMap[accent] ? accent : 'blue';
+      document.documentElement.setAttribute('data-accent', value);
+      localStorage.setItem('accent', value);
+      if (accentLabel) accentLabel.textContent = accentMap[value];
+      accentButtons.forEach(function(option) {
+        option.classList.toggle('is-active', option.dataset.accent === value);
+      });
+    }
     var saved = localStorage.getItem('theme') || 'dark';
+    var savedAccent = localStorage.getItem('accent') || 'blue';
     applyTheme(saved);
+    applyAccent(savedAccent);
     btn.addEventListener('click', function() {
       applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    });
+    accentButtons.forEach(function(option) {
+      option.addEventListener('click', function() {
+        applyAccent(this.dataset.accent);
+        var group = this.closest('details');
+        if (group) group.open = false;
+      });
     });
   })();
 </script>

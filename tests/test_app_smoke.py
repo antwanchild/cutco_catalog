@@ -112,6 +112,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Recent Activity", response.data)
         self.assertIn(b"Quick Actions", response.data)
+        self.assertIn(b"Accent", response.data)
         self.assertIn(b"Recently Changed", response.data)
         self.assertIn(b"Release &amp; Diagnostics", response.data)
         self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
