@@ -607,10 +607,13 @@ def catalog_sync():
                 "sku": sku,
                 "name": None,
                 "quantity": item_set.get("member_quantities", {}).get(sku, 1),
+                "is_set_only": False,
             }
             for sku in item_set.get("member_skus", [])
         ]
         for member in member_entries:
+            if not member.get("is_set_only"):
+                continue
             member_sku = (member.get("sku") or "").strip()
             member_name = (member.get("name") or "").strip()
             candidate = None

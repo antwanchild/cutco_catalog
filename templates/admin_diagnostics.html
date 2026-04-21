@@ -62,6 +62,10 @@
     <div class="stat-number">{{ details.bootstrap_state.version }}</div>
     <div class="stat-label">Bootstrap Version</div>
   </div>
+  <div class="stat-card{% if details.schema_state.version < details.schema_version %} stat-card-warn{% endif %}">
+    <div class="stat-number">v{{ details.schema_version }}</div>
+    <div class="stat-label">Schema Target</div>
+  </div>
 </div>
 
 <div class="stats-grid">
@@ -120,7 +124,7 @@
     <div class="stat-grid" style="margin-bottom:1rem">
       <div class="stat-card">
         <div class="stat-number">v{{ details.schema_state.version }}</div>
-        <div class="stat-label">Current Version</div>
+        <div class="stat-label">Schema Current</div>
       </div>
       <div class="stat-card">
         <div class="stat-number">{{ details.schema_history | length }}</div>

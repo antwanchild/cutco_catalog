@@ -576,6 +576,15 @@ class UtilitySmokeTests(SmokeBaseTest):
              mock.patch("helpers.requests.post", side_effect=RuntimeError("boom")):
             self.assertFalse(_notify_discord("Webhook fails"))
 
+    def test_admin_diagnostics_shows_schema_target(self):
+        self._login_as_admin()
+
+        response = self.client.get("/admin/diagnostics")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Schema Current", response.data)
+        self.assertIn(b"Schema Target", response.data)
+
     def test_check_wishlist_targets_returns_hits(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -1353,7 +1362,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "member_quantities": {"NS-1": 2},
                 "member_entries": [
                     {"sku": "NS-1", "name": "New Sync Knife", "quantity": 2},
-                    {"sku": "", "name": "Set Only Turner", "quantity": 1},
+                    {"sku": "", "name": "Set Only Turner", "quantity": 1, "is_set_only": True},
                 ],
             }
         ]
