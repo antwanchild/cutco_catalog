@@ -600,10 +600,13 @@ textarea { resize: vertical; }
   gap: .35rem;
 }
 .changes-card h3 {
-  font-size: .72rem;
+  font-size: .9rem;
   font-weight: 700;
   margin: 0;
   line-height: 1.2;
+  color: var(--text);
+  letter-spacing: 0;
+  text-transform: none;
 }
 .change-item {
   display: flex;
