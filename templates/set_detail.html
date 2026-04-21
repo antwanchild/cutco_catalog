@@ -117,7 +117,12 @@
 {% endif %}
 
 {% if missing_items %}
-<h2 class="section-heading">❌ Missing ({{ missing_items | length }})</h2>
+<h2 class="section-heading">❌ Not Owned ({{ missing_items | length }})</h2>
+{% if person %}
+<p class="muted">These items are in the set but not owned by {{ person.name }}.</p>
+{% else %}
+<p class="muted">These items are in the set but not owned by anyone in the catalog yet.</p>
+{% endif %}
 <div class="table-wrap">
 <table class="data-table">
   <thead>
