@@ -65,6 +65,7 @@ Notes:
 
 - Set `PUID` / `PGID` to your host user and group if you want files under the mounted `/data` volume to be owned by your normal account instead of root.
 - Gunicorn runtime files are intentionally kept inside the container (`/dev/shm` and `/tmp`) so hidden `.gunicorn` directories do not get created in bind mounts.
+- The image defaults to `TZ=UTC`, so diagnostics timestamps and job history show UTC unless you override `TZ` in the container environment.
 - After changing the Dockerfile or image tag, rebuild and recreate the container so the running container picks up the new startup command.
 
 ---
@@ -107,7 +108,7 @@ ruff check .
 | `COOKWARE_CATEGORIES` | `Cookware` | No | Catalog categories tracked on the Cookware page |
 | `PUID` | `0` | No | If non-zero, create a matching container user and run the app as that UID for correct ownership on mounted volumes |
 | `PGID` | `0` | No | Group ID paired with `PUID` when running the container as a non-root host user |
-| `TZ` | `UTC` | No | Container timezone |
+| `TZ` | `UTC` | No | Container timezone used for diagnostics timestamps and job history displays |
 
 ⚠️ = has a working default but must be changed before exposing to a network.
 
