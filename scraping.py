@@ -178,8 +178,8 @@ def _infer_visible_member_sku(member_name: str | None) -> str | None:
     slug = re.sub(r"[^a-z0-9]+", "-", lower).strip("-")
     if not slug:
         return None
-    inferred_sku, _ = _fetch_sku_from_page(f"https://www.cutco.com/p/{slug}")
-    return _normalize_set_member_sku(inferred_sku)
+    inferred_sku, _ = _fetch_sku_from_page(f"https://www.cutco.com/p/{slug}", preserve_lettered_code=True)
+    return inferred_sku
 
 
 def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
@@ -187,8 +187,6 @@ def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
     if not sku:
         return None
     sku = re.sub(r"[\s\-]+$", "", sku)
-    if re.fullmatch(r"\d{4}[A-Z]", sku):
-        return sku
     variant_match = re.fullmatch(r"(\d{3,})(?:[A-Z]+)?-\d+", sku)
     if variant_match:
         base = variant_match.group(1)
@@ -200,7 +198,7 @@ def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
     return stripped or None
 
 
-def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
+def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> tuple[str | None, str | None]:
     """Fetch a product page and return (sku, name) from on-page content."""
     try:
         resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
@@ -291,9 +289,9 @@ def _fetch_sku_from_page(url: str) -> tuple[str | None, str | None]:
                 sku = sku_match.group(1).upper()
                 strategy_log.append(f"keyword={sku}")
 
-        # Normalise: strip trailing color/variant letters, but keep
-        # four-digit lettered item codes such as 2026D.
-        if not re.fullmatch(r"\d{4}[A-Z]", sku or ""):
+        # Normalise: strip trailing color/variant letters unless explicitly
+        # told to preserve a lettered SKU code (used for gift-box products).
+        if not preserve_lettered_code:
             stripped = re.sub(r"[A-Z]+$", "", sku or "")
             if stripped and stripped.isdigit() and len(stripped) >= 2:
                 sku = stripped
