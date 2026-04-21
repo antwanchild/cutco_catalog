@@ -122,7 +122,7 @@ jobs:
         run: |
           jq -n \
             --arg username "${{ steps.context.outputs.display_name }}" \
-            --arg title "${{ steps.context.outputs.status_emoji }} ${{ steps.context.outputs.display_name }} - ${{ steps.context.outputs.status_text }}" \
+            --arg title "${{ steps.context.outputs.status_emoji }} ${{ steps.context.outputs.display_name }} — ${{ steps.context.outputs.status_text }}" \
             --arg url "$RUN_URL" \
             --arg footer "${{ steps.context.outputs.display_name }} v${{ steps.context.outputs.version_label }} • github.com/${REPO}" \
             --arg commit_body "> ${{ steps.context.outputs.commit }}" \
