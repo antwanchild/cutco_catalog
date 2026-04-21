@@ -208,6 +208,10 @@ def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
     if not sku:
         return None
     sku = re.sub(r"[\s\-]+$", "", sku)
+    if re.fullmatch(r"\d{3,}-\d+", sku):
+        return sku
+    if re.fullmatch(r"\d{3,}(?:CD|CSH|D)", sku):
+        return sku
     variant_match = re.fullmatch(r"(\d{3,})(?:[A-Z]+)?-\d+", sku)
     if variant_match:
         base = variant_match.group(1)

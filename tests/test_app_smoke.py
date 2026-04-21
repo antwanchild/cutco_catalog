@@ -631,8 +631,11 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(_normalize_set_member_sku("1737C-1"), "1737")
         self.assertEqual(_normalize_set_member_sku("1737/1"), "1737")
         self.assertEqual(_normalize_set_member_sku("77-"), "77")
+        self.assertEqual(_normalize_set_member_sku("2120-2"), "2120-2")
+        self.assertEqual(_normalize_set_member_sku("2130CD"), "2130CD")
+        self.assertEqual(_normalize_set_member_sku("3721CSH"), "3721CSH")
+        self.assertEqual(_normalize_set_member_sku("2026D"), "2026D")
         self.assertEqual(_normalize_set_member_sku("1716C"), "1716")
-        self.assertIsNone(_normalize_set_member_sku("2026D"))
         self.assertEqual(_normalize_set_member_sku("1737"), "1737")
         self.assertIsNone(_normalize_set_member_sku(""))
 
