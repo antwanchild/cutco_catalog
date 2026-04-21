@@ -48,9 +48,14 @@ def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
     return rows
 
 
-def _build_member_status_rows(member_entries: list[dict], catalog_sku_lookup: dict[str, Item]) -> tuple[list[dict], list[str]]:
+def _build_member_status_rows(
+    member_entries: list[dict],
+    catalog_sku_lookup: dict[str, Item],
+    found_skus: set[str] | None = None,
+) -> tuple[list[dict], list[str]]:
     rows: list[dict] = []
     missing_skus: list[str] = []
+    found_skus = {sku for sku in (found_skus or set()) if sku}
     for index, entry in enumerate(member_entries, start=1):
         sku = _normalize_member_sku(entry.get("sku"))
         item = catalog_sku_lookup.get(sku) if sku else None
@@ -62,6 +67,9 @@ def _build_member_status_rows(member_entries: list[dict], catalog_sku_lookup: di
         if item is not None:
             status = "present"
             status_label = "In catalog"
+        elif sku and sku in found_skus:
+            status = "found"
+            status_label = "Found in scrape"
         elif sku:
             status = "missing"
             status_label = "Missing from catalog"
@@ -695,9 +703,18 @@ def catalog_sync():
         for item in Item.query.filter(Item.sku.isnot(None)).all()
         if _normalize_member_sku(item.sku)
     }
+    scraped_sku_lookup = {
+        _normalize_member_sku(item["sku"])
+        for item in new_items
+        if _normalize_member_sku(item.get("sku"))
+    }
     for item_set in (*new_sets, *existing_sets_data):
         member_entries = item_set.get("member_entries") or []
-        member_snapshot_rows, missing_member_skus = _build_member_status_rows(member_entries, catalog_sku_lookup)
+        member_snapshot_rows, missing_member_skus = _build_member_status_rows(
+            member_entries,
+            catalog_sku_lookup,
+            scraped_sku_lookup,
+        )
         item_set["member_snapshot_rows"] = member_snapshot_rows
         item_set["missing_member_skus"] = missing_member_skus
         item_set["member_data_json"] = json.dumps(member_entries, ensure_ascii=False)

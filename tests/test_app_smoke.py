@@ -1386,10 +1386,11 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "name": "New Sync Set",
                 "sku": "NSS-1",
                 "url": "https://example.com/new-set",
-                "member_skus": ["EX-1", "NS-2"],
-                "member_quantities": {"EX-1": 2, "NS-2": 1},
+                "member_skus": ["EX-1", "NS-1", "NS-2"],
+                "member_quantities": {"EX-1": 2, "NS-1": 1, "NS-2": 1},
                 "member_entries": [
                     {"sku": "EX-1", "name": "Existing Sync Knife", "quantity": 2},
+                    {"sku": "NS-1", "name": "Found Sync Knife", "quantity": 1},
                     {"sku": "NS-2", "name": "Missing Sync Knife", "quantity": 1},
                 ],
             }
@@ -1416,6 +1417,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Sets", response.data)
         self.assertIn(b"New Sync Set", response.data)
         self.assertIn(b"In catalog", response.data)
+        self.assertIn(b"Found in scrape", response.data)
         self.assertIn(b"Missing from catalog", response.data)
 
     def test_catalog_sync_uses_populates_tasks(self):
