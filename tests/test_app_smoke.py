@@ -1416,9 +1416,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Sync Knife", response.data)
         self.assertIn(b"New Sets", response.data)
         self.assertIn(b"New Sync Set", response.data)
-        self.assertIn(b"In catalog", response.data)
-        self.assertIn(b"Found in scrape", response.data)
-        self.assertIn(b"Missing from catalog", response.data)
+        self.assertIn(b"Missing item numbers", response.data)
 
     def test_catalog_sync_uses_populates_tasks(self):
         self._login_as_admin()

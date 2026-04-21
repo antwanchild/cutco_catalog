@@ -58,7 +58,6 @@
       <th>#</th>
       <th>SKU</th>
       <th>Qty</th>
-      <th>Status</th>
     </tr>
   </thead>
   <tbody>
@@ -77,11 +76,6 @@
         {% endif %}
       </td>
       <td>{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% else %}<span class="muted">1</span>{% endif %}</td>
-      <td>
-        <span class="badge {% if member.status == 'present' %}badge-present{% elif member.status == 'missing' %}badge-missing{% else %}badge-info{% endif %}">
-          {{ member.status_label }}
-        </span>
-      </td>
     </tr>
     {% endfor %}
   </tbody>
