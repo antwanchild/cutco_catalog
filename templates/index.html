@@ -59,7 +59,7 @@
     <div class="quick-action-card">
       <span class="quick-action-title">Catalog sync</span>
       <span class="quick-action-note">Preview and import Cutco updates.</span>
-      <a class="btn btn-secondary btn-sm" href="{{ url_for('catalog.catalog_sync') }}">Run Sync</a>
+      <a class="btn btn-secondary btn-sm" id="dashboard-sync-btn" href="{{ url_for('catalog.catalog_sync') }}">Run Sync</a>
     </div>
     <div class="quick-action-card">
       <span class="quick-action-title">MSRP diff</span>
@@ -69,6 +69,13 @@
     {% endif %}
   </div>
 </section>
+
+<div id="dashboard-sync-overlay" style="display:none">
+  <div class="sync-overlay-inner">
+    <div class="sync-spinner"></div>
+    <p>Preparing the sync preview — this may take a minute…</p>
+  </div>
+</div>
 
 <section class="dash-panel dash-panel-wide dashboard-changes">
   <div class="section-heading-actions" style="margin-bottom:.6rem">
@@ -215,4 +222,37 @@
     </ul>
   </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+const dashboardSyncBtn = document.getElementById('dashboard-sync-btn');
+const dashboardSyncOverlay = document.getElementById('dashboard-sync-overlay');
+if (dashboardSyncBtn && dashboardSyncOverlay) {
+  dashboardSyncBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    const url = this.href;
+
+    this.textContent = 'Syncing…';
+    this.classList.add('btn-disabled');
+    this.style.pointerEvents = 'none';
+    dashboardSyncOverlay.style.display = 'flex';
+
+    fetch(url)
+      .then(res => {
+        history.pushState({}, '', res.url);
+        return res.text();
+      })
+      .then(html => {
+        document.open();
+        document.write(html);
+        document.close();
+      })
+      .catch(() => {
+        window.location.href = url;
+      });
+  });
+}
+</script>
 {% endblock %}
