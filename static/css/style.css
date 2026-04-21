@@ -45,39 +45,6 @@
 [data-theme="light"] .badge-traded   { background: #fef6d6; color: #7a5500; }
 [data-theme="light"] .badge-info     { background: #dce8ff; color: #1a3a6b; }
 
-html[data-accent="blue"] {
-  --accent:  #4f8ef7;
-  --accent2: #7c5cbf;
-}
-html[data-accent="teal"] {
-  --accent:  #2bb8a3;
-  --accent2: #1f8f81;
-}
-html[data-accent="green"] {
-  --accent:  #3aad6e;
-  --accent2: #2f8758;
-}
-html[data-accent="amber"] {
-  --accent:  #d99a2b;
-  --accent2: #a56e15;
-}
-html[data-accent="copper"] {
-  --accent:  #c97a4e;
-  --accent2: #965531;
-}
-html[data-accent="violet"] {
-  --accent:  #8b5cf6;
-  --accent2: #6d3dba;
-}
-html[data-accent="rose"] {
-  --accent:  #e35d8f;
-  --accent2: #b84570;
-}
-html[data-accent="slate"] {
-  --accent:  #73809a;
-  --accent2: #586176;
-}
-
 body {
   background: var(--bg);
   color: var(--text);
@@ -199,57 +166,6 @@ a:hover { text-decoration: underline; }
   display: block;
   width: 100%;
 }
-.accent-group {
-  position: relative;
-}
-.accent-current {
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: .1rem .4rem;
-  border-radius: 999px;
-  font-size: .68rem;
-  font-weight: 700;
-  letter-spacing: .03em;
-  text-transform: none;
-}
-.accent-menu {
-  min-width: 200px;
-}
-.accent-option {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  width: 100%;
-  background: transparent;
-  border: 0;
-  color: var(--text);
-  padding: .38rem .45rem;
-  border-radius: var(--radius);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.accent-option:hover,
-.accent-option.is-active {
-  background: var(--bg3);
-}
-.accent-dot {
-  width: .72rem;
-  height: .72rem;
-  border-radius: 999px;
-  background: var(--accent);
-  border: 1px solid rgba(255,255,255,.18);
-  flex: none;
-}
-.accent-option[data-accent="teal"] .accent-dot { background: #2bb8a3; }
-.accent-option[data-accent="green"] .accent-dot { background: #3aad6e; }
-.accent-option[data-accent="amber"] .accent-dot { background: #d99a2b; }
-.accent-option[data-accent="copper"] .accent-dot { background: #c97a4e; }
-.accent-option[data-accent="violet"] .accent-dot { background: #8b5cf6; }
-.accent-option[data-accent="rose"] .accent-dot { background: #e35d8f; }
-.accent-option[data-accent="slate"] .accent-dot { background: #73809a; }
-.accent-option[data-accent="blue"] .accent-dot { background: #4f8ef7; }
 .badge-admin {
   background: var(--accent2);
   color: #fff;
@@ -320,7 +236,7 @@ a:hover { text-decoration: underline; }
   gap: .75rem;
   margin-bottom: 1.25rem;
 }
-.page-title { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+.page-title { font-size: 1.4rem; font-weight: 700; }
 .page-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 
 /* ── Admin snapshot strip ───────────────────────────────────────────────── */
