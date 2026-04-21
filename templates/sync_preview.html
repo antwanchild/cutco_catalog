@@ -160,7 +160,12 @@
           <input type="hidden" name="set_only_member_qty_{{ loop.index0 }}" value="{{ member.quantity }}">
         </td>
         <td>{{ member.set_name }}</td>
-        <td>{{ member.member_name }}</td>
+        <td>
+          {{ member.member_name }}
+          {% if member.member_sku %}
+            <span class="badge badge-info mono" style="margin-left:.35rem">{{ member.member_sku }}</span>
+          {% endif %}
+        </td>
         <td class="mono">{{ member.quantity }}</td>
         <td><span class="badge badge-off-catalog">Set-only</span></td>
         <td>{% if member.set_sku %}<span class="mono small">{{ member.set_sku }}</span>{% endif %}</td>

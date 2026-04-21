@@ -1362,7 +1362,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "member_quantities": {"NS-1": 2},
                 "member_entries": [
                     {"sku": "NS-1", "name": "New Sync Knife", "quantity": 2},
-                    {"sku": "", "name": "Set Only Turner", "quantity": 1, "is_set_only": True},
+                    {"sku": "BT-1", "name": "Set Only Turner", "quantity": 1, "is_set_only": True},
                 ],
             }
         ]
@@ -1389,6 +1389,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Sync Set", response.data)
         self.assertIn(b"Set-Only Members", response.data)
         self.assertIn(b"Set Only Turner", response.data)
+        self.assertIn(b"BT-1", response.data)
 
     def test_catalog_sync_uses_populates_tasks(self):
         self._login_as_admin()
