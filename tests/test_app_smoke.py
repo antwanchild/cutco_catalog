@@ -735,6 +735,118 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Missing required headers: name", response.data)
         self.assertIn(b"No ownership/status column found", response.data)
 
+    def test_import_preview_csv_and_error_paths(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        existing_item_id, _existing_variant_id = self._add_catalog_item(name="Import Existing Knife", sku="IM-EX-1")
+        self._add_person(name="Import Existing Collector", notes="")
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,color,Owned?,person,Price,Gift Box,Sheath,Quantity Purchased,Given Away\n"
+                        b"Import Existing Knife,IM-EX-1,Classic Brown,yes,Import Existing Collector,12.50,yes,Leather,2,n/a\n"
+                        b"Import New Knife,IM-NEW-1,Pearl White,no,New Collector,34.00,,,,\n"
+                    ),
+                    "preview.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Import Preview", preview_response.data)
+        self.assertIn(b"Import Existing Knife", preview_response.data)
+        self.assertIn(b"Import New Knife", preview_response.data)
+        self.assertIn(b"Classic Brown", preview_response.data)
+
+        invalid_check_response = self.client.post(
+            "/import",
+            data={
+                "mode": "check",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(b"this is not a workbook"),
+                    "broken.xlsx",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(invalid_check_response.status_code, 200)
+        self.assertIn(b"Could not read headers from this file", invalid_check_response.data)
+
+        empty_upload_response = self.client.post(
+            "/import",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(empty_upload_response.status_code, 200)
+        self.assertIn(b"Please choose a file.", empty_upload_response.data)
+
+        confirm_response = self.client.post(
+            "/import/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_count": "1",
+                "own_count": "1",
+                "total_rows": "3",
+                "item_accept_0": "on",
+                "item_row_0": "2",
+                "item_name_0": "Imported Confirm Knife",
+                "item_sku_0": "IM-CF-1",
+                "item_color_0": "Classic Brown",
+                "item_edge_0": "Straight",
+                "item_category_0": "Kitchen Knives",
+                "item_notes_0": "Imported from confirm",
+                "item_person_0": "Confirm Collector",
+                "item_status_0": "Owned",
+                "item_sets_0": "Confirm Set",
+                "item_sku_unicorn_0": "on",
+                "item_variant_unicorn_0": "on",
+                "item_edge_unicorn_0": "on",
+                "own_accept_0": "on",
+                "own_row_0": "3",
+                "own_item_id_0": str(existing_item_id),
+                "own_item_name_0": "Import Existing Knife",
+                "own_item_sku_0": "IM-EX-1",
+                "own_person_0": "Import Existing Collector",
+                "own_color_0": "Classic Brown",
+                "own_status_0": "Wishlist",
+                "own_notes_0": "Existing ownership",
+                "own_sku_unicorn_0": "",
+                "own_variant_unicorn_0": "",
+                "own_edge_unicorn_0": "",
+                "error_count": "1",
+                "error_row_0": "4",
+                "error_name_0": "Broken Row",
+                "error_sku_0": "BR-1",
+                "error_reason_0": "Could not parse row.",
+                "conflict_count": "1",
+                "conflict_row_0": "5",
+                "conflict_item_0": "Import Existing Knife",
+                "conflict_sku_0": "IM-EX-1",
+                "conflict_person_0": "Import Existing Collector",
+                "conflict_existing_status_0": "Owned",
+                "conflict_import_status_0": "Wishlist",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(confirm_response.status_code, 200)
+        self.assertIn(b"Import complete", confirm_response.data)
+        self.assertIn(b"Could not parse row.", confirm_response.data)
+        self.assertIn(b"kept unchanged", confirm_response.data)
+        with self.app.app_context():
+            confirm_item = db.session.execute(
+                db.select(Item).filter_by(sku="IM-CF-1")
+            ).scalar_one()
+            self.assertEqual(confirm_item.msrp, None)
+            confirm_set = db.session.execute(db.select(Set).filter_by(name="Confirm Set")).scalar_one()
+            self.assertEqual(confirm_set.members[0].quantity, 1)
+
 
 class PeopleSmokeTests(SmokeBaseTest):
     def test_people_add_creates_a_record(self):
@@ -881,6 +993,27 @@ class PeopleSmokeTests(SmokeBaseTest):
 
 
 class CatalogSmokeTests(SmokeBaseTest):
+    def test_catalog_page_filters_and_forms_render(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _variant_id = self._add_catalog_item(name="Filter Knife", sku="FL-1", category="Kitchen Knives")
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            item.is_unicorn = True
+            db.session.commit()
+
+        catalog_response = self.client.get("/catalog?q=Filter&category=Kitchen+Knives&unicorn=1&sort=sku&dir=desc")
+        add_page_response = self.client.get("/catalog/add")
+        edit_page_response = self.client.get(f"/catalog/{item_id}/edit")
+
+        self.assertEqual(catalog_response.status_code, 200)
+        self.assertIn(b"Filter Knife", catalog_response.data)
+        self.assertEqual(add_page_response.status_code, 200)
+        self.assertIn(b"Add Item", add_page_response.data)
+        self.assertEqual(edit_page_response.status_code, 200)
+        self.assertIn(b"Filter Knife", edit_page_response.data)
+
     def test_catalog_add_and_edit_item(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -1070,6 +1203,48 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn("Slice onions", task_names)
             self.assertIn("Peel potatoes", task_names)
 
+    def test_catalog_sync_confirm_creates_items_and_sets(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        existing_item_id, _existing_variant_id = self._add_catalog_item(name="Sync Existing Knife", sku="SX-EX-1")
+        existing_set_id = self._add_set(name="Sync Existing Set", sku="SX-SET-1", item_ids=(existing_item_id,))
+
+        response = self.client.post(
+            "/catalog/sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "selected_skus": ["SX-NEW-1"],
+                "name_SX-NEW-1": "Sync New Knife",
+                "category_SX-NEW-1": "Kitchen Knives",
+                "url_SX-NEW-1": "https://example.com/sync-new",
+                "edge_type_SX-NEW-1": "Straight",
+                "msrp_SX-NEW-1": "not-a-number",
+                "blade_length_SX-NEW-1": "4 in",
+                "overall_length_SX-NEW-1": "8 in",
+                "weight_SX-NEW-1": "1 lb",
+                "selected_sets": ["Sync New Set"],
+                "set_count": "1",
+                "set_name_0": "Sync New Set",
+                "set_sku_0": "SX-SET-NEW",
+                "set_members_0": "SX-NEW-1",
+                "set_member_qtys_0": "SX-NEW-1:2",
+                "existing_set_count": "1",
+                "existing_set_name_0": "Sync Existing Set",
+                "existing_set_member_qtys_0": "SX-EX-1:3",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            new_item = db.session.execute(db.select(Item).filter_by(sku="SX-NEW-1")).scalar_one()
+            self.assertIsNone(new_item.msrp)
+            new_set = db.session.execute(db.select(Set).filter_by(name="Sync New Set")).scalar_one()
+            self.assertEqual(new_set.members[0].quantity, 2)
+            existing_set = db.session.get(Set, existing_set_id)
+            self.assertEqual(existing_set.members[0].quantity, 3)
+
     def test_catalog_purge_and_delete_routes(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -1186,6 +1361,228 @@ class OwnershipSmokeTests(SmokeBaseTest):
 
 
 class LogSmokeTests(SmokeBaseTest):
+    def test_log_pages_render_and_notifications(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        sharpening_item_id, _ = self._add_catalog_item(name="Sharpen Page Knife", sku="SR-1")
+        cookware_item_id, _ = self._add_catalog_item(name="Cookware Page Knife", sku="CW-1", category="Cookware")
+        task_item_id, _ = self._add_catalog_item(name="Task Page Knife", sku="TP-1")
+        task_id = self._add_task(name="Slice onions")
+
+        self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(sharpening_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "Page check",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/cookware/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(cookware_item_id),
+                "used_on": "2026-04-15",
+                "made_item": "Soup",
+                "rating": "4",
+                "notes": "Page check",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/tasks/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(task_item_id),
+                "task_id": str(task_id),
+                "logged_on": "2026-04-15",
+                "notes": "Page check",
+            },
+            follow_redirects=False,
+        )
+
+        sharpening_page = self.client.get("/sharpening")
+        cookware_page = self.client.get("/cookware")
+        tasks_page = self.client.get("/tasks")
+        tasks_manage_page = self.client.get("/tasks/manage")
+        task_detail_page = self.client.get(f"/tasks/manage/{task_id}")
+
+        self.assertEqual(sharpening_page.status_code, 200)
+        self.assertIn(b"Sharpening Log", sharpening_page.data)
+        self.assertEqual(cookware_page.status_code, 200)
+        self.assertIn(b"Cookware", cookware_page.data)
+        self.assertEqual(tasks_page.status_code, 200)
+        self.assertIn(b"Knife Task Log", tasks_page.data)
+        self.assertEqual(tasks_manage_page.status_code, 200)
+        self.assertIn(b"Manage Knife Tasks", tasks_manage_page.data)
+        self.assertEqual(task_detail_page.status_code, 200)
+        self.assertIn(b"Slice onions", task_detail_page.data)
+
+        with mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", "https://example.com/webhook"), \
+             mock.patch("blueprints.logs.SHARPEN_THRESHOLD_DAYS", 1), \
+             mock.patch("blueprints.logs.COOKWARE_THRESHOLD_DAYS", 1), \
+             mock.patch("blueprints.logs._notify_discord") as notify_mock:
+            sharpen_notify_response = self.client.post(
+                "/sharpening/notify",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
+            cook_notify_response = self.client.post(
+                "/cookware/notify",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(sharpen_notify_response.status_code, 302)
+        self.assertEqual(cook_notify_response.status_code, 302)
+        self.assertGreaterEqual(notify_mock.call_count, 2)
+
+    def test_log_validation_and_no_notification_paths(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        sharpening_item_id, _ = self._add_catalog_item(name="Validation Sharpen Knife", sku="VL-1")
+        cookware_item_id, _ = self._add_catalog_item(name="Validation Cookware Knife", sku="VC-1", category="Cookware")
+        task_item_id, _ = self._add_catalog_item(name="Validation Task Knife", sku="VT-1")
+        task_id = self._add_task(name="Slice carrots")
+
+        sharpen_edit = self.client.get("/sharpening")
+        cookware_edit = self.client.get("/cookware")
+        self.assertEqual(sharpen_edit.status_code, 200)
+        self.assertEqual(cookware_edit.status_code, 200)
+
+        missing_sharpen_date = self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(sharpening_item_id),
+                "sharpened_on": "",
+                "method": "Whetstone",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        invalid_sharpen_date = self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(sharpening_item_id),
+                "sharpened_on": "2026-99-99",
+                "method": "Whetstone",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(missing_sharpen_date.status_code, 302)
+        self.assertEqual(invalid_sharpen_date.status_code, 302)
+
+        missing_cookware_fields = self.client.post(
+            "/cookware/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": "",
+                "used_on": "2026-04-15",
+                "made_item": "",
+                "rating": "7",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        invalid_cookware_date = self.client.post(
+            "/cookware/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(cookware_item_id),
+                "used_on": "2026-99-99",
+                "made_item": "Soup",
+                "rating": "bogus",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(missing_cookware_fields.status_code, 302)
+        self.assertEqual(invalid_cookware_date.status_code, 302)
+
+        missing_task_fields = self.client.post(
+            "/tasks/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": "",
+                "task_id": "",
+                "logged_on": "",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        invalid_task_date = self.client.post(
+            "/tasks/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(task_item_id),
+                "task_id": str(task_id),
+                "logged_on": "2026-99-99",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(missing_task_fields.status_code, 302)
+        self.assertEqual(invalid_task_date.status_code, 302)
+
+        with self.app.app_context():
+            sharpen_entry = db.session.execute(db.select(SharpeningLog).filter_by(item_id=sharpening_item_id)).first()
+            cookware_entry = db.session.execute(db.select(CookwareSession).filter_by(item_id=cookware_item_id)).first()
+            task_entry = db.session.execute(db.select(KnifeTaskLog).filter_by(item_id=task_item_id)).first()
+
+        self.assertIsNone(sharpen_entry)
+        self.assertIsNone(cookware_entry)
+        self.assertIsNone(task_entry)
+
+        with self.app.app_context():
+            self.client.post(
+                "/sharpening/add",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "item_id": str(sharpening_item_id),
+                    "sharpened_on": "2026-04-20",
+                    "method": "Home Sharpener",
+                    "notes": "Recent sharpen",
+                },
+                follow_redirects=False,
+            )
+            self.client.post(
+                "/cookware/add",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "item_id": str(cookware_item_id),
+                    "used_on": "2026-04-20",
+                    "made_item": "Soup",
+                    "rating": "4",
+                    "notes": "Recent use",
+                },
+                follow_redirects=False,
+            )
+
+        with mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", None), \
+             mock.patch("blueprints.logs.SHARPEN_THRESHOLD_DAYS", 999), \
+             mock.patch("blueprints.logs.COOKWARE_THRESHOLD_DAYS", 999):
+            no_sharpen_notify = self.client.post(
+                "/sharpening/notify",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
+            no_cook_notify = self.client.post(
+                "/cookware/notify",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(no_sharpen_notify.status_code, 302)
+        self.assertEqual(no_cook_notify.status_code, 302)
+
     def test_sharpening_add_edit_and_delete(self):
         self._login_as_admin()
         self._set_csrf_token()
