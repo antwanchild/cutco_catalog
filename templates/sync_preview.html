@@ -124,7 +124,7 @@
               {{ member.sku or '—' }}
               {% set qty = member.quantity or 1 %}
               {% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}
-            </span>{% if not loop.last %}, {% endif %}
+            </span>{%- if not loop.last %}, {% endif -%}
           {% endfor %}
           {% if item_set.missing_member_skus %}
             <div class="muted small">Missing item numbers: {% for sku in item_set.missing_member_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</div>
@@ -159,8 +159,8 @@
           {% for member in item_set.member_snapshot_rows %}
             <span class="mono small" {% if member.name %}title="{{ member.name }}"{% endif %}>
               {{ member.sku or '—' }}
-              {% if member.quantity > 1 %} <span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}
-            </span>{% if not loop.last %}, {% endif %}
+              {% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}
+            </span>{%- if not loop.last %}, {% endif -%}
           {% endfor %}
         </td>
         <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
