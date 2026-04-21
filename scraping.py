@@ -168,7 +168,7 @@ def _member_hover_title(member_name: str | None) -> str | None:
     return title or None
 
 
-def _infer_visible_member_sku(member_name: str | None) -> str | None:
+def _infer_visible_member_sku(member_name: str | None, *, context_url: str | None = None) -> str | None:
     name = str(member_name or "").strip()
     if not name:
         return None
@@ -194,6 +194,10 @@ def _infer_visible_member_sku(member_name: str | None) -> str | None:
             candidate_slugs.append(compact_slug)
     for candidate_slug in candidate_slugs:
         inferred_sku, _ = _fetch_sku_from_page(f"https://www.cutco.com/p/{candidate_slug}", preserve_lettered_code=True)
+        if inferred_sku:
+            return inferred_sku
+    if context_url and "box" in lower:
+        inferred_sku, _ = _fetch_sku_from_page(context_url, preserve_lettered_code=True)
         if inferred_sku:
             return inferred_sku
     return None
@@ -289,9 +293,9 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
 
         # Strategy 5: on-page visible text containing "#XXXX"
         if not sku:
-            sku_text = soup.find(string=re.compile(r"#\d{2,4}(?:-\d+|[A-Z]?)?\b"))
+            sku_text = soup.find(string=re.compile(r"#\d{2,4}(?:-\d+|[A-Z]{0,2})?\b"))
             if sku_text:
-                sku_match = re.search(r"#(\d{2,4}(?:-\d+|[A-Z]?)?)\b", sku_text.strip(), re.IGNORECASE)
+                sku_match = re.search(r"#(\d{2,4}(?:-\d+|[A-Z]{0,2})?)\b", sku_text.strip(), re.IGNORECASE)
                 if sku_match:
                     sku = sku_match.group(1).upper()
                     strategy_log.append(f"visible-text={sku}")
@@ -300,7 +304,7 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
         if not sku:
             page_text = soup.get_text(" ", strip=True)
             sku_match = re.search(
-                r"(?:model|item|sku|product)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{2,4}(?:-\d+|[A-Z]?)?)\b",
+                r"(?:model|item|sku|product)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{2,4}(?:-\d+|[A-Z]{0,2})?)\b",
                 page_text, re.IGNORECASE)
             if sku_match:
                 sku = sku_match.group(1).upper()
@@ -313,8 +317,8 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
             if stripped and stripped.isdigit() and len(stripped) >= 2:
                 sku = stripped
 
-        # Reject CSS hex colors
-        if sku and re.fullmatch(r"[0-9A-F]{6}", sku, re.IGNORECASE):
+        # Reject CSS hex colors, but keep valid Cutco codes like 2130CD.
+        if sku and re.fullmatch(r"[0-9A-F]{6}", sku, re.IGNORECASE) and not sku[0].isdigit():
             sku = None
 
         page_heading = soup.find("h1")
@@ -747,7 +751,7 @@ def scrape_sets(
                                 if visible_sku:
                                     break
                         if not visible_sku:
-                            visible_sku = _infer_visible_member_sku(visible_name)
+                            visible_sku = _infer_visible_member_sku(visible_name, context_url=set_link["url"])
                         visible_rows.append({
                             "name": visible_name,
                             "sku": visible_sku,

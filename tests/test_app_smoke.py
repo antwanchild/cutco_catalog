@@ -671,6 +671,18 @@ class UtilitySmokeTests(SmokeBaseTest):
         with mock.patch("scraping.requests.get", return_value=response):
             self.assertEqual(_infer_visible_member_sku('4" Paring Knife Sheath'), "2120-2")
 
+    def test_infer_visible_member_sku_supports_generic_box_rows(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body><h1>#2130CD</h1><h1>Wine & Cheese Set</h1></body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            self.assertEqual(
+                _infer_visible_member_sku("Gift Box", context_url="https://www.cutco.com/p/wine-cheese-gift-set"),
+                "2130CD",
+            )
+
     def test_build_set_member_entries_uses_visible_row_skus(self):
         structured_members = [{"sku": "777", "name": "Super Shears", "quantity": 1}]
         visible_rows = [
