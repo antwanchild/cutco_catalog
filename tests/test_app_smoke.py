@@ -742,13 +742,13 @@ class UtilitySmokeTests(SmokeBaseTest):
             """
             <ul>
               <li class="pdp-piece">
-                <a class="pdp-set-item-detail" data-item="1720C" data-item-selected="1720C" href="#">
+                <a class="pdp-set-item-detail" data-item="paring-knife" data-item-selected="1720C" href="#">
                   <img alt='2-3/4" Paring Knife' src="https://images.cutco.com/products/rolo/1720C-h.jpg?width=800"/>
                   <span class="pdp-use-detail">2-3/4" Paring Knife </span>
                 </a>
               </li>
               <li class="pdp-piece">
-                <a class="pdp-set-item-detail" data-item="1721C" data-item-selected="1721C" href="#">
+                <a class="pdp-set-item-detail" data-item="trimmer" data-item-selected="1721C" href="#">
                   <img alt="Trimmer" src="https://images.cutco.com/products/rolo/1721C-h.jpg?width=800"/>
                   <span class="pdp-use-detail">Trimmer </span>
                 </a>

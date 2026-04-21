@@ -258,7 +258,9 @@ def _collect_visible_set_piece_rows(pieces_list, *, context_url: str | None = No
             visible_name = image.get("alt", "").strip() if image else ""
         if not visible_name:
             continue
-        visible_sku = _normalize_set_member_sku(anchor.get("data-item"))
+        visible_sku = _normalize_set_member_sku(anchor.get("data-item-selected"))
+        if not visible_sku:
+            visible_sku = _normalize_set_member_sku(_extract_sku_from_image_src(anchor.find("img", src=True).get("src") if anchor.find("img", src=True) else None))
         if not visible_sku:
             href = anchor.get("href") or ""
             visible_sku = _resolve_visible_member_sku(
@@ -282,7 +284,7 @@ def _collect_visible_set_piece_rows(pieces_list, *, context_url: str | None = No
             visible_name = image.get("alt", "").strip() if image else ""
         if not visible_name:
             continue
-        visible_sku = _extract_sku_from_image_src(li.find("img", src=True).get("src") if li.find("img", src=True) else None)
+        visible_sku = _normalize_set_member_sku(_extract_sku_from_image_src(li.find("img", src=True).get("src") if li.find("img", src=True) else None))
         if not visible_sku:
             visible_sku = _resolve_visible_member_sku(None, visible_name, context_url=context_url, set_sku=set_sku)
         visible_rows.append({
