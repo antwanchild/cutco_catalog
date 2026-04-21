@@ -208,18 +208,52 @@ def bulk_status_update(person_id):
     if not db.session.get(Person, person_id):
         abort(404)
     selected = request.form.getlist("ownership_ids", type=int)
-    new_status = request.form.get("bulk_status", "").strip()
-    if not selected or new_status not in STATUS_OPTIONS:
-        flash("Select at least one entry and a valid status.", "error")
+    bulk_action = request.form.get("bulk_action", "status").strip()
+    if not selected:
+        flash("Select at least one entry first.", "error")
         return redirect(url_for("people.person_collection", person_id=person_id))
+
     updated = (Ownership.query
                .filter(Ownership.id.in_(selected), Ownership.person_id == person_id)
                .all())
-    for ownership in updated:
-        ownership.status = new_status
+    if bulk_action == "status":
+        new_status = request.form.get("bulk_status", "").strip()
+        if new_status not in STATUS_OPTIONS:
+            flash("Select at least one entry and a valid status.", "error")
+            return redirect(url_for("people.person_collection", person_id=person_id))
+        for ownership in updated:
+            ownership.status = new_status
+        summary = f"Updated {len(updated)} entr{'y' if len(updated) == 1 else 'ies'} to {new_status}."
+        log_message = f"Bulk status update: person {person_id}, {len(updated)} entries → {new_status}"
+    elif bulk_action == "target":
+        raw_target = request.form.get("bulk_target_price", "").strip()
+        try:
+            target_price = float(raw_target) if raw_target else None
+        except ValueError:
+            flash("Enter a valid target price or leave it blank to clear.", "error")
+            return redirect(url_for("people.person_collection", person_id=person_id))
+        for ownership in updated:
+            ownership.target_price = target_price
+            if target_price is not None and ownership.status != "Wishlist":
+                ownership.status = "Wishlist"
+        if target_price is None:
+            summary = f"Cleared target price for {len(updated)} entr{'y' if len(updated) == 1 else 'ies'}."
+            log_message = f"Bulk target clear: person {person_id}, {len(updated)} entries"
+        else:
+            summary = f"Set target price to ${target_price:.2f} for {len(updated)} entr{'y' if len(updated) == 1 else 'ies'}."
+            log_message = f"Bulk target update: person {person_id}, {len(updated)} entries → {target_price:.2f}"
+    elif bulk_action == "delete":
+        for ownership in updated:
+            db.session.delete(ownership)
+        summary = f"Deleted {len(updated)} entr{'y' if len(updated) == 1 else 'ies'}."
+        log_message = f"Bulk ownership delete: person {person_id}, {len(updated)} entries"
+    else:
+        flash("Choose a valid bulk action.", "error")
+        return redirect(url_for("people.person_collection", person_id=person_id))
+
     if db_commit(db.session):
-        logger.info("Bulk status update: person %d, %d entries → %s", person_id, len(updated), new_status)
-        flash(f"Updated {len(updated)} entr{'y' if len(updated) == 1 else 'ies'} to {new_status}.", "success")
+        logger.info(log_message)
+        flash(summary, "success")
     return redirect(url_for("people.person_collection", person_id=person_id))
 
 

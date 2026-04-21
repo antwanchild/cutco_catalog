@@ -67,15 +67,27 @@
 {# ── Bulk action bar ───────────────────────────────────────────────────────── #}
 <div class="bulk-bar" id="bulk-bar">
   <span class="bulk-count" id="bulk-count">0 selected</span>
-  <label class="flex-center">
-    Change status to:
-    <select name="bulk_status" class="input-sm">
+  <label class="flex-center bulk-field" data-bulk-field="action">
+    Bulk action:
+    <select name="bulk_action" class="input-sm" id="bulk-action">
+      <option value="status">Change status</option>
+      <option value="target">Set target price</option>
+      <option value="delete">Delete selected</option>
+    </select>
+  </label>
+  <label class="flex-center bulk-field" data-bulk-field="status">
+    Status:
+    <select name="bulk_status" class="input-sm" id="bulk-status">
       {% for status_option in status_options %}
         <option value="{{ status_option }}">{{ status_option }}</option>
       {% endfor %}
     </select>
   </label>
-  <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+  <label class="flex-center bulk-field hidden" data-bulk-field="target">
+    Target price:
+    <input type="number" name="bulk_target_price" id="bulk-target" class="input-sm" step="0.01" min="0" placeholder="Optional">
+  </label>
+  <button type="submit" class="btn btn-primary btn-sm" id="bulk-submit">Apply status</button>
   <button type="button" class="btn btn-ghost btn-sm" id="bulk-cancel">Cancel</button>
 </div>
 </form>
@@ -86,6 +98,46 @@
   var checks    = document.querySelectorAll('.row-check');
   var bar       = document.getElementById('bulk-bar');
   var countEl   = document.getElementById('bulk-count');
+  var actionSel = document.getElementById('bulk-action');
+  var statusField = document.querySelector('[data-bulk-field="status"]');
+  var targetField = document.querySelector('[data-bulk-field="target"]');
+  var submitBtn = document.getElementById('bulk-submit');
+  var targetInput = document.getElementById('bulk-target');
+  var statusInput = document.getElementById('bulk-status');
+
+  function syncBulkControls() {
+    var action = actionSel.value;
+    statusField.classList.toggle('hidden', action !== 'status');
+    targetField.classList.toggle('hidden', action !== 'target');
+    submitBtn.classList.toggle('btn-danger', action === 'delete');
+    submitBtn.classList.toggle('btn-primary', action !== 'delete');
+
+    if (action === 'status') {
+      submitBtn.textContent = 'Apply status';
+      submitBtn.dataset.confirmTitle = '';
+      submitBtn.dataset.confirmMessage = '';
+      submitBtn.dataset.confirmPreview = '';
+      submitBtn.dataset.confirmButton = '';
+      statusInput.disabled = false;
+      targetInput.disabled = true;
+    } else if (action === 'target') {
+      submitBtn.textContent = 'Set target';
+      submitBtn.dataset.confirmTitle = '';
+      submitBtn.dataset.confirmMessage = '';
+      submitBtn.dataset.confirmPreview = '';
+      submitBtn.dataset.confirmButton = '';
+      statusInput.disabled = true;
+      targetInput.disabled = false;
+    } else {
+      submitBtn.textContent = 'Delete selected';
+      submitBtn.dataset.confirmTitle = 'Delete selected entries';
+      submitBtn.dataset.confirmMessage = 'This will remove the selected ownership entries.';
+      submitBtn.dataset.confirmPreview = 'Selected ownership entries will be deleted.';
+      submitBtn.dataset.confirmButton = 'Delete entries';
+      statusInput.disabled = true;
+      targetInput.disabled = true;
+    }
+  }
 
   function updateBar() {
     var n = document.querySelectorAll('.row-check:checked').length;
@@ -100,12 +152,15 @@
     updateBar();
   });
   checks.forEach(function(c) { c.addEventListener('change', updateBar); });
+  actionSel.addEventListener('change', syncBulkControls);
 
   document.getElementById('bulk-cancel').addEventListener('click', function() {
     checks.forEach(function(c) { c.checked = false; });
     selectAll.checked = false;
     updateBar();
   });
+
+  syncBulkControls();
 })();
 </script>
 
