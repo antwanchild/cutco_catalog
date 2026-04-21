@@ -701,12 +701,20 @@ def scrape_sets(
                         visible_name = li.get_text(" ", strip=True)
                         if not visible_name:
                             continue
+                        visible_sku = None
+                        for anchor in li.find_all("a", href=True):
+                            href = anchor.get("href") or ""
+                            if "/p/" in href:
+                                visible_sku = _extract_sku_from_href(href)
+                                if visible_sku:
+                                    break
                         has_standalone_product = any(
                             "/p/" in (anchor.get("href") or "")
                             for anchor in li.find_all("a", href=True)
                         )
                         visible_rows.append({
                             "name": visible_name,
+                            "sku": visible_sku,
                             "is_set_only": not has_standalone_product,
                         })
             if visible_rows:
@@ -733,7 +741,7 @@ def scrape_sets(
                             break
                     if matched_index is not None:
                         used_structured.add(matched_index)
-                    fallback_sku = member_skus[idx] if idx < len(member_skus) else None
+                    fallback_sku = visible_row.get("sku") or (member_skus[idx] if idx < len(member_skus) else None)
                     fallback_qty = member_quantities.get(fallback_sku, 1) if fallback_sku else 1
                     member_entries.append(dict(
                         sku=matched_structured["sku"] if matched_structured else fallback_sku,

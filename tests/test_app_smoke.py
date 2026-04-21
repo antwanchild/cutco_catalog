@@ -620,6 +620,25 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(_member_hover_title("Super Shears"), "Super Shears")
         self.assertIsNone(_member_hover_title(""))
 
+    def test_build_set_member_entries_uses_visible_row_skus(self):
+        structured_members = [{"sku": "777", "name": "Super Shears", "quantity": 1}]
+        visible_rows = [
+            {"name": "Super Shears", "sku": "777", "is_set_only": False},
+            {"name": "Gift Box", "sku": "123", "is_set_only": True},
+        ]
+
+        member_entries = _build_set_member_entries(
+            structured_members,
+            visible_rows,
+            ["777", "123"],
+            {"777": 1, "123": 1},
+        )
+
+        self.assertEqual(member_entries[0]["sku"], "777")
+        self.assertEqual(member_entries[0]["name"], "Super Shears")
+        self.assertEqual(member_entries[1]["sku"], "123")
+        self.assertEqual(member_entries[1]["name"], "Gift Box")
+
     def test_admin_diagnostics_shows_schema_target(self):
         self._login_as_admin()
 
