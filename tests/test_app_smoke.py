@@ -1555,9 +1555,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "set_count": "1",
                 "set_name_0": "Sync New Set",
                 "set_sku_0": "SX-SET-NEW",
-                "set_members_0": "SX-NEW-1|SX-MISS-1",
-                "set_member_qtys_0": "SX-NEW-1:2|SX-MISS-1:1",
-                "set_member_data_0": json.dumps(
+                "set_member_entries_0": json.dumps(
                     [
                         {"sku": "SX-NEW-1", "name": "Sync New Knife", "quantity": 2},
                         {"sku": "SX-MISS-1", "name": "Sync Missing Knife", "quantity": 1},
@@ -1566,9 +1564,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "create_missing_set_members": "on",
                 "existing_set_count": "1",
                 "existing_set_name_0": "Sync Existing Set",
-                "existing_set_member_skus_0": "SX-EX-1|SX-EX-MISS-1",
-                "existing_set_member_qtys_0": "SX-EX-1:3|SX-EX-MISS-1:1",
-                "existing_set_member_data_0": json.dumps(
+                "existing_set_member_entries_0": json.dumps(
                     [
                         {"sku": "SX-EX-1", "name": "Sync Existing Knife", "quantity": 3},
                         {"sku": "SX-EX-MISS-1", "name": "Sync Existing Missing Knife", "quantity": 1},

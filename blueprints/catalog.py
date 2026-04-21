@@ -828,19 +828,24 @@ def catalog_sync_confirm():
         set_name = request.form.get(f"set_name_{index}", "").strip()
         if not set_name or set_name not in selected_sets:
             continue
-        member_skus = [raw.strip() for raw in
-                       request.form.get(f"set_members_{index}", "").split("|") if raw.strip()]
-        member_qtys = {}
-        for raw_pair in request.form.get(f"set_member_qtys_{index}", "").split("|"):
-            if ":" in raw_pair:
-                sku_part, qty_part = raw_pair.split(":", 1)
-                try:
-                    member_qtys[sku_part.strip()] = int(qty_part.strip())
-                except ValueError:
-                    pass
+        member_entries_raw = request.form.get(f"set_member_entries_{index}", "").strip()
+        member_entries = _load_member_snapshot(member_entries_raw) if member_entries_raw else []
+        if not member_entries:
+            legacy_member_skus = [raw.strip() for raw in
+                                  request.form.get(f"set_members_{index}", "").split("|") if raw.strip()]
+            legacy_member_qtys = {}
+            for raw_pair in request.form.get(f"set_member_qtys_{index}", "").split("|"):
+                if ":" in raw_pair:
+                    sku_part, qty_part = raw_pair.split(":", 1)
+                    try:
+                        legacy_member_qtys[sku_part.strip()] = int(qty_part.strip())
+                    except ValueError:
+                        pass
+            member_entries = [
+                {"sku": sku, "quantity": legacy_member_qtys.get(sku, 1), "name": None}
+                for sku in legacy_member_skus
+            ]
         set_sku = request.form.get(f"set_sku_{index}", "").strip() or None
-        member_data_raw = request.form.get(f"set_member_data_{index}", "").strip()
-        member_data = _load_member_snapshot(member_data_raw) if member_data_raw else []
 
         pre_existing_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         item_set = get_or_create_set(set_name)
@@ -848,26 +853,22 @@ def catalog_sync_confirm():
             added_sets += 1
         if set_sku and not item_set.sku:
             item_set.sku = set_sku
-        if member_data_raw:
-            item_set.member_data = json.dumps(member_data, ensure_ascii=False)
+        if member_entries_raw:
+            item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
 
         existing_members = {membership.item_id: membership for membership in item_set.members}
-        member_data_lookup = {
-            _normalize_member_sku(member.get("sku")): member
-            for member in member_data
-            if _normalize_member_sku(member.get("sku"))
-        }
-        for member_sku in member_skus:
+        for member in member_entries:
+            member_sku = _normalize_member_sku(member.get("sku"))
+            if not member_sku:
+                continue
             item = sku_to_item.get(member_sku.upper())
             if not item and create_missing_set_members:
-                member = member_data_lookup.get(_normalize_member_sku(member_sku))
-                if member:
-                    item = _create_missing_set_member_item(member, set_name)
-                    sku_to_item[item.sku.upper()] = item
-                    created_missing_items += 1
+                item = _create_missing_set_member_item(member, set_name)
+                sku_to_item[item.sku.upper()] = item
+                created_missing_items += 1
             if not item:
                 continue
-            qty = member_qtys.get(member_sku, 1)
+            qty = max(1, int(member.get("quantity") or 1))
             if item.id not in existing_members:
                 db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
                 linked_items += 1
@@ -886,23 +887,31 @@ def catalog_sync_confirm():
         item_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         if not item_set:
             continue
-        member_skus = [raw.strip() for raw in
-                       request.form.get(f"existing_set_member_skus_{index}", "").split("|") if raw.strip()]
-        member_data_raw = request.form.get(f"existing_set_member_data_{index}", "").strip()
-        member_data = _load_member_snapshot(member_data_raw) if member_data_raw else []
-        member_data_lookup = {
-            _normalize_member_sku(member.get("sku")): member
-            for member in member_data
+        member_entries_raw = request.form.get(f"existing_set_member_entries_{index}", "").strip()
+        member_entries = _load_member_snapshot(member_entries_raw) if member_entries_raw else []
+        if not member_entries:
+            legacy_member_skus = [raw.strip() for raw in
+                                  request.form.get(f"existing_set_member_skus_{index}", "").split("|") if raw.strip()]
+            legacy_member_qtys = {}
+            for raw_pair in request.form.get(f"existing_set_member_qtys_{index}", "").split("|"):
+                if ":" in raw_pair:
+                    sku_part, qty_part = raw_pair.split(":", 1)
+                    try:
+                        legacy_member_qtys[sku_part.strip()] = int(qty_part.strip())
+                    except ValueError:
+                        pass
+            member_entries = [
+                {"sku": sku, "quantity": legacy_member_qtys.get(sku, 1), "name": None}
+                for sku in legacy_member_skus
+            ]
+        if member_entries_raw:
+            item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
+
+        member_qtys = {
+            _normalize_member_sku(member.get("sku")): max(1, int(member.get("quantity") or 1))
+            for member in member_entries
             if _normalize_member_sku(member.get("sku"))
         }
-        member_qtys = {}
-        for raw_pair in request.form.get(f"existing_set_member_qtys_{index}", "").split("|"):
-            if ":" in raw_pair:
-                sku_part, qty_part = raw_pair.split(":", 1)
-                try:
-                    member_qtys[sku_part.strip()] = int(qty_part.strip())
-                except ValueError:
-                    pass
         for member in item_set.members:
             item = db.session.get(Item, member.item_id)
             if item and item.sku:
@@ -910,24 +919,19 @@ def catalog_sync_confirm():
                 if member.quantity != new_qty:
                     member.quantity = new_qty
                     qty_updates += 1
-        if create_missing_set_members and member_skus:
+        if create_missing_set_members and member_entries:
             existing_member_ids = {member.item_id for member in item_set.members}
-            for member_sku in member_skus:
-                sku = _normalize_member_sku(member_sku)
+            for member in member_entries:
+                sku = _normalize_member_sku(member.get("sku"))
                 if not sku:
                     continue
                 item = sku_to_item.get(sku)
                 if not item:
-                    member = member_data_lookup.get(sku)
-                    if not member:
-                        member = {"sku": sku, "name": None, "quantity": member_qtys.get(sku, 1)}
                     item = _create_missing_set_member_item(member, set_name)
                     sku_to_item[item.sku.upper()] = item
                     created_existing_missing_items += 1
                 if item.id not in existing_member_ids:
                     db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=member_qtys.get(sku, 1) or 1))
-        if member_data_raw:
-            item_set.member_data = json.dumps(member_data, ensure_ascii=False)
 
     db_commit(db.session)
     logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates, %d placeholders",

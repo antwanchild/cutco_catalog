@@ -24,9 +24,7 @@
   <input type="hidden" name="existing_set_count" value="{{ existing_sets_data | length }}">
   {% for item_set in existing_sets_data %}
   <input type="hidden" name="existing_set_name_{{ loop.index0 }}" value="{{ item_set.name }}">
-  <input type="hidden" name="existing_set_member_skus_{{ loop.index0 }}" value="{{ item_set.member_skus | join('|') }}">
-  <input type="hidden" name="existing_set_member_qtys_{{ loop.index0 }}" value="{{ item_set.member_quantities.items() | map('join', ':') | join('|') }}">
-  <input type="hidden" name="existing_set_member_data_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
+  <input type="hidden" name="existing_set_member_entries_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
   {% endfor %}
 
   {# ── New Items #}
@@ -117,8 +115,7 @@
           <input type="checkbox" name="selected_sets" value="{{ item_set.name }}" class="set-cb" checked>
           <input type="hidden" name="set_name_{{ loop.index0 }}"    value="{{ item_set.name }}">
           <input type="hidden" name="set_sku_{{ loop.index0 }}"     value="{{ item_set.sku or '' }}">
-          <input type="hidden" name="set_members_{{ loop.index0 }}" value="{{ item_set.member_skus | join('|') }}">
-          <input type="hidden" name="set_member_qtys_{{ loop.index0 }}" value="{{ item_set.member_quantities.items() | map('join', ':') | join('|') }}">
+          <input type="hidden" name="set_member_entries_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
         </td>
         <td>{{ item_set.name }}</td>
         <td class="mono">{{ item_set.sku or '—' }}</td>
