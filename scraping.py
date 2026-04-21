@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import time
+from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
@@ -168,6 +169,7 @@ def _member_hover_title(member_name: str | None) -> str | None:
     return title or None
 
 
+@lru_cache(maxsize=512)
 def _infer_visible_member_sku(member_name: str | None, *, context_url: str | None = None) -> str | None:
     name = str(member_name or "").strip()
     if not name:
@@ -223,6 +225,7 @@ def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
     return stripped or None
 
 
+@lru_cache(maxsize=1024)
 def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> tuple[str | None, str | None]:
     """Fetch a product page and return (sku, name) from on-page content."""
     try:
