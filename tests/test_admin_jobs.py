@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from datetime import timedelta, timezone
 from unittest import mock
 
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
@@ -197,8 +198,33 @@ class AdminJobSmokeTests(unittest.TestCase):
             db.session.commit()
             item_id = item.id
 
-        with mock.patch("blueprints.admin._read_msrp_job", return_value={"status": "idle", "progress": []}), \
-             mock.patch("blueprints.admin._read_specs_job", return_value={"status": "idle", "progress": []}), \
+        with mock.patch(
+                "blueprints.admin._read_msrp_job",
+                return_value={
+                    "status": "idle",
+                    "progress": [],
+                    "started_at": "2026-04-20T18:02:00+00:00",
+                    "finished_at": "2026-04-20T18:07:00+00:00",
+                    "results": None,
+                    "error": None,
+                    "update_db": False,
+                },
+            ), \
+             mock.patch(
+                "blueprints.admin._read_specs_job",
+                return_value={
+                    "status": "idle",
+                    "progress": [],
+                    "started_at": "2026-04-20T18:02:00+00:00",
+                    "finished_at": "2026-04-20T18:07:00+00:00",
+                    "results": None,
+                    "error": None,
+                },
+            ), \
+             mock.patch(
+                "blueprints.admin._container_timezone",
+                return_value=(timezone(timedelta(hours=-6), "MDT"), "MDT"),
+            ), \
              mock.patch.dict(
                  os.environ,
                  {"DATA_DIR": "", "LOG_DIR": "", "GIT_SHA": "abcdef1234567890"},
@@ -217,8 +243,10 @@ class AdminJobSmokeTests(unittest.TestCase):
 
         self.assertEqual(msrp_page.status_code, 200)
         self.assertIn(b"MSRP Diff", msrp_page.data)
+        self.assertIn(b"12:02 PM MDT", msrp_page.data)
         self.assertEqual(specs_page.status_code, 200)
         self.assertIn(b"Specs Backfill", specs_page.data)
+        self.assertIn(b"12:02 PM MDT", specs_page.data)
         self.assertEqual(diagnostics_page.status_code, 200)
         self.assertIn(b"Schema Migrations", diagnostics_page.data)
         self.assertIn(b"Bootstrap History", diagnostics_page.data)

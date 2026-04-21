@@ -3,7 +3,6 @@ import os
 import platform
 import sys
 import threading
-from datetime import date
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -72,18 +71,23 @@ def _container_timezone():
         return timezone.utc, "UTC"
 
 
-def _format_applied_at(value: str | None) -> str:
+def _format_container_time(value: str | None) -> str:
     if not value:
         return "—"
     try:
         dt = datetime.fromisoformat(value)
     except ValueError:
         return value
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
     tz, tz_name = _container_timezone()
     dt = dt.astimezone(tz)
     date_part = dt.strftime("%b %d, %Y").replace(" 0", " ")
     time_part = dt.strftime("%I:%M %p").lstrip("0")
     return f"{date_part}, {time_part} {dt.strftime('%Z') or tz_name}"
+
+
+_format_applied_at = _format_container_time
 
 
 def _runtime_details():
@@ -114,13 +118,13 @@ def _runtime_details():
         "pid1_cmdline": _read_pid1_cmdline(),
         "schema_state": get_schema_state(),
         "schema_history": [
-            {**entry, "formatted_applied_at": _format_applied_at(entry.get("applied_at"))}
+            {**entry, "formatted_applied_at": _format_container_time(entry.get("applied_at"))}
             for entry in get_schema_history()
         ],
         "schema_version": SCHEMA_VERSION,
         "bootstrap_state": get_bootstrap_state(),
         "bootstrap_history": [
-            {**entry, "formatted_applied_at": _format_applied_at(entry.get("applied_at"))}
+            {**entry, "formatted_applied_at": _format_container_time(entry.get("applied_at"))}
             for entry in get_bootstrap_history()
         ],
         "bootstrap_version": BOOTSTRAP_VERSION,
@@ -137,7 +141,11 @@ def msrp_diff_page():
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("index"))
-    return render_template("msrp_diff_ui.html", job=_read_msrp_job())
+    return render_template(
+        "msrp_diff_ui.html",
+        job=_read_msrp_job(),
+        format_container_time=_format_container_time,
+    )
 
 
 @admin_bp.route("/admin/msrp-diff/run", methods=["POST"])
@@ -152,7 +160,8 @@ def msrp_diff_run():
     update_db = request.form.get("update_db") == "on"
     _write_msrp_job({"status": "running", "progress": [], "results": None,
                      "error": None, "update_db": update_db,
-                     "started_at": date.today().isoformat(), "finished_at": None})
+                     "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                     "finished_at": None})
     from flask import current_app
     app = current_app._get_current_object()
     logger.info("MSRP diff job started (update_db=%s)", update_db)
@@ -172,7 +181,11 @@ def specs_backfill_page():
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("index"))
-    return render_template("specs_backfill_ui.html", job=_read_specs_job())
+    return render_template(
+        "specs_backfill_ui.html",
+        job=_read_specs_job(),
+        format_container_time=_format_container_time,
+    )
 
 
 @admin_bp.route("/admin/specs-backfill/run", methods=["POST"])

@@ -32,8 +32,8 @@
         {% if job.status == 'running' %}Running…{% else %}Run Backfill{% endif %}
       </button>
       {% if job.started_at %}
-      <span class="muted small">Last run: {{ job.started_at }}
-        {% if job.finished_at %}→ {{ job.finished_at }}{% endif %}
+      <span class="muted small">Last run: {{ format_container_time(job.started_at) }}
+        {% if job.finished_at %}→ {{ format_container_time(job.finished_at) }}{% endif %}
       </span>
       {% endif %}
     </div>

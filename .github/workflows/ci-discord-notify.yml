@@ -62,6 +62,10 @@ jobs:
           seconds=$((duration_seconds % 60))
           duration="${minutes}m ${seconds}s"
 
+          footer_stamp=$(
+            python3 -c 'from datetime import datetime, timezone; import os; dt = datetime.fromisoformat(os.environ["RUN_UPDATED_AT"].replace("Z", "+00:00")).astimezone(timezone.utc); date_part = dt.strftime("%b %d, %Y").replace(" 0", " "); time_part = dt.strftime("%I:%M %p").lstrip("0"); print(f"{date_part} at {time_part} UTC")'
+          )
+
           commit=$(printf '%s' "$COMMIT_MESSAGE" | tr '\n' ' ' | sed 's/[[:space:]][[:space:]]*/ /g' | cut -c1-280)
           if [ -z "$commit" ]; then
             commit="No commit message available"
@@ -95,6 +99,7 @@ jobs:
             echo "short_sha=${short_sha}"
             echo "version=${version}"
             echo "duration=${duration}"
+            echo "footer_stamp=${footer_stamp}"
             echo "commit=${commit}"
             echo "status_emoji=${status_emoji}"
             echo "status_text=${status_text}"
@@ -110,7 +115,7 @@ jobs:
             --arg username "$REPO_NAME" \
             --arg title "${{ steps.context.outputs.status_emoji }} ${REPO_NAME} - ${{ steps.context.outputs.status_text }}" \
             --arg url "$RUN_URL" \
-            --arg footer "${REPO} • Run #${RUN_NUMBER}" \
+            --arg footer "Cutco Vault v${{ steps.context.outputs.version }} • github.com/${REPO} • ${{ steps.context.outputs.footer_stamp }}" \
             --arg commit "${{ steps.context.outputs.commit }}" \
             --arg version "${{ steps.context.outputs.version }}" \
             --arg actor "$TRIGGERED_BY" \

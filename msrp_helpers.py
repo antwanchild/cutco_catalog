@@ -4,7 +4,7 @@ import os
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date
+from datetime import UTC, datetime
 
 import requests
 from bs4 import BeautifulSoup
@@ -50,7 +50,6 @@ def _run_specs_backfill_job(app) -> None:
     (only when msrp is not already set).
     """
     from scraping import scrape_item_specs
-    from datetime import date as _date
 
     with app.app_context():
         items = Item.query.filter(Item.cutco_url.isnot(None)).all()
@@ -63,7 +62,7 @@ def _run_specs_backfill_job(app) -> None:
                               "results": None, "error": None,
                               "started_at": started_at, "finished_at": None})
 
-        started_at = _date.today().isoformat()
+        started_at = datetime.now(UTC).isoformat(timespec="seconds")
         _log(f"Starting specs backfill for {total} items…")
 
         updated = skipped = errors = 0
@@ -101,7 +100,7 @@ def _run_specs_backfill_job(app) -> None:
                     errors += 1
                     _log(f"[{done}/{total}] ✗ {item.name}: {exc}")
 
-        finished_at = _date.today().isoformat()
+        finished_at = datetime.now(UTC).isoformat(timespec="seconds")
         results = {"updated": updated, "skipped": skipped, "errors": errors, "total": total}
         _log(f"Done — {updated} updated, {skipped} already complete, {errors} errors.")
         _write_specs_job({"status": "done", "progress": progress, "results": results,
@@ -292,12 +291,12 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
 
             job = _read_msrp_job()
             job.update({"status": "done", "results": diff,
-                        "finished_at": date.today().isoformat()})
+                        "finished_at": datetime.now(UTC).isoformat(timespec="seconds")})
             _write_msrp_job(job)
 
     except Exception as exc:
         logger.error("MSRP diff job failed: %s", exc)
         job = _read_msrp_job()
         job.update({"status": "error", "error": str(exc),
-                    "finished_at": date.today().isoformat()})
+                    "finished_at": datetime.now(UTC).isoformat(timespec="seconds")})
         _write_msrp_job(job)
