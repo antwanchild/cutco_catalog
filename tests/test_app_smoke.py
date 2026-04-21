@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 
 from openpyxl import Workbook
+from bs4 import BeautifulSoup
 
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
@@ -29,6 +30,7 @@ from scraping import (
     _member_hover_title,
     _infer_visible_member_sku,
     _normalize_set_member_sku,
+    _collect_visible_set_piece_rows,
     _resolve_visible_member_sku,
 )
 from blueprints.catalog import _load_member_snapshot
@@ -708,10 +710,13 @@ class UtilitySmokeTests(SmokeBaseTest):
             )
 
     def test_resolve_visible_member_sku_prefers_linked_product_pages(self):
+        from scraping import _fetch_sku_from_page
+
+        _fetch_sku_from_page.cache_clear()
         parent_response = mock.Mock()
         parent_response.status_code = 200
         parent_response.text = """
-            <html><body><h1>#1820CD</h1><h1>Salad Mates</h1></body></html>
+            <html><body><h1>#1820</h1><h1>Salad Mates</h1></body></html>
         """
         child_response = mock.Mock()
         child_response.status_code = 200
@@ -727,10 +732,38 @@ class UtilitySmokeTests(SmokeBaseTest):
                     ],
                     "2-3/4\" Paring Knife",
                     context_url="https://www.cutco.com/p/salad-mates",
-                    set_sku="1820CD",
+                    set_sku="1820",
                 ),
                 "1720C",
             )
+
+    def test_collect_visible_set_piece_rows_uses_data_item(self):
+        soup = BeautifulSoup(
+            """
+            <ul>
+              <li class="pdp-piece">
+                <a class="pdp-set-item-detail" data-item="1720C" data-item-selected="1720C" href="#">
+                  <img alt='2-3/4" Paring Knife' src="https://images.cutco.com/products/rolo/1720C-h.jpg?width=800"/>
+                  <span class="pdp-use-detail">2-3/4" Paring Knife </span>
+                </a>
+              </li>
+              <li class="pdp-piece">
+                <a class="pdp-set-item-detail" data-item="1721C" data-item-selected="1721C" href="#">
+                  <img alt="Trimmer" src="https://images.cutco.com/products/rolo/1721C-h.jpg?width=800"/>
+                  <span class="pdp-use-detail">Trimmer </span>
+                </a>
+              </li>
+              <li class="pdp-piece pdp-piece-no-details" data-length="-1">
+                <img alt="Gift Box" src="https://images.cutco.com/products/rolo/2111D-h.jpg?width=800"/>
+                <span class="pdp-use-detail">Gift Box </span>
+              </li>
+            </ul>
+            """,
+            "html.parser",
+        )
+        rows = _collect_visible_set_piece_rows(soup.ul, context_url="https://www.cutco.com/p/salad-mates", set_sku="1820CD")
+        self.assertEqual([row["sku"] for row in rows[:2]], ["1720", "1721"])
+        self.assertEqual([row["name"] for row in rows[:2]], ['2-3/4" Paring Knife', "Trimmer"])
 
     def test_build_set_member_entries_uses_visible_row_skus(self):
         structured_members = [{"sku": "777", "name": "Super Shears", "quantity": 1}]

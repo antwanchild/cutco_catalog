@@ -237,6 +237,51 @@ def _resolve_visible_member_sku(
     return _infer_visible_member_sku(member_name, context_url=context_url)
 
 
+def _collect_visible_set_piece_rows(pieces_list, *, context_url: str | None = None, set_sku: str | None = None) -> list[dict]:
+    visible_rows: list[dict] = []
+    for anchor in pieces_list.select("a.pdp-set-item-detail"):
+        visible_name = ""
+        name_tag = anchor.select_one(".pdp-use-detail")
+        if name_tag is not None:
+            visible_name = name_tag.get_text(" ", strip=True)
+        if not visible_name:
+            image = anchor.find("img", alt=True)
+            visible_name = image.get("alt", "").strip() if image else ""
+        if not visible_name:
+            continue
+        visible_sku = _normalize_set_member_sku(anchor.get("data-item"))
+        if not visible_sku:
+            href = anchor.get("href") or ""
+            visible_sku = _resolve_visible_member_sku(
+                [href] if "/p/" in href else None,
+                visible_name,
+                context_url=context_url,
+                set_sku=set_sku,
+            )
+        visible_rows.append({
+            "name": visible_name,
+            "sku": visible_sku,
+            "is_set_only": not visible_sku,
+        })
+    for li in pieces_list.select("li.pdp-piece-no-details"):
+        visible_name = ""
+        name_tag = li.select_one(".pdp-use-detail")
+        if name_tag is not None:
+            visible_name = name_tag.get_text(" ", strip=True)
+        if not visible_name:
+            image = li.find("img", alt=True)
+            visible_name = image.get("alt", "").strip() if image else ""
+        if not visible_name:
+            continue
+        visible_sku = _resolve_visible_member_sku(None, visible_name, context_url=context_url, set_sku=set_sku)
+        visible_rows.append({
+            "name": visible_name,
+            "sku": visible_sku,
+            "is_set_only": not visible_sku,
+        })
+    return visible_rows
+
+
 def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
     sku = (str(raw_sku or "").upper().strip().split("/")[0] if raw_sku is not None else "")
     if not sku:
@@ -778,26 +823,11 @@ def scrape_sets(
             if heading:
                 pieces_list = heading.find_next("ul")
                 if pieces_list:
-                    for li in pieces_list.find_all("li"):
-                        visible_name = li.get_text(" ", strip=True)
-                        if not visible_name:
-                            continue
-                        visible_hrefs = []
-                        for anchor in li.find_all("a", href=True):
-                            href = anchor.get("href") or ""
-                            if "/p/" in href:
-                                visible_hrefs.append(href)
-                        visible_sku = _resolve_visible_member_sku(
-                            visible_hrefs,
-                            visible_name,
-                            context_url=set_link["url"],
-                            set_sku=set_sku,
-                        )
-                        visible_rows.append({
-                            "name": visible_name,
-                            "sku": visible_sku,
-                            "is_set_only": not visible_sku,
-                        })
+                    visible_rows.extend(_collect_visible_set_piece_rows(
+                        pieces_list,
+                        context_url=set_link["url"],
+                        set_sku=set_sku,
+                    ))
             if visible_rows:
                 logger.debug("Set '%s': visible Set Pieces labels → %d names", set_link["name"], len(visible_rows))
 
