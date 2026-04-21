@@ -56,7 +56,6 @@
   <thead>
     <tr>
       <th>#</th>
-      <th>Item</th>
       <th>SKU</th>
       <th>Qty</th>
       <th>Status</th>
@@ -67,13 +66,16 @@
     <tr class="{% if member.status == 'missing' %}row-missing{% endif %}">
       <td class="mono">{{ member.index }}</td>
       <td>
-        {% if member.matched_item %}
-          <a href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}">{{ member.name or member.matched_item.name }}</a>
+        {% if member.sku %}
+          {% if member.matched_item %}
+            <a class="mono" href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}" title="{{ member.name or member.matched_item.name }}">{{ member.sku }}</a>
+          {% else %}
+            <span class="mono" title="{{ member.name or '' }}">{{ member.sku }}</span>
+          {% endif %}
         {% else %}
-          {{ member.name or '—' }}
+          <span class="muted">—</span>
         {% endif %}
       </td>
-      <td class="mono">{{ member.sku or '—' }}</td>
       <td>{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% else %}<span class="muted">1</span>{% endif %}</td>
       <td>
         <span class="badge {% if member.status == 'present' %}badge-present{% elif member.status == 'missing' %}badge-missing{% else %}badge-info{% endif %}">

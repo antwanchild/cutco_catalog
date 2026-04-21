@@ -120,10 +120,9 @@
         <td>
           <span class="muted small">{{ item_set.member_snapshot_rows | length }} item(s):</span>
           {% for member in item_set.member_snapshot_rows %}
-            <span class="mono small">
+            <span class="mono small" {% if member.name %}title="{{ member.name }}"{% endif %}>
               {{ member.sku or '—' }}
               {% set qty = member.quantity or 1 %}
-              {% if member.name %}<span class="muted"> {{ member.name }}</span>{% endif %}
               {% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}
               {% if member.status == 'present' %}
                 <span class="badge badge-present">In catalog</span>
@@ -165,7 +164,7 @@
         <td>{{ item_set.name }}</td>
         <td>
           {% for member in item_set.member_snapshot_rows %}
-            <span class="mono small">
+            <span class="mono small" {% if member.name %}title="{{ member.name }}"{% endif %}>
               {{ member.sku or '—' }}
               {% if member.quantity > 1 %} <span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}
               {% if member.status == 'present' %}
