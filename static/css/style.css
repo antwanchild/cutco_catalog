@@ -540,6 +540,7 @@ textarea { resize: vertical; }
 .link-list a:hover { color: var(--accent); text-decoration: none; }
 .dashboard-activity { margin-bottom: 1rem; }
 .dashboard-shortcuts { margin-bottom: 1rem; }
+.dashboard-changes { margin-bottom: 1rem; }
 .quick-action-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -563,6 +564,7 @@ textarea { resize: vertical; }
   box-shadow: 0 0 0 1px rgba(85, 146, 255, .12) inset;
 }
 .quick-action-card .quick-action-title {
+  font-size: .95rem;
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
@@ -660,8 +662,8 @@ textarea { resize: vertical; }
   white-space: nowrap;
 }
 .activity-title {
-  font-size: .92rem;
-  font-weight: 600;
+  font-size: .95rem;
+  font-weight: 700;
   color: var(--text);
   line-height: 1.35;
 }
@@ -689,7 +691,7 @@ textarea { resize: vertical; }
 }
 .release-value {
   font-size: .95rem;
-  font-weight: 650;
+  font-weight: 700;
   color: var(--text);
   line-height: 1.3;
 }
