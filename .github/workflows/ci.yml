@@ -152,8 +152,13 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "$NEW_TAG"
-          git push origin "$NEW_TAG"
+
+          if git rev-parse -q --verify "refs/tags/${NEW_TAG}" >/dev/null || git ls-remote --tags origin "refs/tags/${NEW_TAG}" | grep -q "${NEW_TAG}"; then
+            echo "Tag ${NEW_TAG} already exists; skipping tag creation."
+          else
+            git tag "$NEW_TAG"
+            git push origin "$NEW_TAG"
+          fi
 
           echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
