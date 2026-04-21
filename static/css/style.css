@@ -720,6 +720,25 @@ textarea { resize: vertical; }
   color: var(--text);
   font-size: .9rem;
 }
+.lower-entry-list {
+  gap: .3rem;
+}
+.lower-entry-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+.lower-entry-item a {
+  color: var(--text);
+  font-size: .9rem;
+}
+.lower-entry-item .change-meta {
+  justify-content: flex-end;
+}
+.lower-card .badge {
+  font-size: .68rem;
+}
 .lower-card .muted {
   color: var(--muted);
 }

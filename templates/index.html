@@ -208,15 +208,16 @@
 
   <section class="dashboard-card lower-card">
     <h3>Recent Entries</h3>
-    <ul class="link-list">
+    <ul class="link-list lower-entry-list">
       {% for ownership in recent %}
-        <li>
-          <span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span>
-          <a href="{{ url_for('people.person_collection', person_id=ownership.person_id) }}">{{ ownership.person.name }}</a>
-          — {{ ownership.variant.item.name }}
-          {% if ownership.variant.color != UNKNOWN_COLOR %}
-            <span class="muted">({{ ownership.variant.color }})</span>
-          {% endif %}
+        <li class="lower-entry-item">
+          <a href="{{ url_for('people.person_collection', person_id=ownership.person_id) }}">
+            {{ ownership.person.name }} · {{ ownership.variant.item.name }}
+          </a>
+          <span class="change-meta">
+            <span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span>
+            {% if ownership.variant.color != UNKNOWN_COLOR %}<span class="change-badge">{{ ownership.variant.color }}</span>{% endif %}
+          </span>
         </li>
       {% else %}
         <li class="muted">No entries yet.</li>
