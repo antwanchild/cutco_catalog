@@ -215,6 +215,22 @@ def _infer_visible_member_sku(member_name: str | None, *, context_url: str | Non
     return None
 
 
+def _resolve_visible_member_sku(
+    href: str | None,
+    member_name: str | None,
+    *,
+    context_url: str | None = None,
+) -> str | None:
+    if href:
+        href_sku = _extract_sku_from_href(href)
+        if href_sku:
+            return href_sku
+        fetched_sku, _ = _fetch_sku_from_page(href, preserve_lettered_code=True)
+        if fetched_sku:
+            return fetched_sku
+    return _infer_visible_member_sku(member_name, context_url=context_url)
+
+
 def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
     sku = (str(raw_sku or "").upper().strip().split("/")[0] if raw_sku is not None else "")
     if not sku:
@@ -760,15 +776,17 @@ def scrape_sets(
                         visible_name = li.get_text(" ", strip=True)
                         if not visible_name:
                             continue
-                        visible_sku = None
+                        visible_href = None
                         for anchor in li.find_all("a", href=True):
                             href = anchor.get("href") or ""
                             if "/p/" in href:
-                                visible_sku = _extract_sku_from_href(href)
-                                if visible_sku:
-                                    break
-                        if not visible_sku:
-                            visible_sku = _infer_visible_member_sku(visible_name, context_url=set_link["url"])
+                                visible_href = href
+                                break
+                        visible_sku = _resolve_visible_member_sku(
+                            visible_href,
+                            visible_name,
+                            context_url=set_link["url"],
+                        )
                         visible_rows.append({
                             "name": visible_name,
                             "sku": visible_sku,

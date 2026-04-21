@@ -29,6 +29,7 @@ from scraping import (
     _member_hover_title,
     _infer_visible_member_sku,
     _normalize_set_member_sku,
+    _resolve_visible_member_sku,
 )
 from blueprints.catalog import _load_member_snapshot
 from time_utils import container_timezone, format_container_time
@@ -704,6 +705,22 @@ class UtilitySmokeTests(SmokeBaseTest):
             self.assertEqual(
                 _infer_visible_member_sku("Gift Box", context_url="https://www.cutco.com/p/wine-cheese-gift-set"),
                 "2130CD",
+            )
+
+    def test_resolve_visible_member_sku_prefers_linked_product_pages(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body><h1>#1720C</h1><h1>2-3/4&quot; Paring Knife</h1></body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            self.assertEqual(
+                _resolve_visible_member_sku(
+                    "https://www.cutco.com/p/paring-knife",
+                    "2-3/4\" Paring Knife",
+                    context_url="https://www.cutco.com/p/salad-mates",
+                ),
+                "1720C",
             )
 
     def test_build_set_member_entries_uses_visible_row_skus(self):
