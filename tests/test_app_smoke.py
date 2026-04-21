@@ -1536,7 +1536,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         existing_item_id, _existing_variant_id = self._add_catalog_item(name="Sync Existing Knife", sku="SX-EX-1")
-        existing_set_id = self._add_set(name="Sync Existing Set", sku="SX-SET-1", item_ids=(existing_item_id,))
+        stale_item_id, _stale_variant_id = self._add_catalog_item(name="Sync Stale Knife", sku="SX-STALE-1")
+        existing_set_id = self._add_set(name="Sync Existing Set", sku="SX-SET-1", item_ids=(existing_item_id, stale_item_id))
 
         response = self.client.post(
             "/catalog/sync/confirm",
@@ -1593,6 +1594,10 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertFalse(created_existing_member.in_catalog)
             self.assertTrue(created_existing_member.set_only)
             self.assertIsNotNone(existing_set.member_data)
+            existing_member_skus = {db.session.get(Item, membership.item_id).sku for membership in existing_set.members}
+            self.assertNotIn("SX-STALE-1", existing_member_skus)
+            self.assertIn("SX-EX-1", existing_member_skus)
+            self.assertIn("SX-EX-MISS-1", existing_member_skus)
 
         set_detail_response = self.client.get(f"/sets/{new_set.id}")
         self.assertEqual(set_detail_response.status_code, 200)

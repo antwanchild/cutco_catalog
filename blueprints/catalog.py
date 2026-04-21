@@ -857,6 +857,7 @@ def catalog_sync_confirm():
             item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
 
         existing_members = {membership.item_id: membership for membership in item_set.members}
+        incoming_member_ids: set[int] = set()
         for member in member_entries:
             member_sku = _normalize_member_sku(member.get("sku"))
             if not member_sku:
@@ -875,6 +876,10 @@ def catalog_sync_confirm():
             else:
                 # Update quantity if it changed
                 existing_members[item.id].quantity = qty
+            incoming_member_ids.add(item.id)
+        for membership in list(item_set.members):
+            if membership.item_id not in incoming_member_ids:
+                db.session.delete(membership)
 
     # Update quantities on existing sets (no new rows, just qty backfill)
     existing_set_count = int(request.form.get("existing_set_count", 0))
@@ -912,6 +917,7 @@ def catalog_sync_confirm():
             for member in member_entries
             if _normalize_member_sku(member.get("sku"))
         }
+        incoming_member_ids: set[int] = set()
         for member in item_set.members:
             item = db.session.get(Item, member.item_id)
             if item and item.sku:
@@ -932,6 +938,10 @@ def catalog_sync_confirm():
                     created_existing_missing_items += 1
                 if item.id not in existing_member_ids:
                     db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=member_qtys.get(sku, 1) or 1))
+                incoming_member_ids.add(item.id)
+        for membership in list(item_set.members):
+            if membership.item_id not in incoming_member_ids:
+                db.session.delete(membership)
 
     db_commit(db.session)
     logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates, %d placeholders",
