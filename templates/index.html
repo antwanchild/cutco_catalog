@@ -239,6 +239,7 @@ if (dashboardSyncBtn && dashboardSyncOverlay) {
     this.textContent = 'Syncing…';
     this.classList.add('btn-disabled');
     this.style.pointerEvents = 'none';
+    this.closest('.quick-action-card')?.classList.add('is-loading');
     dashboardSyncOverlay.style.display = 'flex';
     if (status) status.hidden = false;
 

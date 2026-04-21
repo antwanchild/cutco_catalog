@@ -555,13 +555,20 @@ textarea { resize: vertical; }
   padding: .9rem 1rem;
   min-height: 88px;
 }
+.quick-action-card.is-loading {
+  opacity: .82;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(85, 146, 255, .12) inset;
+}
 .quick-action-card .quick-action-title {
   font-weight: 700;
   color: var(--text);
+  line-height: 1.2;
 }
 .quick-action-card .quick-action-note {
   font-size: .8rem;
   color: var(--muted);
+  line-height: 1.4;
 }
 .quick-action-card .btn.quick-action-btn {
   align-self: stretch;
@@ -573,6 +580,14 @@ textarea { resize: vertical; }
   font-size: .76rem;
   color: var(--accent);
   font-weight: 600;
+  line-height: 1.2;
+}
+.changes-card h3,
+.activity-label,
+.release-label {
+  color: var(--muted);
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 .changes-grid {
   display: grid;
@@ -588,9 +603,6 @@ textarea { resize: vertical; }
 .changes-card h3 {
   font-size: .72rem;
   font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--muted);
   margin-bottom: .45rem;
 }
 .change-item {
@@ -645,9 +657,6 @@ textarea { resize: vertical; }
 .activity-label {
   font-size: .68rem;
   font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--muted);
 }
 .activity-time {
   font-size: .72rem;
@@ -679,9 +688,6 @@ textarea { resize: vertical; }
 .release-label {
   font-size: .68rem;
   font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--muted);
   margin-bottom: .35rem;
 }
 .release-value {
