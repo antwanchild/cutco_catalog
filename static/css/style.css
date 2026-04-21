@@ -653,8 +653,11 @@ textarea { resize: vertical; }
   flex-wrap: wrap;
 }
 .activity-label {
-  font-size: .68rem;
+  font-size: .95rem;
   font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0;
+  text-transform: none;
 }
 .activity-time {
   font-size: .72rem;
@@ -682,11 +685,11 @@ textarea { resize: vertical; }
   min-height: 92px;
 }
 .release-label {
-  font-size: .68rem;
+  font-size: .95rem;
   font-weight: 700;
-  color: var(--muted);
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  color: var(--text);
+  letter-spacing: 0;
+  text-transform: none;
   margin: 0;
 }
 .release-value {
@@ -1381,7 +1384,8 @@ textarea { resize: vertical; }
 .flex-center { display: flex; align-items: center; gap: .5rem; }
 .section-heading-actions { display: flex; justify-content: space-between; align-items: center; }
 .section-heading-actions .btn {
-  min-width: 8.5rem;
+  min-width: 9.5rem;
   justify-content: center;
+  font-weight: 700;
 }
 .mono-sm { font-family: var(--mono); font-size: .82rem; }
