@@ -60,7 +60,7 @@
       <span class="quick-action-title">Catalog sync</span>
       <span class="quick-action-note">Preview and import Cutco updates.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" id="dashboard-sync-btn" href="{{ url_for('catalog.catalog_sync') }}">Run Sync</a>
-      <span class="quick-action-status" id="dashboard-sync-status" hidden>Preparing sync preview…</span>
+      <span class="quick-action-status" id="dashboard-sync-status" hidden>Preparing sync preview...</span>
     </div>
     <div class="quick-action-card">
       <span class="quick-action-title">MSRP diff</span>
@@ -71,7 +71,7 @@
   </div>
 </section>
 
-<div id="dashboard-sync-overlay" style="display:none">
+<div id="dashboard-sync-overlay" class="sync-overlay" style="display:none">
   <div class="sync-overlay-inner">
     <div class="sync-spinner"></div>
     <p>Preparing the sync preview — this may take a minute…</p>

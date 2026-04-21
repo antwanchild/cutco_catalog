@@ -578,7 +578,7 @@ textarea { resize: vertical; }
 }
 .quick-action-status {
   font-size: .76rem;
-  color: var(--accent);
+  color: var(--muted);
   font-weight: 600;
   line-height: 1.2;
 }
@@ -873,7 +873,9 @@ textarea { resize: vertical; }
 .sync-category-toggle { font-size: .78rem; font-weight: 400; text-transform: none; }
 
 /* ── Sync loading overlay ────────────────────────────────────────────────── */
-#sync-overlay {
+.sync-overlay,
+#sync-overlay,
+#dashboard-sync-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, .65);
@@ -889,6 +891,9 @@ textarea { resize: vertical; }
   gap: 1rem;
   color: var(--text);
   font-size: 1rem;
+  text-align: center;
+  max-width: 24rem;
+  padding: 1rem 1.25rem;
 }
 .sync-spinner {
   width: 48px;
