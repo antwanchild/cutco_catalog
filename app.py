@@ -361,6 +361,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=_env_flag("SESSION_COOKIE_SECURE"),
+        SESSION_REFRESH_EACH_REQUEST=False,
         LOG_DIR=os.environ.get("LOG_DIR", "/data/logs"),
         LOG_LEVEL=os.environ.get("LOG_LEVEL", "INFO").upper(),
         TESTING=False,

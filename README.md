@@ -94,7 +94,7 @@ ruff check .
 |---|---|:---:|---|
 | `SECRET_KEY` | `cutco-vault-dev-key` | ⚠️ | Flask session secret — **change in production** |
 | `ADMIN_TOKEN` | `admin` | ⚠️ | Token required to log in as admin — **change in production** |
-| `ADMIN_SESSION_SECONDS` | `7200` | No | Admin session lifetime in seconds (default 2 h); set to `0` for browser-session only |
+| `ADMIN_SESSION_SECONDS` | `7200` | No | Admin session lifetime in seconds (default 2 h from login time); set to `0` for browser-session only |
 | `DATABASE_URL` | `sqlite:////data/cutco.db` | No | SQLAlchemy connection string |
 | `DATA_DIR` | `/data` | No | Directory for the database and job state files |
 | `LOG_LEVEL` | `INFO` | No | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |

@@ -170,6 +170,8 @@ class PublicSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 302)
         self.assertNotIn("Secure", response.headers.get("Set-Cookie", ""))
+        self.assertIn("Expires=", response.headers.get("Set-Cookie", ""))
+        self.assertFalse(self.app.config["SESSION_REFRESH_EACH_REQUEST"])
         with self.client.session_transaction() as session:
             self.assertTrue(session.get("is_admin"))
 
