@@ -1600,9 +1600,12 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn("SX-EX-MISS-1", existing_member_skus)
 
         set_detail_response = self.client.get(f"/sets/{new_set.id}")
+        existing_set_detail_response = self.client.get(f"/sets/{existing_set.id}")
         self.assertEqual(set_detail_response.status_code, 200)
         self.assertIn(b"Imported Members", set_detail_response.data)
         self.assertIn(b"SX-MISS-1", set_detail_response.data)
+        self.assertEqual(existing_set_detail_response.status_code, 200)
+        self.assertIn(b"Sync Existing Missing Knife", existing_set_detail_response.data)
 
     def test_catalog_purge_and_delete_routes(self):
         self._login_as_admin()
