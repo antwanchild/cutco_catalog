@@ -708,17 +708,26 @@ class UtilitySmokeTests(SmokeBaseTest):
             )
 
     def test_resolve_visible_member_sku_prefers_linked_product_pages(self):
-        response = mock.Mock()
-        response.status_code = 200
-        response.text = """
+        parent_response = mock.Mock()
+        parent_response.status_code = 200
+        parent_response.text = """
+            <html><body><h1>#1820CD</h1><h1>Salad Mates</h1></body></html>
+        """
+        child_response = mock.Mock()
+        child_response.status_code = 200
+        child_response.text = """
             <html><body><h1>#1720C</h1><h1>2-3/4&quot; Paring Knife</h1></body></html>
         """
-        with mock.patch("scraping.requests.get", return_value=response):
+        with mock.patch("scraping.requests.get", side_effect=[parent_response, child_response]):
             self.assertEqual(
                 _resolve_visible_member_sku(
-                    "https://www.cutco.com/p/paring-knife",
+                    [
+                        "https://www.cutco.com/p/salad-mates",
+                        "https://www.cutco.com/p/paring-knife",
+                    ],
                     "2-3/4\" Paring Knife",
                     context_url="https://www.cutco.com/p/salad-mates",
+                    set_sku="1820CD",
                 ),
                 "1720C",
             )

@@ -216,17 +216,23 @@ def _infer_visible_member_sku(member_name: str | None, *, context_url: str | Non
 
 
 def _resolve_visible_member_sku(
-    href: str | None,
+    href: str | list[str] | tuple[str, ...] | None,
     member_name: str | None,
     *,
     context_url: str | None = None,
+    set_sku: str | None = None,
 ) -> str | None:
-    if href:
-        href_sku = _extract_sku_from_href(href)
-        if href_sku:
+    hrefs = [href] if isinstance(href, str) else list(href or ())
+    set_sku_norm = _normalize_set_member_sku(set_sku)
+    for candidate_href in hrefs:
+        href_sku = _extract_sku_from_href(candidate_href)
+        normalized_href_sku = _normalize_set_member_sku(href_sku)
+        if normalized_href_sku and normalized_href_sku != set_sku_norm:
             return href_sku
-        fetched_sku, _ = _fetch_sku_from_page(href, preserve_lettered_code=True)
-        if fetched_sku:
+    for candidate_href in hrefs:
+        fetched_sku, _ = _fetch_sku_from_page(candidate_href, preserve_lettered_code=True)
+        normalized_fetched_sku = _normalize_set_member_sku(fetched_sku)
+        if normalized_fetched_sku and normalized_fetched_sku != set_sku_norm:
             return fetched_sku
     return _infer_visible_member_sku(member_name, context_url=context_url)
 
@@ -776,16 +782,16 @@ def scrape_sets(
                         visible_name = li.get_text(" ", strip=True)
                         if not visible_name:
                             continue
-                        visible_href = None
+                        visible_hrefs = []
                         for anchor in li.find_all("a", href=True):
                             href = anchor.get("href") or ""
                             if "/p/" in href:
-                                visible_href = href
-                                break
+                                visible_hrefs.append(href)
                         visible_sku = _resolve_visible_member_sku(
-                            visible_href,
+                            visible_hrefs,
                             visible_name,
                             context_url=set_link["url"],
+                            set_sku=set_sku,
                         )
                         visible_rows.append({
                             "name": visible_name,
