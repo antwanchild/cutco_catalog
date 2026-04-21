@@ -173,13 +173,30 @@ def _infer_visible_member_sku(member_name: str | None) -> str | None:
     if not name:
         return None
     lower = name.lower()
-    if "gift box" not in lower:
+    if "gift box" not in lower and "sheath" not in lower:
         return None
-    slug = re.sub(r"[^a-z0-9]+", "-", lower).strip("-")
+    lower = re.sub(r'(\d[\d/-]*)["”]', r"\1 inch", lower)
+    lower = re.sub(r"\b(inches?|in\.)\b", "inch", lower)
+    slug = re.sub(r"[^a-z0-9]+", "-", lower)
+    slug = slug.replace("inch", "inch")
+    slug = re.sub(r"(^|-)p-c(-|$)", r"\1pc\2", slug)
+    slug = re.sub(r"(^|-)pc(-|$)", r"\1pc\2", slug)
+    slug = re.sub(r"(^|-)knife-and-sheath(-|$)", r"\1knife-sheath\2", slug)
+    slug = re.sub(r"(^|-)knife-sheath-set(-|$)", r"\1knife-sheath-set\2", slug)
+    slug = re.sub(r"(^|-)sheath(-|$)", r"\1sheath\2", slug)
+    slug = slug.strip("-")
     if not slug:
         return None
-    inferred_sku, _ = _fetch_sku_from_page(f"https://www.cutco.com/p/{slug}", preserve_lettered_code=True)
-    return inferred_sku
+    candidate_slugs = [slug]
+    if "sheath" in lower:
+        compact_slug = slug.replace("-inch-", "-")
+        if compact_slug != slug:
+            candidate_slugs.append(compact_slug)
+    for candidate_slug in candidate_slugs:
+        inferred_sku, _ = _fetch_sku_from_page(f"https://www.cutco.com/p/{candidate_slug}", preserve_lettered_code=True)
+        if inferred_sku:
+            return inferred_sku
+    return None
 
 
 def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
@@ -252,7 +269,7 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
         # Strategy 3: generic inline JS
         if not sku:
             sku_match = re.search(
-                r"""["']?sku["']?\s*:\s*["']?(\d{2,4}[A-Z]{0,2})["']?""",
+                r"""["']?sku["']?\s*:\s*["']?(\d{2,4}(?:-\d+|[A-Z]{0,2})?)["']?""",
                 raw_html, re.IGNORECASE)
             if sku_match:
                 sku = sku_match.group(1).upper()
@@ -272,9 +289,9 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
 
         # Strategy 5: on-page visible text containing "#XXXX"
         if not sku:
-            sku_text = soup.find(string=re.compile(r"#\d{2,4}[A-Z]?\b"))
+            sku_text = soup.find(string=re.compile(r"#\d{2,4}(?:-\d+|[A-Z]?)?\b"))
             if sku_text:
-                sku_match = re.search(r"#(\d{2,4}[A-Z]?)\b", sku_text.strip(), re.IGNORECASE)
+                sku_match = re.search(r"#(\d{2,4}(?:-\d+|[A-Z]?)?)\b", sku_text.strip(), re.IGNORECASE)
                 if sku_match:
                     sku = sku_match.group(1).upper()
                     strategy_log.append(f"visible-text={sku}")
@@ -283,7 +300,7 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
         if not sku:
             page_text = soup.get_text(" ", strip=True)
             sku_match = re.search(
-                r"(?:model|item|sku|product)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{2,4}[A-Z]?)\b",
+                r"(?:model|item|sku|product)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{2,4}(?:-\d+|[A-Z]?)?)\b",
                 page_text, re.IGNORECASE)
             if sku_match:
                 sku = sku_match.group(1).upper()

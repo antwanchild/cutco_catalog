@@ -662,6 +662,15 @@ class UtilitySmokeTests(SmokeBaseTest):
             self.assertEqual(_infer_visible_member_sku("Gift Box for Super Shears"), "2026D")
             self.assertIsNone(_infer_visible_member_sku("Super Shears"))
 
+    def test_infer_visible_member_sku_supports_sheath_pages(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body><h1>#2120-2</h1><h1>4\" Paring Knife Sheath</h1></body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            self.assertEqual(_infer_visible_member_sku('4" Paring Knife Sheath'), "2120-2")
+
     def test_build_set_member_entries_uses_visible_row_skus(self):
         structured_members = [{"sku": "777", "name": "Super Shears", "quantity": 1}]
         visible_rows = [
