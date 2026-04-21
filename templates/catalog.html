@@ -20,6 +20,12 @@
       <option value="{{ category }}" {% if category == cat_filter %}selected{% endif %}>{{ category }}</option>
     {% endfor %}
   </select>
+  <select name="status" class="select-sm">
+    <option value="">All Statuses</option>
+    <option value="set_only" {% if status_f == 'set_only' %}selected{% endif %}>Set-only</option>
+    <option value="off_catalog" {% if status_f == 'off_catalog' %}selected{% endif %}>Off-catalog</option>
+    <option value="non_catalog" {% if status_f == 'non_catalog' %}selected{% endif %}>Non-catalog</option>
+  </select>
   <label class="checkbox-label">
     <input type="checkbox" name="unicorn" value="1" {% if unicorn_f == '1' %}checked{% endif %}> Unicorns only
   </label>
@@ -30,7 +36,7 @@
 {% macro sort_link(column, label) %}
   {# Toggle direction if already sorted by this column, otherwise default to asc #}
   {% set new_dir = 'asc' if (sort == column and direction == 'desc') else 'desc' if sort == column else 'asc' %}
-  <a href="{{ url_for('catalog.catalog', q=q, category=cat_filter, unicorn=unicorn_f, sort=column, dir=new_dir) }}">
+  <a href="{{ url_for('catalog.catalog', q=q, category=cat_filter, status=status_f, unicorn=unicorn_f, sort=column, dir=new_dir) }}">
     {{ label }}{% if sort == column %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}
   </a>
 {% endmacro %}

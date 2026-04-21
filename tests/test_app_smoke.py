@@ -1232,14 +1232,24 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             item.is_unicorn = True
+            db.session.add(Item(name="Set Only Knife", sku="SO-1", category="Kitchen Knives", set_only=True, in_catalog=False))
+            db.session.add(Item(name="Off Catalog Knife", sku="OC-1", category="Kitchen Knives", set_only=False, in_catalog=False))
             db.session.commit()
 
         catalog_response = self.client.get("/catalog?q=Filter&category=Kitchen+Knives&unicorn=1&sort=sku&dir=desc")
+        set_only_response = self.client.get("/catalog?status=set_only")
+        off_catalog_response = self.client.get("/catalog?status=off_catalog")
+        non_catalog_response = self.client.get("/catalog?status=non_catalog")
         add_page_response = self.client.get("/catalog/add")
         edit_page_response = self.client.get(f"/catalog/{item_id}/edit")
 
         self.assertEqual(catalog_response.status_code, 200)
         self.assertIn(b"Filter Knife", catalog_response.data)
+        self.assertIn(b"Set-only", set_only_response.data)
+        self.assertIn(b"Set Only Knife", set_only_response.data)
+        self.assertIn(b"Off Catalog Knife", off_catalog_response.data)
+        self.assertIn(b"Set Only Knife", non_catalog_response.data)
+        self.assertIn(b"Off Catalog Knife", non_catalog_response.data)
         self.assertEqual(add_page_response.status_code, 200)
         self.assertIn(b"Add Item", add_page_response.data)
         self.assertEqual(edit_page_response.status_code, 200)

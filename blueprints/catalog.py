@@ -133,6 +133,7 @@ def catalog():
     search_query = request.args.get("q", "").strip()
     cat_filter = request.args.get("category", "")
     unicorn_f  = request.args.get("unicorn", "")
+    status_f   = request.args.get("status", "")
     sort       = request.args.get("sort", "name")
     direction  = request.args.get("dir", "asc")
 
@@ -148,6 +149,12 @@ def catalog():
             Item.edge_is_unicorn,
             Item.variants.any(ItemVariant.is_unicorn == True)  # noqa: E712
         ))
+    if status_f == "set_only":
+        query = query.filter(Item.set_only.is_(True))
+    elif status_f == "off_catalog":
+        query = query.filter(Item.set_only.is_(False), Item.in_catalog.is_(False))
+    elif status_f == "non_catalog":
+        query = query.filter(Item.in_catalog.is_(False))
 
     from sqlalchemy.orm import selectinload
     sort_cols = {"name": Item.name, "sku": Item.sku, "category": Item.category, "edge_type": Item.edge_type}
@@ -168,6 +175,7 @@ def catalog():
 
     return render_template("catalog.html", items=items, categories=categories,
                            q=search_query, cat_filter=cat_filter, unicorn_f=unicorn_f,
+                           status_f=status_f,
                            sort=sort, direction=direction,
                            edge_types=EDGE_TYPES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
