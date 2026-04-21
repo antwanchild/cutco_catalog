@@ -65,6 +65,11 @@ jobs:
           if [ -z "$version_label" ]; then
             version_label="$version"
           fi
+          if [ "$version_label" = "n/a" ]; then
+            version_display="$version_label"
+          else
+            version_display="v${version_label}"
+          fi
 
           duration_seconds=$(
             python3 -c 'from datetime import datetime; import os; started = datetime.fromisoformat(os.environ["RUN_STARTED_AT"].replace("Z", "+00:00")); updated = datetime.fromisoformat(os.environ["RUN_UPDATED_AT"].replace("Z", "+00:00")); print(max(0, int((updated - started).total_seconds())))'
@@ -108,6 +113,7 @@ jobs:
             echo "short_sha=${short_sha}"
             echo "version=${version}"
             echo "version_label=${version_label}"
+            echo "version_display=${version_display}"
             echo "duration=${duration}"
             echo "commit=${commit}"
             echo "status_emoji=${status_emoji}"
@@ -124,7 +130,7 @@ jobs:
             --arg username "${{ steps.context.outputs.display_name }}" \
             --arg title "${{ steps.context.outputs.status_emoji }} ${{ steps.context.outputs.display_name }} — ${{ steps.context.outputs.status_text }}" \
             --arg url "$RUN_URL" \
-            --arg footer "${{ steps.context.outputs.display_name }} v${{ steps.context.outputs.version_label }} • github.com/${REPO}" \
+            --arg footer "${{ steps.context.outputs.display_name }} ${{ steps.context.outputs.version_display }} • github.com/${REPO}" \
             --arg commit_body "> ${{ steps.context.outputs.commit }}" \
             --arg version "${{ steps.context.outputs.version_label }}" \
             --arg actor "$TRIGGERED_BY" \
