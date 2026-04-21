@@ -69,8 +69,12 @@ def _resolve_member_item(
 
     if sku_item and set_sku:
         item_sku, _ = _get_item_identity(sku_item)
-        if item_sku and item_sku == set_sku and name_item is not None:
-            sku_item = name_item
+        if item_sku and item_sku == set_sku:
+            sku_item = None
+    if name_item and set_sku:
+        name_sku, _ = _get_item_identity(name_item)
+        if name_sku and name_sku == set_sku:
+            name_item = None
     if sku_item and name_item:
         sku_name = _normalize_member_name(_get_item_field(sku_item, "name"))
         name_sku, _ = _get_item_identity(name_item)
@@ -130,6 +134,8 @@ def _build_member_status_rows(
     for index, entry in enumerate(member_entries, start=1):
         sku = _normalize_member_sku(entry.get("sku"))
         item = _resolve_member_item(entry, catalog_sku_lookup, catalog_name_lookup, set_sku=set_sku)
+        display_sku = _normalize_member_sku(_get_item_field(item, "sku")) if item is not None else sku
+        display_name = _get_item_field(item, "name") if item is not None else entry.get("name")
         quantity = entry.get("quantity", 1)
         try:
             quantity = max(1, int(quantity))
@@ -150,10 +156,10 @@ def _build_member_status_rows(
             status_label = "No item number"
         rows.append({
             "index": index,
-            "sku": sku,
-            "name": entry.get("name") or None,
+            "sku": display_sku,
+            "name": display_name or None,
             "hover_title": _member_hover_title(
-                _get_item_field(item, "name") if item is not None else entry.get("name")
+                display_name
             ),
             "quantity": quantity,
             "status": status,
@@ -925,6 +931,7 @@ def catalog_sync_confirm():
 
         existing_members = {membership.item_id: membership for membership in item_set.members}
         incoming_member_ids: set[int] = set()
+        normalized_member_entries: list[dict] = []
         for member in member_entries:
             resolved_item = _resolve_member_item(member, sku_to_item, name_to_item, set_sku=set_sku)
             member_sku = _normalize_member_sku(getattr(resolved_item, "sku", None) if resolved_item else member.get("sku"))
@@ -941,6 +948,11 @@ def catalog_sync_confirm():
             if not item:
                 continue
             qty = max(1, int(member.get("quantity") or 1))
+            normalized_member_entries.append({
+                "sku": _normalize_member_sku(getattr(item, "sku", None)) or member_sku,
+                "name": _get_item_field(item, "name") or member.get("name"),
+                "quantity": qty,
+            })
             if item.id not in existing_members:
                 db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
                 linked_items += 1
@@ -948,6 +960,8 @@ def catalog_sync_confirm():
                 # Update quantity if it changed
                 existing_members[item.id].quantity = qty
             incoming_member_ids.add(item.id)
+        if normalized_member_entries:
+            item_set.member_data = json.dumps(normalized_member_entries, ensure_ascii=False)
         for membership in list(item_set.members):
             if membership.item_id not in incoming_member_ids:
                 db.session.delete(membership)
@@ -989,6 +1003,7 @@ def catalog_sync_confirm():
             if _normalize_member_sku(member.get("sku"))
         }
         incoming_member_ids: set[int] = set()
+        normalized_member_entries: list[dict] = []
         for member in item_set.members:
             item = db.session.get(Item, member.item_id)
             if item and item.sku:
@@ -1014,6 +1029,13 @@ def catalog_sync_confirm():
                 if item.id not in existing_member_ids:
                     db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=member_qtys.get(sku, 1) or 1))
                 incoming_member_ids.add(item.id)
+                normalized_member_entries.append({
+                    "sku": _normalize_member_sku(getattr(item, "sku", None)) or sku,
+                    "name": _get_item_field(item, "name") or member.get("name"),
+                    "quantity": member_qtys.get(sku, 1) or 1,
+                })
+        if normalized_member_entries:
+            item_set.member_data = json.dumps(normalized_member_entries, ensure_ascii=False)
         for membership in list(item_set.members):
             if membership.item_id not in incoming_member_ids:
                 db.session.delete(membership)

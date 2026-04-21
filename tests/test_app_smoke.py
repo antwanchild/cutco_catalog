@@ -30,7 +30,7 @@ from scraping import (
     _infer_visible_member_sku,
     _normalize_set_member_sku,
 )
-from blueprints.catalog import _load_member_snapshot
+from blueprints.catalog import _load_member_snapshot, _resolve_member_item
 from time_utils import container_timezone, format_container_time
 
 
@@ -724,6 +724,25 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(member_entries[0]["name"], "Super Shears")
         self.assertEqual(member_entries[1]["sku"], "123")
         self.assertEqual(member_entries[1]["name"], "Gift Box")
+
+    def test_resolve_member_item_ignores_set_self_matches(self):
+        catalog_sku_lookup = {
+            "1820": {"sku": "1820", "name": "Salad Mates"},
+            "1821": {"sku": "1821", "name": "Deli Mates"},
+        }
+        catalog_name_lookup = {
+            "deli mates": {"sku": "1821", "name": "Deli Mates"},
+        }
+
+        resolved = _resolve_member_item(
+            {"sku": "1820", "name": "Deli Mates"},
+            catalog_sku_lookup,
+            catalog_name_lookup,
+            set_sku="1820",
+        )
+
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved["sku"], "1821")
 
     def test_admin_diagnostics_shows_schema_target(self):
         self._login_as_admin()
