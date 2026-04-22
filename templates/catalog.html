@@ -66,7 +66,13 @@
         {% endif %}
       </td>
       <td class="mono">{{ item.sku or '—' }}</td>
-      <td>{{ item.category or '—' }}</td>
+      <td>
+        {% if item.category %}
+          {{ item.category }}
+        {% else %}
+          <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
+        {% endif %}
+      </td>
       <td>
         {% if item.edge_type != 'N/A' %}
           {{ item.edge_type }}{% if item.edge_is_unicorn %} <span title="Edge unicorn">🦄</span>{% endif %}

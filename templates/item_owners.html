@@ -21,7 +21,11 @@
 <div class="item-meta mb-section">
   {% if item.sku %}<span><strong>SKU:</strong> <span class="mono">{{ item.sku }}</span></span>{% endif %}
   {% if item.set_only %}<span><strong>Status:</strong> Set-only</span>{% endif %}
-  {% if item.category %}<span><strong>Category:</strong> {{ item.category }}</span>{% endif %}
+  {% if item.category %}
+    <span><strong>Category:</strong> {{ item.category }}</span>
+  {% else %}
+    <span><strong>Category:</strong> <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span></span>
+  {% endif %}
   {% if item.edge_type != 'N/A' %}
     <span><strong>Edge:</strong> {{ item.edge_type }}{% if item.edge_is_unicorn %} 🦄{% endif %}</span>
   {% endif %}

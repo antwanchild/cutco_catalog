@@ -102,7 +102,13 @@
         {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
       </td>
       <td class="mono">{{ item.sku or '—' }}</td>
-      <td>{{ item.category or '—' }}</td>
+      <td>
+        {% if item.category %}
+          {{ item.category }}
+        {% else %}
+          <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
+        {% endif %}
+      </td>
       <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>
         {% if item.category in COOKWARE_CATEGORIES %}
@@ -154,7 +160,13 @@
         {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
       </td>
       <td class="mono">{{ item.sku or '—' }}</td>
-      <td>{{ item.category or '—' }}</td>
+      <td>
+        {% if item.category %}
+          {{ item.category }}
+        {% else %}
+          <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
+        {% endif %}
+      </td>
       <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{% if item.msrp %}${{ "%.2f"|format(item.msrp) }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>
