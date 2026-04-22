@@ -7,6 +7,9 @@
 </div>
 
 <form method="post" class="form-card">
+  {% if next_target %}
+    <input type="hidden" name="next" value="{{ next_target }}">
+  {% endif %}
 
   <div class="form-row">
     <label>Name *

@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 UNCATEGORIZED_FILTER = "__uncategorized__"
 
 
+def _safe_redirect_target(target: str | None) -> str | None:
+    if not target:
+        return None
+    target = target.strip()
+    if not target.startswith("/") or target.startswith("//"):
+        return None
+    return target
+
+
 def _normalize_member_sku(value: str | None) -> str | None:
     sku = (str(value).strip().upper() if value is not None else "")
     return sku or None
@@ -324,6 +333,7 @@ def catalog():
 @catalog_bp.route("/catalog/add", methods=["GET", "POST"])
 @admin_required
 def catalog_add():
+    next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
     if request.method == "POST":
         item = Item(
             name       = request.form["name"].strip(),
@@ -348,13 +358,14 @@ def catalog_add():
         if db_commit(db.session):
             logger.info("Item added: %s (SKU: %s)", item.name, item.sku or "none")
             flash(f'Added "{item.name}" to catalog.', "success")
-        return redirect(url_for("catalog.catalog"))
+        return redirect(_safe_redirect_target(next_target) or url_for("catalog.catalog"))
 
     return render_template("item_form.html", item=None,
                            edge_types=EDGE_TYPES, action="Add",
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            all_sets=Set.query.order_by(Set.name).all(),
-                           categories=_catalog_category_options())
+                           categories=_catalog_category_options(),
+                           next_target=_safe_redirect_target(next_target))
 
 
 @catalog_bp.route("/catalog/<int:item_id>/edit", methods=["GET", "POST"])
@@ -363,6 +374,7 @@ def catalog_edit(item_id):
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)
+    next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
     if request.method == "POST":
         item.name       = request.form["name"].strip()
         item.sku        = request.form.get("sku", "").strip().upper() or None
@@ -401,13 +413,14 @@ def catalog_edit(item_id):
         if db_commit(db.session):
             logger.info("Item updated: %s (SKU: %s)", item.name, item.sku or "none")
             flash(f'Updated "{item.name}".', "success")
-        return redirect(url_for("catalog.catalog"))
+        return redirect(_safe_redirect_target(next_target) or url_for("catalog.catalog"))
 
     return render_template("item_form.html", item=item,
                            edge_types=EDGE_TYPES, action="Edit",
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            all_sets=Set.query.order_by(Set.name).all(),
-                           categories=_catalog_category_options())
+                           categories=_catalog_category_options(),
+                           next_target=_safe_redirect_target(next_target))
 
 
 @catalog_bp.route("/catalog/purge-unreferenced", methods=["POST"])

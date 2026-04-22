@@ -1472,6 +1472,12 @@ class CatalogSmokeTests(SmokeBaseTest):
         edit_page = self.client.get(f"/catalog/{item_id}/edit")
         self.assertEqual(edit_page.status_code, 200)
         self.assertIn(b"suggest-field", edit_page.data)
+        self.assertNotIn(b'name="next"', edit_page.data)
+
+        filtered_edit_page = self.client.get(f"/catalog/{item_id}/edit?next=/catalog?category=Kitchen+Knives")
+        self.assertEqual(filtered_edit_page.status_code, 200)
+        self.assertIn(b'name="next"', filtered_edit_page.data)
+        self.assertIn(b'/catalog?category=Kitchen Knives', filtered_edit_page.data)
 
         set_edit_setup = self.client.post(
             "/sets/add",
@@ -1497,6 +1503,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             f"/catalog/{item_id}/edit",
             data={
                 "csrf_token": "test-csrf-token",
+                "next": "/catalog?category=Kitchen Knives",
                 "name": "Test Knife Updated",
                 "sku": "TK-1",
                 "category": "Kitchen Knives",
@@ -1511,6 +1518,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual(edit_response.status_code, 302)
+        self.assertIn("/catalog?category=Kitchen%20Knives", edit_response.location)
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             self.assertIsNotNone(item)

@@ -108,7 +108,7 @@
       </td>
       <td class="actions">
         {% if is_admin() %}
-          <a href="{{ url_for('catalog.catalog_edit', item_id=item.id) }}" class="btn btn-xs btn-secondary">Edit</a>
+          <a href="{{ url_for('catalog.catalog_edit', item_id=item.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}" class="btn btn-xs btn-secondary">Edit</a>
           <form method="post" action="{{ url_for('catalog.catalog_delete', item_id=item.id) }}"
                 class="form-inline">
             <button class="btn btn-xs btn-danger"
