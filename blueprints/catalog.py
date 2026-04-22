@@ -313,6 +313,16 @@ def catalog():
                      name_col.desc() if direction == "desc" else name_col,
                  )
                  .all())
+    elif sort == "edge_type":
+        edge_col = db.func.lower(db.func.coalesce(Item.edge_type, ""))
+        name_col = db.func.lower(db.func.coalesce(Item.name, ""))
+        items = (query
+                 .options(selectinload(Item.variants), selectinload(Item.sets))
+                 .order_by(
+                     edge_col.desc() if direction == "desc" else edge_col,
+                     name_col.desc() if direction == "desc" else name_col,
+                 )
+                 .all())
     else:
         items = (query
                  .options(selectinload(Item.variants), selectinload(Item.sets))

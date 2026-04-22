@@ -1387,6 +1387,19 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertLess(response.data.find(b"Alpha Knife"), response.data.find(b"Beta Knife"))
 
+    def test_catalog_edge_sort_uses_name_tiebreaker(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with self.app.app_context():
+            db.session.add(Item(name="Beta Edge Knife", sku="BE-1", edge_type="Straight"))
+            db.session.add(Item(name="Alpha Edge Knife", sku="AE-1", edge_type="Straight"))
+            db.session.commit()
+
+        response = self.client.get("/catalog?sort=edge_type&dir=asc")
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(response.data.find(b"Alpha Edge Knife"), response.data.find(b"Beta Edge Knife"))
+
     def test_catalog_validation_and_sort_fallbacks(self):
         self._login_as_admin()
         self._set_csrf_token()
