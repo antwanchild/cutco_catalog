@@ -15,6 +15,7 @@ from scraping import _member_hover_title, scrape_catalog, scrape_item_specs, scr
 
 catalog_bp = Blueprint("catalog", __name__)
 logger = logging.getLogger(__name__)
+UNCATEGORIZED_FILTER = "__uncategorized__"
 
 
 def _normalize_member_sku(value: str | None) -> str | None:
@@ -240,7 +241,10 @@ def catalog():
         query = query.filter(
             db.or_(Item.name.ilike(f"%{search_query}%"), Item.sku.ilike(f"%{search_query}%")))
     if cat_filter:
-        query = query.filter(Item.category == cat_filter)
+        if cat_filter == UNCATEGORIZED_FILTER:
+            query = query.filter(db.or_(Item.category.is_(None), Item.category == ""))
+        else:
+            query = query.filter(Item.category == cat_filter)
     if unicorn_f == "1":
         query = query.filter(db.or_(
             Item.is_unicorn,
@@ -276,6 +280,7 @@ def catalog():
                            status_f=status_f,
                            sort=sort, direction=direction,
                            edge_types=EDGE_TYPES,
+                           UNCATEGORIZED_FILTER=UNCATEGORIZED_FILTER,
                            COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            unreferenced_count=unreferenced_count,

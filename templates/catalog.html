@@ -16,6 +16,7 @@
   <input name="q" value="{{ q }}" placeholder="Search name or SKU…" class="input-search">
   <select name="category" class="select-sm">
     <option value="">All Categories</option>
+    <option value="{{ UNCATEGORIZED_FILTER }}" {% if cat_filter == UNCATEGORIZED_FILTER %}selected{% endif %}>Uncategorized</option>
     {% for category in categories %}
       <option value="{{ category }}" {% if category == cat_filter %}selected{% endif %}>{{ category }}</option>
     {% endfor %}
