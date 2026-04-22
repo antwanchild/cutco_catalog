@@ -522,7 +522,8 @@ textarea.input-full { height: auto; }
   font: inherit;
 }
 .suggest-option:hover,
-.suggest-option:focus {
+.suggest-option:focus,
+.suggest-option.active {
   background: var(--bg3);
   outline: none;
 }
