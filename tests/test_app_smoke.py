@@ -1540,6 +1540,22 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         item_id, variant_id = self._add_catalog_item(name="Set Knife", sku="1111")
+        incomplete_item_id, incomplete_variant_id = self._add_catalog_item(name="Incomplete Knife", sku="3333")
+        person_id = self._add_person(name="Set Owner", notes="")
+
+        ownership_response = self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(variant_id),
+                "status": "Owned",
+                "target_price": "",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(ownership_response.status_code, 302)
 
         set_add_response = self.client.post(
             "/sets/add",
@@ -1558,12 +1574,21 @@ class CatalogSmokeTests(SmokeBaseTest):
             item_set.member_data = json.dumps(
                 {"members": [{"sku": "9999", "quantity": 1}, {"sku": "9998", "quantity": 1}]}
             )
+            item_set.members.append(ItemSetMember(item_id=item_id, quantity=1))
             clear_set = Set(
                 name="Clear Set",
                 sku="CS-1",
-                member_data=json.dumps({"members": [{"sku": "2222", "quantity": 1}, {"sku": "1111", "quantity": 1}]}),
+                member_data=json.dumps({"members": [{"sku": "1111", "quantity": 1}]}),
             )
+            clear_set.members.append(ItemSetMember(item_id=item_id, quantity=1))
+            incomplete_set = Set(
+                name="Incomplete Set",
+                sku="IS-1",
+                member_data=json.dumps({"members": [{"sku": "3333", "quantity": 1}]}),
+            )
+            incomplete_set.members.append(ItemSetMember(item_id=incomplete_item_id, quantity=1))
             db.session.add(clear_set)
+            db.session.add(incomplete_set)
             db.session.commit()
 
         sets_page = self.client.get("/sets")
@@ -1578,9 +1603,6 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(set_edit_page.status_code, 200)
         self.assertIn(b"Set Members", set_edit_page.data)
 
-        with self.app.app_context():
-            _clear_item_id, _ = self._add_catalog_item(name="Clear Set Knife", sku="2222")
-
         filtered_set_edit_page = self.client.get(f"/sets/{set_id}/edit?next=/sets?person=1")
         self.assertEqual(filtered_set_edit_page.status_code, 200)
         self.assertIn(b'name="next"', filtered_set_edit_page.data)
@@ -1592,6 +1614,12 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Set Group", missing_sets_page.data)
         self.assertNotIn(b"Clear Set", missing_sets_page.data)
         self.assertIn(b"Has missing members", missing_sets_page.data)
+
+        incomplete_sets_page = self.client.get("/sets?incomplete=1")
+        self.assertEqual(incomplete_sets_page.status_code, 200)
+        self.assertIn(b"Incomplete Set", incomplete_sets_page.data)
+        self.assertNotIn(b"Clear Set", incomplete_sets_page.data)
+        self.assertIn(b"Incomplete only", incomplete_sets_page.data)
 
         edit_response = self.client.post(
             f"/sets/{set_id}/edit",

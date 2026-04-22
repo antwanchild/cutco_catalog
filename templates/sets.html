@@ -24,6 +24,13 @@
       <option value="1" {% if missing_f == '1' %}selected{% endif %}>Has missing members</option>
     </select>
   </label>
+  <label class="flex-center" style="font-size:.9rem">
+    Completion:
+    <select name="incomplete" onchange="this.form.submit()" class="input-sm">
+      <option value="">All sets</option>
+      <option value="1" {% if incomplete_f == '1' %}selected{% endif %}>Incomplete only</option>
+    </select>
+  </label>
 </form>
 
 {% if sets %}

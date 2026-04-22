@@ -567,6 +567,7 @@ def sets_list():
     all_persons = Person.query.order_by(Person.name).all()
     person_id   = request.args.get("person", type=int)
     missing_f   = request.args.get("missing", "")
+    incomplete_f = request.args.get("incomplete", "")
 
     # Completion relative to selected person, or globally if none selected
     owned_q = Ownership.query.filter_by(status="Owned")
@@ -590,6 +591,7 @@ def sets_list():
     for item_set in all_sets:
         total = len(item_set.items)
         owned = sum(1 for item in item_set.items if item.id in owned_item_ids)
+        pct = round(100 * owned / total) if total else 0
         _, missing_member_skus = _build_member_status_rows(
             _load_member_snapshot(item_set.member_data),
             catalog_sku_lookup,
@@ -597,14 +599,15 @@ def sets_list():
         missing_member_counts[item_set.id] = len(missing_member_skus)
         if missing_f == "1" and not missing_member_skus:
             continue
-        completion[item_set.id] = dict(total=total, owned=owned,
-                                       pct=round(100 * owned / total) if total else 0)
+        if incomplete_f == "1" and pct == 100:
+            continue
+        completion[item_set.id] = dict(total=total, owned=owned, pct=pct)
         filtered_sets.append(item_set)
 
     return render_template("sets.html", sets=filtered_sets, completion=completion,
                            missing_member_counts=missing_member_counts,
                            all_persons=all_persons, person_id=person_id,
-                           missing_f=missing_f)
+                           missing_f=missing_f, incomplete_f=incomplete_f)
 
 
 @catalog_bp.route("/sets/add", methods=["GET", "POST"])
