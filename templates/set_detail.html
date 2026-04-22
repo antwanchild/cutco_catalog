@@ -81,8 +81,8 @@
   </tbody>
 </table>
 </div>
-{% if missing_member_skus %}
-<p class="muted">Not in catalog: {% for sku in missing_member_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</p>
+{% if not_in_catalog_skus %}
+<p class="muted">Not in catalog: {% for sku in not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</p>
 {% endif %}
 {% endif %}
 

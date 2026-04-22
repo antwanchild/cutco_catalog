@@ -566,7 +566,7 @@ def sets_list():
     all_sets    = Set.query.order_by(Set.name).all()
     all_persons = Person.query.order_by(Person.name).all()
     person_id   = request.args.get("person", type=int)
-    missing_f   = request.args.get("missing", "")
+    not_in_catalog_f = request.args.get("missing", "")
     incomplete_f = request.args.get("incomplete", "")
 
     # Completion relative to selected person, or globally if none selected
@@ -586,18 +586,18 @@ def sets_list():
     }
 
     completion = {}
-    missing_member_counts: dict[int, int] = {}
+    not_in_catalog_counts: dict[int, int] = {}
     filtered_sets = []
     for item_set in all_sets:
         total = len(item_set.items)
         owned = sum(1 for item in item_set.items if item.id in owned_item_ids)
         pct = round(100 * owned / total) if total else 0
-        _, missing_member_skus = _build_member_status_rows(
+        _, not_in_catalog_skus = _build_member_status_rows(
             _load_member_snapshot(item_set.member_data),
             catalog_sku_lookup,
         )
-        missing_member_counts[item_set.id] = len(missing_member_skus)
-        if missing_f == "1" and not missing_member_skus:
+        not_in_catalog_counts[item_set.id] = len(not_in_catalog_skus)
+        if not_in_catalog_f == "1" and not not_in_catalog_skus:
             continue
         if incomplete_f == "1" and pct == 100:
             continue
@@ -605,9 +605,9 @@ def sets_list():
         filtered_sets.append(item_set)
 
     return render_template("sets.html", sets=filtered_sets, completion=completion,
-                           missing_member_counts=missing_member_counts,
+                           not_in_catalog_counts=not_in_catalog_counts,
                            all_persons=all_persons, person_id=person_id,
-                           missing_f=missing_f, incomplete_f=incomplete_f)
+                           not_in_catalog_f=not_in_catalog_f, incomplete_f=incomplete_f)
 
 
 @catalog_bp.route("/sets/add", methods=["GET", "POST"])
@@ -764,7 +764,7 @@ def set_detail(set_id=None, sid=None):
         for item in Item.query.filter(Item.sku.isnot(None)).all()
         if _normalize_member_sku(item.sku)
     }
-    member_snapshot_rows, missing_member_skus = _build_member_status_rows(
+    member_snapshot_rows, not_in_catalog_skus = _build_member_status_rows(
         _load_member_snapshot(item_set.member_data),
         catalog_sku_lookup,
     )
@@ -815,7 +815,7 @@ def set_detail(set_id=None, sid=None):
                            wishlisted_item_ids=wishlisted_item_ids,
                            qty_map=qty_map,
                            member_snapshot_rows=member_snapshot_rows,
-                           missing_member_skus=missing_member_skus,
+                           not_in_catalog_skus=not_in_catalog_skus,
                            next_target=next_target,
                            COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
@@ -957,7 +957,7 @@ def catalog_sync():
     }
     for item_set in (*new_sets, *existing_sets_data):
         member_entries = item_set.get("member_entries") or []
-        member_snapshot_rows, missing_member_skus = _build_member_status_rows(
+        member_snapshot_rows, not_in_catalog_skus = _build_member_status_rows(
             member_entries,
             catalog_sku_lookup,
             preview_name_lookup,
@@ -965,7 +965,7 @@ def catalog_sync():
             found_skus=scraped_sku_lookup,
         )
         item_set["member_snapshot_rows"] = member_snapshot_rows
-        item_set["missing_member_skus"] = missing_member_skus
+        item_set["not_in_catalog_skus"] = not_in_catalog_skus
         item_set["member_data_json"] = json.dumps(member_entries, ensure_ascii=False)
 
     return render_template("sync_preview.html",
