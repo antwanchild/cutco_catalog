@@ -42,19 +42,24 @@
 
     {# Variants #}
     <section class="detail-section">
-      <h2 class="section-heading">Variants ({{ item.variants | length }})</h2>
-      <div class="chip-list">
-        {% for v in item.variants %}
-          {% if v.color != UNKNOWN_COLOR %}
-            <span class="chip {% if v.is_unicorn %}chip-unicorn{% endif %}">
-              {{ v.color }}{% if v.is_unicorn %} 🦄{% endif %}
-            </span>
+      {% if item.category in COOKWARE_CATEGORIES %}
+        <h2 class="section-heading">Variants</h2>
+        <p class="muted">Cookware does not use color variants.</p>
+      {% else %}
+        <h2 class="section-heading">Variants ({{ item.variants | length }})</h2>
+        <div class="chip-list">
+          {% for v in item.variants %}
+            {% if v.color != UNKNOWN_COLOR %}
+              <span class="chip {% if v.is_unicorn %}chip-unicorn{% endif %}">
+                {{ v.color }}{% if v.is_unicorn %} 🦄{% endif %}
+              </span>
+            {% endif %}
+          {% endfor %}
+          {% if item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length == 0 %}
+            <span class="muted">No color variants recorded.</span>
           {% endif %}
-        {% endfor %}
-        {% if item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length == 0 %}
-          <span class="muted">No color variants recorded.</span>
-        {% endif %}
-      </div>
+        </div>
+      {% endif %}
     </section>
 
     {# Sets #}

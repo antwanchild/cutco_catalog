@@ -72,10 +72,14 @@
         {% else %}<span class="muted">—</span>{% endif %}
       </td>
       <td>
-        <a href="{{ url_for('catalog.variants', item_id=item.id) }}">
-          {{ item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length }}
-          color{% if item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length != 1 %}s{% endif %}
-        </a>
+        {% if item.category in COOKWARE_CATEGORIES %}
+          <span class="muted">—</span>
+        {% else %}
+          <a href="{{ url_for('catalog.variants', item_id=item.id) }}">
+            {{ item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length }}
+            color{% if item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length != 1 %}s{% endif %}
+          </a>
+        {% endif %}
       </td>
       <td class="sets-cell">
         {% if item.sets %}

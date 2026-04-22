@@ -1,6 +1,6 @@
 from flask import Blueprint, abort, render_template, request
 
-from constants import STATUS_RANK, UNKNOWN_COLOR
+from constants import COOKWARE_CATEGORIES, STATUS_RANK, UNKNOWN_COLOR
 from extensions import db
 from helpers import (_collection_token, _gift_token,
                      _verify_collection_token, _verify_gift_token)
@@ -44,6 +44,7 @@ def item_owners(item_id):
                            entries=entries, people_without=people_without,
                            sharpening=sharpening, task_log=task_log,
                            top_tasks=top_tasks,
+                           COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 

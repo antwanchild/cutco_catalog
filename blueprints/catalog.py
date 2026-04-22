@@ -276,6 +276,7 @@ def catalog():
                            status_f=status_f,
                            sort=sort, direction=direction,
                            edge_types=EDGE_TYPES,
+                           COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            unreferenced_count=unreferenced_count,
                            all_item_count=all_item_count,
@@ -720,6 +721,7 @@ def set_detail(set_id=None, sid=None):
                            qty_map=qty_map,
                            member_snapshot_rows=member_snapshot_rows,
                            missing_member_skus=missing_member_skus,
+                           COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
