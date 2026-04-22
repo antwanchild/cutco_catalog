@@ -7,7 +7,7 @@
     {% if person_id %}
       <a href="{{ url_for('views.gift_token', set_id=set.id, person=person_id) }}" class="btn btn-secondary">🎁 Share Gift List</a>
     {% endif %}
-    <a href="{{ url_for('catalog.set_edit', set_id=set.id) }}" class="btn btn-secondary">Edit</a>
+    <a href="{{ url_for('catalog.set_edit', set_id=set.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}" class="btn btn-secondary">Edit</a>
     <a href="{{ url_for('catalog.sets_list') }}{% if person_id %}?person={{ person_id }}{% endif %}" class="btn btn-ghost">← Sets</a>
   </div>
 </div>

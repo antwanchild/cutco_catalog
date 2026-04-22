@@ -591,6 +591,7 @@ def sets_list():
 @catalog_bp.route("/sets/add", methods=["GET", "POST"])
 @admin_required
 def set_add():
+    next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
     if request.method == "POST":
         name = request.form["name"].strip()
         if Set.query.filter(db.func.lower(Set.name) == name.lower()).first():
@@ -605,7 +606,7 @@ def set_add():
         if db_commit(db.session):
             logger.info("Set created: %s", name)
             flash(f'Created set "{name}".', "success")
-        return redirect(url_for("catalog.sets_list"))
+        return redirect(_safe_redirect_target(next_target) or url_for("catalog.sets_list"))
     return render_template(
         "set_form.html",
         set=None,
@@ -614,6 +615,7 @@ def set_add():
         member_qty_map={},
         set_name_options=_set_name_options(),
         set_sku_options=_set_sku_options(),
+        next_target=_safe_redirect_target(next_target),
     )
 
 
@@ -625,6 +627,7 @@ def set_edit(set_id=None, sid=None):
     item_set = db.session.get(Set, set_id)
     if not item_set:
         abort(404)
+    next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
     all_items = Item.query.order_by(Item.name).all()
     member_qty_map = {member.item_id: member.quantity for member in item_set.members}
 
@@ -667,7 +670,7 @@ def set_edit(set_id=None, sid=None):
         if db_commit(db.session):
             logger.info("Set updated: %s", item_set.name)
             flash(f'Updated set "{item_set.name}".', "success")
-        return redirect(url_for("catalog.sets_list"))
+        return redirect(_safe_redirect_target(next_target) or url_for("catalog.sets_list"))
     return render_template(
         "set_form.html",
         set=item_set,
@@ -676,6 +679,7 @@ def set_edit(set_id=None, sid=None):
         member_qty_map=member_qty_map,
         set_name_options=_set_name_options(),
         set_sku_options=_set_sku_options(),
+        next_target=_safe_redirect_target(next_target),
     )
 
 

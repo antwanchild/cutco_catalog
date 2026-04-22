@@ -1500,6 +1500,12 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Update Set", set_edit_page.data)
         self.assertIn(b"Back to Sets", set_edit_page.data)
 
+        filtered_set_edit_page = self.client.get(f"/sets/{set_id}/edit?next=/sets?person=1")
+        self.assertEqual(filtered_set_edit_page.status_code, 200)
+        self.assertIn(b'name="next"', filtered_set_edit_page.data)
+        self.assertIn(b'/sets?person=1', filtered_set_edit_page.data)
+        self.assertIn(b'href="/sets?person=1"', filtered_set_edit_page.data)
+
         edit_response = self.client.post(
             f"/catalog/{item_id}/edit",
             data={
@@ -1561,10 +1567,17 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(set_edit_page.status_code, 200)
         self.assertIn(b"Set Members", set_edit_page.data)
 
+        filtered_set_edit_page = self.client.get(f"/sets/{item_set.id}/edit?next=/sets?person=1")
+        self.assertEqual(filtered_set_edit_page.status_code, 200)
+        self.assertIn(b'name="next"', filtered_set_edit_page.data)
+        self.assertIn(b'/sets?person=1', filtered_set_edit_page.data)
+        self.assertIn(b'href="/sets?person=1"', filtered_set_edit_page.data)
+
         edit_response = self.client.post(
             f"/sets/{item_set.id}/edit",
             data={
                 "csrf_token": "test-csrf-token",
+                "next": "/sets?person=1",
                 "name": "Set Group Updated",
                 "sku": "SG-2",
                 "notes": "Updated set",
@@ -1574,6 +1587,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             follow_redirects=False,
         )
         self.assertEqual(edit_response.status_code, 302)
+        self.assertIn("/sets?person=1", edit_response.location)
         with self.app.app_context():
             item_set = db.session.get(Set, item_set.id)
             self.assertIsNotNone(item_set)

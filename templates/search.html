@@ -100,7 +100,7 @@
           </div>
           <div class="search-result-badges">
             <span class="badge badge-info">{{ item_set.items | length }} items</span>
-            <a class="btn btn-xs btn-secondary" href="{{ url_for('catalog.set_edit', set_id=item_set.id) }}">Edit</a>
+            <a class="btn btn-xs btn-secondary" href="{{ url_for('catalog.set_edit', set_id=item_set.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}">Edit</a>
           </div>
         </div>
       {% else %}

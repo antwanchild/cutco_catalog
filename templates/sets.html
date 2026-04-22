@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">🗂️ Sets {{ help_btn("sets") }}</h1>
-  <a class="btn btn-primary" href="{{ url_for('catalog.set_add') }}">+ New Set</a>
+  <a class="btn btn-primary" href="{{ url_for('catalog.set_add', next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}">+ New Set</a>
 </div>
 
 {# ── Person filter ─────────────────────────────────────────────────────────── #}
@@ -55,7 +55,7 @@
       </td>
       <td>{{ item_set.notes or '—' }}</td>
       <td class="actions">
-        <a href="{{ url_for('catalog.set_edit', set_id=item_set.id) }}" class="btn btn-xs btn-secondary">Edit</a>
+        <a href="{{ url_for('catalog.set_edit', set_id=item_set.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}" class="btn btn-xs btn-secondary">Edit</a>
         <form method="post" action="{{ url_for('catalog.set_delete', set_id=item_set.id) }}"
               class="form-inline">
           <button class="btn btn-xs btn-danger"

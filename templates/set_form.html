@@ -3,10 +3,13 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">{{ action }} Set</h1>
-  <a href="{{ url_for('catalog.sets_list') }}" class="btn btn-ghost">← Sets</a>
+  <a href="{{ next_target or url_for('catalog.sets_list') }}" class="btn btn-ghost">← Sets</a>
 </div>
 
 <form method="post" class="form-card">
+  {% if next_target %}
+    <input type="hidden" name="next" value="{{ next_target }}">
+  {% endif %}
   <div class="suggest-field" data-suggest-values='{{ set_name_options | tojson }}'>
     <label>Set Name *
       <input type="text" name="name" value="{{ set.name if set else '' }}" required class="input-full suggest-input" autocomplete="off">
