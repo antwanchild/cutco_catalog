@@ -450,9 +450,19 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
   padding: .1rem .4rem;
   font-size: .75rem;
   color: var(--muted);
+  font: inherit;
 }
 .chip:hover { color: var(--text); text-decoration: none; }
-.set-chips { display: flex; flex-wrap: wrap; gap: .25rem; }
+.set-chips { display: flex; flex-wrap: wrap; gap: .25rem; align-items: flex-start; }
+.chip-more {
+  cursor: pointer;
+  color: var(--accent);
+  border-style: dashed;
+}
+.chip-more:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
 
 /* ── Forms ──────────────────────────────────────────────────────────────── */
 .form-card {

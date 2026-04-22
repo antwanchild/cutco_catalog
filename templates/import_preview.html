@@ -105,7 +105,7 @@
         <td>
           <input type="hidden" name="item_sets_{{ loop.index0 }}" value="{{ item.sets | join('|') }}">
           {% if item.sets %}
-            <span class="set-chips">{% for set_name in item.sets %}<span class="chip">{{ set_name }}</span>{% endfor %}</span>
+            <span class="set-chips" data-clamp-rows="2">{% for set_name in item.sets %}<span class="chip">{{ set_name }}</span>{% endfor %}</span>
           {% else %}—{% endif %}
         </td>
         <td>
@@ -177,7 +177,7 @@
         <td>
           <input type="hidden" name="item_sets_{{ form_field_index }}" value="{{ item.sets | join('|') }}">
           {% if item.sets %}
-            <span class="set-chips">{% for set_name in item.sets %}<span class="chip">{{ set_name }}</span>{% endfor %}</span>
+            <span class="set-chips" data-clamp-rows="2">{% for set_name in item.sets %}<span class="chip">{{ set_name }}</span>{% endfor %}</span>
           {% else %}—{% endif %}
         </td>
       </tr>

@@ -315,6 +315,7 @@ class PublicSmokeTests(SmokeBaseTest):
 
         self.assertEqual(item_response.status_code, 200)
         self.assertIn(b"View Knife", item_response.data)
+        self.assertIn(b'data-clamp-rows="2"', item_response.data)
         self.assertEqual(matrix_response.status_code, 200)
         self.assertIn(b"Matrix", matrix_response.data)
         self.assertEqual(stats_response.status_code, 200)
@@ -338,6 +339,7 @@ class PublicSmokeTests(SmokeBaseTest):
 
         self.assertEqual(catalog_response.status_code, 200)
         self.assertIn(b"Catalog Knife", catalog_response.data)
+        self.assertIn(b'data-clamp-rows="2"', catalog_response.data)
         self.assertIn(b"data-confirm-title=\"Delete item\"", catalog_response.data)
         self.assertEqual(variants_response.status_code, 200)
         self.assertIn(b"Variants", variants_response.data)

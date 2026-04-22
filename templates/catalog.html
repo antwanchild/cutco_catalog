@@ -100,7 +100,7 @@
       </td>
       <td class="sets-cell">
         {% if item.sets %}
-          <span class="set-chips">
+          <span class="set-chips" data-clamp-rows="2">
             {% for item_set in item.sets %}
               <a href="{{ url_for('catalog.set_detail', set_id=item_set.id) }}" class="chip">{{ item_set.name }}</a>
             {% endfor %}

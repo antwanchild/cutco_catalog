@@ -70,7 +70,7 @@
     {% if item.sets %}
     <section class="detail-section">
       <h2 class="section-heading">Sets</h2>
-      <div class="chip-list">
+      <div class="chip-list set-chips" data-clamp-rows="2">
         {% for item_set in item.sets %}
           <a href="{{ url_for('catalog.set_detail', set_id=item_set.id) }}" class="chip chip-link">{{ item_set.name }}</a>
         {% endfor %}
