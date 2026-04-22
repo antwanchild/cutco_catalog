@@ -798,6 +798,7 @@ def set_detail(set_id=None, sid=None):
     pct = round(100 * owned_count / total) if total else 0
 
     qty_map = {membership.item_id: membership.quantity for membership in item_set.members}
+    next_target = _safe_redirect_target(request.args.get("next"))
 
     return render_template("set_detail.html",
                            set=item_set,
@@ -815,6 +816,7 @@ def set_detail(set_id=None, sid=None):
                            qty_map=qty_map,
                            member_snapshot_rows=member_snapshot_rows,
                            missing_member_skus=missing_member_skus,
+                           next_target=next_target,
                            COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 

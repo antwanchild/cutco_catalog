@@ -44,7 +44,7 @@
     {% set c = completion[item_set.id] %}
     <tr>
       <td>
-        <a href="{{ url_for('catalog.set_detail', set_id=item_set.id) }}{% if person_id %}?person={{ person_id }}{% endif %}">
+        <a href="{{ url_for('catalog.set_detail', set_id=item_set.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}{% if person_id %}&person={{ person_id }}{% endif %}">
           {{ item_set.name }}
         </a>
         {% if item_set.sku %}

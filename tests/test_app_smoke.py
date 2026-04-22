@@ -1575,6 +1575,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 {"members": [{"sku": "9999", "quantity": 1}, {"sku": "9998", "quantity": 1}]}
             )
             item_set.members.append(ItemSetMember(item_id=item_id, quantity=1))
+            item_set.members.append(ItemSetMember(item_id=incomplete_item_id, quantity=1))
             clear_set = Set(
                 name="Clear Set",
                 sku="CS-1",
@@ -1602,12 +1603,25 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Set Group", set_detail_page.data)
         self.assertEqual(set_edit_page.status_code, 200)
         self.assertIn(b"Set Members", set_edit_page.data)
+        self.assertIn("← Sets".encode(), set_detail_page.data)
 
         filtered_set_edit_page = self.client.get(f"/sets/{set_id}/edit?next=/sets?person=1")
         self.assertEqual(filtered_set_edit_page.status_code, 200)
         self.assertIn(b'name="next"', filtered_set_edit_page.data)
         self.assertIn(b'/sets?person=1', filtered_set_edit_page.data)
         self.assertIn(b'href="/sets?person=1"', filtered_set_edit_page.data)
+
+        filtered_sets_page = self.client.get("/sets?missing=1&incomplete=1")
+        self.assertEqual(filtered_sets_page.status_code, 200)
+        self.assertIn(b'next=/sets?missing%3D1%26incomplete%3D1', filtered_sets_page.data)
+
+        filtered_set_detail_page = self.client.get(f"/sets/{set_id}?next=/sets?missing%3D1%26incomplete%3D1")
+        self.assertEqual(filtered_set_detail_page.status_code, 200)
+        self.assertIn(b'href="/sets?missing=1&amp;incomplete=1"', filtered_set_detail_page.data)
+        self.assertIn(
+            f'href="/sets/{set_id}/edit?next=/sets?missing%3D1%26incomplete%3D1"'.encode(),
+            filtered_set_detail_page.data,
+        )
 
         missing_sets_page = self.client.get("/sets?missing=1")
         self.assertEqual(missing_sets_page.status_code, 200)
