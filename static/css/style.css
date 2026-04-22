@@ -343,6 +343,7 @@ a:hover { text-decoration: underline; }
 }
 .data-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: .875rem;
 }
@@ -350,6 +351,7 @@ a:hover { text-decoration: underline; }
   padding: .55rem .75rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
+  overflow-wrap: anywhere;
 }
 .data-table td { vertical-align: top; }
 .data-table th {
@@ -360,6 +362,9 @@ a:hover { text-decoration: underline; }
   text-transform: uppercase;
   letter-spacing: .04em;
   white-space: nowrap;
+}
+.data-table td, .data-table th {
+  min-width: 0;
 }
 .data-table th a { color: var(--muted); }
 .data-table th a:hover { color: var(--text); }
