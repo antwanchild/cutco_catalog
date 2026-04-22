@@ -527,6 +527,17 @@ textarea.input-full { height: auto; }
   background: var(--bg3);
   outline: none;
 }
+.suggest-option.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 0 rgba(255, 255, 255, .25);
+}
+.suggest-option.active:hover,
+.suggest-option.active:focus {
+  background: var(--accent);
+  color: #fff;
+}
 select.input-full, select.select-sm, select.select-xs {
   appearance: auto;
   cursor: pointer;
