@@ -188,6 +188,7 @@
       var input = field.querySelector('input');
       var menu = field.querySelector('.suggest-menu');
       if (!input || !menu) return;
+      var suppressNextRender = false;
 
       function focusNextFocusable(fromElement, backwards) {
         var focusable = Array.prototype.slice.call(document.querySelectorAll(
@@ -205,6 +206,7 @@
 
       function selectOption(option, focusInput) {
         if (!option) return;
+        suppressNextRender = true;
         input.value = option.dataset.value || option.textContent || '';
         closeMenus();
         input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -214,6 +216,10 @@
       }
 
       input.addEventListener('input', function() {
+        if (suppressNextRender) {
+          suppressNextRender = false;
+          return;
+        }
         closeMenus(field);
         renderMenu(field, input);
       });
