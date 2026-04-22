@@ -284,23 +284,45 @@ def _register_routes(app: Flask) -> None:
     @app.route("/search")
     def search():
         query = request.args.get("q", "").strip()
+        cat_filter = request.args.get("category", "").strip()
+        categories = [
+            row[0]
+            for row in db.session.query(Item.category)
+            .filter(Item.category.isnot(None), Item.category != "")
+            .distinct()
+            .order_by(Item.category)
+            .all()
+        ]
         if not query:
-            return render_template("search.html", query="", results={}, shortcuts=[
+            return render_template(
+                "search.html",
+                query="",
+                results={},
+                shortcuts=[
                 {"label": "Catalog", "url": url_for("catalog.catalog"), "description": "Browse and filter items."},
                 {"label": "People", "url": url_for("people.people"), "description": "Open collector records."},
                 {"label": "Tasks", "url": url_for("logs.tasks_manage"), "description": "Manage knife tasks."},
                 {"label": "Diagnostics", "url": url_for("admin.diagnostics_page"), "description": "Check runtime health."},
-            ])
+                ],
+                categories=categories,
+                cat_filter=cat_filter,
+                UNCATEGORIZED_FILTER="__uncategorized__",
+            )
 
         like = f"%{query}%"
-        item_results = Item.query.filter(
+        item_query = Item.query.filter(
             db.or_(
                 Item.name.ilike(like),
                 Item.sku.ilike(like),
                 Item.category.ilike(like),
                 Item.notes.ilike(like),
             )
-        ).order_by(Item.name).limit(20).all()
+        )
+        if cat_filter == "__uncategorized__":
+            item_query = item_query.filter(db.or_(Item.category.is_(None), Item.category == ""))
+        elif cat_filter:
+            item_query = item_query.filter(Item.category == cat_filter)
+        item_results = item_query.order_by(Item.name).limit(20).all()
 
         person_results = Person.query.filter(
             db.or_(
@@ -331,6 +353,9 @@ def _register_routes(app: Flask) -> None:
                 "tasks": task_results,
             },
             shortcuts=[],
+            categories=categories,
+            cat_filter=cat_filter,
+            UNCATEGORIZED_FILTER="__uncategorized__",
         )
 
     @app.route("/health")

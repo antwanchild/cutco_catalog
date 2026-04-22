@@ -7,6 +7,18 @@
 
 {% if query %}
   <p class="search-kicker">Results for <strong>{{ query }}</strong></p>
+  <form class="filter-bar" method="get" action="{{ url_for('search') }}">
+    <input name="q" value="{{ query }}" placeholder="Search name or SKU…" class="input-search">
+    <select name="category" class="select-sm">
+      <option value="">All Categories</option>
+      <option value="{{ UNCATEGORIZED_FILTER }}" {% if cat_filter == UNCATEGORIZED_FILTER %}selected{% endif %}>Uncategorized</option>
+      {% for category in categories %}
+        <option value="{{ category }}" {% if category == cat_filter %}selected{% endif %}>{{ category }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-sm">Filter</button>
+    <a href="{{ url_for('search', q=query) }}" class="btn btn-sm btn-ghost">Clear</a>
+  </form>
 {% else %}
   <p class="search-kicker">Search items, collectors, sets, and tasks from one place.</p>
 {% endif %}

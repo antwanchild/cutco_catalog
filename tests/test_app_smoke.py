@@ -63,19 +63,21 @@ class SmokeBaseTest(unittest.TestCase):
         return value
 
     def _add_catalog_item(self, *, name="Test Knife", sku="TK-1", category="Kitchen Knives"):
+        payload = {
+            "csrf_token": "test-csrf-token",
+            "name": name,
+            "sku": sku,
+            "edge_type": "Straight",
+            "cutco_url": "https://example.com/test-knife",
+            "notes": "Initial note",
+            "colors": "",
+            "in_catalog": "on",
+        }
+        if category is not None:
+            payload["category"] = category
         response = self.client.post(
             "/catalog/add",
-            data={
-                "csrf_token": "test-csrf-token",
-                "name": name,
-                "sku": sku,
-                "category": category,
-                "edge_type": "Straight",
-                "cutco_url": "https://example.com/test-knife",
-                "notes": "Initial note",
-                "colors": "",
-                "in_catalog": "on",
-            },
+            data=payload,
             follow_redirects=False,
         )
         self.assertEqual(response.status_code, 302)
@@ -157,6 +159,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         item_id, _variant_id = self._add_catalog_item(name="Search Knife", sku="SRCH-1")
+        _uncategorized_item_id, _uncategorized_variant_id = self._add_catalog_item(name="Search Uncat", sku="SRCH-2", category=None)
         _person_id = self._add_person(name="Search Collector", notes="Search note")
         _set_id = self._add_set(name="Search Set", sku="SET-S", item_ids=(item_id,))
         self._add_task(name="Slice tomatoes")
@@ -171,6 +174,12 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Search Collector", response.data)
         self.assertIn(b"Search Set", response.data)
         self.assertIn(b"Catalog Items", response.data)
+
+        uncategorized_response = self.client.get("/search?q=Search&category=__uncategorized__")
+        self.assertEqual(uncategorized_response.status_code, 200)
+        self.assertIn(b"Search Uncat", uncategorized_response.data)
+        self.assertIn(b"Uncategorized", uncategorized_response.data)
+        self.assertNotIn(b"Search Knife", uncategorized_response.data)
 
     def test_admin_login_sets_session_flag(self):
         response = self.client.post(
