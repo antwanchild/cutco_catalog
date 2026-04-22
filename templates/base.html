@@ -189,6 +189,14 @@
       var menu = field.querySelector('.suggest-menu');
       if (!input || !menu) return;
 
+      function selectOption(option) {
+        if (!option) return;
+        input.value = option.dataset.value || option.textContent || '';
+        closeMenus();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+      }
+
       input.addEventListener('input', function() {
         closeMenus(field);
         renderMenu(field, input);
@@ -223,7 +231,7 @@
         if (e.key === 'Enter') {
           e.preventDefault();
           var option = getActiveOption(menu) || options[0];
-          if (option) option.click();
+          selectOption(option);
         }
       });
 
@@ -231,10 +239,7 @@
         var option = e.target.closest('.suggest-option');
         if (!option) return;
         e.preventDefault();
-        input.value = option.dataset.value || option.textContent || '';
-        closeMenus();
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.focus();
+        selectOption(option);
       });
 
       input.addEventListener('blur', function() {
