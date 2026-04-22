@@ -302,11 +302,22 @@ def catalog():
 
     from sqlalchemy.orm import selectinload
     sort_cols = {"name": Item.name, "sku": Item.sku, "category": Item.category, "edge_type": Item.edge_type}
-    col   = sort_cols.get(sort, Item.name)
-    items = (query
-             .options(selectinload(Item.variants), selectinload(Item.sets))
-             .order_by(col.desc() if direction == "desc" else col)
-             .all())
+    col = sort_cols.get(sort, Item.name)
+    if sort == "category":
+        category_col = db.func.lower(db.func.coalesce(Item.category, ""))
+        name_col = db.func.lower(db.func.coalesce(Item.name, ""))
+        items = (query
+                 .options(selectinload(Item.variants), selectinload(Item.sets))
+                 .order_by(
+                     category_col.desc() if direction == "desc" else category_col,
+                     name_col.desc() if direction == "desc" else name_col,
+                 )
+                 .all())
+    else:
+        items = (query
+                 .options(selectinload(Item.variants), selectinload(Item.sets))
+                 .order_by(col.desc() if direction == "desc" else col)
+                 .all())
 
     categories = [row[0] for row in
                   db.session.query(Item.category)

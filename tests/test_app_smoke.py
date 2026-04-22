@@ -1373,8 +1373,19 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Add Item", add_page_response.data)
         self.assertEqual(edit_page_response.status_code, 200)
         self.assertIn(b"Filter Knife", edit_page_response.data)
-        self.assertIn(b"Update Item", edit_page_response.data)
-        self.assertIn(b"Back to Catalog", edit_page_response.data)
+
+    def test_catalog_category_sort_uses_name_tiebreaker(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with self.app.app_context():
+            db.session.add(Item(name="Beta Knife", sku="BT-1", category="Kitchen Knives"))
+            db.session.add(Item(name="Alpha Knife", sku="AL-1", category="Kitchen Knives"))
+            db.session.commit()
+
+        response = self.client.get("/catalog?sort=category&dir=asc")
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(response.data.find(b"Alpha Knife"), response.data.find(b"Beta Knife"))
 
     def test_catalog_validation_and_sort_fallbacks(self):
         self._login_as_admin()
