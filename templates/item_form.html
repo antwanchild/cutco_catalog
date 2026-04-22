@@ -88,8 +88,8 @@
   </label>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">{{ action }} Item</button>
-    <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">Cancel</a>
+    <button type="submit" class="btn btn-primary">{% if action == "Edit" %}Update{% else %}Add{% endif %} Item</button>
+    <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">Back to Catalog</a>
   </div>
 
 </form>

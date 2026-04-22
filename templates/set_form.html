@@ -89,8 +89,8 @@
   </div>
   {% endif %}
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">{{ action }} Set</button>
-    <a href="{{ url_for('catalog.sets_list') }}" class="btn btn-ghost">Cancel</a>
+    <button type="submit" class="btn btn-primary">{% if action == "Edit" %}Update{% else %}Add{% endif %} Set</button>
+    <a href="{{ url_for('catalog.sets_list') }}" class="btn btn-ghost">Back to Sets</a>
   </div>
 </form>
 {% if action == "Edit" %}

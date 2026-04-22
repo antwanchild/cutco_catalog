@@ -1371,6 +1371,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Add Item", add_page_response.data)
         self.assertEqual(edit_page_response.status_code, 200)
         self.assertIn(b"Filter Knife", edit_page_response.data)
+        self.assertIn(b"Update Item", edit_page_response.data)
+        self.assertIn(b"Back to Catalog", edit_page_response.data)
 
     def test_catalog_validation_and_sort_fallbacks(self):
         self._login_as_admin()
@@ -1462,6 +1464,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         set_add_page = self.client.get("/sets/add")
         self.assertEqual(set_add_page.status_code, 200)
         self.assertGreaterEqual(set_add_page.data.count(b"suggest-field"), 2)
+        self.assertIn(b"Add Set", set_add_page.data)
+        self.assertIn(b"Back to Sets", set_add_page.data)
 
         item_id, _variant_id = self._add_catalog_item()
 
@@ -1486,6 +1490,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         set_edit_page = self.client.get(f"/sets/{set_id}/edit")
         self.assertEqual(set_edit_page.status_code, 200)
         self.assertGreaterEqual(set_edit_page.data.count(b"suggest-field"), 2)
+        self.assertIn(b"Update Set", set_edit_page.data)
+        self.assertIn(b"Back to Sets", set_edit_page.data)
 
         edit_response = self.client.post(
             f"/catalog/{item_id}/edit",
