@@ -14,21 +14,21 @@
 
 <form class="filter-bar" method="get">
   <input name="q" value="{{ q }}" placeholder="Search name or SKU…" class="input-search">
-  <select name="category" class="select-sm">
+  <select name="category" class="select-sm" onchange="this.form.submit()">
     <option value="">All Categories</option>
     <option value="{{ UNCATEGORIZED_FILTER }}" {% if cat_filter == UNCATEGORIZED_FILTER %}selected{% endif %}>Uncategorized</option>
     {% for category in categories %}
       <option value="{{ category }}" {% if category == cat_filter %}selected{% endif %}>{{ category }}</option>
     {% endfor %}
   </select>
-  <select name="status" class="select-sm">
+  <select name="status" class="select-sm" onchange="this.form.submit()">
     <option value="">All Statuses</option>
     <option value="set_only" {% if status_f == 'set_only' %}selected{% endif %}>Set-only</option>
     <option value="off_catalog" {% if status_f == 'off_catalog' %}selected{% endif %}>Off-catalog</option>
     <option value="non_catalog" {% if status_f == 'non_catalog' %}selected{% endif %}>Non-catalog</option>
   </select>
   <label class="checkbox-label">
-    <input type="checkbox" name="unicorn" value="1" {% if unicorn_f == '1' %}checked{% endif %}> Unicorns only
+    <input type="checkbox" name="unicorn" value="1" {% if unicorn_f == '1' %}checked{% endif %} onchange="this.form.submit()"> Unicorns only
   </label>
   <button type="submit" class="btn btn-sm">Filter</button>
   <a href="{{ url_for('catalog.catalog') }}" class="btn btn-sm btn-ghost">Clear</a>

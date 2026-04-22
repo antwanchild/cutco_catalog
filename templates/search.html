@@ -9,7 +9,7 @@
   <p class="search-kicker">Results for <strong>{{ query }}</strong></p>
   <form class="filter-bar" method="get" action="{{ url_for('search') }}">
     <input name="q" value="{{ query }}" placeholder="Search name or SKU…" class="input-search">
-    <select name="category" class="select-sm">
+    <select name="category" class="select-sm" onchange="this.form.submit()">
       <option value="">All Categories</option>
       <option value="{{ UNCATEGORIZED_FILTER }}" {% if cat_filter == UNCATEGORIZED_FILTER %}selected{% endif %}>Uncategorized</option>
       {% for category in categories %}
