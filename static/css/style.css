@@ -495,7 +495,37 @@ textarea.input-full { height: auto; }
   border-color: var(--accent);
   outline: none;
 }
-.suggest-input { color-scheme: light; }
+.suggest-field {
+  position: relative;
+}
+.suggest-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + .25rem);
+  z-index: 40;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.suggest-option {
+  display: block;
+  width: 100%;
+  padding: .45rem .7rem;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.suggest-option:hover,
+.suggest-option:focus {
+  background: var(--bg3);
+  outline: none;
+}
 select.input-full, select.select-sm, select.select-xs {
   appearance: auto;
   cursor: pointer;

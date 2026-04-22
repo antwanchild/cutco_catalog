@@ -18,14 +18,12 @@
   </div>
 
   <div class="form-row">
-    <label>Category
-      <input type="text" name="category" value="{{ item.category if item and item.category else '' }}" class="input-full suggest-input" list="category-suggestions" autocomplete="off">
-      <datalist id="category-suggestions">
-        {% for category in categories %}
-          <option value="{{ category }}"></option>
-        {% endfor %}
-      </datalist>
-    </label>
+    <div class="suggest-field" data-suggest-values='{{ categories | tojson }}'>
+      <label>Category
+        <input type="text" name="category" value="{{ item.category if item and item.category else '' }}" class="input-full suggest-input" autocomplete="off">
+      </label>
+      <div class="suggest-menu" hidden></div>
+    </div>
     <label>Edge Type
       <select name="edge_type" class="input-full">
         {% for et in edge_types %}

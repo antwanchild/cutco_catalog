@@ -1457,18 +1457,17 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         add_page = self.client.get("/catalog/add")
         self.assertEqual(add_page.status_code, 200)
-        self.assertIn(b"category-suggestions", add_page.data)
+        self.assertIn(b"suggest-field", add_page.data)
 
         set_add_page = self.client.get("/sets/add")
         self.assertEqual(set_add_page.status_code, 200)
-        self.assertIn(b"set-name-suggestions", set_add_page.data)
-        self.assertIn(b"set-sku-suggestions", set_add_page.data)
+        self.assertGreaterEqual(set_add_page.data.count(b"suggest-field"), 2)
 
         item_id, _variant_id = self._add_catalog_item()
 
         edit_page = self.client.get(f"/catalog/{item_id}/edit")
         self.assertEqual(edit_page.status_code, 200)
-        self.assertIn(b"category-suggestions", edit_page.data)
+        self.assertIn(b"suggest-field", edit_page.data)
 
         set_edit_setup = self.client.post(
             "/sets/add",
@@ -1486,8 +1485,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         set_edit_page = self.client.get(f"/sets/{set_id}/edit")
         self.assertEqual(set_edit_page.status_code, 200)
-        self.assertIn(b"set-name-suggestions", set_edit_page.data)
-        self.assertIn(b"set-sku-suggestions", set_edit_page.data)
+        self.assertGreaterEqual(set_edit_page.data.count(b"suggest-field"), 2)
 
         edit_response = self.client.post(
             f"/catalog/{item_id}/edit",
