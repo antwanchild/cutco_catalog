@@ -1478,6 +1478,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(filtered_edit_page.status_code, 200)
         self.assertIn(b'name="next"', filtered_edit_page.data)
         self.assertIn(b'/catalog?category=Kitchen Knives', filtered_edit_page.data)
+        self.assertIn(b'href="/catalog?category=Kitchen Knives"', filtered_edit_page.data)
 
         set_edit_setup = self.client.post(
             "/sets/add",

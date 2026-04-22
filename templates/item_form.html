@@ -92,7 +92,7 @@
 
   <div class="form-actions">
     <button type="submit" class="btn btn-primary">{% if action == "Edit" %}Update{% else %}Add{% endif %} Item</button>
-    <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">Back to Catalog</a>
+    <a href="{{ next_target or url_for('catalog.catalog') }}" class="btn btn-ghost">Back to Catalog</a>
   </div>
 
 </form>
