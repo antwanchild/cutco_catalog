@@ -1455,7 +1455,15 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
+        add_page = self.client.get("/catalog/add")
+        self.assertEqual(add_page.status_code, 200)
+        self.assertIn(b"category-suggestions", add_page.data)
+
         item_id, _variant_id = self._add_catalog_item()
+
+        edit_page = self.client.get(f"/catalog/{item_id}/edit")
+        self.assertEqual(edit_page.status_code, 200)
+        self.assertIn(b"category-suggestions", edit_page.data)
 
         edit_response = self.client.post(
             f"/catalog/{item_id}/edit",

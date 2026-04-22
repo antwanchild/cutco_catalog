@@ -80,6 +80,17 @@ def _resolve_member_item(
     return sku_item or name_item
 
 
+def _catalog_category_options() -> list[str]:
+    return [
+        row[0]
+        for row in db.session.query(Item.category)
+        .filter(Item.category.isnot(None), Item.category != "")
+        .distinct()
+        .order_by(Item.category)
+        .all()
+    ]
+
+
 def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
     if not raw_member_data:
         return []
@@ -320,7 +331,8 @@ def catalog_add():
     return render_template("item_form.html", item=None,
                            edge_types=EDGE_TYPES, action="Add",
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
-                           all_sets=Set.query.order_by(Set.name).all())
+                           all_sets=Set.query.order_by(Set.name).all(),
+                           categories=_catalog_category_options())
 
 
 @catalog_bp.route("/catalog/<int:item_id>/edit", methods=["GET", "POST"])
@@ -372,7 +384,8 @@ def catalog_edit(item_id):
     return render_template("item_form.html", item=item,
                            edge_types=EDGE_TYPES, action="Edit",
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
-                           all_sets=Set.query.order_by(Set.name).all())
+                           all_sets=Set.query.order_by(Set.name).all(),
+                           categories=_catalog_category_options())
 
 
 @catalog_bp.route("/catalog/purge-unreferenced", methods=["POST"])
