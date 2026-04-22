@@ -364,6 +364,15 @@ a:hover { text-decoration: underline; }
 .data-table th a { color: var(--muted); }
 .data-table th a:hover { color: var(--text); }
 .data-table tbody tr:hover { background: var(--bg2); }
+.sets-table { table-layout: fixed; }
+.sets-table td:first-child {
+  word-break: break-word;
+  white-space: normal;
+}
+.sets-table td:nth-child(4) {
+  word-break: break-word;
+  white-space: normal;
+}
 .data-table.compact th, .data-table.compact td { padding: .35rem .6rem; }
 .member-sort-btn {
   background: transparent;
