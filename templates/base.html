@@ -291,10 +291,12 @@
       return options[((activeIndex % options.length) + options.length) % options.length];
     }
 
-    document.querySelectorAll('.suggest-field').forEach(initField);
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.suggest-field').forEach(initField);
 
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('.suggest-field')) closeMenus();
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('.suggest-field')) closeMenus();
+      });
     });
   })();
 </script>
