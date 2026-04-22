@@ -17,6 +17,13 @@
       {% endfor %}
     </select>
   </label>
+  <label class="flex-center" style="font-size:.9rem">
+    Set filter:
+    <select name="missing" onchange="this.form.submit()" class="input-sm">
+      <option value="">All sets</option>
+      <option value="1" {% if missing_f == '1' %}selected{% endif %}>Has missing members</option>
+    </select>
+  </label>
 </form>
 
 {% if sets %}
@@ -53,7 +60,15 @@
         <span class="muted">—</span>
         {% endif %}
       </td>
-      <td>{{ item_set.notes or '—' }}</td>
+      <td>
+        {{ item_set.notes or '—' }}
+        {% set missing_count = missing_member_counts.get(item_set.id, 0) %}
+        {% if missing_count %}
+          <div class="muted" style="margin-top:.35rem">
+            <span class="badge badge-missing">{{ missing_count }} missing member{% if missing_count != 1 %}s{% endif %}</span>
+          </div>
+        {% endif %}
+      </td>
       <td class="actions">
         <a href="{{ url_for('catalog.set_edit', set_id=item_set.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}" class="btn btn-xs btn-secondary">Edit</a>
         <form method="post" action="{{ url_for('catalog.set_delete', set_id=item_set.id) }}"

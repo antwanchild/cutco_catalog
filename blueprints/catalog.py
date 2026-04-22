@@ -566,6 +566,7 @@ def sets_list():
     all_sets    = Set.query.order_by(Set.name).all()
     all_persons = Person.query.order_by(Person.name).all()
     person_id   = request.args.get("person", type=int)
+    missing_f   = request.args.get("missing", "")
 
     # Completion relative to selected person, or globally if none selected
     owned_q = Ownership.query.filter_by(status="Owned")
@@ -577,15 +578,33 @@ def sets_list():
         if ownership.variant is not None and ownership.variant.item is not None
     }
 
+    catalog_sku_lookup = {
+        _normalize_member_sku(item.sku): item
+        for item in Item.query.filter(Item.sku.isnot(None)).all()
+        if _normalize_member_sku(item.sku)
+    }
+
     completion = {}
+    missing_member_counts: dict[int, int] = {}
+    filtered_sets = []
     for item_set in all_sets:
         total = len(item_set.items)
         owned = sum(1 for item in item_set.items if item.id in owned_item_ids)
+        _, missing_member_skus = _build_member_status_rows(
+            _load_member_snapshot(item_set.member_data),
+            catalog_sku_lookup,
+        )
+        missing_member_counts[item_set.id] = len(missing_member_skus)
+        if missing_f == "1" and not missing_member_skus:
+            continue
         completion[item_set.id] = dict(total=total, owned=owned,
                                        pct=round(100 * owned / total) if total else 0)
+        filtered_sets.append(item_set)
 
-    return render_template("sets.html", sets=all_sets, completion=completion,
-                           all_persons=all_persons, person_id=person_id)
+    return render_template("sets.html", sets=filtered_sets, completion=completion,
+                           missing_member_counts=missing_member_counts,
+                           all_persons=all_persons, person_id=person_id,
+                           missing_f=missing_f)
 
 
 @catalog_bp.route("/sets/add", methods=["GET", "POST"])
