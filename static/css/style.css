@@ -452,6 +452,7 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
   color: var(--muted);
   font: inherit;
 }
+.chip[hidden] { display: none !important; }
 .chip:hover { color: var(--text); text-decoration: none; }
 .set-chips { display: flex; flex-wrap: wrap; gap: .25rem; align-items: flex-start; }
 .chip-more {
