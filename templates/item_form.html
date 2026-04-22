@@ -19,7 +19,7 @@
 
   <div class="form-row">
     <label>Category
-      <input type="text" name="category" value="{{ item.category if item and item.category else '' }}" class="input-full" list="category-suggestions" autocomplete="off">
+      <input type="text" name="category" value="{{ item.category if item and item.category else '' }}" class="input-full suggest-input" list="category-suggestions" autocomplete="off">
       <datalist id="category-suggestions">
         {% for category in categories %}
           <option value="{{ category }}"></option>

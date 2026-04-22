@@ -8,10 +8,20 @@
 
 <form method="post" class="form-card">
   <label>Set Name *
-    <input type="text" name="name" value="{{ set.name if set else '' }}" required class="input-full">
+    <input type="text" name="name" value="{{ set.name if set else '' }}" required class="input-full suggest-input" list="set-name-suggestions" autocomplete="off">
+    <datalist id="set-name-suggestions">
+      {% for set_name in set_name_options %}
+        <option value="{{ set_name }}"></option>
+      {% endfor %}
+    </datalist>
   </label>
   <label>Set SKU
-    <input type="text" name="sku" value="{{ set.sku if set and set.sku else '' }}" class="input-full" placeholder="e.g. 1815">
+    <input type="text" name="sku" value="{{ set.sku if set and set.sku else '' }}" class="input-full suggest-input" list="set-sku-suggestions" autocomplete="off" placeholder="e.g. 1815">
+    <datalist id="set-sku-suggestions">
+      {% for set_sku in set_sku_options %}
+        <option value="{{ set_sku }}"></option>
+      {% endfor %}
+    </datalist>
   </label>
   <label>Notes
     <textarea name="notes" rows="2" class="input-full">{{ set.notes if set and set.notes else '' }}</textarea>

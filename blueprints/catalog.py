@@ -91,6 +91,28 @@ def _catalog_category_options() -> list[str]:
     ]
 
 
+def _set_name_options() -> list[str]:
+    return [
+        row[0]
+        for row in db.session.query(Set.name)
+        .filter(Set.name.isnot(None), Set.name != "")
+        .distinct()
+        .order_by(Set.name)
+        .all()
+    ]
+
+
+def _set_sku_options() -> list[str]:
+    return [
+        row[0]
+        for row in db.session.query(Set.sku)
+        .filter(Set.sku.isnot(None), Set.sku != "")
+        .distinct()
+        .order_by(Set.sku)
+        .all()
+    ]
+
+
 def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
     if not raw_member_data:
         return []
@@ -571,7 +593,15 @@ def set_add():
             logger.info("Set created: %s", name)
             flash(f'Created set "{name}".', "success")
         return redirect(url_for("catalog.sets_list"))
-    return render_template("set_form.html", set=None, action="Add", all_items=[], member_qty_map={})
+    return render_template(
+        "set_form.html",
+        set=None,
+        action="Add",
+        all_items=[],
+        member_qty_map={},
+        set_name_options=_set_name_options(),
+        set_sku_options=_set_sku_options(),
+    )
 
 
 @catalog_bp.route("/sets/<int:set_id>/edit", methods=["GET", "POST"])
@@ -625,8 +655,15 @@ def set_edit(set_id=None, sid=None):
             logger.info("Set updated: %s", item_set.name)
             flash(f'Updated set "{item_set.name}".', "success")
         return redirect(url_for("catalog.sets_list"))
-    return render_template("set_form.html", set=item_set, action="Edit",
-                           all_items=all_items, member_qty_map=member_qty_map)
+    return render_template(
+        "set_form.html",
+        set=item_set,
+        action="Edit",
+        all_items=all_items,
+        member_qty_map=member_qty_map,
+        set_name_options=_set_name_options(),
+        set_sku_options=_set_sku_options(),
+    )
 
 
 @catalog_bp.route("/sets/<int:set_id>/delete", methods=["POST"])

@@ -1459,11 +1459,35 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(add_page.status_code, 200)
         self.assertIn(b"category-suggestions", add_page.data)
 
+        set_add_page = self.client.get("/sets/add")
+        self.assertEqual(set_add_page.status_code, 200)
+        self.assertIn(b"set-name-suggestions", set_add_page.data)
+        self.assertIn(b"set-sku-suggestions", set_add_page.data)
+
         item_id, _variant_id = self._add_catalog_item()
 
         edit_page = self.client.get(f"/catalog/{item_id}/edit")
         self.assertEqual(edit_page.status_code, 200)
         self.assertIn(b"category-suggestions", edit_page.data)
+
+        set_edit_setup = self.client.post(
+            "/sets/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "name": "Set Suggestions",
+                "sku": "SS-1",
+                "notes": "For testing",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(set_edit_setup.status_code, 302)
+        with self.app.app_context():
+            set_id = db.session.execute(db.select(Set).filter_by(name="Set Suggestions")).scalar_one().id
+
+        set_edit_page = self.client.get(f"/sets/{set_id}/edit")
+        self.assertEqual(set_edit_page.status_code, 200)
+        self.assertIn(b"set-name-suggestions", set_edit_page.data)
+        self.assertIn(b"set-sku-suggestions", set_edit_page.data)
 
         edit_response = self.client.post(
             f"/catalog/{item_id}/edit",

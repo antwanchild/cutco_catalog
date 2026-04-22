@@ -70,7 +70,7 @@
           {% endif %}
         </td>
         <td class="actions">
-          <a href="{{ url_for('people.ownership_edit', ownership_id=o.id) }}" class="btn btn-xs">Edit</a>
+          <a href="{{ url_for('people.ownership_edit', ownership_id=o.id) }}" class="btn btn-xs btn-secondary">Edit</a>
           <form method="post" action="{{ url_for('people.ownership_delete', ownership_id=o.id) }}"
                 class="form-inline">
             <button class="btn btn-xs btn-danger"

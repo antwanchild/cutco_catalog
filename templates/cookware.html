@@ -190,7 +190,7 @@
         <td>{% if s.rating %}{{ '⭐' * s.rating }}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{{ s.notes or '—' }}</td>
         <td class="actions">
-          <a href="{{ url_for('logs.cookware_edit', session_id=s.id) }}" class="btn btn-xs">Edit</a>
+          <a href="{{ url_for('logs.cookware_edit', session_id=s.id) }}" class="btn btn-xs btn-secondary">Edit</a>
           <form method="post" action="{{ url_for('logs.cookware_delete', session_id=s.id) }}"
                 class="form-inline">
             <button class="btn btn-xs btn-danger"

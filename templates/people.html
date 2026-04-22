@@ -19,7 +19,7 @@
       <td>{{ counts[person.id] }}</td>
       <td>{{ person.notes or '—' }}</td>
       <td class="actions">
-        <a href="{{ url_for('people.people_edit', person_id=person.id) }}" class="btn btn-xs">Edit</a>
+        <a href="{{ url_for('people.people_edit', person_id=person.id) }}" class="btn btn-xs btn-secondary">Edit</a>
         <form method="post" action="{{ url_for('people.people_delete', person_id=person.id) }}"
               class="form-inline">
           <button class="btn btn-xs btn-danger"
