@@ -1627,7 +1627,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(missing_sets_page.status_code, 200)
         self.assertIn(b"Set Group", missing_sets_page.data)
         self.assertNotIn(b"Clear Set", missing_sets_page.data)
-        self.assertIn(b"Has missing members", missing_sets_page.data)
+        self.assertIn(b"Has items not in catalog", missing_sets_page.data)
 
         incomplete_sets_page = self.client.get("/sets?incomplete=1")
         self.assertEqual(incomplete_sets_page.status_code, 200)
@@ -1743,7 +1743,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Sets", response.data)
         self.assertIn(b"New Sync Set", response.data)
         self.assertNotIn(b"EX-1 ,", response.data)
-        self.assertIn(b"Missing item numbers", response.data)
+        self.assertIn(b"Not in catalog", response.data)
 
     def test_catalog_sync_uses_populates_tasks(self):
         self._login_as_admin()

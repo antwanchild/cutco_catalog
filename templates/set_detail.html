@@ -50,7 +50,7 @@
 
 {% if member_snapshot_rows %}
 <h2 class="section-heading">📋 Imported Members ({{ member_snapshot_rows | length }})</h2>
-<p class="muted">These are the item numbers captured when this set was imported. Missing numbers are not currently in the catalog.</p>
+<p class="muted">These are the item numbers captured when this set was imported. Items not in the catalog are flagged below.</p>
 <div class="table-wrap">
 <table class="data-table compact">
   <thead>
@@ -82,7 +82,7 @@
 </table>
 </div>
 {% if missing_member_skus %}
-<p class="muted">Missing item numbers: {% for sku in missing_member_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</p>
+<p class="muted">Not in catalog: {% for sku in missing_member_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</p>
 {% endif %}
 {% endif %}
 
