@@ -184,6 +184,68 @@
       }
     }
 
+    function initField(field) {
+      var input = field.querySelector('input');
+      var menu = field.querySelector('.suggest-menu');
+      if (!input || !menu) return;
+
+      input.addEventListener('input', function() {
+        closeMenus(field);
+        renderMenu(field, input);
+      });
+
+      input.addEventListener('focus', function() {
+        closeMenus(field);
+        renderMenu(field, input);
+      });
+
+      input.addEventListener('keydown', function(e) {
+        if (menu.hidden) return;
+        var options = Array.prototype.slice.call(menu.querySelectorAll('.suggest-option'));
+        if (!options.length) return;
+
+        var activeIndex = Number(menu.dataset.activeIndex || 0);
+        if (!Number.isFinite(activeIndex)) activeIndex = 0;
+
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          menu.hidden = true;
+          return;
+        }
+
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          activeIndex += e.key === 'ArrowDown' ? 1 : -1;
+          setActiveOption(menu, activeIndex);
+          return;
+        }
+
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          var option = getActiveOption(menu) || options[0];
+          if (option) option.click();
+        }
+      });
+
+      menu.addEventListener('mousedown', function(e) {
+        var option = e.target.closest('.suggest-option');
+        if (!option) return;
+        e.preventDefault();
+        input.value = option.dataset.value || option.textContent || '';
+        closeMenus();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+      });
+
+      input.addEventListener('blur', function() {
+        window.setTimeout(function() {
+          if (!field.contains(document.activeElement)) {
+            menu.hidden = true;
+          }
+        }, 120);
+      });
+    }
+
     function renderMenu(field, input) {
       var menu = field.querySelector('.suggest-menu');
       if (!menu) return;
@@ -229,70 +291,10 @@
       return options[((activeIndex % options.length) + options.length) % options.length];
     }
 
-    document.addEventListener('input', function(e) {
-      var input = e.target.closest('.suggest-field input');
-      if (!input) return;
-      var field = input.closest('.suggest-field');
-      if (!field) return;
-      closeMenus(field);
-      renderMenu(field, input);
-    });
-
-    document.addEventListener('focusin', function(e) {
-      var input = e.target.closest('.suggest-field input');
-      if (!input) return;
-      var field = input.closest('.suggest-field');
-      if (!field) return;
-      closeMenus(field);
-      renderMenu(field, input);
-    });
-
-    document.addEventListener('mousedown', function(e) {
-      var option = e.target.closest('.suggest-option');
-      if (!option) return;
-      var field = option.closest('.suggest-field');
-      var input = field && field.querySelector('input');
-      if (!input) return;
-      input.value = option.dataset.value || option.textContent || '';
-      closeMenus();
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.focus();
-    });
+    document.querySelectorAll('.suggest-field').forEach(initField);
 
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.suggest-field')) closeMenus();
-    });
-
-    document.addEventListener('keydown', function(e) {
-      var input = e.target.closest('.suggest-field input');
-      if (!input) return;
-      var field = input.closest('.suggest-field');
-      var menu = field && field.querySelector('.suggest-menu');
-      if (!menu || menu.hidden) return;
-      var options = Array.prototype.slice.call(menu.querySelectorAll('.suggest-option'));
-      if (!options.length) return;
-
-      var activeIndex = Number(menu.dataset.activeIndex || 0);
-      if (!Number.isFinite(activeIndex)) activeIndex = 0;
-
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        menu.hidden = true;
-        return;
-      }
-
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        activeIndex += e.key === 'ArrowDown' ? 1 : -1;
-        setActiveOption(menu, activeIndex);
-        return;
-      }
-
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        var option = getActiveOption(menu) || options[0];
-        if (option) option.click();
-      }
     });
   })();
 </script>
