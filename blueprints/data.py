@@ -121,6 +121,11 @@ def _parse_quantity_fields(row: dict) -> tuple[int | None, int | None, list[str]
     return quantity_purchased, quantity_given_away, errors
 
 
+def _parse_truthy_field(value: str) -> bool:
+    """Interpret a spreadsheet cell as a yes/no flag."""
+    return (value or "").strip().lower() in TRUTHY
+
+
 def _read_confirm_quantity_field(raw_value: str, label: str) -> tuple[int | None, str | None]:
     """Parse a posted ownership quantity field."""
     cleaned = (raw_value or "").strip()
@@ -256,12 +261,12 @@ def export_csv():
 def import_template():
     csv_buffer = io.StringIO()
     writer = csv.writer(csv_buffer)
-    writer.writerow(["name", "sku", "owned", "color", "quantity purchased",
+    writer.writerow(["name", "sku", "owned", "color", "non_catalog", "quantity purchased",
                      "quantity given away", "category", "edge",
                      "is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn", "price"])
-    writer.writerow(["2-3/4\" Paring Knife", "1720", "Anthony", "Classic Brown", "1",
+    writer.writerow(["2-3/4\" Paring Knife", "1720", "Anthony", "Classic Brown", "no", "1",
                      "0", "Kitchen Knives", "Double-D", "no", "no", "no", "12.50"])
-    writer.writerow(["Super Shears", "2137", "yes", "Pearl White", "", "",
+    writer.writerow(["Super Shears", "2137", "yes", "Pearl White", "yes", "", "",
                      "Kitchen Knives", "Straight", "no", "no", "no", ""])
     csv_buffer.seek(0)
     return Response(csv_buffer.getvalue(), mimetype="text/csv",
@@ -376,6 +381,7 @@ def import_page():
         name       = row.get("name", "").strip()
         sku        = normalize_sku_value(row.get("sku", ""))
         color      = _normalize_import_color(row.get("color", ""))
+        non_catalog = _parse_truthy_field(row.get("non_catalog", ""))
         edge_type  = row.get("edge_type", "").strip() or "Unknown"
         is_sku_unicorn = row.get("is_sku_unicorn", row.get("item_is_unicorn", "")).strip().lower() in TRUTHY
         is_variant_unicorn = row.get("is_variant_unicorn", "").strip().lower() in TRUTHY
@@ -433,6 +439,7 @@ def import_page():
             already_in_catalog.append({"item": matched_item, "row": row,
                                        "row_num": row_num,
                                        "color": color, "display_color": _display_import_color(color),
+                                       "non_catalog": non_catalog,
                                        "person": person_name,
                                        "status": status})
             already_in_catalog[-1]["row"] = row_num
@@ -458,6 +465,7 @@ def import_page():
                 "name": name, "sku": sku, "color": color,
                 "display_color": _display_import_color(color),
                 "edge_type": edge_type,
+                "non_catalog": non_catalog,
                 "is_sku_unicorn": is_sku_unicorn,
                 "is_variant_unicorn": is_variant_unicorn,
                 "is_edge_unicorn": is_edge_unicorn,
@@ -497,6 +505,7 @@ def import_page():
                 "display_color": _display_import_color(target_color),
                 "status":    status,
                 "notes":     notes,
+                "non_catalog": non_catalog,
                 "is_sku_unicorn": is_sku_unicorn,
                 "is_variant_unicorn": is_variant_unicorn,
                 "is_edge_unicorn": is_edge_unicorn,
@@ -562,6 +571,7 @@ def import_confirm():
             sku         = normalize_sku_value(request.form.get(f"item_sku_{row_index}", ""))
             color       = _normalize_import_color(request.form.get(f"item_color_{row_index}", ""))
             edge_type   = request.form.get(f"item_edge_{row_index}", "Unknown")
+            non_catalog = request.form.get(f"item_non_catalog_{row_index}") == "on"
             is_sku_unicorn = request.form.get(f"item_sku_unicorn_{row_index}") == "on"
             is_variant_unicorn = request.form.get(f"item_variant_unicorn_{row_index}") == "on"
             is_edge_unicorn = request.form.get(f"item_edge_unicorn_{row_index}") == "on"
@@ -588,7 +598,7 @@ def import_confirm():
                 item = Item(name=name, sku=sku, category=category,
                             edge_type=edge_type, is_unicorn=is_sku_unicorn,
                             edge_is_unicorn=is_edge_unicorn,
-                            in_catalog=bool(sku), notes=notes)
+                            in_catalog=bool(sku) and not non_catalog, notes=notes)
                 db.session.add(item)
                 db.session.flush()
                 if sku:
@@ -600,6 +610,8 @@ def import_confirm():
                     item.is_unicorn = True
                 if is_edge_unicorn and not item.edge_is_unicorn:
                     item.edge_is_unicorn = True
+                if non_catalog:
+                    item.in_catalog = False
 
             is_cookware = (item.category or "") in COOKWARE_CATEGORIES
             target_color = UNKNOWN_COLOR if is_cookware else (color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR)

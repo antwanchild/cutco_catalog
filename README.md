@@ -229,6 +229,7 @@ Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted tem
 | `sku` | Cutco model number |
 | `owned` | `yes` / `no` / collector name |
 | `color` | Handle color (or leave blank for Unknown) |
+| `non_catalog` | `yes` / `x` / `true` / `1` to mark an item as not in the catalog |
 | `quantity_purchased` | Whole-number ownership count |
 | `quantity_given_away` | Whole-number ownership count |
 | `category` | Product category |
@@ -238,7 +239,7 @@ Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted tem
 | `is_edge_unicorn` | `yes` / `x` / `true` / `1` edge/blade-type unicorn flag |
 | `notes` | Free-text notes |
 
-For XLSX imports, the app also recognizes `Owned?`, `status`, and `person` for older files, plus older auxiliary columns like `Price`, which is merged into notes. `quantity purchased` and `quantity given away` are imported as separate whole-number ownership fields, and rows with decimal values in those columns are rejected. Legacy files may also include `is_color_unicorn`.
+For XLSX imports, the app also recognizes `Owned?`, `status`, and `person` for older files, plus older auxiliary columns like `Price`, which is merged into notes. `quantity purchased` and `quantity given away` are imported as separate whole-number ownership fields, and rows with decimal values in those columns are rejected. `non_catalog` marks the item as not in the catalog. Legacy files may also include `is_color_unicorn`.
 
 Import headers are matched case-insensitively, so lowercase headers are recommended only for consistency.
 

@@ -513,7 +513,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(import_template_response.status_code, 200)
         self.assertEqual(import_template_response.mimetype, "text/csv")
         self.assertIn(
-            b"name,sku,owned,color,quantity purchased,quantity given away,category,edge,"
+            b"name,sku,owned,color,non_catalog,quantity purchased,quantity given away,category,edge,"
             b"is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price",
             import_template_response.data,
         )
@@ -1123,6 +1123,42 @@ class ImportSmokeTests(SmokeBaseTest):
             self.assertEqual(item.notes, "Imported note")
             self.assertEqual(ownership.status, "Owned")
 
+    def test_import_confirm_marks_non_catalog_items_off_catalog(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        response = self.client.post(
+            "/import/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_count": "1",
+                "own_count": "0",
+                "total_rows": "1",
+                "item_accept_0": "on",
+                "item_row_0": "2",
+                "item_name_0": "Rep Only Piece",
+                "item_sku_0": "RO-1",
+                "item_color_0": "Stainless",
+                "item_edge_0": "Unknown",
+                "item_category_0": "Cookware",
+                "item_non_catalog_0": "on",
+                "item_notes_0": "",
+                "item_person_0": "",
+                "item_status_0": "Owned",
+                "item_sku_unicorn_0": "",
+                "item_variant_unicorn_0": "",
+                "item_edge_unicorn_0": "",
+                "error_count": "0",
+                "conflict_count": "0",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            item = db.session.execute(db.select(Item).filter_by(sku="RO-1")).scalar_one()
+            self.assertFalse(item.in_catalog)
+
     def test_import_confirm_keeps_existing_name_for_matching_sku(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -1176,6 +1212,7 @@ class ImportSmokeTests(SmokeBaseTest):
             "Model #",
             "COLOR",
             "Owned?",
+            "non_catalog",
             "person",
             "Price",
             "Gift Box",
@@ -1189,6 +1226,7 @@ class ImportSmokeTests(SmokeBaseTest):
             "PR-1",
             "Classic Brown",
             "Anthony",
+            "no",
             "",
             "12.50",
             "yes",
@@ -1202,6 +1240,7 @@ class ImportSmokeTests(SmokeBaseTest):
             "PN-1",
             "Pearl White",
             "Wishlist",
+            "yes",
             "Collector Two",
             "34.00",
             "",
@@ -1231,6 +1270,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Preview Knife", response.data)
         self.assertIn(b"Preview New Knife", response.data)
         self.assertIn(b"Price: 12.50", response.data)
+        self.assertIn(b"badge-off-catalog", response.data)
         self.assertIn(b'own_quantity_purchased_0" value="2"', response.data)
         self.assertIn(b'own_quantity_given_away_0" value="1"', response.data)
         self.assertIn(b"Qty Purchased", response.data)
@@ -1308,6 +1348,15 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"New Catalog Items (1)", response.data)
         self.assertIn(b"Alias Name Knife", response.data)
+
+    def test_import_page_lists_non_catalog_column(self):
+        self._login_as_admin()
+
+        response = self.client.get("/import")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"<code>non_catalog</code>", response.data)
+        self.assertIn(b"mark the item as not in the catalog", response.data)
 
     def test_import_preview_warns_on_same_sku_different_name(self):
         self._login_as_admin()
@@ -1436,11 +1485,11 @@ class ImportSmokeTests(SmokeBaseTest):
                 "csrf_token": "test-csrf-token",
                 "csvfile": (
                     BytesIO(
-                        b"name,sku,owned,color,quantity purchased,quantity given away,category,edge,"
+                        b"name,sku,owned,color,non_catalog,quantity purchased,quantity given away,category,edge,"
                         b"sku_unicorn,variant_unicorn,edge_unicorn,price,Gift Box,Sheath\n"
-                        b"Import Existing Knife,IM-EX-1,Import Existing Collector,Classic Brown,2,n/a,Kitchen Knives,Straight,"
+                        b"Import Existing Knife,IM-EX-1,Import Existing Collector,Classic Brown,no,2,n/a,Kitchen Knives,Straight,"
                         b"no,no,no,12.50,yes,Leather\n"
-                        b"Import New Knife,IM-NEW-1,no,Pearl White,,,,,x,x,x,34.00,,\n"
+                        b"Import New Knife,IM-NEW-1,no,Pearl White,yes,,,,x,x,x,34.00,,\n"
                     ),
                     "preview.csv",
                 ),
@@ -1454,6 +1503,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Classic Brown", preview_response.data)
         self.assertNotIn(b"Gift Box:", preview_response.data)
         self.assertNotIn(b"Sheath:", preview_response.data)
+        self.assertIn(b"badge-off-catalog", preview_response.data)
 
         invalid_check_response = self.client.post(
             "/import",

@@ -151,6 +151,7 @@ XLSX_COL_MAP = {
     "model#":                "sku",
     "owned":                 "owned_raw",
     "color":                 "color",
+    "non_catalog":           "non_catalog",
     "category":              "category",
     "edge":                  "edge_type",
     "sku unicorn?":          "is_sku_unicorn",

@@ -32,7 +32,7 @@
   <table class="data-table import-item-table">
     <thead>
       <tr>
-        <th>Row</th><th>Name</th><th>SKU</th><th>Color</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th>
+        <th>Row</th><th>Name</th><th>SKU</th><th>Color</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Non-catalog</th>
       </tr>
     </thead>
     <tbody>
@@ -47,6 +47,7 @@
         <td>{% if matched.is_edge_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{{ matched.person or '—' }}</td>
         <td>{{ matched.status }}</td>
+        <td>{% if matched.non_catalog %}<span class="badge badge-off-catalog">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -104,7 +105,7 @@
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
+        <th>Edge</th><th>Category</th><th>Non-catalog</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
       </tr>
     </thead>
     <tbody>
@@ -133,6 +134,10 @@
         </td>
         <td>
           <input type="text" name="item_category_{{ loop.index0 }}" value="{{ item.category or '' }}" class="input-xs">
+        </td>
+        <td>
+          <input type="hidden" name="item_non_catalog_{{ loop.index0 }}" value="{% if item.non_catalog %}on{% endif %}">
+          {% if item.non_catalog %}<span class="badge badge-off-catalog">yes</span>{% else %}<span class="muted">—</span>{% endif %}
         </td>
         <td><input type="checkbox" name="item_sku_unicorn_{{ loop.index0 }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
         <td><input type="checkbox" name="item_variant_unicorn_{{ loop.index0 }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
@@ -168,7 +173,7 @@
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
+        <th>Edge</th><th>Category</th><th>Non-catalog</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
       </tr>
     </thead>
     <tbody>
@@ -203,6 +208,10 @@
         <td>
           <input type="text" name="item_category_{{ form_field_index }}" value="{{ item.category or '' }}" class="input-xs">
         </td>
+        <td>
+          <input type="hidden" name="item_non_catalog_{{ form_field_index }}" value="{% if item.non_catalog %}on{% endif %}">
+          {% if item.non_catalog %}<span class="badge badge-off-catalog">yes</span>{% else %}<span class="muted">—</span>{% endif %}
+        </td>
         <td><input type="checkbox" name="item_sku_unicorn_{{ form_field_index }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
         <td><input type="checkbox" name="item_variant_unicorn_{{ form_field_index }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
         <td><input type="checkbox" name="item_edge_unicorn_{{ form_field_index }}" {% if item.is_edge_unicorn %}checked{% endif %}></td>
@@ -232,9 +241,9 @@
     <p class="muted">These rows match an existing set SKU. They are unchecked by default because they usually should not import as standalone items.</p>
     <table class="data-table import-item-table">
       <thead>
-        <tr>
+      <tr>
           <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-          <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
+          <th>Edge</th><th>Category</th><th>Non-catalog</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
         </tr>
       </thead>
       <tbody>
@@ -266,6 +275,10 @@
           </td>
           <td>
             <input type="text" name="item_category_{{ form_field_index }}" value="{{ item.category or '' }}" class="input-xs">
+          </td>
+          <td>
+            <input type="hidden" name="item_non_catalog_{{ form_field_index }}" value="{% if item.non_catalog %}on{% endif %}">
+            {% if item.non_catalog %}<span class="badge badge-off-catalog">yes</span>{% else %}<span class="muted">—</span>{% endif %}
           </td>
           <td><input type="checkbox" name="item_sku_unicorn_{{ form_field_index }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
           <td><input type="checkbox" name="item_variant_unicorn_{{ form_field_index }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
