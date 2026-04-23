@@ -29,7 +29,7 @@
 <details class="diff-section">
   <summary>{{ already_in_catalog | length }} row(s) matched existing catalog items and will update ownership only</summary>
   <p class="muted">These rows already match catalog items by SKU or alias. The existing item name stays in place; unicorn flags still apply if checked.</p>
-  <table class="data-table">
+  <table class="data-table import-item-table">
     <thead>
       <tr>
         <th>Row</th><th>Name</th><th>SKU</th><th>Color</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th>
@@ -58,7 +58,7 @@
 <details class="diff-section">
   <summary>SKU or alias already exists ({{ sku_name_mismatches | length }})</summary>
   <p class="muted">These rows match an existing item by SKU or alias, so the current catalog item name will stay in place.</p>
-  <table class="data-table">
+  <table class="data-table import-item-table">
     <thead>
       <tr><th>Row</th><th>SKU</th><th>Imported Name</th><th>Existing Name</th></tr>
     </thead>
@@ -168,7 +168,7 @@
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th>
+        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
       </tr>
     </thead>
     <tbody>
@@ -216,6 +216,10 @@
             {% endfor %}
           </select>
         </td>
+        <td>
+          <input type="hidden" name="item_notes_{{ form_field_index }}" value="{{ item.notes or '' }}">
+          <span class="muted small">{{ item.notes or '' }}</span>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -226,11 +230,11 @@
   <details class="diff-section">
     <summary>⚠️ Set SKU Collisions ({{ set_sku_collisions | length }})</summary>
     <p class="muted">These rows match an existing set SKU. They are unchecked by default because they usually should not import as standalone items.</p>
-    <table class="data-table">
+    <table class="data-table import-item-table">
       <thead>
         <tr>
           <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-          <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th>
+          <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
         </tr>
       </thead>
       <tbody>
@@ -269,15 +273,19 @@
           <td>
             <input type="text" name="item_person_{{ form_field_index }}" value="{{ item.person or '' }}" class="input-xs">
           </td>
-          <td>
-            <select name="item_status_{{ form_field_index }}" class="select-xs">
-              {% for status_option in status_options %}
-                <option value="{{ status_option }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
-              {% endfor %}
-            </select>
-          </td>
-        </tr>
-        {% endfor %}
+        <td>
+          <select name="item_status_{{ form_field_index }}" class="select-xs">
+            {% for status_option in status_options %}
+              <option value="{{ status_option }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <input type="hidden" name="item_notes_{{ form_field_index }}" value="{{ item.notes or '' }}">
+          <span class="muted small">{{ item.notes or '' }}</span>
+        </td>
+      </tr>
+      {% endfor %}
       </tbody>
     </table>
   </details>
