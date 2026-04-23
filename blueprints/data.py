@@ -386,6 +386,7 @@ def import_page():
         is_sku_unicorn = row.get("is_sku_unicorn", row.get("item_is_unicorn", "")).strip().lower() in TRUTHY
         is_variant_unicorn = row.get("is_variant_unicorn", "").strip().lower() in TRUTHY
         is_edge_unicorn = row.get("is_edge_unicorn", row.get("edge_is_unicorn", "")).strip().lower() in TRUTHY
+        non_catalog = non_catalog or is_sku_unicorn or is_variant_unicorn or is_edge_unicorn
         category   = canonicalize_category(row.get("category", ""))
         note_text, note_errors = _build_notes(row)
         quantity_purchased, quantity_given_away, quantity_errors = _parse_quantity_fields(row)

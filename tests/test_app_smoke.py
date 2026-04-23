@@ -1384,6 +1384,30 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Imported Different Name", preview_response.data)
         self.assertIn(b"Original Knife", preview_response.data)
 
+    def test_import_preview_marks_unicorn_rows_off_catalog(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color,is_sku_unicorn\n"
+                        b"Unicorn Knife,UNI-1,yes,Classic Brown,x\n"
+                    ),
+                    "unicorn_off_catalog.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"badge-off-catalog", preview_response.data)
+        self.assertIn(b"Unicorn Knife", preview_response.data)
+
     def test_import_preview_matches_alternate_sku(self):
         self._login_as_admin()
         self._set_csrf_token()
