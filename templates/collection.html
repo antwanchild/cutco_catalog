@@ -21,7 +21,7 @@
 </div>
 
 {% if ownerships %}
-<form method="post" action="{{ url_for('people.bulk_status_update', person_id=person.id) }}" id="bulk-form">
+<form method="post" action="{{ url_for('people.bulk_status_update', person_id=person.id) }}" id="bulk-form"></form>
 <h2>Owned / Tracked</h2>
 <div class="table-wrap">
 <table class="data-table">
@@ -36,7 +36,7 @@
   <tbody>
     {% for ownership in ownerships %}
     <tr>
-      <td><input type="checkbox" name="ownership_ids" value="{{ ownership.id }}" class="row-check"></td>
+      <td><input type="checkbox" name="ownership_ids" value="{{ ownership.id }}" class="row-check" form="bulk-form"></td>
       <td><a href="{{ url_for('views.item_owners', item_id=ownership.variant.item_id) }}">{{ ownership.variant.item.name }}</a></td>
       <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
       <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
@@ -73,7 +73,7 @@
   <span class="bulk-count" id="bulk-count">0 selected</span>
   <label class="flex-center bulk-field" data-bulk-field="action">
     Bulk action:
-    <select name="bulk_action" class="input-sm" id="bulk-action">
+    <select name="bulk_action" class="input-sm" id="bulk-action" form="bulk-form">
       <option value="status">Change status</option>
       <option value="target">Set target price</option>
       <option value="delete">Delete selected</option>
@@ -81,7 +81,7 @@
   </label>
   <label class="flex-center bulk-field" data-bulk-field="status">
     Status:
-    <select name="bulk_status" class="input-sm" id="bulk-status">
+    <select name="bulk_status" class="input-sm" id="bulk-status" form="bulk-form">
       {% for status_option in status_options %}
         <option value="{{ status_option }}">{{ status_option }}</option>
       {% endfor %}
@@ -89,12 +89,11 @@
   </label>
   <label class="flex-center bulk-field hidden" data-bulk-field="target">
     Target price:
-    <input type="number" name="bulk_target_price" id="bulk-target" class="input-sm" step="0.01" min="0" placeholder="Optional">
+    <input type="number" name="bulk_target_price" id="bulk-target" class="input-sm" step="0.01" min="0" placeholder="Optional" form="bulk-form">
   </label>
-  <button type="submit" class="btn btn-primary btn-sm" id="bulk-submit">Apply status</button>
+  <button type="submit" class="btn btn-primary btn-sm" id="bulk-submit" form="bulk-form">Apply status</button>
   <button type="button" class="btn btn-ghost btn-sm" id="bulk-cancel">Cancel</button>
 </div>
-</form>
 
 <script>
 (function() {
