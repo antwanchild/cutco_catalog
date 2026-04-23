@@ -81,7 +81,7 @@
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Sets</th><th>Notes</th>
+        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
       </tr>
     </thead>
     <tbody>
@@ -125,12 +125,6 @@
           </select>
         </td>
         <td>
-          <input type="hidden" name="item_sets_{{ loop.index0 }}" value="{{ item.sets | join('|') }}">
-          {% if item.sets %}
-            <span class="set-chips" data-clamp-rows="2">{% for set_name in item.sets %}<span class="chip">{{ set_name }}</span>{% endfor %}</span>
-          {% else %}—{% endif %}
-        </td>
-        <td>
           <input type="hidden" name="item_notes_{{ loop.index0 }}" value="{{ item.notes or '' }}">
           <span class="muted small">{{ item.notes or '' }}</span>
         </td>
@@ -151,7 +145,7 @@
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Sets</th>
+        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th>
       </tr>
     </thead>
     <tbody>
@@ -195,12 +189,6 @@
               <option value="{{ status_option }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
             {% endfor %}
           </select>
-        </td>
-        <td>
-          <input type="hidden" name="item_sets_{{ form_field_index }}" value="{{ item.sets | join('|') }}">
-          {% if item.sets %}
-            <span class="set-chips" data-clamp-rows="2">{% for set_name in item.sets %}<span class="chip">{{ set_name }}</span>{% endfor %}</span>
-          {% else %}—{% endif %}
         </td>
       </tr>
       {% endfor %}

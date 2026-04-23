@@ -142,12 +142,6 @@ REQUEST_TIMEOUT = 12
 _blocked_env = os.environ.get("SYNC_BLOCKED_CATEGORIES", "")
 SYNC_BLOCKED_CATEGORIES = {cat_name.strip() for cat_name in _blocked_env.split(",") if cat_name.strip()}
 
-SPREADSHEET_SET_COLUMNS = [
-    "Beast", "Fanatic", "SIGNATURE", "HOMEMAKER",
-    "Accomplished Chef", "CUTCO Kitchen", "BEAST2", "HOMEMAKER2",
-    "Accomplished Chef3", "CUTCO Kitchen4",
-]
-
 TRUTHY = {"yes", "y", "true", "1", "x"}
 
 XLSX_COL_MAP = {
@@ -170,5 +164,3 @@ XLSX_COL_MAP = {
     "quantity purchased":    "_notes_qty",
     "given away":            "_notes_given_away",
 }
-
-XLSX_SET_COLS = {s.lower(): s for s in SPREADSHEET_SET_COLUMNS}

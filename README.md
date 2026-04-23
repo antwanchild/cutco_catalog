@@ -239,8 +239,6 @@ Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted tem
 
 For XLSX imports, the app also recognizes `Owned?` and older auxiliary columns like `Price`, `Gift Box`, `Sheath`, `Quantity Purchased`, and `Given Away`, which are merged into notes.
 
-Set membership columns (mark a truthy value such as `yes` to assign): `Beast`, `Fanatic`, `SIGNATURE`, `HOMEMAKER`, `Accomplished Chef`, `CUTCO Kitchen`, and other configured set columns.
-
 During import preview, rows where the SKU already exists but the name differs are grouped into a collapsed `SKU already exists` section so you can review naming differences before confirming.
 
 ---

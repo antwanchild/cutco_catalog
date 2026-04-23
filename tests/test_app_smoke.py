@@ -958,7 +958,6 @@ class ImportSmokeTests(SmokeBaseTest):
                 "item_notes_0": "Imported note",
                 "item_person_0": "Importer",
                 "item_status_0": "Owned",
-                "item_sets_0": "Imported Set",
                 "item_sku_unicorn_0": "on",
                 "item_variant_unicorn_0": "on",
                 "item_edge_unicorn_0": "on",
@@ -976,17 +975,11 @@ class ImportSmokeTests(SmokeBaseTest):
                 db.select(ItemVariant).filter_by(item_id=item.id, color="Pearl White")
             ).scalar_one()
             person = db.session.execute(db.select(Person).filter_by(name="Importer")).scalar_one()
-            item_set = db.session.execute(db.select(Set).filter_by(name="Imported Set")).scalar_one()
-            membership = db.session.execute(
-                db.select(ItemSetMember).filter_by(item_id=item.id, set_id=item_set.id)
-            ).scalar_one()
             ownership = db.session.execute(
                 db.select(Ownership).filter_by(person_id=person.id, variant_id=variant.id)
             ).scalar_one()
 
             self.assertEqual(item.notes, "Imported note")
-            self.assertEqual(membership.quantity, 1)
-            self.assertIn(item, item_set.items)
             self.assertEqual(ownership.status, "Owned")
 
     def test_import_confirm_keeps_existing_name_for_matching_sku(self):
@@ -1216,7 +1209,6 @@ class ImportSmokeTests(SmokeBaseTest):
                 "item_notes_0": "Imported from confirm",
                 "item_person_0": "Confirm Collector",
                 "item_status_0": "Owned",
-                "item_sets_0": "Confirm Set",
                 "item_sku_unicorn_0": "on",
                 "item_variant_unicorn_0": "on",
                 "item_edge_unicorn_0": "on",
@@ -1256,8 +1248,6 @@ class ImportSmokeTests(SmokeBaseTest):
                 db.select(Item).filter_by(sku="IM-CF-1")
             ).scalar_one()
             self.assertEqual(confirm_item.msrp, None)
-            confirm_set = db.session.execute(db.select(Set).filter_by(name="Confirm Set")).scalar_one()
-            self.assertEqual(confirm_set.members[0].quantity, 1)
 
 
 class PeopleSmokeTests(SmokeBaseTest):

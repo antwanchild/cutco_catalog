@@ -9,11 +9,11 @@ from flask import Blueprint, Response, flash, redirect, render_template, request
 
 from constants import (
     COOKWARE_CATEGORIES, EDGE_TYPES, STATUS_OPTIONS, TRUTHY, UNKNOWN_COLOR,
-    XLSX_COL_MAP, XLSX_SET_COLS, canonicalize_category,
+    XLSX_COL_MAP, canonicalize_category,
 )
 from extensions import db
 from helpers import admin_required, db_commit
-from models import Item, ItemSetMember, ItemVariant, Ownership, Person, get_or_create_set, record_activity, reconcile_unknown_variant
+from models import Item, ItemVariant, Ownership, Person, record_activity, reconcile_unknown_variant
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
@@ -93,8 +93,6 @@ def _build_import_header_report(uploaded_file, ext: str) -> dict:
         normalized = _normalized_header(header)
         if normalized in XLSX_COL_MAP:
             mapped_headers.add(XLSX_COL_MAP[normalized])
-        elif normalized in XLSX_SET_COLS:
-            mapped_headers.add("_sets")
         else:
             mapped_headers.add(normalized)
 
@@ -106,7 +104,7 @@ def _build_import_header_report(uploaded_file, ext: str) -> dict:
     unicorn_columns_found = bool({"is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn"} & mapped_headers)
     unknown_headers = sorted(
         header for header in raw_headers
-        if _normalized_header(header) not in XLSX_COL_MAP and _normalized_header(header) not in XLSX_SET_COLS
+        if _normalized_header(header) not in XLSX_COL_MAP
     )
 
     warnings = []
@@ -237,17 +235,12 @@ def import_page():
             parsed_rows = []
             for row in norm_rows:
                 out_row = {}
-                set_memberships = []
                 for orig_key, val in row.items():
                     normalized_key = orig_key.strip().lower()
                     if normalized_key in XLSX_COL_MAP:
                         out_row[XLSX_COL_MAP[normalized_key]] = val
-                    elif normalized_key in XLSX_SET_COLS:
-                        if val.strip().lower() in TRUTHY:
-                            set_memberships.append(XLSX_SET_COLS[normalized_key])
                     else:
                         out_row[normalized_key.replace(" ", "_")] = val
-                out_row["_sets"] = set_memberships
                 parsed_rows.append(out_row)
         else:
             stream = io.StringIO(uploaded_file.stream.read().decode("utf-8-sig"))
@@ -256,7 +249,6 @@ def import_page():
             for row in reader:
                 out_row = {k.strip().lower().replace(" ", "_"): v.strip()
                            for k, v in row.items()}
-                out_row["_sets"] = []
                 parsed_rows.append(out_row)
 
     except Exception as exc:
@@ -293,8 +285,6 @@ def import_page():
         is_edge_unicorn = row.get("is_edge_unicorn", row.get("edge_is_unicorn", "")).strip().lower() in TRUTHY
         category   = canonicalize_category(row.get("category", ""))
         notes      = _build_notes(row) or row.get("notes", "").strip() or None
-        set_names  = row.get("_sets", [])
-
         owned_raw = row.get("owned_raw", row.get("status", "yes"))
         status, person_name = _parse_owned_raw(owned_raw, row.get("_person_override") or row.get("person", ""))
 
@@ -333,7 +323,7 @@ def import_page():
             already_in_catalog.append({"item": matched_item, "row": row,
                                        "row_num": row_num,
                                        "color": color, "person": person_name,
-                                       "status": status, "sets": set_names})
+                                       "status": status})
             if sku and matched_item.name.strip().lower() != name.lower():
                 sku_name_mismatches.append({
                     "row": row_num,
@@ -352,7 +342,7 @@ def import_page():
                 "is_edge_unicorn": is_edge_unicorn,
                 "category": category, "notes": notes,
                 "person": person_name, "status": status,
-                "sets": set_names, "row": row_num,
+                "row": row_num,
             })
 
         if person_name and matched_item:
@@ -452,7 +442,6 @@ def import_confirm():
             notes       = request.form.get(f"item_notes_{row_index}", "").strip() or None
             person_name = request.form.get(f"item_person_{row_index}", "").strip()
             status      = request.form.get(f"item_status_{row_index}", "Owned")
-            set_names   = [set_name for set_name in request.form.get(f"item_sets_{row_index}", "").split("|") if set_name]
 
             if not name:
                 skipped_details.append({
@@ -484,13 +473,6 @@ def import_confirm():
                     item.is_unicorn = True
                 if is_edge_unicorn and not item.edge_is_unicorn:
                     item.edge_is_unicorn = True
-
-            existing_memberships = {membership.set_id: membership for membership in item.set_memberships}
-            for set_name in set_names:
-                item_set = get_or_create_set(set_name)
-                if item_set.id not in existing_memberships:
-                    db.session.add(ItemSetMember(item_id=item.id, set_id=item_set.id, quantity=1))
-                    existing_memberships[item_set.id] = True
 
             is_cookware = (item.category or "") in COOKWARE_CATEGORIES
             target_color = UNKNOWN_COLOR if is_cookware else (color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR)
