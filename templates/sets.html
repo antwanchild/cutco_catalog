@@ -126,6 +126,9 @@
               data-confirm-button="Resync memberships">Resync from Cutco</button>
       <button type="button" class="btn btn-ghost btn-sm" id="sets-bulk-cancel">Cancel</button>
     </div>
+    <p class="muted" style="margin-top:.5rem">
+      Restore memberships uses the saved imported snapshot. Resync from Cutco re-scrapes the live set pages and rebuilds from there.
+    </p>
   {% endif %}
 
 {% if is_admin() %}
