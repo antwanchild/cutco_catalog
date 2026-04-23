@@ -366,7 +366,12 @@ a:hover { text-decoration: underline; }
 .data-table td, .data-table th {
   min-width: 0;
 }
-.data-table th a { color: var(--muted); }
+.data-table th a {
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: .18rem;
+}
 .data-table th a:hover { color: var(--text); }
 .data-table tbody tr:hover { background: var(--bg2); }
 .sets-table { table-layout: fixed; }
