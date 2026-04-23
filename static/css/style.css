@@ -251,6 +251,32 @@ a:hover { text-decoration: underline; }
 .page-actions .btn {
   min-height: 2.35rem;
 }
+.collection-empty-state {
+  margin: 2rem 0 1.5rem;
+  padding: 1.35rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  background: linear-gradient(180deg, rgba(255,255,255,.02), transparent), var(--bg2);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.collection-empty-copy h2 {
+  margin-bottom: .25rem;
+  font-size: 1.1rem;
+}
+.collection-empty-copy p {
+  color: var(--muted);
+  max-width: 42rem;
+}
+.collection-empty-actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
 
 /* ── Admin snapshot strip ───────────────────────────────────────────────── */
 .admin-status-strip {

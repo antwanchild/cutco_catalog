@@ -415,6 +415,18 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(wishlist_response.status_code, 200)
         self.assertIn(b"Wishlist", wishlist_response.data)
 
+    def test_empty_collection_page_renders_shell(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        person_id = self._add_person(name="Empty Collector", notes="")
+        collection_response = self.client.get(f"/people/{person_id}/collection")
+
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertIn(b"No entries yet", collection_response.data)
+        self.assertIn(b'collection-empty-state', collection_response.data)
+        self.assertIn(b"Browse Catalog", collection_response.data)
+
     def test_data_routes_render(self):
         self._login_as_admin()
         self._set_csrf_token()

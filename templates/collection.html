@@ -172,7 +172,16 @@
 </script>
 
 {% else %}
-<p class="empty">No entries yet for {{ person.name }}.</p>
+<div class="collection-empty-state">
+  <div class="collection-empty-copy">
+    <h2>No entries yet</h2>
+    <p>No items are currently tracked for {{ person.name }}.</p>
+  </div>
+  <div class="collection-empty-actions">
+    <a href="{{ url_for('people.ownership_add', person_id=person.id) }}" class="btn btn-primary">+ Add Entry</a>
+    <a href="{{ url_for('catalog.catalog') }}" class="btn btn-secondary">Browse Catalog</a>
+  </div>
+</div>
 {% endif %}
 
 {% if item_gaps %}
