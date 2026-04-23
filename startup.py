@@ -1,11 +1,12 @@
 import logging
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Callable
 
 from constants import KNIFE_TASK_PRESETS, canonicalize_category
 from extensions import db
-from models import Item, KnifeTask, ensure_unknown_variant
+from models import Item, KnifeTask, Ownership, ensure_unknown_variant
 from schema_migrations import apply_schema_migrations
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,7 @@ BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
     BootstrapMigration(2, "cleanup_invalid_skus", lambda: _cleanup_invalid_items()),
     BootstrapMigration(3, "normalize_categories", lambda: _normalize_categories()),
     BootstrapMigration(4, "ensure_unknown_variants", lambda: _ensure_unknown_variants()),
+    BootstrapMigration(5, "split_ownership_quantity_notes", lambda: _split_quantity_notes()),
 )
 
 BOOTSTRAP_VERSION = BOOTSTRAP_MIGRATIONS[-1].version
@@ -147,6 +149,49 @@ def _normalize_categories() -> None:
 def _ensure_unknown_variants() -> None:
     for item in Item.query.all():
         ensure_unknown_variant(item)
+
+
+def _split_quantity_fields_from_notes(notes: str | None) -> tuple[int | None, int | None, str | None]:
+    if not notes:
+        return None, None, None
+
+    parts = [part.strip() for part in notes.split(";") if part.strip()]
+    purchased = None
+    given_away = None
+    kept_parts: list[str] = []
+    for part in parts:
+        match = re.fullmatch(r"Quantity Purchased:\s*(\d+)", part, re.IGNORECASE)
+        if match:
+            purchased = int(match.group(1))
+            continue
+        match = re.fullmatch(r"(?:Quantity )?Given Away:\s*(\d+)", part, re.IGNORECASE)
+        if match:
+            given_away = int(match.group(1))
+            continue
+        kept_parts.append(part)
+
+    cleaned_notes = "; ".join(kept_parts) or None
+    return purchased, given_away, cleaned_notes
+
+
+def _split_quantity_notes() -> None:
+    updated = 0
+    for ownership in Ownership.query.all():
+        purchased, given_away, cleaned_notes = _split_quantity_fields_from_notes(ownership.notes)
+        changed = False
+        if purchased is not None and ownership.quantity_purchased is None:
+            ownership.quantity_purchased = purchased
+            changed = True
+        if given_away is not None and ownership.quantity_given_away is None:
+            ownership.quantity_given_away = given_away
+            changed = True
+        if cleaned_notes != ownership.notes:
+            ownership.notes = cleaned_notes
+            changed = True
+        if changed:
+            updated += 1
+    if updated:
+        logger.info("Quantity note backfill: updated %d ownership record(s)", updated)
 
 
 def initialize_database() -> None:

@@ -30,7 +30,7 @@
       <th style="width:2rem">
         <input type="checkbox" id="select-all" title="Select all">
       </th>
-      <th>Item</th><th>Color</th><th>Status</th><th>Target</th><th>Notes</th><th>Actions</th>
+      <th>Item</th><th>Color</th><th>Status</th><th>Target</th><th>Qty Purchased</th><th>Qty Given Away</th><th>Notes</th><th>Actions</th>
     </tr>
   </thead>
   <tbody>
@@ -47,6 +47,8 @@
           <span class="muted">—</span>
         {% endif %}
       </td>
+      <td>{% if ownership.quantity_purchased is not none %}<span class="mono">{{ ownership.quantity_purchased }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if ownership.quantity_given_away is not none %}<span class="mono">{{ ownership.quantity_given_away }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{{ ownership.notes or '—' }}</td>
       <td class="actions">
         <a href="{{ url_for('people.ownership_edit', ownership_id=ownership.id) }}" class="btn btn-xs btn-secondary">Edit</a>

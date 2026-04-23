@@ -1,4 +1,5 @@
 import logging
+import re
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
@@ -9,6 +10,15 @@ from models import Item, Ownership, Person
 
 people_bp = Blueprint("people", __name__)
 logger = logging.getLogger(__name__)
+
+
+def _parse_optional_whole_number(raw_value: str, label: str) -> tuple[int | None, str | None]:
+    cleaned = (raw_value or "").strip()
+    if not cleaned or cleaned.lower() in {"0", "none", "n/a", "-"}:
+        return None, None
+    if re.fullmatch(r"\d+", cleaned):
+        return int(cleaned), None
+    return None, f"{label} must be a whole number."
 
 
 @people_bp.route("/people")
@@ -129,12 +139,40 @@ def ownership_add():
             target_price = float(raw_target) if raw_target else None
         except ValueError:
             target_price = None
+        quantity_purchased, qty_error = _parse_optional_whole_number(
+            request.form.get("quantity_purchased", ""),
+            "Quantity Purchased",
+        )
+        if qty_error:
+            flash(qty_error, "error")
+            return redirect(url_for(
+                "people.ownership_add",
+                person_id=person_id,
+                item_id=request.form.get("item_id", type=int),
+                variant_id=variant_id,
+                status=request.form.get("status", "Owned"),
+            ))
+        quantity_given_away, qty_error = _parse_optional_whole_number(
+            request.form.get("quantity_given_away", ""),
+            "Quantity Given Away",
+        )
+        if qty_error:
+            flash(qty_error, "error")
+            return redirect(url_for(
+                "people.ownership_add",
+                person_id=person_id,
+                item_id=request.form.get("item_id", type=int),
+                variant_id=variant_id,
+                status=request.form.get("status", "Owned"),
+            ))
         db.session.add(Ownership(
             person_id    = person_id,
             variant_id   = variant_id,
             status       = request.form.get("status", "Owned"),
             target_price = target_price,
             notes        = request.form.get("notes", "").strip() or None,
+            quantity_purchased=quantity_purchased,
+            quantity_given_away=quantity_given_away,
         ))
         if db_commit(db.session):
             logger.info("Ownership added: person %d, variant %d", person_id, variant_id)
@@ -169,6 +207,22 @@ def ownership_edit(ownership_id):
         except ValueError:
             ownership.target_price = None
         ownership.notes  = request.form.get("notes", "").strip() or None
+        quantity_purchased, qty_error = _parse_optional_whole_number(
+            request.form.get("quantity_purchased", ""),
+            "Quantity Purchased",
+        )
+        if qty_error:
+            flash(qty_error, "error")
+            return redirect(url_for("people.ownership_edit", ownership_id=ownership_id))
+        quantity_given_away, qty_error = _parse_optional_whole_number(
+            request.form.get("quantity_given_away", ""),
+            "Quantity Given Away",
+        )
+        if qty_error:
+            flash(qty_error, "error")
+            return redirect(url_for("people.ownership_edit", ownership_id=ownership_id))
+        ownership.quantity_purchased = quantity_purchased
+        ownership.quantity_given_away = quantity_given_away
         if db_commit(db.session):
             logger.info("Ownership updated: id %d → %s", ownership_id, ownership.status)
             flash("Updated.", "success")

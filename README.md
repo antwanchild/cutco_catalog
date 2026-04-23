@@ -235,9 +235,11 @@ Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted tem
 | `person` | Collector name |
 | `status` | `Owned`, `Wishlist`, `Sold`, or `Traded` |
 | `category` | Product category |
+| `quantity_purchased` | Whole-number ownership count |
+| `quantity_given_away` | Whole-number ownership count |
 | `notes` | Free-text notes |
 
-For XLSX imports, the app also recognizes `Owned?` and older auxiliary columns like `Price`, which is merged into notes. `Quantity Purchased` and `Given Away` are imported as whole-number note values, and rows with decimal values in those columns are rejected.
+For XLSX imports, the app also recognizes `Owned?` and older auxiliary columns like `Price`, which is merged into notes. `Quantity Purchased` and `Quantity Given Away` are imported as separate whole-number ownership fields, and rows with decimal values in those columns are rejected.
 
 During import preview, rows where the SKU already exists but the name differs are grouped into a collapsed `SKU already exists` section so you can review naming differences before confirming.
 
@@ -275,7 +277,7 @@ Eleven tables backed by SQLite. All migrations run automatically at startup.
 |---|---|---|
 | `items` | `id`, `name`, `sku`, `category`, `edge_type`, `is_unicorn`, `in_catalog`, `cutco_url`, `msrp` | One row per catalog item |
 | `item_variants` | `id`, `item_id`, `color`, `is_unicorn` | One row per handle color; `Unknown` is kept only when no real colors exist |
-| `ownership` | `id`, `variant_id`, `person_id`, `status`, `target_price` | Links a person to a variant; status is `Owned`, `Wishlist`, `Sold`, or `Traded` |
+| `ownership` | `id`, `variant_id`, `person_id`, `status`, `target_price`, `quantity_purchased`, `quantity_given_away` | Links a person to a variant; status is `Owned`, `Wishlist`, `Sold`, or `Traded` |
 | `people` | `id`, `name` | Collectors |
 | `sets` | `id`, `name`, `sku` | Named Cutco sets |
 | `item_sets` | `item_id`, `set_id`, `quantity` | Many-to-many join between items and sets; quantity tracks how many of an item a set includes |

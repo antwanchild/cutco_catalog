@@ -42,24 +42,45 @@ def _parse_whole_number(value: str, label: str) -> tuple[int | None, str | None]
 def _build_notes(row: dict) -> tuple[str | None, list[str]]:
     """Combine spreadsheet auxiliary columns into a single notes string."""
     parts = []
-    errors: list[str] = []
-    for key, label in [
-        ("_notes_price",     "Price"),
-        ("_notes_qty",       "Quantity Purchased"),
-        ("_notes_given_away","Quantity Given Away"),
-    ]:
+    for key, label in [("_notes_price", "Price")]:
         value = row.get(key, "").strip()
         if value and value not in ("0", "none", "n/a", "-"):
-            if key in {"_notes_qty", "_notes_given_away"}:
-                parsed_value, error = _parse_whole_number(value, label)
-                if error:
-                    errors.append(error)
-                    continue
-                if parsed_value is not None:
-                    parts.append(f"{label}: {parsed_value}")
+            parts.append(f"{label}: {value}")
+    return ("; ".join(parts) or None), []
+
+
+def _parse_quantity_fields(row: dict) -> tuple[int | None, int | None, list[str]]:
+    """Parse ownership quantity fields as whole numbers."""
+    errors: list[str] = []
+    quantity_purchased = None
+    quantity_given_away = None
+    for key, label in [
+        ("quantity_purchased", "Quantity Purchased"),
+        ("quantity_given_away", "Quantity Given Away"),
+    ]:
+        value = row.get(key, "").strip()
+        if not value or value.lower() in {"0", "none", "n/a", "-"}:
+            continue
+        parsed_value, error = _parse_whole_number(value, label)
+        if error:
+            errors.append(error)
+            continue
+        if parsed_value is not None:
+            if key == "quantity_purchased":
+                quantity_purchased = parsed_value
             else:
-                parts.append(f"{label}: {value}")
-    return ("; ".join(parts) or None), errors
+                quantity_given_away = parsed_value
+    return quantity_purchased, quantity_given_away, errors
+
+
+def _read_confirm_quantity_field(raw_value: str, label: str) -> tuple[int | None, str | None]:
+    """Parse a posted ownership quantity field."""
+    cleaned = (raw_value or "").strip()
+    if not cleaned or cleaned.lower() in {"0", "none", "n/a", "-"}:
+        return None, None
+    if re.fullmatch(r"\d+", cleaned):
+        return int(cleaned), None
+    return None, f"{label} must be a whole number."
 
 
 def _safe_csv_filename(raw_name: str) -> str:
@@ -161,6 +182,7 @@ def export_csv():
         "person", "item_name", "sku", "category", "edge_type",
         "color", "status",
         "is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn",
+        "quantity_purchased", "quantity_given_away",
         "notes",
     ])
     for ownership, variant, item, person in rows:
@@ -170,6 +192,8 @@ def export_csv():
             "yes" if item.is_unicorn else "no",
             "yes" if variant.is_unicorn else "no",
             "yes" if item.edge_is_unicorn else "no",
+            ownership.quantity_purchased if ownership.quantity_purchased is not None else "",
+            ownership.quantity_given_away if ownership.quantity_given_away is not None else "",
             ownership.notes or "",
         ])
     csv_buffer.seek(0)
@@ -186,11 +210,12 @@ def import_template():
     writer = csv.writer(csv_buffer)
     writer.writerow(["name", "sku", "color", "edge_type",
                      "is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn",
-                     "person", "status", "category", "notes"])
+                     "person", "status", "category", "quantity_purchased",
+                     "quantity_given_away", "notes"])
     writer.writerow(["2-3/4\" Paring Knife", "1720", "Classic Brown", "Double-D",
-                     "no", "no", "no", "Anthony", "Owned", "Kitchen Knives", ""])
+                     "no", "no", "no", "Anthony", "Owned", "Kitchen Knives", "1", "0", ""])
     writer.writerow(["Super Shears", "2137", "Pearl White", "Straight",
-                     "no", "no", "no", "Anthony", "Owned", "Kitchen Knives", ""])
+                     "no", "no", "no", "Anthony", "Owned", "Kitchen Knives", "", "", ""])
     csv_buffer.seek(0)
     return Response(csv_buffer.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
@@ -308,6 +333,8 @@ def import_page():
         is_edge_unicorn = row.get("is_edge_unicorn", row.get("edge_is_unicorn", "")).strip().lower() in TRUTHY
         category   = canonicalize_category(row.get("category", ""))
         note_text, note_errors = _build_notes(row)
+        quantity_purchased, quantity_given_away, quantity_errors = _parse_quantity_fields(row)
+        note_errors.extend(quantity_errors)
         if note_errors:
             errors.append({
                 "row": row_num,
@@ -407,6 +434,8 @@ def import_page():
                 "is_sku_unicorn": is_sku_unicorn,
                 "is_variant_unicorn": is_variant_unicorn,
                 "is_edge_unicorn": is_edge_unicorn,
+                "quantity_purchased": quantity_purchased,
+                "quantity_given_away": quantity_given_away,
                 "is_new_variant": existing_variant is None,
                 "is_new_person": person_name.lower() not in existing_persons,
             })
@@ -553,6 +582,28 @@ def import_confirm():
             color       = request.form.get(f"own_color_{row_index}", "").strip() or UNKNOWN_COLOR
             status      = request.form.get(f"own_status_{row_index}", "Owned")
             notes       = request.form.get(f"own_notes_{row_index}", "").strip() or None
+            quantity_purchased, qty_error = _read_confirm_quantity_field(
+                request.form.get(f"own_quantity_purchased_{row_index}", ""),
+                "Quantity Purchased",
+            )
+            if qty_error:
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, item_name_hint, sku_hint),
+                    "reason": qty_error,
+                })
+                continue
+            quantity_given_away, qty_error = _read_confirm_quantity_field(
+                request.form.get(f"own_quantity_given_away_{row_index}", ""),
+                "Quantity Given Away",
+            )
+            if qty_error:
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, item_name_hint, sku_hint),
+                    "reason": qty_error,
+                })
+                continue
             is_sku_unicorn = request.form.get(f"own_sku_unicorn_{row_index}") == "on"
             is_variant_unicorn = request.form.get(f"own_variant_unicorn_{row_index}") == "on"
             is_edge_unicorn = request.form.get(f"own_edge_unicorn_{row_index}") == "on"
@@ -599,7 +650,10 @@ def import_confirm():
                                               variant_id=variant.id).first():
                 db.session.add(Ownership(person_id=person.id,
                                          variant_id=variant.id,
-                                         status=status, notes=notes))
+                                         status=status,
+                                         notes=notes,
+                                         quantity_purchased=quantity_purchased,
+                                         quantity_given_away=quantity_given_away))
                 added_ownership += 1
 
             db.session.flush()

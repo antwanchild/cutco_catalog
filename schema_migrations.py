@@ -132,6 +132,8 @@ def _schema_column_migrations() -> None:
         "edge_is_unicorn",
         "ALTER TABLE items ADD COLUMN edge_is_unicorn BOOLEAN NOT NULL DEFAULT 0",
     )
+    _add_column("ownership", "quantity_purchased", "ALTER TABLE ownership ADD COLUMN quantity_purchased INTEGER")
+    _add_column("ownership", "quantity_given_away", "ALTER TABLE ownership ADD COLUMN quantity_given_away INTEGER")
 
 
 def _schema_set_only_migrations() -> None:
@@ -150,6 +152,7 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
     SchemaMigration(3, "set_member_snapshot", _schema_set_member_snapshot_migrations),
+    SchemaMigration(4, "ownership_quantity_fields", lambda: None),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

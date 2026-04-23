@@ -104,6 +104,8 @@ class Ownership(db.Model):
     person_id    = db.Column(db.Integer, db.ForeignKey("people.id"),        nullable=False)
     status       = db.Column(db.String(20), nullable=False, default="Owned")
     target_price = db.Column(db.Float, nullable=True)
+    quantity_purchased   = db.Column(db.Integer, nullable=True)
+    quantity_given_away  = db.Column(db.Integer, nullable=True)
     notes        = db.Column(db.Text, nullable=True)
 
     __table_args__ = (db.UniqueConstraint("variant_id", "person_id",

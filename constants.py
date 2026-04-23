@@ -159,7 +159,7 @@ XLSX_COL_MAP = {
     "is_edge_unicorn":       "is_edge_unicorn",
     "owned?":                "owned_raw",
     "price":                 "_notes_price",
-    "quantity purchased":    "_notes_qty",
-    "quantity given away":   "_notes_given_away",
-    "given away":            "_notes_given_away",
+    "quantity purchased":    "quantity_purchased",
+    "quantity given away":   "quantity_given_away",
+    "given away":            "quantity_given_away",
 }

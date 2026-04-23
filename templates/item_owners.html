@@ -118,13 +118,15 @@
       {% if entries %}
       <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>Person</th><th>Color</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th>Person</th><th>Color</th><th>Status</th><th>Qty Purchased</th><th>Qty Given Away</th><th>Notes</th><th></th></tr></thead>
         <tbody>
           {% for ownership in entries %}
           <tr>
             <td><a href="{{ url_for('people.person_collection', person_id=ownership.person_id) }}">{{ ownership.person.name }}</a></td>
             <td>{% if ownership.variant.color != UNKNOWN_COLOR %}{{ ownership.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
             <td><span class="badge badge-{{ ownership.status | lower }}">{{ ownership.status }}</span></td>
+            <td>{% if ownership.quantity_purchased is not none %}<span class="mono">{{ ownership.quantity_purchased }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td>{% if ownership.quantity_given_away is not none %}<span class="mono">{{ ownership.quantity_given_away }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
             <td class="muted">{{ ownership.notes or '' }}</td>
             <td class="actions">
               <a href="{{ url_for('people.ownership_edit', ownership_id=ownership.id) }}" class="btn btn-xs">Edit</a>

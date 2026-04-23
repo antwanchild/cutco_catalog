@@ -78,6 +78,19 @@
     </label>
   </div>
 
+  <div class="form-row">
+    <label>Quantity Purchased
+      <input type="number" name="quantity_purchased" min="0" step="1" placeholder="e.g. 2"
+             class="input-full"
+             value="{{ ownership.quantity_purchased if ownership and ownership.quantity_purchased is not none else '' }}">
+    </label>
+    <label>Quantity Given Away
+      <input type="number" name="quantity_given_away" min="0" step="1" placeholder="e.g. 1"
+             class="input-full"
+             value="{{ ownership.quantity_given_away if ownership and ownership.quantity_given_away is not none else '' }}">
+    </label>
+  </div>
+
   <label>Notes
     <textarea name="notes" rows="2" class="input-full">{{ ownership.notes if ownership and ownership.notes else '' }}</textarea>
   </label>

@@ -431,6 +431,8 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(export_csv_response.mimetype, "text/csv")
         self.assertIn("my_export.csv", export_csv_response.headers["Content-Disposition"])
         self.assertIn(b"Exporter", export_csv_response.data)
+        self.assertIn(b"quantity_purchased", export_csv_response.data)
+        self.assertIn(b"quantity_given_away", export_csv_response.data)
         self.assertEqual(import_page_response.status_code, 200)
         self.assertIn(b"Import", import_page_response.data)
         self.assertEqual(import_template_response.status_code, 200)
@@ -915,6 +917,8 @@ class ImportSmokeTests(SmokeBaseTest):
                 "own_color_0": "Classic Brown",
                 "own_status_0": "Owned",
                 "own_notes_0": "Imported ownership",
+                "own_quantity_purchased_0": "3",
+                "own_quantity_given_away_0": "1",
                 "own_sku_unicorn_0": "",
                 "own_variant_unicorn_0": "",
                 "own_edge_unicorn_0": "",
@@ -936,6 +940,8 @@ class ImportSmokeTests(SmokeBaseTest):
             ).scalar_one()
             self.assertEqual(ownership.status, "Owned")
             self.assertEqual(ownership.notes, "Imported ownership")
+            self.assertEqual(ownership.quantity_purchased, 3)
+            self.assertEqual(ownership.quantity_given_away, 1)
 
     def test_import_confirm_creates_catalog_item_and_set_from_item_rows(self):
         self._login_as_admin()
@@ -1090,8 +1096,10 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Preview Knife", response.data)
         self.assertIn(b"Preview New Knife", response.data)
         self.assertIn(b"Price: 12.50", response.data)
-        self.assertIn(b"Quantity Purchased: 2", response.data)
-        self.assertIn(b"Quantity Given Away: 1", response.data)
+        self.assertIn(b'own_quantity_purchased_0" value="2"', response.data)
+        self.assertIn(b'own_quantity_given_away_0" value="1"', response.data)
+        self.assertIn(b"Qty Purchased", response.data)
+        self.assertIn(b"Qty Given Away", response.data)
         self.assertNotIn(b"Gift Box:", response.data)
         self.assertNotIn(b"Sheath:", response.data)
 
@@ -2049,6 +2057,8 @@ class OwnershipSmokeTests(SmokeBaseTest):
                 "status": "Owned",
                 "target_price": "",
                 "notes": "First ownership",
+                "quantity_purchased": "2",
+                "quantity_given_away": "1",
             },
             follow_redirects=False,
         )
@@ -2060,6 +2070,8 @@ class OwnershipSmokeTests(SmokeBaseTest):
             ).scalar_one()
             self.assertEqual(ownership.status, "Owned")
             self.assertEqual(ownership.notes, "First ownership")
+            self.assertEqual(ownership.quantity_purchased, 2)
+            self.assertEqual(ownership.quantity_given_away, 1)
 
         edit_response = self.client.post(
             f"/ownership/{ownership.id}/edit",
@@ -2068,6 +2080,8 @@ class OwnershipSmokeTests(SmokeBaseTest):
                 "status": "Wishlist",
                 "target_price": "89.00",
                 "notes": "Updated ownership",
+                "quantity_purchased": "5",
+                "quantity_given_away": "",
             },
             follow_redirects=False,
         )
@@ -2079,6 +2093,8 @@ class OwnershipSmokeTests(SmokeBaseTest):
             self.assertEqual(ownership.status, "Wishlist")
             self.assertEqual(ownership.target_price, 89.00)
             self.assertEqual(ownership.notes, "Updated ownership")
+            self.assertEqual(ownership.quantity_purchased, 5)
+            self.assertIsNone(ownership.quantity_given_away)
 
         delete_response = self.client.post(
             f"/ownership/{ownership.id}/delete",
