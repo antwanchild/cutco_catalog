@@ -160,9 +160,9 @@
   {# ── Likely Unicorns ────────────────────────────────────────────────── #}
 {% if likely_unicorns %}
   <h2>🦄 Likely Unicorns / Off-Catalog ({{ likely_unicorns | length }})</h2>
-  <p class="muted">No SKU match found, the row matches a set SKU, or it was explicitly flagged. Review before accepting.</p>
+  <p class="muted">No SKU match found or the row was explicitly flagged. Review before accepting.</p>
   <input type="hidden" name="item_count"
-         value="{{ (new_items | length) + (likely_unicorns | length) }}"
+         value="{{ (new_items | length) + (likely_unicorns | length) + (set_sku_collisions | length) }}"
          id="item_count_override">
   <table class="data-table">
     <thead>
@@ -188,6 +188,65 @@
           {% if item.matches_set_sku %}
             <span class="badge badge-warning" title="Matches existing set{% if item.matched_set_name %}: {{ item.matched_set_name }}{% endif %}">Set SKU</span>
           {% endif %}
+        </td>
+        <td>
+          <input type="hidden" name="item_color_{{ form_field_index }}" value="{{ item.color }}">
+          {{ item.color }}
+        </td>
+        <td>
+          <select name="item_edge_{{ form_field_index }}" class="select-xs">
+            {% for et in edge_types %}
+              <option value="{{ et }}" {% if et == item.edge_type %}selected{% endif %}>{{ et }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td>
+          <input type="text" name="item_category_{{ form_field_index }}" value="{{ item.category or '' }}" class="input-xs">
+        </td>
+        <td><input type="checkbox" name="item_sku_unicorn_{{ form_field_index }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
+        <td><input type="checkbox" name="item_variant_unicorn_{{ form_field_index }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
+        <td><input type="checkbox" name="item_edge_unicorn_{{ form_field_index }}" {% if item.is_edge_unicorn %}checked{% endif %}></td>
+        <td>
+          <input type="text" name="item_person_{{ form_field_index }}" value="{{ item.person or '' }}" class="input-xs">
+        </td>
+        <td>
+          <select name="item_status_{{ form_field_index }}" class="select-xs">
+            {% for status_option in status_options %}
+              <option value="{{ status_option }}" {% if status_option == item.status %}selected{% endif %}>{{ status_option }}</option>
+            {% endfor %}
+          </select>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if set_sku_collisions %}
+  <h2>⚠️ Set SKU Collisions ({{ set_sku_collisions | length }})</h2>
+  <p class="muted">These rows match an existing set SKU. They are unchecked by default because they usually should not import as standalone items.</p>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
+        <th>Edge</th><th>Category</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set offset = (new_items | length) + (likely_unicorns | length) %}
+      {% for item in set_sku_collisions %}
+      {% set form_field_index = offset + loop.index0 %}
+      <tr>
+        <td><input type="checkbox" name="item_accept_{{ form_field_index }}"></td>
+        <td>
+          <input type="hidden" name="item_row_{{ form_field_index }}" value="{{ item.row }}">
+          <input type="hidden" name="item_name_{{ form_field_index }}" value="{{ item.name }}">
+          {{ item.name }}
+        </td>
+        <td>
+          <input type="hidden" name="item_sku_{{ form_field_index }}" value="{{ item.sku or '' }}">
+          <span class="mono">{{ item.sku or '—' }}</span>
+          <span class="badge badge-warning" title="Matches existing set{% if item.matched_set_name %}: {{ item.matched_set_name }}{% endif %}">Set SKU</span>
         </td>
         <td>
           <input type="hidden" name="item_color_{{ form_field_index }}" value="{{ item.color }}">

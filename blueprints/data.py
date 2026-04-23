@@ -350,6 +350,7 @@ def import_page():
     sku_name_mismatches = []
     new_items_list     = []
     likely_unicorns    = []
+    set_sku_collisions = []
     ownership_entries  = []
     conflicts          = []
     errors             = []
@@ -432,7 +433,10 @@ def import_page():
             })
         elif dedup_key not in seen_skus:
             seen_skus.add(dedup_key)
-            bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku or matches_set_sku else new_items_list
+            if matches_set_sku:
+                bucket = set_sku_collisions
+            else:
+                bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku else new_items_list
             bucket.append({
                 "name": name, "sku": sku, "color": color,
                 "edge_type": edge_type,
@@ -488,6 +492,7 @@ def import_page():
                            sku_name_mismatches=sku_name_mismatches,
                            new_items=new_items_list,
                            likely_unicorns=likely_unicorns,
+                           set_sku_collisions=set_sku_collisions,
                            ownership_entries=ownership_entries,
                            conflicts=conflicts,
                            errors=errors,
