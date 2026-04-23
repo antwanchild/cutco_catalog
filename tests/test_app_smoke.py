@@ -27,6 +27,7 @@ from models import (
 )
 from scraping import (
     _build_set_member_entries,
+    _extract_sku_from_href,
     _member_hover_title,
     _infer_visible_member_sku,
     _normalize_set_member_sku,
@@ -688,6 +689,13 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(_normalize_set_member_sku("1716C"), "1716")
         self.assertEqual(_normalize_set_member_sku("1737"), "1737")
         self.assertIsNone(_normalize_set_member_sku(""))
+
+    def test_extract_sku_from_href_can_preserve_lettered_code(self):
+        self.assertEqual(_extract_sku_from_href("https://www.cutco.com/p/990c"), "990")
+        self.assertEqual(
+            _extract_sku_from_href("https://www.cutco.com/p/990c", preserve_lettered_code=True),
+            "990C",
+        )
 
     def test_member_hover_titles_trim_set_lists(self):
         self.assertEqual(

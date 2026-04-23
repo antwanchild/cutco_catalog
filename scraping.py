@@ -9,14 +9,14 @@ import requests
 from bs4 import BeautifulSoup
 
 from constants import (
-    REQUEST_TIMEOUT, SCRAPE_CATEGORIES, SCRAPE_HEADERS, SCRAPE_SETS_URL,
+    COOKWARE_CATEGORIES, REQUEST_TIMEOUT, SCRAPE_CATEGORIES, SCRAPE_HEADERS, SCRAPE_SETS_URL,
     SYNC_BLOCKED_CATEGORIES, _BUNDLE_KEYWORDS, _resolve_category, _is_set_product,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def _extract_sku_from_href(href: str) -> str | None:
+def _extract_sku_from_href(href: str, *, preserve_lettered_code: bool = False) -> str | None:
     """Pull a base SKU from a /p/ product URL."""
     parts = href.rstrip("/").split("/")
     slug = parts[-1].split("?")[0].split("&")[0].upper()
@@ -29,11 +29,12 @@ def _extract_sku_from_href(href: str) -> str | None:
         candidate = slug
     else:
         return None
-    if candidate.endswith("SH"):
-        candidate = candidate[:-2]
-    stripped = re.sub(r"[A-Z]+$", "", candidate)
-    if stripped and stripped.isdigit() and len(stripped) >= 2:
-        candidate = stripped
+    if not preserve_lettered_code:
+        if candidate.endswith("SH"):
+            candidate = candidate[:-2]
+        stripped = re.sub(r"[A-Z]+$", "", candidate)
+        if stripped and stripped.isdigit() and len(stripped) >= 2:
+            candidate = stripped
     return candidate or None
 
 
@@ -327,7 +328,7 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
         strategy_log: list[str] = []
 
         # Strategy 0: SKU embedded in the URL slug
-        url_slug_sku = _extract_sku_from_href(url)
+        url_slug_sku = _extract_sku_from_href(url, preserve_lettered_code=preserve_lettered_code)
         if url_slug_sku:
             sku = url_slug_sku
             strategy_log.append(f"slug={sku}")
@@ -629,7 +630,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
 
             for anchor, href in unique_links:
                 base_href = href.split("&")[0]
-                sku = _extract_sku_from_href(base_href)
+                sku = _extract_sku_from_href(base_href, preserve_lettered_code=cat_name in COOKWARE_CATEGORIES)
                 prod_url = href if href.startswith("http") else f"https://www.cutco.com{href}"
 
                 name_el = anchor.find(["h2", "h3"])
@@ -668,7 +669,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
         added_from_slugs = 0
         with ThreadPoolExecutor(max_workers=6) as pool:
             future_map = {
-                pool.submit(_fetch_sku_from_page, prod_url): (prod_url, cat_name, cat_name_hint)
+                pool.submit(_fetch_sku_from_page, prod_url, preserve_lettered_code=cat_name in COOKWARE_CATEGORIES): (prod_url, cat_name, cat_name_hint)
                 for prod_url, cat_name, cat_name_hint in slug_queue
             }
             for future in as_completed(future_map):
