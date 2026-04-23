@@ -148,11 +148,25 @@ def _schema_set_member_snapshot_migrations() -> None:
     _add_column("sets", "member_data", "ALTER TABLE sets ADD COLUMN member_data TEXT")
 
 
+def _schema_repair_ownership_quantity_fields() -> None:
+    _add_column(
+        "ownership",
+        "quantity_purchased",
+        "ALTER TABLE ownership ADD COLUMN quantity_purchased INTEGER",
+    )
+    _add_column(
+        "ownership",
+        "quantity_given_away",
+        "ALTER TABLE ownership ADD COLUMN quantity_given_away INTEGER",
+    )
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
     SchemaMigration(3, "set_member_snapshot", _schema_set_member_snapshot_migrations),
     SchemaMigration(4, "ownership_quantity_fields", lambda: None),
+    SchemaMigration(5, "repair_ownership_quantity_fields", _schema_repair_ownership_quantity_fields),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version
