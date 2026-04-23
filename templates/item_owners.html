@@ -20,6 +20,14 @@
 {# ── Meta strip ───────────────────────────────────────────────────────────── #}
 <div class="item-meta mb-section">
   {% if item.sku %}<span><strong>SKU:</strong> <span class="mono">{{ item.sku }}</span></span>{% endif %}
+  {% if item.alternate_sku_values %}
+    <span>
+      <strong>Aliases:</strong>
+      <span class="badge badge-alias" title="{{ item.alternate_sku_values | join(', ') }}">
+        {{ item.alternate_sku_values | length }} alt SKU{{ 's' if item.alternate_sku_values | length != 1 else '' }}
+      </span>
+    </span>
+  {% endif %}
   {% if item.set_only %}<span><strong>Status:</strong> Set-only</span>{% endif %}
   {% if item.category %}
     <span><strong>Category:</strong> {{ item.category }}</span>

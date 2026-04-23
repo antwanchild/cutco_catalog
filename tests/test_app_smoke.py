@@ -291,7 +291,11 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, variant_id = self._add_catalog_item(name="View Knife", sku="VW-1")
+        item_id, variant_id = self._add_catalog_item(
+            name="View Knife",
+            sku="VW-1",
+            alternate_skus="VW-ALT1, VW-ALT2",
+        )
         person_id = self._add_person(name="Viewer", notes="")
         set_id = self._add_set(name="View Set", sku="VS-1", item_ids=(item_id,))
 
@@ -316,6 +320,8 @@ class PublicSmokeTests(SmokeBaseTest):
 
         self.assertEqual(item_response.status_code, 200)
         self.assertIn(b"View Knife", item_response.data)
+        self.assertIn(b"Aliases:", item_response.data)
+        self.assertIn(b"2 alt SKUs", item_response.data)
         self.assertIn(b'data-clamp-rows="2"', item_response.data)
         self.assertEqual(matrix_response.status_code, 200)
         self.assertIn(b"Matrix", matrix_response.data)
