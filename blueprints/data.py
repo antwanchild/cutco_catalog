@@ -45,8 +45,6 @@ def _build_notes(row: dict) -> tuple[str | None, list[str]]:
     errors: list[str] = []
     for key, label in [
         ("_notes_price",     "Price"),
-        ("_notes_gift_box",  "Gift Box"),
-        ("_notes_sheath",    "Sheath"),
         ("_notes_qty",       "Quantity Purchased"),
         ("_notes_given_away","Quantity Given Away"),
     ]:

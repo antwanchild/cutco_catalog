@@ -1092,6 +1092,8 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Price: 12.50", response.data)
         self.assertIn(b"Quantity Purchased: 2", response.data)
         self.assertIn(b"Quantity Given Away: 1", response.data)
+        self.assertNotIn(b"Gift Box:", response.data)
+        self.assertNotIn(b"Sheath:", response.data)
 
     def test_import_preview_rejects_decimal_quantity_values(self):
         self._login_as_admin()
@@ -1194,6 +1196,8 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Import Existing Knife", preview_response.data)
         self.assertIn(b"Import New Knife", preview_response.data)
         self.assertIn(b"Classic Brown", preview_response.data)
+        self.assertNotIn(b"Gift Box:", preview_response.data)
+        self.assertNotIn(b"Sheath:", preview_response.data)
 
         invalid_check_response = self.client.post(
             "/import",

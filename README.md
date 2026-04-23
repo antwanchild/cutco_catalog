@@ -237,7 +237,7 @@ Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted tem
 | `category` | Product category |
 | `notes` | Free-text notes |
 
-For XLSX imports, the app also recognizes `Owned?` and older auxiliary columns like `Price`, `Gift Box`, and `Sheath`, which are merged into notes. `Quantity Purchased` and `Given Away` are imported as whole-number note values, and rows with decimal values in those columns are rejected.
+For XLSX imports, the app also recognizes `Owned?` and older auxiliary columns like `Price`, which is merged into notes. `Quantity Purchased` and `Given Away` are imported as whole-number note values, and rows with decimal values in those columns are rejected.
 
 During import preview, rows where the SKU already exists but the name differs are grouped into a collapsed `SKU already exists` section so you can review naming differences before confirming.
 
