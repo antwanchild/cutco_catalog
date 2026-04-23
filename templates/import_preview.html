@@ -32,23 +32,25 @@
 {% endif %}
 
 {% if sku_name_mismatches %}
-<h2>Same SKU, Different Name ({{ sku_name_mismatches | length }})</h2>
-<p class="muted">These rows match an existing SKU, so the current catalog item name will stay in place.</p>
-<table class="data-table">
-  <thead>
-    <tr><th>Row</th><th>SKU</th><th>Imported Name</th><th>Existing Name</th></tr>
-  </thead>
-  <tbody>
-    {% for mismatch in sku_name_mismatches %}
-    <tr>
-      <td>Row {{ mismatch.row }}</td>
-      <td><span class="mono">{{ mismatch.sku }}</span></td>
-      <td>{{ mismatch.import_name }}</td>
-      <td>{{ mismatch.existing_name }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<details class="diff-section">
+  <summary>Same SKU, Different Name ({{ sku_name_mismatches | length }})</summary>
+  <p class="muted">These rows match an existing SKU, so the current catalog item name will stay in place.</p>
+  <table class="data-table">
+    <thead>
+      <tr><th>Row</th><th>SKU</th><th>Imported Name</th><th>Existing Name</th></tr>
+    </thead>
+    <tbody>
+      {% for mismatch in sku_name_mismatches %}
+      <tr>
+        <td>Row {{ mismatch.row }}</td>
+        <td><span class="mono">{{ mismatch.sku }}</span></td>
+        <td>{{ mismatch.import_name }}</td>
+        <td>{{ mismatch.existing_name }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
 {% endif %}
 
 <form method="post" action="{{ url_for('data.import_confirm') }}">
