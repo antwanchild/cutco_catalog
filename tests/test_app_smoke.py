@@ -2147,6 +2147,45 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn("RS-1", item_set.member_data)
             self.assertIn("RS-2", item_set.member_data)
 
+    def test_bulk_restore_set_memberships_relinks_selected_sets(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        first_item_id, _first_variant_id = self._add_catalog_item(name="Bulk Restore Knife One", sku="BR-1")
+        second_item_id, _second_variant_id = self._add_catalog_item(name="Bulk Restore Knife Two", sku="BR-2")
+        first_set_id = self._add_set(name="Bulk Restore Set One", sku="BR-SET-1", item_ids=(first_item_id,))
+        second_set_id = self._add_set(name="Bulk Restore Set Two", sku="BR-SET-2", item_ids=(second_item_id,))
+
+        with self.app.app_context():
+            first_set = db.session.get(Set, first_set_id)
+            second_set = db.session.get(Set, second_set_id)
+            first_set.member_data = json.dumps({"members": [{"sku": "BR-1", "name": "Bulk Restore Knife One", "quantity": 1}]})
+            second_set.member_data = json.dumps({"members": [{"sku": "BR-2", "name": "Bulk Restore Knife Two", "quantity": 2}]})
+            for item_set in (first_set, second_set):
+                for membership in list(item_set.members):
+                    db.session.delete(membership)
+            db.session.commit()
+
+        response = self.client.post(
+            "/sets/bulk-restore-memberships",
+            data={
+                "csrf_token": "test-csrf-token",
+                "next": "/sets?missing=1&incomplete=1",
+                "set_ids": [str(first_set_id), str(second_set_id)],
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/sets?missing=1&incomplete=1", response.headers["Location"])
+
+        with self.app.app_context():
+            first_set = db.session.get(Set, first_set_id)
+            second_set = db.session.get(Set, second_set_id)
+            self.assertEqual(len(first_set.members), 1)
+            self.assertEqual(len(second_set.members), 1)
+            self.assertEqual(db.session.get(Item, first_set.members[0].item_id).sku, "BR-1")
+            self.assertEqual(db.session.get(Item, second_set.members[0].item_id).sku, "BR-2")
+
     def test_catalog_purge_and_delete_routes(self):
         self._login_as_admin()
         self._set_csrf_token()

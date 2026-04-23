@@ -760,22 +760,14 @@ def set_edit(set_id=None, sid=None):
     )
 
 
-@catalog_bp.route("/sets/<int:set_id>/restore-memberships", methods=["POST"])
-@catalog_bp.route("/sets/<int:sid>/restore-memberships", methods=["POST"])
-@admin_required
-def set_restore_memberships(set_id=None, sid=None):
-    set_id = set_id if set_id is not None else sid
-    item_set = db.session.get(Set, set_id)
-    if not item_set:
-        abort(404)
-
+def _restore_set_memberships_from_snapshot(item_set: Set) -> tuple[int, int, bool]:
     snapshot = _load_member_snapshot(item_set.member_data)
     if not snapshot:
-        flash(f'No imported member snapshot is available for "{item_set.name}".', "warning")
-        return redirect(url_for("catalog.set_detail", set_id=item_set.id))
+        return 0, 0, False
 
-    sku_to_item = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
-    name_to_item = _build_member_name_lookup(Item.query.filter(Item.sku.isnot(None)).all())
+    items = Item.query.filter(Item.sku.isnot(None)).all()
+    sku_to_item = {item.sku.upper(): item for item in items if item.sku}
+    name_to_item = _build_member_name_lookup(items)
     resolved_members, _created_now = _aggregate_resolved_members(
         snapshot,
         sku_to_item,
@@ -784,8 +776,7 @@ def set_restore_memberships(set_id=None, sid=None):
         set_name=item_set.name,
     )
     if not resolved_members:
-        flash(f'No catalog items could be matched for "{item_set.name}".', "warning")
-        return redirect(url_for("catalog.set_detail", set_id=item_set.id))
+        return 0, 0, False
 
     existing_members = {member.item_id: member for member in item_set.members}
     restored = 0
@@ -801,11 +792,84 @@ def set_restore_memberships(set_id=None, sid=None):
         if membership.quantity != qty:
             membership.quantity = qty
             updated += 1
+    return restored, updated, True
+
+
+@catalog_bp.route("/sets/<int:set_id>/restore-memberships", methods=["POST"])
+@catalog_bp.route("/sets/<int:sid>/restore-memberships", methods=["POST"])
+@admin_required
+def set_restore_memberships(set_id=None, sid=None):
+    set_id = set_id if set_id is not None else sid
+    item_set = db.session.get(Set, set_id)
+    if not item_set:
+        abort(404)
+    restored, updated, matched = _restore_set_memberships_from_snapshot(item_set)
+    if not matched:
+        flash(f'No catalog items could be matched for "{item_set.name}".', "warning")
+        return redirect(url_for("catalog.set_detail", set_id=item_set.id))
 
     if db_commit(db.session):
         logger.info("Set memberships restored: %s (+%d memberships, %d updated)", item_set.name, restored, updated)
         flash(f'Restored {restored} membership(s) for "{item_set.name}".', "success")
     return redirect(url_for("catalog.set_detail", set_id=item_set.id))
+
+
+@catalog_bp.route("/sets/bulk-restore-memberships", methods=["POST"])
+@admin_required
+def bulk_restore_set_memberships():
+    selected_set_ids: set[int] = set()
+    invalid_seen = False
+    for raw_set_id in request.form.getlist("set_ids"):
+        try:
+            selected_set_ids.add(int(raw_set_id))
+        except (TypeError, ValueError):
+            invalid_seen = True
+
+    if invalid_seen:
+        flash("Some set selections were invalid and were ignored.", "warning")
+    if not selected_set_ids:
+        flash("Choose one or more sets to restore.", "warning")
+        return redirect(url_for("catalog.sets_list"))
+
+    item_sets = {
+        item_set.id: item_set
+        for item_set in Set.query.filter(Set.id.in_(selected_set_ids)).all()
+    }
+    if not item_sets:
+        flash("No valid sets were selected.", "warning")
+        return redirect(url_for("catalog.sets_list"))
+
+    restored_sets = 0
+    restored_memberships = 0
+    updated_memberships = 0
+    skipped_sets = 0
+    for item_set in item_sets.values():
+        restored, updated, matched = _restore_set_memberships_from_snapshot(item_set)
+        if not matched:
+            skipped_sets += 1
+            continue
+        restored_sets += 1
+        restored_memberships += restored
+        updated_memberships += updated
+
+    if db_commit(db.session):
+        logger.info(
+            "Bulk set membership restore: %d set(s), %d memberships restored, %d updated, %d skipped",
+            restored_sets,
+            restored_memberships,
+            updated_memberships,
+            skipped_sets,
+        )
+        flash(
+            f"Restored memberships for {restored_sets} set{'s' if restored_sets != 1 else ''}.",
+            "success",
+        )
+        if skipped_sets:
+            flash(
+                f"Skipped {skipped_sets} set{'s' if skipped_sets != 1 else ''} with no imported member snapshot.",
+                "warning",
+            )
+    return redirect(_safe_redirect_target(request.form.get("next")) or url_for("catalog.sets_list"))
 
 
 @catalog_bp.route("/sets/<int:set_id>/delete", methods=["POST"])

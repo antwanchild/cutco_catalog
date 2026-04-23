@@ -34,72 +34,133 @@
 </form>
 
 {% if sets %}
+<form method="post" action="{{ url_for('catalog.bulk_restore_set_memberships') }}" id="sets-bulk-restore-form">
+  <input type="hidden" name="next" value="{{ request.full_path[:-1] if request.full_path.endswith('?') else request.full_path }}">
+</form>
 <div class="table-wrap">
-<table class="data-table sets-table">
-  <colgroup>
-    <col style="width: 36%">
-    <col style="width: 10%">
-    <col style="width: 18%">
-    <col style="width: auto">
-    <col style="width: 19%">
-  </colgroup>
-  <thead>
-    <tr><th>Set Name</th><th>Items</th><th>Completion</th><th>Notes</th><th>Actions</th></tr>
-  </thead>
-  <tbody>
-    {% for item_set in sets %}
-    {% set c = completion[item_set.id] %}
-    <tr>
-      <td>
-        <a href="{{ url_for('catalog.set_detail', set_id=item_set.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}{% if person_id %}&person={{ person_id }}{% endif %}">
-          {{ item_set.name }}
-        </a>
-        {% if item_set.sku %}
-          <div class="muted mono" style="margin-top:.2rem">SKU: {{ item_set.sku }}</div>
+  <table class="data-table sets-table">
+    <colgroup>
+      {% if is_admin() %}
+        <col style="width: 32px">
+      {% endif %}
+      <col style="width: 36%">
+      <col style="width: 10%">
+      <col style="width: 18%">
+      <col style="width: auto">
+      <col style="width: 19%">
+    </colgroup>
+    <thead>
+      <tr>
+        {% if is_admin() %}
+          <th><input type="checkbox" id="sets-select-all" title="Select all"></th>
         {% endif %}
-      </td>
-      <td>{{ c.total }}</td>
-      <td>
-        {% if c.total > 0 %}
-        <div class="set-progress-wrap">
-          <div class="set-progress-bar">
-            <div class="set-progress-fill {% if c.pct == 100 %}set-progress-complete{% endif %}"
-                 style="width: {{ c.pct }}%"></div>
+        <th>Set Name</th><th>Items</th><th>Completion</th><th>Notes</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item_set in sets %}
+      {% set c = completion[item_set.id] %}
+      <tr>
+        {% if is_admin() %}
+          <td><input type="checkbox" name="set_ids" value="{{ item_set.id }}" class="set-restore-check" form="sets-bulk-restore-form"></td>
+        {% endif %}
+        <td>
+          <a href="{{ url_for('catalog.set_detail', set_id=item_set.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}{% if person_id %}&person={{ person_id }}{% endif %}">
+            {{ item_set.name }}
+          </a>
+          {% if item_set.sku %}
+            <div class="muted mono" style="margin-top:.2rem">SKU: {{ item_set.sku }}</div>
+          {% endif %}
+        </td>
+        <td>{{ c.total }}</td>
+        <td>
+          {% if c.total > 0 %}
+          <div class="set-progress-wrap">
+            <div class="set-progress-bar">
+              <div class="set-progress-fill {% if c.pct == 100 %}set-progress-complete{% endif %}"
+                   style="width: {{ c.pct }}%"></div>
+            </div>
+            <span class="set-progress-label {% if c.pct == 100 %}set-complete-text{% endif %}">
+              {% if c.pct == 100 %}✓ Complete{% else %}{{ c.owned }} / {{ c.total }}{% endif %}
+            </span>
           </div>
-          <span class="set-progress-label {% if c.pct == 100 %}set-complete-text{% endif %}">
-            {% if c.pct == 100 %}✓ Complete{% else %}{{ c.owned }} / {{ c.total }}{% endif %}
-          </span>
-        </div>
-        {% else %}
-        <span class="muted">—</span>
-        {% endif %}
-      </td>
-      <td>
-        {{ item_set.notes or '—' }}
-        {% set not_in_catalog_count = not_in_catalog_counts.get(item_set.id, 0) %}
-        {% if not_in_catalog_count %}
-          <div class="muted" style="margin-top:.35rem">
-            <span class="badge badge-missing">{{ not_in_catalog_count }} not in catalog</span>
-          </div>
-        {% endif %}
-      </td>
-      <td class="actions">
-        <a href="{{ url_for('catalog.set_edit', set_id=item_set.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}" class="btn btn-xs btn-secondary">Edit</a>
-        <form method="post" action="{{ url_for('catalog.set_delete', set_id=item_set.id) }}"
-              class="form-inline">
-          <button class="btn btn-xs btn-danger"
-                  data-confirm-title="Delete set"
-                  data-confirm-message="This set will be removed."
-                  data-confirm-count="1 set"
-                  data-confirm-preview="Set: {{ item_set.name | e }} | Items: {{ c.total }} | Completion: {{ c.owned }}/{{ c.total }}"
-                  data-confirm-button="Delete set">Del</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
+          {% else %}
+          <span class="muted">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {{ item_set.notes or '—' }}
+          {% set not_in_catalog_count = not_in_catalog_counts.get(item_set.id, 0) %}
+          {% if not_in_catalog_count %}
+            <div class="muted" style="margin-top:.35rem">
+              <span class="badge badge-missing">{{ not_in_catalog_count }} not in catalog</span>
+            </div>
+          {% endif %}
+        </td>
+        <td class="actions">
+          <a href="{{ url_for('catalog.set_edit', set_id=item_set.id, next=request.full_path[:-1] if request.full_path.endswith('?') else request.full_path) }}" class="btn btn-xs btn-secondary">Edit</a>
+          <form method="post" action="{{ url_for('catalog.set_delete', set_id=item_set.id) }}"
+                class="form-inline">
+            <button class="btn btn-xs btn-danger"
+                    data-confirm-title="Delete set"
+                    data-confirm-message="This set will be removed."
+                    data-confirm-count="1 set"
+                    data-confirm-preview="Set: {{ item_set.name | e }} | Items: {{ c.total }} | Completion: {{ c.owned }}/{{ c.total }}"
+                    data-confirm-button="Delete set">Del</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  {% if is_admin() %}
+    <div class="bulk-bar" id="sets-bulk-bar">
+      <span class="bulk-count" id="sets-bulk-count">0 selected</span>
+      <button type="submit" form="sets-bulk-restore-form" class="btn btn-primary btn-sm" id="sets-bulk-restore">Restore memberships</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="sets-bulk-cancel">Cancel</button>
+    </div>
+  {% endif %}
+
+{% if is_admin() %}
+<script>
+(function() {
+  var form = document.getElementById('sets-bulk-restore-form');
+  var selectAll = document.getElementById('sets-select-all');
+  var checks = Array.prototype.slice.call(document.querySelectorAll('.set-restore-check'));
+  var bar = document.getElementById('sets-bulk-bar');
+  var countEl = document.getElementById('sets-bulk-count');
+  var submitBtn = document.getElementById('sets-bulk-restore');
+  var cancelBtn = document.getElementById('sets-bulk-cancel');
+
+  if (!form || !selectAll || !checks.length || !bar || !countEl || !submitBtn || !cancelBtn) {
+    return;
+  }
+
+  function updateBar() {
+    var n = checks.filter(function(c) { return c.checked; }).length;
+    countEl.textContent = n + ' selected';
+    bar.classList.toggle('bulk-bar-visible', n > 0);
+    selectAll.indeterminate = n > 0 && n < checks.length;
+    selectAll.checked = n === checks.length;
+    submitBtn.disabled = n === 0;
+  }
+
+  selectAll.addEventListener('change', function() {
+    checks.forEach(function(c) { c.checked = selectAll.checked; });
+    updateBar();
+  });
+  checks.forEach(function(c) { c.addEventListener('change', updateBar); });
+  cancelBtn.addEventListener('click', function() {
+    checks.forEach(function(c) { c.checked = false; });
+    updateBar();
+  });
+
+  updateBar();
+})();
+</script>
+{% endif %}
 {% else %}
 <p class="empty">No sets yet. Sets are auto-created during import, or add one manually.</p>
 {% endif %}
