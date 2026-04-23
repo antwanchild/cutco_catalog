@@ -207,7 +207,7 @@
   <summary>Variant Gaps ({{ variant_gaps | length }} item{{ 's' if variant_gaps | length != 1 }})</summary>
   <ul class="gap-list">
     {% for item, missing in variant_gaps %}
-      <li class="gap-row gap-row-stack">
+      <li class="gap-row gap-row-variant-group">
         <div class="gap-main">
           <strong>{{ item.name }}</strong>
           <span class="gap-sku">{{ item.sku or '—' }}</span>
@@ -215,7 +215,9 @@
         <div class="gap-variants">
           {% for variant in missing %}
             <div class="gap-variant-row">
-              <span class="chip">{{ variant.color }}</span>
+              <div class="gap-main gap-variant-main">
+                <span class="chip">{{ variant.color }}</span>
+              </div>
               <a href="{{ url_for('people.ownership_add', person_id=person.id, item_id=item.id, variant_id=variant.id) }}"
                  class="btn btn-xs btn-success gap-action">+ Add</a>
             </div>

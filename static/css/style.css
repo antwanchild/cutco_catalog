@@ -1060,7 +1060,7 @@ textarea { resize: vertical; }
   align-items: center;
   font-size: .875rem;
 }
-.gap-row-stack {
+.gap-row-variant-group {
   align-items: start;
 }
 .gap-main {
@@ -1087,10 +1087,12 @@ textarea { resize: vertical; }
 }
 .gap-variant-row {
   display: grid;
-  grid-template-columns: auto auto;
-  justify-content: start;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: .5rem .75rem;
+}
+.gap-variant-main {
+  flex-wrap: wrap;
 }
 .gap-action {
   justify-self: end;

@@ -441,6 +441,39 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"GK-1", collection_response.data)
         self.assertIn(b"+ Add", collection_response.data)
 
+    def test_collection_variant_gaps_show_skus(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, owned_variant_id = self._add_catalog_item(name="Variant Gap Knife", sku="VG-1")
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            db.session.add(ItemVariant(item_id=item_id, color="Pearl White"))
+            db.session.commit()
+            missing_variant = next(variant for variant in item.variants if variant.color == "Pearl White")
+        person_id = self._add_person(name="Variant Gap Collector", notes="")
+        self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(owned_variant_id),
+                "status": "Owned",
+                "target_price": "",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+
+        collection_response = self.client.get(f"/people/{person_id}/collection")
+
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertIn(b"Variant Gaps", collection_response.data)
+        self.assertIn(b"Variant Gap Knife", collection_response.data)
+        self.assertIn(b"VG-1", collection_response.data)
+        self.assertIn(missing_variant.color.encode(), collection_response.data)
+        self.assertIn(b"+ Add", collection_response.data)
+
     def test_data_routes_render(self):
         self._login_as_admin()
         self._set_csrf_token()
