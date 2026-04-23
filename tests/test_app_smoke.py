@@ -29,6 +29,7 @@ from scraping import (
     _build_set_member_entries,
     _dedupe_product_links,
     _extract_sku_from_href,
+    _product_link_name,
     _member_hover_title,
     _infer_visible_member_sku,
     _normalize_set_member_sku,
@@ -724,6 +725,19 @@ class UtilitySmokeTests(SmokeBaseTest):
         _anchor, href, name = deduped[0]
         self.assertEqual(href, "/p/4135-2&view=product")
         self.assertEqual(name, "Cutco 4\" Vegetable Knife Sheath")
+
+    def test_product_link_name_prefers_title_over_full_text(self):
+        soup = BeautifulSoup(
+            """
+            <a href="/p/5-pc-garden-tool-set&view=product" class="tb-product-details">
+              <h3>5-Pc. Garden Tool Set w/FREE Garden Bag</h3>
+              <span>Cutco 5-Pc. Garden Tool Set w/FREE Garden Bag $23 Set Savings $310 $333 When Purchased Separately Your garden will flourish with this complete set of garden tools.</span>
+            </a>
+            """,
+            "html.parser",
+        )
+        anchor = soup.find("a")
+        self.assertEqual(_product_link_name(anchor), "5-Pc. Garden Tool Set w/FREE Garden Bag")
 
     def test_should_queue_slug_allows_sheaths_to_override_seen_urls(self):
         seen = {"https://www.cutco.com/p/4135-2&view=product"}

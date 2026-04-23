@@ -102,11 +102,13 @@ def _build_category_list() -> list[tuple[str, str]]:
 
 
 def _product_link_name(anchor) -> str | None:
-    text = anchor.get_text(" ", strip=True)
-    if text:
-        return text
     name_el = anchor.find(["h2", "h3"])
-    return name_el.get_text(strip=True) if name_el else None
+    if name_el:
+        title = name_el.get_text(" ", strip=True)
+        if title:
+            return title
+    text = anchor.get_text(" ", strip=True)
+    return text or None
 
 
 def _dedupe_product_links(product_links) -> list[tuple[object, str, str | None]]:
