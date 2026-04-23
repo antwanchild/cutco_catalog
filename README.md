@@ -118,7 +118,9 @@ The **Sync** button (admin only) scrapes Cutco.com and shows a preview of new it
 
 - Review and deselect items you don't want imported
 - Edit category assignments inline
+- Review same-SKU / different-name rows before confirm so you can keep your preferred item names
 - Import new sets with member SKUs and quantities pre-populated (e.g. Galley +6 records ×6 steak knives)
+- See set completeness cues, including items not yet in the catalog
 
 A separate **Sync Uses** button (admin, on the Manage Tasks page) scrapes Cutco.com's "Uses" tab for every cataloged item and populates the task system with Cutco-recommended pairings.
 
@@ -154,6 +156,15 @@ docker exec -it cutco-vault python msrp_diff.py --update --csv /data/msrp_diff.c
 ```
 
 After a DB update, any wishlist items whose MSRP now meets a collector's target price are automatically surfaced (and notified via Discord if `DISCORD_WEBHOOK_URL` is set).
+
+## 🗂️ Sets
+
+The Sets page helps you track collection progress through Cutco sets:
+
+- Filter to only sets with items not yet in the catalog
+- Filter to only incomplete sets
+- View imported member item numbers and quantities for each set
+- Drill into a set to edit it or return to the same filtered list you came from
 
 ---
 
@@ -229,6 +240,8 @@ Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted tem
 For XLSX imports, the app also recognizes `Owned?` and older auxiliary columns like `Price`, `Gift Box`, `Sheath`, `Quantity Purchased`, and `Given Away`, which are merged into notes.
 
 Set membership columns (mark a truthy value such as `yes` to assign): `Beast`, `Fanatic`, `SIGNATURE`, `HOMEMAKER`, `Accomplished Chef`, `CUTCO Kitchen`, and other configured set columns.
+
+During import preview, rows where the SKU already exists but the name differs are grouped into a collapsed `SKU already exists` section so you can review naming differences before confirming.
 
 ---
 
