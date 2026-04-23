@@ -872,7 +872,7 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "text/csv")
-        self.assertIn("cutco_import_template.csv", response.headers["Content-Disposition"])
+        self.assertIn("cutco_import_starter.csv", response.headers["Content-Disposition"])
 
     def test_import_check_accepts_basic_csv(self):
         self._login_as_admin()

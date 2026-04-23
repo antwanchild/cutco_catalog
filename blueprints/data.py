@@ -194,7 +194,7 @@ def import_template():
     csv_buffer.seek(0)
     return Response(csv_buffer.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
-                             "attachment; filename=cutco_import_template.csv"})
+                             "attachment; filename=cutco_import_starter.csv"})
 
 
 @data_bp.route("/import", methods=["GET", "POST"])
