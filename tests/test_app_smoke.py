@@ -1347,10 +1347,10 @@ class ImportSmokeTests(SmokeBaseTest):
                 "csvfile": (
                     BytesIO(
                         b"name,sku,owned,color,quantity purchased,quantity given away,category,edge,"
-                        b"is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price,Gift Box,Sheath\n"
+                        b"sku_unicorn,variant_unicorn,edge_unicorn,price,Gift Box,Sheath\n"
                         b"Import Existing Knife,IM-EX-1,Import Existing Collector,Classic Brown,2,n/a,Kitchen Knives,Straight,"
                         b"no,no,no,12.50,yes,Leather\n"
-                        b"Import New Knife,IM-NEW-1,no,Pearl White,,,,,no,no,no,34.00,,\n"
+                        b"Import New Knife,IM-NEW-1,no,Pearl White,,,,,x,x,x,34.00,,\n"
                     ),
                     "preview.csv",
                 ),
