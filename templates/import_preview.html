@@ -135,9 +135,9 @@
   {% endif %}
 
   {# ── Likely Unicorns ────────────────────────────────────────────────── #}
-  {% if likely_unicorns %}
+{% if likely_unicorns %}
   <h2>🦄 Likely Unicorns / Off-Catalog ({{ likely_unicorns | length }})</h2>
-  <p class="muted">No SKU match found or explicitly flagged. Review before accepting.</p>
+  <p class="muted">No SKU match found, the row matches a set SKU, or it was explicitly flagged. Review before accepting.</p>
   <input type="hidden" name="item_count"
          value="{{ (new_items | length) + (likely_unicorns | length) }}"
          id="item_count_override">
@@ -162,6 +162,9 @@
         <td>
           <input type="hidden" name="item_sku_{{ form_field_index }}" value="{{ item.sku or '' }}">
           <span class="mono">{{ item.sku or '—' }}</span>
+          {% if item.matches_set_sku %}
+            <span class="badge badge-warning" title="Matches existing set{% if item.matched_set_name %}: {{ item.matched_set_name }}{% endif %}">Set SKU</span>
+          {% endif %}
         </td>
         <td>
           <input type="hidden" name="item_color_{{ form_field_index }}" value="{{ item.color }}">

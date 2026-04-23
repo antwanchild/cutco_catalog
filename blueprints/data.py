@@ -18,6 +18,7 @@ from models import (
     ItemVariant,
     Ownership,
     Person,
+    Set,
     normalize_sku_value,
     parse_alternate_skus,
     record_activity,
@@ -68,6 +69,15 @@ def _build_item_sku_lookup(items: list[Item]) -> dict[str, Item]:
         for alias_sku in parse_alternate_skus(item.alternate_skus):
             if alias_sku and alias_sku not in lookup:
                 lookup[alias_sku] = item
+    return lookup
+
+
+def _build_set_sku_lookup(sets: list[Set]) -> dict[str, Set]:
+    lookup: dict[str, Set] = {}
+    for item_set in sets:
+        set_sku = normalize_sku_value(item_set.sku)
+        if set_sku and set_sku not in lookup:
+            lookup[set_sku] = item_set
     return lookup
 
 
@@ -332,6 +342,7 @@ def import_page():
             row["_person_override"] = person_override
 
     existing_items   = _build_item_sku_lookup(Item.query.all())
+    existing_set_skus = _build_set_sku_lookup(Set.query.all())
     existing_names   = {item.name.lower(): item for item in Item.query.all()}
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
 
@@ -383,6 +394,9 @@ def import_page():
         elif name.lower() in existing_names:
             matched_item = existing_names[name.lower()]
 
+        matched_set = existing_set_skus.get(sku) if sku else None
+        matches_set_sku = bool(sku and matched_set and not matched_item)
+
         is_cookware = ((matched_item.category or "") in COOKWARE_CATEGORIES) if matched_item else False
         target_color = UNKNOWN_COLOR if is_cookware else color
         existing_variant = None
@@ -412,7 +426,7 @@ def import_page():
                 })
         elif dedup_key not in seen_skus:
             seen_skus.add(dedup_key)
-            bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku else new_items_list
+            bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku or matches_set_sku else new_items_list
             bucket.append({
                 "name": name, "sku": sku, "color": color,
                 "edge_type": edge_type,
@@ -422,6 +436,8 @@ def import_page():
                 "category": category, "notes": notes,
                 "person": person_name, "status": status,
                 "row": row_num,
+                "matches_set_sku": matches_set_sku,
+                "matched_set_name": matched_set.name if matched_set is not None else None,
             })
 
         if person_name and matched_item:

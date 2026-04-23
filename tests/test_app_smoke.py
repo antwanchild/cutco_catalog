@@ -1230,6 +1230,32 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Existing Pan", preview_response.data)
         self.assertNotIn(b"New Catalog Items (1)", preview_response.data)
 
+    def test_import_preview_flags_set_sku_collisions(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        self._add_set(name="Cookware Set", sku="990C")
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color,edge,category\n"
+                        b"Cookware Piece,990C,yes,Classic Brown,Straight,Cookware\n"
+                    ),
+                    "set_collision.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Likely Unicorns / Off-Catalog", preview_response.data)
+        self.assertIn(b"Set SKU", preview_response.data)
+        self.assertNotIn(b"New Catalog Items (1)", preview_response.data)
+
     def test_import_preview_csv_and_error_paths(self):
         self._login_as_admin()
         self._set_csrf_token()
