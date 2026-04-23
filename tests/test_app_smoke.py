@@ -1223,6 +1223,30 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Missing required headers: name", response.data)
         self.assertIn(b"No ownership/status column found", response.data)
 
+    def test_import_accepts_item_name_alias_for_name(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"item_name,sku,owned,color\n"
+                        b"Alias Name Knife,ALIAS-1,yes,Classic Brown\n"
+                    ),
+                    "alias_name.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"New Catalog Items (1)", response.data)
+        self.assertIn(b"Alias Name Knife", response.data)
+
     def test_import_preview_warns_on_same_sku_different_name(self):
         self._login_as_admin()
         self._set_csrf_token()

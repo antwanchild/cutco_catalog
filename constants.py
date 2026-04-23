@@ -146,6 +146,7 @@ TRUTHY = {"yes", "y", "true", "1", "x"}
 
 XLSX_COL_MAP = {
     "name":                  "name",
+    "item_name":             "name",
     "model #":               "sku",
     "model#":                "sku",
     "owned":                 "owned_raw",
