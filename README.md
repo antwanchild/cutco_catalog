@@ -240,7 +240,7 @@ Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted tem
 
 For XLSX imports, the app also recognizes `Owned?`, `status`, and `person` for older files, plus older auxiliary columns like `Price`, which is merged into notes. `quantity purchased` and `quantity given away` are imported as separate whole-number ownership fields, and rows with decimal values in those columns are rejected. Legacy files may also include `is_color_unicorn`.
 
-Import headers are matched case-insensitively, but lowercase headers are the recommended style.
+Import headers are matched case-insensitively, so lowercase headers are recommended only for consistency.
 
 During import preview, rows where the SKU already exists but the name differs are grouped into a collapsed `SKU already exists` section so you can review naming differences before confirming.
 

@@ -436,6 +436,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(import_page_response.status_code, 200)
         self.assertIn(b"Import", import_page_response.data)
         self.assertIn(b"Bulk-import ownership data from a CSV or XLSX file.", import_page_response.data)
+        self.assertIn(b"Header matching is case-insensitive", import_page_response.data)
         self.assertEqual(import_template_response.status_code, 200)
         self.assertEqual(import_template_response.mimetype, "text/csv")
         self.assertIn(
