@@ -760,6 +760,54 @@ def set_edit(set_id=None, sid=None):
     )
 
 
+@catalog_bp.route("/sets/<int:set_id>/restore-memberships", methods=["POST"])
+@catalog_bp.route("/sets/<int:sid>/restore-memberships", methods=["POST"])
+@admin_required
+def set_restore_memberships(set_id=None, sid=None):
+    set_id = set_id if set_id is not None else sid
+    item_set = db.session.get(Set, set_id)
+    if not item_set:
+        abort(404)
+
+    snapshot = _load_member_snapshot(item_set.member_data)
+    if not snapshot:
+        flash(f'No imported member snapshot is available for "{item_set.name}".', "warning")
+        return redirect(url_for("catalog.set_detail", set_id=item_set.id))
+
+    sku_to_item = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
+    name_to_item = _build_member_name_lookup(Item.query.filter(Item.sku.isnot(None)).all())
+    resolved_members, _created_now = _aggregate_resolved_members(
+        snapshot,
+        sku_to_item,
+        name_to_item,
+        create_missing=False,
+        set_name=item_set.name,
+    )
+    if not resolved_members:
+        flash(f'No catalog items could be matched for "{item_set.name}".', "warning")
+        return redirect(url_for("catalog.set_detail", set_id=item_set.id))
+
+    existing_members = {member.item_id: member for member in item_set.members}
+    restored = 0
+    updated = 0
+    for item_id, resolved in resolved_members.items():
+        item = resolved["item"]
+        qty = max(1, int(resolved.get("quantity") or 1))
+        membership = existing_members.get(item_id)
+        if membership is None:
+            db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
+            restored += 1
+            continue
+        if membership.quantity != qty:
+            membership.quantity = qty
+            updated += 1
+
+    if db_commit(db.session):
+        logger.info("Set memberships restored: %s (+%d memberships, %d updated)", item_set.name, restored, updated)
+        flash(f'Restored {restored} membership(s) for "{item_set.name}".', "success")
+    return redirect(url_for("catalog.set_detail", set_id=item_set.id))
+
+
 @catalog_bp.route("/sets/<int:set_id>/delete", methods=["POST"])
 @catalog_bp.route("/sets/<int:sid>/delete", methods=["POST"])
 def set_delete(set_id=None, sid=None):
@@ -872,6 +920,7 @@ def set_detail(set_id=None, sid=None):
                            member_snapshot_rows=member_snapshot_rows,
                            not_in_catalog_skus=not_in_catalog_skus,
                            next_target=next_target,
+                           can_restore_memberships=bool(item_set.member_data),
                            COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 

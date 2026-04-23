@@ -2109,6 +2109,44 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn("SX-STALE-1", existing_member_skus)
             self.assertEqual(json.loads(existing_set.member_data), [])
 
+    def test_restore_set_memberships_relinks_from_member_snapshot(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        first_item_id, _first_variant_id = self._add_catalog_item(name="Restore Knife One", sku="RS-1")
+        second_item_id, _second_variant_id = self._add_catalog_item(name="Restore Knife Two", sku="RS-2")
+        set_id = self._add_set(name="Restore Set", sku="RS-SET", item_ids=(first_item_id, second_item_id))
+
+        with self.app.app_context():
+            item_set = db.session.get(Set, set_id)
+            item_set.member_data = json.dumps(
+                {
+                    "members": [
+                        {"sku": "RS-1", "name": "Restore Knife One", "quantity": 2},
+                        {"sku": "RS-2", "name": "Restore Knife Two", "quantity": 1},
+                    ]
+                }
+            )
+            for membership in list(item_set.members):
+                db.session.delete(membership)
+            db.session.commit()
+
+        response = self.client.post(
+            f"/sets/{set_id}/restore-memberships",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            item_set = db.session.get(Set, set_id)
+            self.assertEqual(len(item_set.members), 2)
+            qty_map = {db.session.get(Item, member.item_id).sku: member.quantity for member in item_set.members}
+            self.assertEqual(qty_map["RS-1"], 2)
+            self.assertEqual(qty_map["RS-2"], 1)
+            self.assertIn("RS-1", item_set.member_data)
+            self.assertIn("RS-2", item_set.member_data)
+
     def test_catalog_purge_and_delete_routes(self):
         self._login_as_admin()
         self._set_csrf_token()

@@ -7,6 +7,11 @@
     {% if person_id %}
       <a href="{{ url_for('views.gift_token', set_id=set.id, person=person_id) }}" class="btn btn-secondary">🎁 Share Gift List</a>
     {% endif %}
+    {% if can_restore_memberships and is_admin() %}
+      <form method="post" action="{{ url_for('catalog.set_restore_memberships', set_id=set.id) }}" class="form-inline">
+        <button class="btn btn-secondary" data-confirm-title="Restore set memberships" data-confirm-message="This will restore set links from the imported member snapshot without removing existing links." data-confirm-count="1 set" data-confirm-button="Restore memberships">Restore Memberships</button>
+      </form>
+    {% endif %}
     <a href="{{ url_for('catalog.set_edit', set_id=set.id, next=next_target or (request.full_path[:-1] if request.full_path.endswith('?') else request.full_path)) }}" class="btn btn-secondary">Edit</a>
     <a href="{{ next_target or (url_for('catalog.sets_list') + ('?person=' ~ person_id if person_id else '')) }}" class="btn btn-ghost">← Sets</a>
   </div>
