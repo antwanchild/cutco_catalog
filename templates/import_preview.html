@@ -41,7 +41,7 @@
         <td>Row {{ matched.row }}</td>
         <td>{{ matched.item.name }}</td>
         <td><span class="mono">{{ matched.item.sku or '—' }}</span></td>
-        <td>{{ matched.color }}</td>
+        <td>{{ matched.display_color }}</td>
         <td>{% if matched.is_sku_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if matched.is_variant_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if matched.is_edge_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
@@ -122,7 +122,7 @@
         </td>
         <td>
           <input type="hidden" name="item_color_{{ loop.index0 }}" value="{{ item.color }}">
-          {{ item.color }}
+          {{ item.display_color }}
         </td>
         <td>
           <select name="item_edge_{{ loop.index0 }}" class="select-xs">
@@ -191,7 +191,7 @@
         </td>
         <td>
           <input type="hidden" name="item_color_{{ form_field_index }}" value="{{ item.color }}">
-          {{ item.color }}
+          {{ item.display_color }}
         </td>
         <td>
           <select name="item_edge_{{ form_field_index }}" class="select-xs">
@@ -255,7 +255,7 @@
           </td>
           <td>
             <input type="hidden" name="item_color_{{ form_field_index }}" value="{{ item.color }}">
-            {{ item.color }}
+            {{ item.display_color }}
           </td>
           <td>
             <select name="item_edge_{{ form_field_index }}" class="select-xs">
@@ -325,7 +325,7 @@
         </td>
         <td>
           <input type="hidden" name="own_color_{{ loop.index0 }}" value="{{ entry.color }}">
-          {{ entry.color }}
+          {{ entry.display_color or entry.color }}
           {% if entry.is_new_variant %}<span class="badge badge-new">new variant</span>{% endif %}
         </td>
         <td>

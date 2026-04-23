@@ -1333,6 +1333,33 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"unchecked by default", preview_response.data)
         self.assertNotIn(b"New Catalog Items (1)", preview_response.data)
 
+    def test_import_preview_normalizes_color_display(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color\n"
+                        b"Color Knife,IM-COLOR-1,yes,BLACK\n"
+                        b"Unknown Knife,IM-COLOR-2,yes,\n"
+                    ),
+                    "colors.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Black", preview_response.data)
+        self.assertIn(b"Unknown", preview_response.data)
+        self.assertIn(b'name="item_color_1" value="Unknown / Unspecified"', preview_response.data)
+        self.assertNotIn(b"BLACK", preview_response.data)
+
     def test_import_preview_csv_and_error_paths(self):
         self._login_as_admin()
         self._set_csrf_token()

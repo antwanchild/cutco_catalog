@@ -59,6 +59,22 @@ def _build_notes(row: dict) -> tuple[str | None, list[str]]:
     return ("; ".join(parts) or None), []
 
 
+def _normalize_import_color(value: str) -> str:
+    """Normalize imported color text into a consistent display/storage form."""
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return UNKNOWN_COLOR
+    lowered = cleaned.lower()
+    if lowered in {"unknown", "unknown / unspecified", "unknown/unspecified"}:
+        return UNKNOWN_COLOR
+    return cleaned.title()
+
+
+def _display_import_color(color: str) -> str:
+    """Shorten the long unknown color label in import previews."""
+    return "Unknown" if color == UNKNOWN_COLOR else color
+
+
 def _build_item_sku_lookup(items: list[Item]) -> dict[str, Item]:
     lookup: dict[str, Item] = {}
     for item in items:
@@ -359,7 +375,7 @@ def import_page():
     for row_num, row in enumerate(parsed_rows, start=2):
         name       = row.get("name", "").strip()
         sku        = normalize_sku_value(row.get("sku", ""))
-        color      = row.get("color", "").strip() or UNKNOWN_COLOR
+        color      = _normalize_import_color(row.get("color", ""))
         edge_type  = row.get("edge_type", "").strip() or "Unknown"
         is_sku_unicorn = row.get("is_sku_unicorn", row.get("item_is_unicorn", "")).strip().lower() in TRUTHY
         is_variant_unicorn = row.get("is_variant_unicorn", "").strip().lower() in TRUTHY
@@ -416,7 +432,8 @@ def import_page():
         if matched_item:
             already_in_catalog.append({"item": matched_item, "row": row,
                                        "row_num": row_num,
-                                       "color": color, "person": person_name,
+                                       "color": color, "display_color": _display_import_color(color),
+                                       "person": person_name,
                                        "status": status})
             already_in_catalog[-1]["row"] = row_num
             if sku and matched_item.name.strip().lower() != name.lower():
@@ -439,6 +456,7 @@ def import_page():
                 bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku else new_items_list
             bucket.append({
                 "name": name, "sku": sku, "color": color,
+                "display_color": _display_import_color(color),
                 "edge_type": edge_type,
                 "is_sku_unicorn": is_sku_unicorn,
                 "is_variant_unicorn": is_variant_unicorn,
@@ -476,6 +494,7 @@ def import_page():
                 "sku": matched_item.sku,
                 "item_id":   matched_item.id,
                 "color":     target_color,
+                "display_color": _display_import_color(target_color),
                 "status":    status,
                 "notes":     notes,
                 "is_sku_unicorn": is_sku_unicorn,
@@ -541,7 +560,7 @@ def import_confirm():
 
             name        = request.form.get(f"item_name_{row_index}", "").strip()
             sku         = normalize_sku_value(request.form.get(f"item_sku_{row_index}", ""))
-            color       = request.form.get(f"item_color_{row_index}", "").strip() or UNKNOWN_COLOR
+            color       = _normalize_import_color(request.form.get(f"item_color_{row_index}", ""))
             edge_type   = request.form.get(f"item_edge_{row_index}", "Unknown")
             is_sku_unicorn = request.form.get(f"item_sku_unicorn_{row_index}") == "on"
             is_variant_unicorn = request.form.get(f"item_variant_unicorn_{row_index}") == "on"
@@ -627,7 +646,7 @@ def import_confirm():
 
             item_id     = int(request.form.get(f"own_item_id_{row_index}", 0))
             person_name = request.form.get(f"own_person_{row_index}", "").strip()
-            color       = request.form.get(f"own_color_{row_index}", "").strip() or UNKNOWN_COLOR
+            color       = _normalize_import_color(request.form.get(f"own_color_{row_index}", ""))
             status      = request.form.get(f"own_status_{row_index}", "Owned")
             notes       = request.form.get(f"own_notes_{row_index}", "").strip() or None
             quantity_purchased, qty_error = _read_confirm_quantity_field(
