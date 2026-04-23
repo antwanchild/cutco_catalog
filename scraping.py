@@ -22,7 +22,10 @@ def _extract_sku_from_href(href: str, *, preserve_lettered_code: bool = False) -
     slug = parts[-1].split("?")[0].split("&")[0].upper()
     if not slug:
         return None
-    lead = re.match(r'^(\d{3,}[A-Z]{0,3})', slug)
+    if preserve_lettered_code:
+        lead = re.match(r'^(\d{3,}(?:[A-Z]{0,3}(?:-\d+)?)?)', slug)
+    else:
+        lead = re.match(r'^(\d{3,}[A-Z]{0,3})', slug)
     if lead:
         candidate = lead.group(1)
     elif any(char.isdigit() for char in slug) and len(slug) <= 12:
@@ -630,7 +633,8 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
 
             for anchor, href in unique_links:
                 base_href = href.split("&")[0]
-                sku = _extract_sku_from_href(base_href, preserve_lettered_code=cat_name in COOKWARE_CATEGORIES)
+                preserve_lettered_code = cat_name in COOKWARE_CATEGORIES or cat_name == "Sheaths"
+                sku = _extract_sku_from_href(base_href, preserve_lettered_code=preserve_lettered_code)
                 prod_url = href if href.startswith("http") else f"https://www.cutco.com{href}"
 
                 name_el = anchor.find(["h2", "h3"])
@@ -669,7 +673,11 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
         added_from_slugs = 0
         with ThreadPoolExecutor(max_workers=6) as pool:
             future_map = {
-                pool.submit(_fetch_sku_from_page, prod_url, preserve_lettered_code=cat_name in COOKWARE_CATEGORIES): (prod_url, cat_name, cat_name_hint)
+                pool.submit(
+                    _fetch_sku_from_page,
+                    prod_url,
+                    preserve_lettered_code=cat_name in COOKWARE_CATEGORIES or cat_name == "Sheaths",
+                ): (prod_url, cat_name, cat_name_hint)
                 for prod_url, cat_name, cat_name_hint in slug_queue
             }
             for future in as_completed(future_map):

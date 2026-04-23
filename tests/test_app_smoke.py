@@ -696,6 +696,14 @@ class UtilitySmokeTests(SmokeBaseTest):
             _extract_sku_from_href("https://www.cutco.com/p/990c", preserve_lettered_code=True),
             "990C",
         )
+        self.assertEqual(
+            _extract_sku_from_href("https://www.cutco.com/p/4135-2", preserve_lettered_code=True),
+            "4135-2",
+        )
+        self.assertEqual(
+            _extract_sku_from_href("https://www.cutco.com/p/2135-2", preserve_lettered_code=True),
+            "2135-2",
+        )
 
     def test_member_hover_titles_trim_set_lists(self):
         self.assertEqual(
