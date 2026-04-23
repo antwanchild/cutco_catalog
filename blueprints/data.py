@@ -147,7 +147,7 @@ def _build_import_header_report(uploaded_file, ext: str) -> dict:
 
     warnings = []
     if not ownership_columns_found:
-        warnings.append("No ownership/status column found (Owned? / status / person). Rows will default to Owned.")
+        warnings.append("No ownership/status column found (owned / Owned? / status / person). Rows will default to Owned.")
     if not unicorn_columns_found:
         warnings.append("No unicorn columns found. If needed, add is_sku_unicorn / is_variant_unicorn / is_edge_unicorn.")
 
@@ -208,14 +208,13 @@ def export_csv():
 def import_template():
     csv_buffer = io.StringIO()
     writer = csv.writer(csv_buffer)
-    writer.writerow(["name", "sku", "color", "edge_type",
-                     "is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn",
-                     "person", "status", "category", "quantity_purchased",
-                     "quantity_given_away", "notes"])
-    writer.writerow(["2-3/4\" Paring Knife", "1720", "Classic Brown", "Double-D",
-                     "no", "no", "no", "Anthony", "Owned", "Kitchen Knives", "1", "0", ""])
-    writer.writerow(["Super Shears", "2137", "Pearl White", "Straight",
-                     "no", "no", "no", "Anthony", "Owned", "Kitchen Knives", "", "", ""])
+    writer.writerow(["name", "sku", "owned", "color", "quantity purchased",
+                     "quantity given away", "category", "edge",
+                     "is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn", "price"])
+    writer.writerow(["2-3/4\" Paring Knife", "1720", "Anthony", "Classic Brown", "1",
+                     "0", "Kitchen Knives", "Double-D", "no", "no", "no", "12.50"])
+    writer.writerow(["Super Shears", "2137", "yes", "Pearl White", "", "",
+                     "Kitchen Knives", "Straight", "no", "no", "no", ""])
     csv_buffer.seek(0)
     return Response(csv_buffer.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":

@@ -435,8 +435,14 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"quantity_given_away", export_csv_response.data)
         self.assertEqual(import_page_response.status_code, 200)
         self.assertIn(b"Import", import_page_response.data)
+        self.assertIn(b"Bulk-import ownership data from a CSV or XLSX file.", import_page_response.data)
         self.assertEqual(import_template_response.status_code, 200)
         self.assertEqual(import_template_response.mimetype, "text/csv")
+        self.assertIn(
+            b"name,sku,owned,color,quantity purchased,quantity given away,category,edge,"
+            b"is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price",
+            import_template_response.data,
+        )
 
     def test_log_dashboards_render(self):
         self._login_as_admin()
@@ -886,7 +892,7 @@ class ImportSmokeTests(SmokeBaseTest):
                 "mode": "check",
                 "csrf_token": "test-csrf-token",
                 "csvfile": (
-                    BytesIO(b"name,sku,color,status\nParing Knife,1720,Classic Brown,Owned\n"),
+                    BytesIO(b"name,sku,owned,color\nParing Knife,1720,yes,Classic Brown\n"),
                     "import.csv",
                 ),
             },
@@ -1114,8 +1120,8 @@ class ImportSmokeTests(SmokeBaseTest):
                 "csrf_token": "test-csrf-token",
                 "csvfile": (
                     BytesIO(
-                        b"name,sku,color,Owned?,person,Quantity Purchased,Given Away\n"
-                        b"Decimal Knife,DM-1,Classic Brown,yes,Collector,2.5,1.25\n"
+                        b"name,sku,owned,color,quantity purchased,quantity given away\n"
+                        b"Decimal Knife,DM-1,yes,Classic Brown,2.5,1.25\n"
                     ),
                     "decimal_qty.csv",
                 ),
@@ -1162,8 +1168,8 @@ class ImportSmokeTests(SmokeBaseTest):
                 "csrf_token": "test-csrf-token",
                 "csvfile": (
                     BytesIO(
-                        b"name,sku,color,Owned?,person\n"
-                        b"Imported Different Name,IM-WARN-1,Classic Brown,yes,Collector\n"
+                        b"name,sku,owned,color\n"
+                        b"Imported Different Name,IM-WARN-1,yes,Classic Brown\n"
                     ),
                     "preview.csv",
                 ),
@@ -1190,9 +1196,11 @@ class ImportSmokeTests(SmokeBaseTest):
                 "csrf_token": "test-csrf-token",
                 "csvfile": (
                     BytesIO(
-                        b"name,sku,color,Owned?,person,Price,Gift Box,Sheath,Quantity Purchased,Given Away\n"
-                        b"Import Existing Knife,IM-EX-1,Classic Brown,yes,Import Existing Collector,12.50,yes,Leather,2,n/a\n"
-                        b"Import New Knife,IM-NEW-1,Pearl White,no,New Collector,34.00,,,,\n"
+                        b"name,sku,owned,color,quantity purchased,quantity given away,category,edge,"
+                        b"is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price,Gift Box,Sheath\n"
+                        b"Import Existing Knife,IM-EX-1,Import Existing Collector,Classic Brown,2,n/a,Kitchen Knives,Straight,"
+                        b"no,no,no,12.50,yes,Leather\n"
+                        b"Import New Knife,IM-NEW-1,no,Pearl White,,,,,no,no,no,34.00,,\n"
                     ),
                     "preview.csv",
                 ),
@@ -1877,6 +1885,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Sync Knife", response.data)
         self.assertIn(b"New Sets", response.data)
         self.assertIn(b"New Sync Set", response.data)
+        self.assertIn(b"Scrapes Cutco.com to discover new items and sets.", response.data)
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)
 

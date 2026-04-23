@@ -2,27 +2,27 @@
 {% block title %}Import – Cutco Vault{% endblock %}
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">📥 Import Items {{ help_btn("import_page") }}</h1>
+  <h1 class="page-title">📥 Import Items {{ help_btn("import") }}</h1>
   <a href="{{ url_for('data.import_template') }}" class="btn btn-ghost">⬇ Import Starter CSV</a>
 </div>
 
 <div class="form-card">
-  <h2>XLSX Column Mapping</h2>
+  <h2>Import Column Mapping</h2>
   <table class="data-table compact">
     <thead><tr><th>Spreadsheet Column</th><th>Maps To</th></tr></thead>
     <tbody>
       <tr><td><code>Name</code></td><td>Item name</td></tr>
       <tr><td><code>Model #</code></td><td>SKU</td></tr>
+      <tr><td><code>owned</code></td><td>yes → Owned, no → Wishlist, text → assigned person</td></tr>
       <tr><td><code>COLOR</code></td><td>Variant color</td></tr>
+      <tr><td><code>quantity purchased</code></td><td>Whole-number ownership field</td></tr>
+      <tr><td><code>quantity given away</code></td><td>Whole-number ownership field</td></tr>
       <tr><td><code>Category</code></td><td>Category</td></tr>
-      <tr><td><code>Edge</code></td><td>Edge type</td></tr>
+      <tr><td><code>edge</code></td><td>Edge type</td></tr>
       <tr><td><code>is_sku_unicorn</code></td><td>SKU/item unicorn flag</td></tr>
       <tr><td><code>is_variant_unicorn</code></td><td>Variant/color unicorn flag</td></tr>
       <tr><td><code>is_edge_unicorn</code></td><td>Edge/blade-type unicorn flag</td></tr>
-      <tr><td><code>Owned?</code></td><td>yes → Owned, no → Wishlist, text → assigned person</td></tr>
       <tr><td><code>Price</code></td><td>Merged into notes</td></tr>
-      <tr><td><code>Quantity Purchased</code></td><td>Whole-number ownership field</td></tr>
-      <tr><td><code>Quantity Given Away</code></td><td>Whole-number ownership field</td></tr>
     </tbody>
   </table>
 </div>
@@ -33,9 +33,9 @@
   </label>
 
   <label>Person override
-    <span class="hint">If set, all rows are attributed to this person instead of the Owned? column value.</span>
+    <span class="hint">If set, all rows are attributed to this person instead of the Owned column value.</span>
     <select name="person_override" class="input-full">
-      <option value="">— use Owned? column —</option>
+      <option value="">— use Owned column —</option>
       {% for person in people %}
         <option value="{{ person.name }}">{{ person.name }}</option>
       {% endfor %}

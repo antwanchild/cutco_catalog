@@ -15,8 +15,8 @@
       {% elif page == 'matrix' %}📊 Matrix
       {% elif page == 'stats' %}📈 Stats
       {% elif page == 'item_detail' %}📋 Item Detail
-      {% elif page == 'sync' %}🔄 Catalog Sync
-      {% elif page == 'import' %}📥 Import
+      {% elif page in ['sync', 'sync_preview'] %}🔄 Catalog Sync
+      {% elif page in ['import', 'import_page'] %}📥 Import
       {% elif page == 'dashboard' %}⚔️ Dashboard
       {% elif page == 'msrp_diff' %}💲 MSRP Diff
       {% elif page == 'variants' %}🎨 Variants
@@ -121,7 +121,7 @@
         <li><strong>Sharpening history</strong> and <strong>task log</strong> appear below if any events have been logged.</li>
       </ul>
 
-    {% elif page == 'sync' %}
+    {% elif page in ['sync', 'sync_preview'] %}
       <p>Scrapes Cutco.com to discover new items and sets.</p>
       <ul>
         <li>New items are grouped by category — check the ones you want to import.</li>
@@ -130,11 +130,13 @@
         <li>Only items with SKUs not already in the database are shown.</li>
       </ul>
 
-    {% elif page == 'import' %}
+    {% elif page in ['import', 'import_page'] %}
       <p>Bulk-import ownership data from a CSV or XLSX file.</p>
       <ul>
-        <li>Required columns: <code>person</code>, <code>item_name</code> or <code>sku</code>, <code>status</code>.</li>
-        <li>Optional columns: <code>color</code>, <code>notes</code>, <code>is_sku_unicorn</code>, <code>is_variant_unicorn</code>, <code>is_edge_unicorn</code>.</li>
+        <li>Core columns: <code>name</code>, <code>sku</code>, <code>owned</code>.</li>
+        <li>Optional columns: <code>color</code>, <code>quantity_purchased</code>, <code>quantity_given_away</code>, <code>category</code>, <code>edge</code>, <code>is_sku_unicorn</code>, <code>is_variant_unicorn</code>, <code>is_edge_unicorn</code>, <code>price</code>.</li>
+        <li>Legacy files may still use <code>is_color_unicorn</code>.</li>
+        <li><code>Owned</code> can be a yes/no value, a collector name, or a legacy status/person value.</li>
         <li>A preview is shown before any data is written — you can deselect rows.</li>
         <li>Existing ownership entries are skipped (no duplicates created).</li>
       </ul>
