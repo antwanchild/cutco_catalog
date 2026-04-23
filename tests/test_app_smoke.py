@@ -2079,6 +2079,36 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(existing_set_detail_response.status_code, 200)
         self.assertIn(b"Sync Existing Missing Knife", existing_set_detail_response.data)
 
+    def test_catalog_sync_confirm_preserves_existing_set_members_when_snapshot_is_empty(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        existing_item_id, _existing_variant_id = self._add_catalog_item(name="Sync Existing Knife", sku="SX-EX-1")
+        stale_item_id, _stale_variant_id = self._add_catalog_item(name="Sync Stale Knife", sku="SX-STALE-1")
+        existing_set_id = self._add_set(name="Sync Existing Set", sku="SX-SET-1", item_ids=(existing_item_id, stale_item_id))
+
+        response = self.client.post(
+            "/catalog/sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "selected_skus": [],
+                "selected_sets": ["Sync Existing Set"],
+                "existing_set_count": "1",
+                "existing_set_name_0": "Sync Existing Set",
+                "existing_set_member_entries_0": json.dumps([]),
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            existing_set = db.session.get(Set, existing_set_id)
+            self.assertEqual(len(existing_set.members), 2)
+            existing_member_skus = {db.session.get(Item, membership.item_id).sku for membership in existing_set.members}
+            self.assertIn("SX-EX-1", existing_member_skus)
+            self.assertIn("SX-STALE-1", existing_member_skus)
+            self.assertEqual(json.loads(existing_set.member_data), [])
+
     def test_catalog_purge_and_delete_routes(self):
         self._login_as_admin()
         self._set_csrf_token()

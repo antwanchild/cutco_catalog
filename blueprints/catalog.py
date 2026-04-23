@@ -1136,9 +1136,13 @@ def catalog_sync_confirm():
             else:
                 existing_members[item_id].quantity = qty
             incoming_member_ids.add(item_id)
-        for membership in list(item_set.members):
-            if membership.item_id not in incoming_member_ids:
-                db.session.delete(membership)
+        if incoming_member_ids:
+            for membership in list(item_set.members):
+                if membership.item_id not in incoming_member_ids:
+                    db.session.delete(membership)
+        elif member_entries_raw:
+            logger.warning("Skipping set membership reconciliation for %s because no members were resolved",
+                           set_name)
 
     # Update quantities on existing sets (no new rows, just qty backfill)
     existing_set_count = int(request.form.get("existing_set_count", 0))
@@ -1207,9 +1211,13 @@ def catalog_sync_confirm():
                         membership.quantity = qty
                         qty_updates += 1
                 incoming_member_ids.add(item_id)
-        for membership in list(item_set.members):
-            if membership.item_id not in incoming_member_ids:
-                db.session.delete(membership)
+        if incoming_member_ids:
+            for membership in list(item_set.members):
+                if membership.item_id not in incoming_member_ids:
+                    db.session.delete(membership)
+        elif member_entries_raw:
+            logger.warning("Skipping existing set membership reconciliation for %s because no members were resolved",
+                           set_name)
 
     db_commit(db.session)
     logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates, %d placeholders",
