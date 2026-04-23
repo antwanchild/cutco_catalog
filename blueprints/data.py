@@ -29,20 +29,39 @@ def _parse_owned_raw(owned_raw: str, default_person: str | None):
     return "Owned", val or default_person
 
 
-def _build_notes(row: dict) -> str | None:
+def _parse_whole_number(value: str, label: str) -> tuple[int | None, str | None]:
+    """Parse a spreadsheet cell into a non-negative whole number."""
+    cleaned = value.strip()
+    if not cleaned or cleaned.lower() in {"0", "none", "n/a", "-"}:
+        return None, None
+    if re.fullmatch(r"\d+", cleaned):
+        return int(cleaned), None
+    return None, f"{label} must be a whole number."
+
+
+def _build_notes(row: dict) -> tuple[str | None, list[str]]:
     """Combine spreadsheet auxiliary columns into a single notes string."""
     parts = []
+    errors: list[str] = []
     for key, label in [
         ("_notes_price",     "Price"),
         ("_notes_gift_box",  "Gift Box"),
         ("_notes_sheath",    "Sheath"),
-        ("_notes_qty",       "Qty Purchased"),
-        ("_notes_given_away","Given Away"),
+        ("_notes_qty",       "Quantity Purchased"),
+        ("_notes_given_away","Quantity Given Away"),
     ]:
         value = row.get(key, "").strip()
         if value and value not in ("0", "none", "n/a", "-"):
-            parts.append(f"{label}: {value}")
-    return "; ".join(parts) or None
+            if key in {"_notes_qty", "_notes_given_away"}:
+                parsed_value, error = _parse_whole_number(value, label)
+                if error:
+                    errors.append(error)
+                    continue
+                if parsed_value is not None:
+                    parts.append(f"{label}: {parsed_value}")
+            else:
+                parts.append(f"{label}: {value}")
+    return ("; ".join(parts) or None), errors
 
 
 def _safe_csv_filename(raw_name: str) -> str:
@@ -247,8 +266,14 @@ def import_page():
             reader = csv.DictReader(stream)
             parsed_rows = []
             for row in reader:
-                out_row = {k.strip().lower().replace(" ", "_"): v.strip()
-                           for k, v in row.items()}
+                out_row = {}
+                for orig_key, val in row.items():
+                    normalized_key = orig_key.strip().lower()
+                    value = val.strip() if val is not None else ""
+                    if normalized_key in XLSX_COL_MAP:
+                        out_row[XLSX_COL_MAP[normalized_key]] = value
+                    else:
+                        out_row[normalized_key.replace(" ", "_")] = value
                 parsed_rows.append(out_row)
 
     except Exception as exc:
@@ -284,7 +309,15 @@ def import_page():
         is_variant_unicorn = row.get("is_variant_unicorn", "").strip().lower() in TRUTHY
         is_edge_unicorn = row.get("is_edge_unicorn", row.get("edge_is_unicorn", "")).strip().lower() in TRUTHY
         category   = canonicalize_category(row.get("category", ""))
-        notes      = _build_notes(row) or row.get("notes", "").strip() or None
+        note_text, note_errors = _build_notes(row)
+        if note_errors:
+            errors.append({
+                "row": row_num,
+                "reason": "; ".join(note_errors),
+                "data": row,
+            })
+            continue
+        notes      = note_text or row.get("notes", "").strip() or None
         owned_raw = row.get("owned_raw", row.get("status", "yes"))
         status, person_name = _parse_owned_raw(owned_raw, row.get("_person_override") or row.get("person", ""))
 

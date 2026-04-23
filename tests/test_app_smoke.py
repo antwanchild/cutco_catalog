@@ -1053,7 +1053,7 @@ class ImportSmokeTests(SmokeBaseTest):
             "yes",
             "Leather",
             "2",
-            "n/a",
+            "1",
             "",
         ])
         sheet.append([
@@ -1090,6 +1090,32 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Preview Knife", response.data)
         self.assertIn(b"Preview New Knife", response.data)
         self.assertIn(b"Price: 12.50", response.data)
+        self.assertIn(b"Quantity Purchased: 2", response.data)
+        self.assertIn(b"Quantity Given Away: 1", response.data)
+
+    def test_import_preview_rejects_decimal_quantity_values(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,color,Owned?,person,Quantity Purchased,Given Away\n"
+                        b"Decimal Knife,DM-1,Classic Brown,yes,Collector,2.5,1.25\n"
+                    ),
+                    "decimal_qty.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Quantity Purchased must be a whole number.", response.data)
+        self.assertIn(b"Quantity Given Away must be a whole number.", response.data)
 
     def test_import_check_reports_header_warnings(self):
         self._login_as_admin()
