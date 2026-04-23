@@ -101,6 +101,37 @@ def _build_category_list() -> list[tuple[str, str]]:
     return list(known.values())
 
 
+def _product_link_name(anchor) -> str | None:
+    text = anchor.get_text(" ", strip=True)
+    if text:
+        return text
+    name_el = anchor.find(["h2", "h3"])
+    return name_el.get_text(strip=True) if name_el else None
+
+
+def _dedupe_product_links(product_links) -> list[tuple[object, str, str | None]]:
+    """Keep one /p/ anchor per base URL, preferring the anchor with a title."""
+    unique_links: dict[str, tuple[object, str, str | None]] = {}
+    for anchor in product_links:
+        full_href = anchor.get("href", "")
+        base_href = full_href.split("&")[0]
+        name = _product_link_name(anchor)
+        existing = unique_links.get(base_href)
+        if existing is None:
+            unique_links[base_href] = (anchor, full_href, name)
+            continue
+        existing_anchor, _existing_href, existing_name = existing
+        if not existing_name and name:
+            unique_links[base_href] = (anchor, full_href, name)
+        elif existing_anchor is None:
+            unique_links[base_href] = (anchor, full_href, name)
+    return list(unique_links.values())
+
+
+def _should_queue_slug(prod_url: str, cat_name: str, seen_slug_urls: set[str]) -> bool:
+    return prod_url not in seen_slug_urls or cat_name == "Sheaths"
+
+
 def _norm_member_name(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
 
@@ -622,25 +653,13 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                          cat_name, len(product_links),
                          [anchor.get("href", "") for anchor in product_links[:10]])
 
-            seen_hrefs: set[str] = set()
-            unique_links = []
-            for anchor in product_links:
-                full_href = anchor.get("href", "")
-                base_href = full_href.split("&")[0]
-                if base_href not in seen_hrefs:
-                    seen_hrefs.add(base_href)
-                    unique_links.append((anchor, full_href))
-
-            for anchor, href in unique_links:
+            for anchor, href, name_hint in _dedupe_product_links(product_links):
                 base_href = href.split("&")[0]
                 preserve_lettered_code = cat_name in COOKWARE_CATEGORIES or cat_name == "Sheaths"
                 sku = _extract_sku_from_href(base_href, preserve_lettered_code=preserve_lettered_code)
                 prod_url = href if href.startswith("http") else f"https://www.cutco.com{href}"
 
-                name_el = anchor.find(["h2", "h3"])
-                if not name_el and anchor.parent:
-                    name_el = anchor.parent.find(["h2", "h3"])
-                name = name_el.get_text(strip=True) if name_el else None
+                name = name_hint
 
                 if cat_name == "Sheaths" or (name and "sheath" in name.lower() and "with sheath" not in name.lower()):
                     sku = None
@@ -648,7 +667,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                 if not sku:
                     if "&view=product" not in prod_url:
                         prod_url = prod_url + "&view=product"
-                    if prod_url not in seen_slug_urls:
+                    if _should_queue_slug(prod_url, cat_name, seen_slug_urls):
                         seen_slug_urls.add(prod_url)
                         slug_queue.append((prod_url, cat_name, name))
                     continue

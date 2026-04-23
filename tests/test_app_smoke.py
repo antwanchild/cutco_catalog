@@ -27,12 +27,14 @@ from models import (
 )
 from scraping import (
     _build_set_member_entries,
+    _dedupe_product_links,
     _extract_sku_from_href,
     _member_hover_title,
     _infer_visible_member_sku,
     _normalize_set_member_sku,
     _collect_visible_set_piece_rows,
     _resolve_visible_member_sku,
+    _should_queue_slug,
 )
 from blueprints.catalog import _load_member_snapshot
 from time_utils import container_timezone, format_container_time
@@ -703,6 +705,33 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(
             _extract_sku_from_href("https://www.cutco.com/p/2135-2", preserve_lettered_code=True),
             "2135-2",
+        )
+
+    def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
+        soup = BeautifulSoup(
+            """
+            <html><body>
+              <a href="/p/4135-2" class="tb-pic"></a>
+              <a href="/p/4135-2&view=product" class="tb-product-details">
+                <h3>Cutco 4&quot; Vegetable Knife Sheath</h3>
+              </a>
+            </body></html>
+            """,
+            "html.parser",
+        )
+        deduped = _dedupe_product_links(soup.select("a[href*='/p/']"))
+        self.assertEqual(len(deduped), 1)
+        _anchor, href, name = deduped[0]
+        self.assertEqual(href, "/p/4135-2&view=product")
+        self.assertEqual(name, "Cutco 4\" Vegetable Knife Sheath")
+
+    def test_should_queue_slug_allows_sheaths_to_override_seen_urls(self):
+        seen = {"https://www.cutco.com/p/4135-2&view=product"}
+        self.assertTrue(
+            _should_queue_slug("https://www.cutco.com/p/4135-2&view=product", "Sheaths", seen),
+        )
+        self.assertFalse(
+            _should_queue_slug("https://www.cutco.com/p/4135-2&view=product", "Storage", seen),
         )
 
     def test_member_hover_titles_trim_set_lists(self):
