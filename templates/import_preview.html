@@ -100,7 +100,7 @@
   <h2>New Catalog Items ({{ new_items | length }})</h2>
   <p class="muted">Check items to add them to the catalog.</p>
   <input type="hidden" name="item_count" value="{{ new_items | length }}">
-  <table class="data-table import-ownership-table">
+  <table class="data-table import-item-table">
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
@@ -164,7 +164,7 @@
   <input type="hidden" name="item_count"
          value="{{ (new_items | length) + (likely_unicorns | length) + (set_sku_collisions | length) }}"
          id="item_count_override">
-  <table class="data-table">
+  <table class="data-table import-item-table">
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
@@ -303,7 +303,7 @@
   <p class="muted small">Variant colors are item-specific, so a new variant here applies only to that item/SKU.</p>
   {% endif %}
   <input type="hidden" name="own_count" value="{{ ownership_entries | length }}">
-  <table class="data-table">
+  <table class="data-table import-ownership-table">
     <thead>
       <tr><th>Accept</th><th>Person</th><th>Item</th><th>Color</th><th>Status</th><th>Flags</th><th>Qty Purchased</th><th>Qty Given Away</th><th>Notes</th></tr>
     </thead>
