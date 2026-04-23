@@ -119,6 +119,11 @@
     <div class="bulk-bar" id="sets-bulk-bar">
       <span class="bulk-count" id="sets-bulk-count">0 selected</span>
       <button type="submit" form="sets-bulk-restore-form" class="btn btn-primary btn-sm" id="sets-bulk-restore">Restore memberships</button>
+      <button type="submit" form="sets-bulk-restore-form" formaction="{{ url_for('catalog.bulk_resync_set_memberships') }}" class="btn btn-secondary btn-sm" id="sets-bulk-resync"
+              data-confirm-title="Resync set memberships"
+              data-confirm-message="This will re-scrape Cutco and rebuild the selected sets from the live set pages."
+              data-confirm-count="1 set"
+              data-confirm-button="Resync memberships">Resync from Cutco</button>
       <button type="button" class="btn btn-ghost btn-sm" id="sets-bulk-cancel">Cancel</button>
     </div>
   {% endif %}
@@ -132,9 +137,10 @@
   var bar = document.getElementById('sets-bulk-bar');
   var countEl = document.getElementById('sets-bulk-count');
   var submitBtn = document.getElementById('sets-bulk-restore');
+  var resyncBtn = document.getElementById('sets-bulk-resync');
   var cancelBtn = document.getElementById('sets-bulk-cancel');
 
-  if (!form || !selectAll || !checks.length || !bar || !countEl || !submitBtn || !cancelBtn) {
+  if (!form || !selectAll || !checks.length || !bar || !countEl || !submitBtn || !resyncBtn || !cancelBtn) {
     return;
   }
 
@@ -145,6 +151,8 @@
     selectAll.indeterminate = n > 0 && n < checks.length;
     selectAll.checked = n === checks.length;
     submitBtn.disabled = n === 0;
+    resyncBtn.disabled = n === 0;
+    resyncBtn.dataset.confirmCount = n + ' set' + (n === 1 ? '' : 's');
   }
 
   selectAll.addEventListener('change', function() {

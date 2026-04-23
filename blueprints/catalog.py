@@ -761,15 +761,27 @@ def set_edit(set_id=None, sid=None):
 
 
 def _restore_set_memberships_from_snapshot(item_set: Set) -> tuple[int, int, bool]:
-    snapshot = _load_member_snapshot(item_set.member_data)
-    if not snapshot:
+    return _reconcile_set_memberships_from_entries(
+        item_set,
+        _load_member_snapshot(item_set.member_data),
+        replace_memberships=False,
+    )
+
+
+def _reconcile_set_memberships_from_entries(
+    item_set: Set,
+    member_entries: list[dict],
+    *,
+    replace_memberships: bool,
+) -> tuple[int, int, bool]:
+    if not member_entries:
         return 0, 0, False
 
     items = Item.query.filter(Item.sku.isnot(None)).all()
     sku_to_item = {item.sku.upper(): item for item in items if item.sku}
     name_to_item = _build_member_name_lookup(items)
     resolved_members, _created_now = _aggregate_resolved_members(
-        snapshot,
+        member_entries,
         sku_to_item,
         name_to_item,
         create_missing=False,
@@ -781,6 +793,7 @@ def _restore_set_memberships_from_snapshot(item_set: Set) -> tuple[int, int, boo
     existing_members = {member.item_id: member for member in item_set.members}
     restored = 0
     updated = 0
+    incoming_member_ids: set[int] = set()
     for item_id, resolved in resolved_members.items():
         item = resolved["item"]
         qty = max(1, int(resolved.get("quantity") or 1))
@@ -788,10 +801,16 @@ def _restore_set_memberships_from_snapshot(item_set: Set) -> tuple[int, int, boo
         if membership is None:
             db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
             restored += 1
-            continue
-        if membership.quantity != qty:
+        elif membership.quantity != qty:
             membership.quantity = qty
             updated += 1
+        incoming_member_ids.add(item_id)
+
+    if replace_memberships and incoming_member_ids:
+        for membership in list(item_set.members):
+            if membership.item_id not in incoming_member_ids:
+                db.session.delete(membership)
+
     return restored, updated, True
 
 
@@ -812,6 +831,83 @@ def set_restore_memberships(set_id=None, sid=None):
         logger.info("Set memberships restored: %s (+%d memberships, %d updated)", item_set.name, restored, updated)
         flash(f'Restored {restored} membership(s) for "{item_set.name}".', "success")
     return redirect(url_for("catalog.set_detail", set_id=item_set.id))
+
+
+@catalog_bp.route("/sets/bulk-resync-memberships", methods=["POST"])
+@admin_required
+def bulk_resync_set_memberships():
+    selected_set_ids: set[int] = set()
+    invalid_seen = False
+    for raw_set_id in request.form.getlist("set_ids"):
+        try:
+            selected_set_ids.add(int(raw_set_id))
+        except (TypeError, ValueError):
+            invalid_seen = True
+
+    if invalid_seen:
+        flash("Some set selections were invalid and were ignored.", "warning")
+    if not selected_set_ids:
+        flash("Choose one or more sets to resync.", "warning")
+        return redirect(url_for("catalog.sets_list"))
+
+    item_sets = {
+        item_set.id: item_set
+        for item_set in Set.query.filter(Set.id.in_(selected_set_ids)).all()
+    }
+    if not item_sets:
+        flash("No valid sets were selected.", "warning")
+        return redirect(url_for("catalog.sets_list"))
+
+    try:
+        scraped_sets = scrape_sets()
+    except Exception as exc:
+        logger.error("Bulk set resync failed: %s", exc)
+        flash("Could not re-scrape Cutco sets right now.", "error")
+        return redirect(url_for("catalog.sets_list"))
+
+    scraped_lookup = {scraped_set["name"].lower(): scraped_set for scraped_set in scraped_sets if scraped_set.get("name")}
+    restored_sets = 0
+    restored_memberships = 0
+    updated_memberships = 0
+    skipped_sets = 0
+    for item_set in item_sets.values():
+        scraped_set = scraped_lookup.get(item_set.name.lower())
+        if not scraped_set:
+            skipped_sets += 1
+            continue
+        member_entries = scraped_set.get("member_entries") or []
+        if member_entries:
+            item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
+        restored, updated, matched = _reconcile_set_memberships_from_entries(
+            item_set,
+            member_entries,
+            replace_memberships=True,
+        )
+        if not matched:
+            skipped_sets += 1
+            continue
+        restored_sets += 1
+        restored_memberships += restored
+        updated_memberships += updated
+
+    if db_commit(db.session):
+        logger.info(
+            "Bulk set resync: %d set(s), %d memberships restored, %d updated, %d skipped",
+            restored_sets,
+            restored_memberships,
+            updated_memberships,
+            skipped_sets,
+        )
+        flash(
+            f"Resynced memberships for {restored_sets} set{'s' if restored_sets != 1 else ''}.",
+            "success",
+        )
+        if skipped_sets:
+            flash(
+                f"Skipped {skipped_sets} set{'s' if skipped_sets != 1 else ''} that could not be matched from Cutco.",
+                "warning",
+            )
+    return redirect(_safe_redirect_target(request.form.get("next")) or url_for("catalog.sets_list"))
 
 
 @catalog_bp.route("/sets/bulk-restore-memberships", methods=["POST"])

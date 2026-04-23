@@ -2186,6 +2186,69 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual(db.session.get(Item, first_set.members[0].item_id).sku, "BR-1")
             self.assertEqual(db.session.get(Item, second_set.members[0].item_id).sku, "BR-2")
 
+    def test_bulk_resync_set_memberships_relinks_selected_sets_from_scrape(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        first_item_id, _first_variant_id = self._add_catalog_item(name="Bulk Resync Knife One", sku="BS-1")
+        second_item_id, _second_variant_id = self._add_catalog_item(name="Bulk Resync Knife Two", sku="BS-2")
+        first_set_id = self._add_set(name="Bulk Resync Set One", sku="BS-SET-1", item_ids=(first_item_id,))
+        second_set_id = self._add_set(name="Bulk Resync Set Two", sku="BS-SET-2", item_ids=(second_item_id,))
+
+        with self.app.app_context():
+            first_set = db.session.get(Set, first_set_id)
+            second_set = db.session.get(Set, second_set_id)
+            first_set.member_data = json.dumps({"members": [{"sku": "BS-1", "name": "Bulk Resync Knife One", "quantity": 1}]})
+            second_set.member_data = json.dumps({"members": [{"sku": "BS-2", "name": "Bulk Resync Knife Two", "quantity": 1}]})
+            for item_set in (first_set, second_set):
+                for membership in list(item_set.members):
+                    db.session.delete(membership)
+            db.session.commit()
+
+        with mock.patch(
+            "blueprints.catalog.scrape_sets",
+            return_value=[
+                {
+                    "name": "Bulk Resync Set One",
+                    "sku": "BS-SET-1",
+                    "member_entries": [
+                        {"sku": "BS-1", "name": "Bulk Resync Knife One", "quantity": 2},
+                    ],
+                },
+                {
+                    "name": "Bulk Resync Set Two",
+                    "sku": "BS-SET-2",
+                    "member_entries": [
+                        {"sku": "BS-2", "name": "Bulk Resync Knife Two", "quantity": 3},
+                    ],
+                },
+            ],
+        ):
+            response = self.client.post(
+                "/sets/bulk-resync-memberships",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "next": "/sets?missing=1&incomplete=1",
+                    "set_ids": [str(first_set_id), str(second_set_id)],
+                },
+                follow_redirects=False,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/sets?missing=1&incomplete=1", response.headers["Location"])
+
+        with self.app.app_context():
+            first_set = db.session.get(Set, first_set_id)
+            second_set = db.session.get(Set, second_set_id)
+            self.assertEqual(len(first_set.members), 1)
+            self.assertEqual(len(second_set.members), 1)
+            self.assertEqual(db.session.get(Item, first_set.members[0].item_id).sku, "BS-1")
+            self.assertEqual(db.session.get(Item, second_set.members[0].item_id).sku, "BS-2")
+            self.assertEqual(first_set.members[0].quantity, 2)
+            self.assertEqual(second_set.members[0].quantity, 3)
+            self.assertIn("BS-1", first_set.member_data)
+            self.assertIn("BS-2", second_set.member_data)
+
     def test_catalog_purge_and_delete_routes(self):
         self._login_as_admin()
         self._set_csrf_token()
