@@ -1143,7 +1143,7 @@ class ImportSmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"same SKU as an existing catalog item", preview_response.data)
+        self.assertIn(b"Same SKU, Different Name", preview_response.data)
         self.assertIn(b"Imported Different Name", preview_response.data)
         self.assertIn(b"Original Knife", preview_response.data)
 

@@ -32,14 +32,23 @@
 {% endif %}
 
 {% if sku_name_mismatches %}
-<div class="flash flash-warning">
-  <strong>{{ sku_name_mismatches | length }}</strong> row(s) had the same SKU as an existing catalog item but a different name:
-  <ul>
+<h2>Same SKU, Different Name ({{ sku_name_mismatches | length }})</h2>
+<p class="muted">These rows match an existing SKU, so the current catalog item name will stay in place.</p>
+<table class="data-table">
+  <thead>
+    <tr><th>Row</th><th>SKU</th><th>Imported Name</th><th>Existing Name</th></tr>
+  </thead>
+  <tbody>
     {% for mismatch in sku_name_mismatches %}
-      <li>Row {{ mismatch.row }}: imported <strong>{{ mismatch.import_name }}</strong> will keep existing <strong>{{ mismatch.existing_name }}</strong> for SKU <strong>{{ mismatch.sku }}</strong>.</li>
+    <tr>
+      <td>Row {{ mismatch.row }}</td>
+      <td><span class="mono">{{ mismatch.sku }}</span></td>
+      <td>{{ mismatch.import_name }}</td>
+      <td>{{ mismatch.existing_name }}</td>
+    </tr>
     {% endfor %}
-  </ul>
-</div>
+  </tbody>
+</table>
 {% endif %}
 
 <form method="post" action="{{ url_for('data.import_confirm') }}">
