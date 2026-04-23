@@ -233,9 +233,9 @@ Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted tem
 | `quantity_given_away` | Whole-number ownership count |
 | `category` | Product category |
 | `edge` | `Straight`, `Double-D`, `Micro Double-D`, `Serrated`, `Micro-D`, `Tec Edge`, `N/A`, or `Unknown` |
-| `is_sku_unicorn` | `yes` / `no` item-level unicorn flag |
-| `is_variant_unicorn` | `yes` / `no` variant/color unicorn flag |
-| `is_edge_unicorn` | `yes` / `no` edge/blade-type unicorn flag |
+| `is_sku_unicorn` | `yes` / `x` / `true` / `1` item-level unicorn flag |
+| `is_variant_unicorn` | `yes` / `x` / `true` / `1` variant/color unicorn flag |
+| `is_edge_unicorn` | `yes` / `x` / `true` / `1` edge/blade-type unicorn flag |
 | `notes` | Free-text notes |
 
 For XLSX imports, the app also recognizes `Owned?`, `status`, and `person` for older files, plus older auxiliary columns like `Price`, which is merged into notes. `quantity purchased` and `quantity given away` are imported as separate whole-number ownership fields, and rows with decimal values in those columns are rejected. Legacy files may also include `is_color_unicorn`.

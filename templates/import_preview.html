@@ -26,9 +26,32 @@
 {% endif %}
 
 {% if already_in_catalog %}
-<p class="flash flash-info">
-  <strong>{{ already_in_catalog | length }}</strong> row(s) matched existing catalog items and will update ownership only.
-</p>
+<details class="diff-section">
+  <summary>{{ already_in_catalog | length }} row(s) matched existing catalog items and will update ownership only</summary>
+  <p class="muted">These rows already match catalog items by SKU or alias. The existing item name stays in place; unicorn flags still apply if checked.</p>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Row</th><th>Name</th><th>SKU</th><th>Color</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for matched in already_in_catalog %}
+      <tr>
+        <td>Row {{ matched.row }}</td>
+        <td>{{ matched.item.name }}</td>
+        <td><span class="mono">{{ matched.item.sku or '—' }}</span></td>
+        <td>{{ matched.color }}</td>
+        <td>{% if matched.is_sku_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if matched.is_variant_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if matched.is_edge_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{{ matched.person or '—' }}</td>
+        <td>{{ matched.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</details>
 {% endif %}
 
 {% if sku_name_mismatches %}

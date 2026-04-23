@@ -417,6 +417,7 @@ def import_page():
                                        "row_num": row_num,
                                        "color": color, "person": person_name,
                                        "status": status})
+            already_in_catalog[-1]["row"] = row_num
             if sku and matched_item.name.strip().lower() != name.lower():
                 sku_name_mismatches.append({
                     "row": row_num,
@@ -424,6 +425,11 @@ def import_page():
                     "existing_name": matched_item.name,
                     "sku": sku,
                 })
+            already_in_catalog[-1].update({
+                "is_sku_unicorn": is_sku_unicorn,
+                "is_variant_unicorn": is_variant_unicorn,
+                "is_edge_unicorn": is_edge_unicorn,
+            })
         elif dedup_key not in seen_skus:
             seen_skus.add(dedup_key)
             bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku or matches_set_sku else new_items_list

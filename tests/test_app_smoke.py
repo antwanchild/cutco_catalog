@@ -1289,8 +1289,8 @@ class ImportSmokeTests(SmokeBaseTest):
                 "csrf_token": "test-csrf-token",
                 "csvfile": (
                     BytesIO(
-                        b"name,sku,owned,color\n"
-                        b"Imported Pan,PAN-VENDOR,yes,Classic Brown\n"
+                        b"name,sku,owned,color,is_sku_unicorn\n"
+                        b"Imported Pan,PAN-VENDOR,yes,Classic Brown,x\n"
                     ),
                     "alias_preview.csv",
                 ),
@@ -1299,10 +1299,11 @@ class ImportSmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"row(s) matched existing catalog items and will update ownership only.", preview_response.data)
+        self.assertIn(b"row(s) matched existing catalog items and will update ownership only", preview_response.data)
         self.assertIn(b"SKU or alias already exists", preview_response.data)
         self.assertIn(b"Imported Pan", preview_response.data)
         self.assertIn(b"Existing Pan", preview_response.data)
+        self.assertIn(b"badge badge-unicorn", preview_response.data)
         self.assertNotIn(b"New Catalog Items (1)", preview_response.data)
 
     def test_import_preview_flags_set_sku_collisions(self):
