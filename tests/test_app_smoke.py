@@ -427,6 +427,20 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b'collection-empty-state', collection_response.data)
         self.assertIn(b"Browse Catalog", collection_response.data)
 
+    def test_collection_missing_items_show_skus(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        self._add_catalog_item(name="Gap Knife", sku="GK-1")
+        person_id = self._add_person(name="Gap Collector", notes="")
+        collection_response = self.client.get(f"/people/{person_id}/collection")
+
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertIn(b"Missing Items", collection_response.data)
+        self.assertIn(b"Gap Knife", collection_response.data)
+        self.assertIn(b"GK-1", collection_response.data)
+        self.assertIn(b"+ Add", collection_response.data)
+
     def test_data_routes_render(self):
         self._login_as_admin()
         self._set_csrf_token()

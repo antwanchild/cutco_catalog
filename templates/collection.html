@@ -189,10 +189,13 @@
   <summary>Missing Items ({{ item_gaps | length }})</summary>
   <ul class="gap-list">
     {% for item in item_gaps %}
-      <li>
-        <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
+      <li class="gap-row">
+        <div class="gap-main">
+          <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
+          <span class="gap-sku">{{ item.sku or '—' }}</span>
+        </div>
         <a href="{{ url_for('people.ownership_add', person_id=person.id, item_id=item.id) }}"
-           class="btn btn-xs btn-success">+ Add</a>
+           class="btn btn-xs btn-success gap-action">+ Add</a>
       </li>
     {% endfor %}
   </ul>
@@ -204,13 +207,20 @@
   <summary>Variant Gaps ({{ variant_gaps | length }} item{{ 's' if variant_gaps | length != 1 }})</summary>
   <ul class="gap-list">
     {% for item, missing in variant_gaps %}
-      <li>
-        <strong>{{ item.name }}</strong> — missing:
-        {% for variant in missing %}
-          <span class="chip">{{ variant.color }}</span>
-          <a href="{{ url_for('people.ownership_add', person_id=person.id, item_id=item.id, variant_id=variant.id) }}"
-             class="btn btn-xs btn-success">+ Add</a>
-        {% endfor %}
+      <li class="gap-row gap-row-stack">
+        <div class="gap-main">
+          <strong>{{ item.name }}</strong>
+          <span class="gap-sku">{{ item.sku or '—' }}</span>
+        </div>
+        <div class="gap-variants">
+          {% for variant in missing %}
+            <div class="gap-variant-row">
+              <span class="chip">{{ variant.color }}</span>
+              <a href="{{ url_for('people.ownership_add', person_id=person.id, item_id=item.id, variant_id=variant.id) }}"
+                 class="btn btn-xs btn-success gap-action">+ Add</a>
+            </div>
+          {% endfor %}
+        </div>
       </li>
     {% endfor %}
   </ul>

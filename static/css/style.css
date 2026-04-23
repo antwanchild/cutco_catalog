@@ -1053,7 +1053,49 @@ textarea { resize: vertical; }
 .gap-section summary::-webkit-details-marker { display: none; }
 .gap-section[open] summary { color: var(--text); border-bottom: 1px solid var(--border); }
 .gap-list { list-style: none; padding: .5rem 1rem 1rem; display: flex; flex-direction: column; gap: .4rem; }
-.gap-list li { display: flex; align-items: center; gap: .5rem; font-size: .875rem; }
+.gap-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .5rem .75rem;
+  align-items: center;
+  font-size: .875rem;
+}
+.gap-row-stack {
+  align-items: start;
+}
+.gap-main {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.gap-main a {
+  min-width: 0;
+}
+.gap-sku {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: .8rem;
+  white-space: nowrap;
+}
+.gap-variants {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.gap-variant-row {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  align-items: center;
+  gap: .5rem .75rem;
+}
+.gap-action {
+  justify-self: end;
+  align-self: center;
+}
 
 /* ── Quick add ──────────────────────────────────────────────────────────── */
 .quick-add-list { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
