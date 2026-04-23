@@ -13,7 +13,16 @@ from constants import (
 )
 from extensions import db
 from helpers import admin_required, db_commit
-from models import Item, ItemVariant, Ownership, Person, record_activity, reconcile_unknown_variant
+from models import (
+    Item,
+    ItemVariant,
+    Ownership,
+    Person,
+    normalize_sku_value,
+    parse_alternate_skus,
+    record_activity,
+    reconcile_unknown_variant,
+)
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
@@ -47,6 +56,19 @@ def _build_notes(row: dict) -> tuple[str | None, list[str]]:
         if value and value not in ("0", "none", "n/a", "-"):
             parts.append(f"{label}: {value}")
     return ("; ".join(parts) or None), []
+
+
+def _build_item_sku_lookup(items: list[Item]) -> dict[str, Item]:
+    lookup: dict[str, Item] = {}
+    for item in items:
+        primary_sku = normalize_sku_value(item.sku)
+        if primary_sku and primary_sku not in lookup:
+            lookup[primary_sku] = item
+    for item in items:
+        for alias_sku in parse_alternate_skus(item.alternate_skus):
+            if alias_sku and alias_sku not in lookup:
+                lookup[alias_sku] = item
+    return lookup
 
 
 def _parse_quantity_fields(row: dict) -> tuple[int | None, int | None, list[str]]:
@@ -309,7 +331,7 @@ def import_page():
             row["owned_raw"] = row.get("owned_raw", "yes")
             row["_person_override"] = person_override
 
-    existing_items   = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
+    existing_items   = _build_item_sku_lookup(Item.query.all())
     existing_names   = {item.name.lower(): item for item in Item.query.all()}
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
 
@@ -324,7 +346,7 @@ def import_page():
 
     for row_num, row in enumerate(parsed_rows, start=2):
         name       = row.get("name", "").strip()
-        sku        = (row.get("sku", "") or "").strip().upper() or None
+        sku        = normalize_sku_value(row.get("sku", ""))
         color      = row.get("color", "").strip() or UNKNOWN_COLOR
         edge_type  = row.get("edge_type", "").strip() or "Unknown"
         is_sku_unicorn = row.get("is_sku_unicorn", row.get("item_is_unicorn", "")).strip().lower() in TRUTHY
@@ -467,7 +489,7 @@ def import_confirm():
     own_rows_imported = 0
     skipped_details = []
 
-    existing_items   = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
+    existing_items   = _build_item_sku_lookup(Item.query.all())
     existing_names   = {item.name.lower(): item for item in Item.query.all()}
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
 
@@ -479,7 +501,7 @@ def import_confirm():
         for row_index in range(item_count):
             row_num = request.form.get(f"item_row_{row_index}", type=int)
             name_hint = request.form.get(f"item_name_{row_index}", "").strip() or None
-            sku_hint = request.form.get(f"item_sku_{row_index}", "").strip().upper() or None
+            sku_hint = normalize_sku_value(request.form.get(f"item_sku_{row_index}", ""))
 
             if request.form.get(f"item_accept_{row_index}") != "on":
                 skipped_details.append({
@@ -491,7 +513,7 @@ def import_confirm():
             item_rows_selected += 1
 
             name        = request.form.get(f"item_name_{row_index}", "").strip()
-            sku         = request.form.get(f"item_sku_{row_index}", "").strip().upper() or None
+            sku         = normalize_sku_value(request.form.get(f"item_sku_{row_index}", ""))
             color       = request.form.get(f"item_color_{row_index}", "").strip() or UNKNOWN_COLOR
             edge_type   = request.form.get(f"item_edge_{row_index}", "Unknown")
             is_sku_unicorn = request.form.get(f"item_sku_unicorn_{row_index}") == "on"
@@ -565,7 +587,7 @@ def import_confirm():
         for row_index in range(own_count):
             row_num = request.form.get(f"own_row_{row_index}", type=int)
             item_name_hint = request.form.get(f"own_item_name_{row_index}", "").strip() or None
-            sku_hint = request.form.get(f"own_item_sku_{row_index}", "").strip().upper() or None
+            sku_hint = normalize_sku_value(request.form.get(f"own_item_sku_{row_index}", ""))
 
             if request.form.get(f"own_accept_{row_index}") != "on":
                 skipped_details.append({

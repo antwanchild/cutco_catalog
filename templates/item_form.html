@@ -20,6 +20,11 @@
     </label>
   </div>
 
+  <label>Alternate SKUs
+    <span class="hint">Comma- or newline-separated aliases used for import matching.</span>
+    <textarea name="alternate_skus" rows="2" class="input-full">{{ alternate_skus_text if alternate_skus_text is defined else '' }}</textarea>
+  </label>
+
   <div class="form-row">
     <div class="suggest-field" data-suggest-values='{{ categories | tojson }}'>
       <label>Category

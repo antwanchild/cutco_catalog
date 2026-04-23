@@ -242,7 +242,7 @@ For XLSX imports, the app also recognizes `Owned?`, `status`, and `person` for o
 
 Import headers are matched case-insensitively, so lowercase headers are recommended only for consistency.
 
-During import preview, rows where the SKU already exists but the name differs are grouped into a collapsed `SKU already exists` section so you can review naming differences before confirming.
+You can also store alternate SKUs on an item so imports can match the same product under a different vendor or legacy model number. During import preview, rows where the SKU or an alias already exists but the name differs are grouped into a collapsed `SKU or alias already exists` section so you can review naming differences before confirming.
 
 ---
 

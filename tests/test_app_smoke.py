@@ -62,11 +62,12 @@ class SmokeBaseTest(unittest.TestCase):
             session["csrf_token"] = value
         return value
 
-    def _add_catalog_item(self, *, name="Test Knife", sku="TK-1", category="Kitchen Knives"):
+    def _add_catalog_item(self, *, name="Test Knife", sku="TK-1", category="Kitchen Knives", alternate_skus=""):
         payload = {
             "csrf_token": "test-csrf-token",
             "name": name,
             "sku": sku,
+            "alternate_skus": alternate_skus,
             "edge_type": "Straight",
             "cutco_url": "https://example.com/test-knife",
             "notes": "Initial note",
@@ -1179,9 +1180,41 @@ class ImportSmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"SKU already exists", preview_response.data)
+        self.assertIn(b"SKU or alias already exists", preview_response.data)
         self.assertIn(b"Imported Different Name", preview_response.data)
         self.assertIn(b"Original Knife", preview_response.data)
+
+    def test_import_preview_matches_alternate_sku(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        self._add_catalog_item(
+            name="Existing Pan",
+            sku="PAN-1",
+            alternate_skus="PAN-ALT, PAN-VENDOR",
+        )
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color\n"
+                        b"Imported Pan,PAN-VENDOR,yes,Classic Brown\n"
+                    ),
+                    "alias_preview.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"row(s) matched existing catalog items and will update ownership only.", preview_response.data)
+        self.assertIn(b"SKU or alias already exists", preview_response.data)
+        self.assertIn(b"Imported Pan", preview_response.data)
+        self.assertIn(b"Existing Pan", preview_response.data)
+        self.assertNotIn(b"New Catalog Items (1)", preview_response.data)
 
     def test_import_preview_csv_and_error_paths(self):
         self._login_as_admin()
@@ -1604,6 +1637,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         add_page = self.client.get("/catalog/add")
         self.assertEqual(add_page.status_code, 200)
         self.assertIn(b"suggest-field", add_page.data)
+        self.assertIn(b"Alternate SKUs", add_page.data)
 
         set_add_page = self.client.get("/sets/add")
         self.assertEqual(set_add_page.status_code, 200)
@@ -1616,6 +1650,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         edit_page = self.client.get(f"/catalog/{item_id}/edit")
         self.assertEqual(edit_page.status_code, 200)
         self.assertIn(b"suggest-field", edit_page.data)
+        self.assertIn(b"Alternate SKUs", edit_page.data)
         self.assertNotIn(b'name="next"', edit_page.data)
 
         filtered_edit_page = self.client.get(f"/catalog/{item_id}/edit?next=/catalog?category=Kitchen+Knives")
@@ -1623,6 +1658,15 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b'name="next"', filtered_edit_page.data)
         self.assertIn(b'/catalog?category=Kitchen Knives', filtered_edit_page.data)
         self.assertIn(b'href="/catalog?category=Kitchen Knives"', filtered_edit_page.data)
+
+        alias_item_id, _alias_variant_id = self._add_catalog_item(
+            name="Alias Pan",
+            sku="PAN-1",
+            alternate_skus="PAN-LEGACY, PAN-OLD",
+        )
+        alias_edit_page = self.client.get(f"/catalog/{alias_item_id}/edit")
+        self.assertEqual(alias_edit_page.status_code, 200)
+        self.assertIn(b"PAN-LEGACY, PAN-OLD", alias_edit_page.data)
 
         set_edit_setup = self.client.post(
             "/sets/add",
@@ -1678,6 +1722,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual(item.notes, "Updated note")
             self.assertTrue(item.is_unicorn)
             self.assertTrue(item.edge_is_unicorn)
+            self.assertEqual(item.alternate_skus, None)
 
     def test_catalog_set_and_variant_management_routes(self):
         self._login_as_admin()

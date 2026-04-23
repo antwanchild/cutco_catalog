@@ -161,12 +161,21 @@ def _schema_repair_ownership_quantity_fields() -> None:
     )
 
 
+def _schema_item_alternate_skus_migrations() -> None:
+    _add_column(
+        "items",
+        "alternate_skus",
+        "ALTER TABLE items ADD COLUMN alternate_skus TEXT",
+    )
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
     SchemaMigration(3, "set_member_snapshot", _schema_set_member_snapshot_migrations),
     SchemaMigration(4, "ownership_quantity_fields", lambda: None),
     SchemaMigration(5, "repair_ownership_quantity_fields", _schema_repair_ownership_quantity_fields),
+    SchemaMigration(6, "item_alternate_skus", _schema_item_alternate_skus_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

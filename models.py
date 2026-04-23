@@ -1,5 +1,6 @@
 from extensions import db
 from constants import COOKWARE_CATEGORIES, UNKNOWN_COLOR
+import re
 from datetime import UTC, datetime
 
 
@@ -28,6 +29,7 @@ class Item(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     name       = db.Column(db.String(160), nullable=False)
     sku        = db.Column(db.String(60),  nullable=True, unique=True)
+    alternate_skus = db.Column(db.Text, nullable=True)
     category   = db.Column(db.String(80),  nullable=True)
     edge_type  = db.Column(db.String(40),  nullable=False, default="Unknown")
     is_unicorn = db.Column(db.Boolean,     nullable=False, default=False)
@@ -55,6 +57,10 @@ class Item(db.Model):
     def any_unicorn(self) -> bool:
         """True if the item, edge type, or any specific variant is flagged unicorn."""
         return self.is_unicorn or self.edge_is_unicorn or any(variant.is_unicorn for variant in self.variants)
+
+    @property
+    def alternate_sku_values(self) -> list[str]:
+        return parse_alternate_skus(self.alternate_skus)
 
 
 class ItemVariant(db.Model):
@@ -227,6 +233,25 @@ def get_or_create_set(name: str) -> Set:
         db.session.add(item_set)
         db.session.flush()
     return item_set
+
+
+def normalize_sku_value(value: str | None) -> str | None:
+    cleaned = re.sub(r"\s+", "", (value or "").strip()).upper()
+    return cleaned or None
+
+
+def parse_alternate_skus(raw_value: str | None) -> list[str]:
+    if not raw_value:
+        return []
+    values: list[str] = []
+    seen: set[str] = set()
+    for part in re.split(r"[\n,;]+", raw_value):
+        sku = normalize_sku_value(part)
+        if not sku or sku in seen:
+            continue
+        seen.add(sku)
+        values.append(sku)
+    return values
 
 
 def _now_utc() -> str:

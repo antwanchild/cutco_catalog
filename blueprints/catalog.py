@@ -10,7 +10,19 @@ from constants import (
 )
 from extensions import db
 from helpers import admin_required, db_commit, is_admin
-from models import Item, ItemSetMember, ItemVariant, KnifeTask, Ownership, Set, get_or_create_set, record_activity, reconcile_unknown_variant
+from models import (
+    Item,
+    ItemSetMember,
+    ItemVariant,
+    KnifeTask,
+    Ownership,
+    Set,
+    normalize_sku_value,
+    parse_alternate_skus,
+    get_or_create_set,
+    record_activity,
+    reconcile_unknown_variant,
+)
 from scraping import _member_hover_title, scrape_catalog, scrape_item_specs, scrape_item_uses, scrape_sets
 
 catalog_bp = Blueprint("catalog", __name__)
@@ -25,6 +37,12 @@ def _safe_redirect_target(target: str | None) -> str | None:
     if not target.startswith("/") or target.startswith("//"):
         return None
     return target
+
+
+def _item_alternate_skus_text(item: Item | None) -> str:
+    if not item or not item.alternate_skus:
+        return ""
+    return ", ".join(parse_alternate_skus(item.alternate_skus))
 
 
 def _normalize_member_sku(value: str | None) -> str | None:
@@ -370,7 +388,8 @@ def catalog_add():
     if request.method == "POST":
         item = Item(
             name       = request.form["name"].strip(),
-            sku        = request.form.get("sku", "").strip().upper() or None,
+            sku        = normalize_sku_value(request.form.get("sku", "")),
+            alternate_skus = ", ".join(parse_alternate_skus(request.form.get("alternate_skus", ""))) or None,
             category   = canonicalize_category(request.form.get("category", "")),
             edge_type  = request.form.get("edge_type", "Unknown"),
             is_unicorn = request.form.get("is_unicorn") == "on",
@@ -398,6 +417,7 @@ def catalog_add():
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            all_sets=Set.query.order_by(Set.name).all(),
                            categories=_catalog_category_options(),
+                           alternate_skus_text="",
                            next_target=_safe_redirect_target(next_target))
 
 
@@ -410,7 +430,8 @@ def catalog_edit(item_id):
     next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
     if request.method == "POST":
         item.name       = request.form["name"].strip()
-        item.sku        = request.form.get("sku", "").strip().upper() or None
+        item.sku        = normalize_sku_value(request.form.get("sku", ""))
+        item.alternate_skus = ", ".join(parse_alternate_skus(request.form.get("alternate_skus", ""))) or None
         item.category   = canonicalize_category(request.form.get("category", ""))
         item.edge_type  = request.form.get("edge_type", "Unknown")
         item.is_unicorn = request.form.get("is_unicorn") == "on"
@@ -453,6 +474,7 @@ def catalog_edit(item_id):
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            all_sets=Set.query.order_by(Set.name).all(),
                            categories=_catalog_category_options(),
+                           alternate_skus_text=_item_alternate_skus_text(item),
                            next_target=_safe_redirect_target(next_target))
 
 

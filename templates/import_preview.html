@@ -33,8 +33,8 @@
 
 {% if sku_name_mismatches %}
 <details class="diff-section">
-  <summary>SKU already exists ({{ sku_name_mismatches | length }})</summary>
-  <p class="muted">These rows match an existing SKU, so the current catalog item name will stay in place.</p>
+  <summary>SKU or alias already exists ({{ sku_name_mismatches | length }})</summary>
+  <p class="muted">These rows match an existing item by SKU or alias, so the current catalog item name will stay in place.</p>
   <table class="data-table">
     <thead>
       <tr><th>Row</th><th>SKU</th><th>Imported Name</th><th>Existing Name</th></tr>
