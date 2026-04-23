@@ -398,6 +398,15 @@ a:hover { text-decoration: underline; }
 .import-item-table th:nth-child(10), .import-item-table td:nth-child(10) { width: 9%; }
 .import-item-table th:nth-child(11), .import-item-table td:nth-child(11) { width: 8%; }
 .import-item-table th:nth-child(12), .import-item-table td:nth-child(12) { width: 11%; }
+.import-ownership-table th:nth-child(1), .import-ownership-table td:nth-child(1) { width: 4%; }
+.import-ownership-table th:nth-child(2), .import-ownership-table td:nth-child(2) { width: 15%; }
+.import-ownership-table th:nth-child(3), .import-ownership-table td:nth-child(3) { width: 22%; }
+.import-ownership-table th:nth-child(4), .import-ownership-table td:nth-child(4) { width: 8%; }
+.import-ownership-table th:nth-child(5), .import-ownership-table td:nth-child(5) { width: 8%; }
+.import-ownership-table th:nth-child(6), .import-ownership-table td:nth-child(6) { width: 16%; }
+.import-ownership-table th:nth-child(7), .import-ownership-table td:nth-child(7) { width: 8%; }
+.import-ownership-table th:nth-child(8), .import-ownership-table td:nth-child(8) { width: 8%; }
+.import-ownership-table th:nth-child(9), .import-ownership-table td:nth-child(9) { width: 11%; }
 .member-sort-btn {
   background: transparent;
   border: 0;
