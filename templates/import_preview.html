@@ -31,6 +31,17 @@
 </p>
 {% endif %}
 
+{% if sku_name_mismatches %}
+<div class="flash flash-warning">
+  <strong>{{ sku_name_mismatches | length }}</strong> row(s) had the same SKU as an existing catalog item but a different name:
+  <ul>
+    {% for mismatch in sku_name_mismatches %}
+      <li>Row {{ mismatch.row }}: imported <strong>{{ mismatch.import_name }}</strong> will keep existing <strong>{{ mismatch.existing_name }}</strong> for SKU <strong>{{ mismatch.sku }}</strong>.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <form method="post" action="{{ url_for('data.import_confirm') }}">
   <input type="hidden" name="total_rows" value="{{ total_rows or 0 }}">
   <input type="hidden" name="error_count" value="{{ errors | length }}">

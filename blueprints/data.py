@@ -275,6 +275,7 @@ def import_page():
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
 
     already_in_catalog = []
+    sku_name_mismatches = []
     new_items_list     = []
     likely_unicorns    = []
     ownership_entries  = []
@@ -333,6 +334,13 @@ def import_page():
                                        "row_num": row_num,
                                        "color": color, "person": person_name,
                                        "status": status, "sets": set_names})
+            if sku and matched_item.name.strip().lower() != name.lower():
+                sku_name_mismatches.append({
+                    "row": row_num,
+                    "import_name": name,
+                    "existing_name": matched_item.name,
+                    "sku": sku,
+                })
         elif dedup_key not in seen_skus:
             seen_skus.add(dedup_key)
             bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku else new_items_list
@@ -384,6 +392,7 @@ def import_page():
 
     return render_template("import_preview.html",
                            already_in_catalog=already_in_catalog,
+                           sku_name_mismatches=sku_name_mismatches,
                            new_items=new_items_list,
                            likely_unicorns=likely_unicorns,
                            ownership_entries=ownership_entries,
