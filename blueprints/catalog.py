@@ -323,6 +323,18 @@ def catalog():
                      name_col.desc() if direction == "desc" else name_col,
                  )
                  .all())
+    elif sort == "variants":
+        variant_count = db.func.count(ItemVariant.id)
+        name_col = db.func.lower(db.func.coalesce(Item.name, ""))
+        items = (query
+                 .outerjoin(Item.variants)
+                 .options(selectinload(Item.variants), selectinload(Item.sets))
+                 .group_by(Item.id)
+                 .order_by(
+                     variant_count.desc() if direction == "desc" else variant_count,
+                     name_col.desc() if direction == "desc" else name_col,
+                 )
+                 .all())
     else:
         items = (query
                  .options(selectinload(Item.variants), selectinload(Item.sets))

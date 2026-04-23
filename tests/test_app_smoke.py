@@ -1400,6 +1400,21 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertLess(response.data.find(b"Alpha Edge Knife"), response.data.find(b"Beta Edge Knife"))
 
+    def test_catalog_variant_sort_uses_variant_count(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with self.app.app_context():
+            item_id, _ = self._add_catalog_item(name="Beta Variant Knife", sku="BV-1")
+            db.session.add(Item(name="Alpha Variant Knife", sku="AV-1"))
+            db.session.commit()
+            db.session.add(ItemVariant(item_id=item_id, color="Blue"))
+            db.session.commit()
+
+        response = self.client.get("/catalog?sort=variants&dir=desc")
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(response.data.find(b"Beta Variant Knife"), response.data.find(b"Alpha Variant Knife"))
+
     def test_catalog_validation_and_sort_fallbacks(self):
         self._login_as_admin()
         self._set_csrf_token()
