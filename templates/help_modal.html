@@ -17,6 +17,7 @@
       {% elif page == 'item_detail' %}📋 Item Detail
       {% elif page in ['sync', 'sync_preview'] %}🔄 Catalog Sync
       {% elif page in ['import', 'import_page'] %}📥 Import
+      {% elif page in ['completion_import', 'completion_import_page'] %}🧾 All SKU Completion Import
       {% elif page == 'dashboard' %}⚔️ Dashboard
       {% elif page == 'msrp_diff' %}💲 MSRP Diff
       {% elif page == 'variants' %}🎨 Variants
@@ -144,6 +145,16 @@
         <li><code>Owned</code> can be a yes/no value, a collector name, or a legacy status/person value.</li>
         <li>A preview is shown before any data is written — you can deselect rows.</li>
         <li>Existing ownership entries are skipped (no duplicates created).</li>
+      </ul>
+
+    {% elif page in ['completion_import', 'completion_import_page'] %}
+      <p>Paste or upload a list of SKUs to build a completion rollup for a collector.</p>
+      <ul>
+        <li>Set SKUs expand into their member item SKUs before totals are rolled up.</li>
+        <li>Unknown item or set SKUs are skipped, not created.</li>
+        <li>Duplicate rows for the same person, item, and color are summed.</li>
+        <li>Matching ownership rows are updated by adding to <strong>Quantity Purchased</strong>.</li>
+        <li>Use headers <code>person</code>, <code>sku</code>, <code>quantity</code>, <code>note</code>.</li>
       </ul>
 
     {% elif page == 'dashboard' %}

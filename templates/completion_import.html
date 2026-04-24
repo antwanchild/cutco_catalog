@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}All SKU Completion Import – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">All SKU Completion Import {{ help_btn("completion_import") }}</h1>
+  <a href="{{ url_for('data.import_page') }}" class="btn btn-ghost">← Standard Import</a>
+</div>
+
+<div class="form-card">
+  <h2>How It Works</h2>
+  <p class="muted">Paste spreadsheet rows or upload a CSV to expand set SKUs into member items and roll duplicate ownership quantities together.</p>
+  <ul class="completion-rules">
+    <li>Set SKUs expand into their member item SKUs before totals are rolled up.</li>
+    <li>Unknown item or set SKUs are skipped, not created.</li>
+    <li>Duplicate rows for the same person, item, and color are summed.</li>
+    <li>Existing ownership rows are updated, not duplicated.</li>
+    <li>Quantity is added to <strong>Quantity Purchased</strong> for matching ownership rows.</li>
+  </ul>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="form-card completion-import-form">
+  <label class="completion-dropzone" id="completion-dropzone">
+    <span class="completion-dropzone-title">Paste rows or drop CSV</span>
+    <span class="completion-dropzone-help">Use headers: <code>person, sku, quantity, note</code>. Tabs from Excel or Google Sheets work too.</span>
+    <textarea name="rows_text" rows="10" class="input-full completion-pastebox" placeholder="person&#9;sku&#9;quantity&#9;note&#10;Anthony Child&#9;1726&#9;1&#9;ordered from rep"></textarea>
+    <input type="file" name="csvfile" accept=".csv" class="completion-file-input" id="completion-file-input">
+    <span class="completion-dropzone-filehint">Click to choose a CSV, or drag one here.</span>
+  </label>
+
+  <label>Person override
+    <span class="hint">Optional. If set, all pasted rows use this person instead of the file contents.</span>
+    <select name="person_override" class="input-full">
+      <option value="">— use pasted person column —</option>
+      {% for person in people %}
+        <option value="{{ person.name }}">{{ person.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Preview Completion Import</button>
+    <a href="{{ url_for('data.import_page') }}" class="btn btn-secondary">Standard Import</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function() {
+  const dropzone = document.getElementById('completion-dropzone');
+  const fileInput = document.getElementById('completion-file-input');
+  if (!dropzone || !fileInput) return;
+
+  function setDrag(active) {
+    dropzone.classList.toggle('dragover', active);
+  }
+
+  dropzone.addEventListener('click', function(e) {
+    if (e.target === fileInput) return;
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', function() {
+    setDrag(false);
+  });
+  dropzone.addEventListener('dragenter', function(e) {
+    e.preventDefault();
+    setDrag(true);
+  });
+  dropzone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    setDrag(true);
+  });
+  dropzone.addEventListener('dragleave', function(e) {
+    if (e.target === dropzone || !dropzone.contains(e.relatedTarget)) {
+      setDrag(false);
+    }
+  });
+  dropzone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    setDrag(false);
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+    }
+  });
+})();
+</script>
+{% endblock %}

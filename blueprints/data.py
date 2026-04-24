@@ -6,6 +6,7 @@ from datetime import date
 
 import openpyxl
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
+from sqlalchemy.orm import selectinload
 
 from constants import (
     COOKWARE_CATEGORIES, EDGE_TYPES, STATUS_OPTIONS, TRUTHY, UNKNOWN_COLOR,
@@ -16,6 +17,7 @@ from helpers import admin_required, db_commit
 from models import (
     Item,
     ItemVariant,
+    ItemSetMember,
     Ownership,
     Person,
     Set,
@@ -141,6 +143,299 @@ def _availability_preview_fields(availability: str) -> tuple[str, str | None]:
         "non-catalog": ("Non-catalog", "badge-off-catalog"),
     }
     return labels.get(availability, ("", None))
+
+
+COMPLETION_COL_MAP = {
+    "person": "person",
+    "collector": "person",
+    "owner": "person",
+    "sku": "sku",
+    "item_sku": "sku",
+    "model #": "sku",
+    "model#": "sku",
+    "quantity": "quantity",
+    "qty": "quantity",
+    "note": "note",
+    "notes": "note",
+}
+
+
+def _parse_completion_quantity(raw_value: str) -> tuple[int | None, str | None]:
+    """Parse a completion quantity as a positive whole number."""
+    cleaned = (raw_value or "").strip()
+    if not cleaned:
+        return 1, None
+    if re.fullmatch(r"[1-9]\d*", cleaned):
+        return int(cleaned), None
+    return None, "Quantity must be a positive whole number."
+
+
+def _merge_note_text(existing: str | None, incoming: str | None) -> str | None:
+    """Merge two free-text notes while keeping duplicates out."""
+    existing_value = (existing or "").strip()
+    incoming_value = (incoming or "").strip()
+    if existing_value and incoming_value:
+        if incoming_value.lower() in existing_value.lower():
+            return existing_value
+        return f"{existing_value}; {incoming_value}"
+    return incoming_value or existing_value or None
+
+
+def _completion_field_name(raw_name: str | None) -> str | None:
+    if not raw_name:
+        return None
+    normalized = _normalized_header(raw_name)
+    return COMPLETION_COL_MAP.get(normalized, normalized)
+
+
+def _read_completion_rows(uploaded_file, paste_text: str) -> tuple[list[dict], str | None]:
+    """Read pasted or uploaded completion rows from CSV-like text."""
+    content = (paste_text or "").strip()
+    if content:
+        source_label = "paste"
+    elif uploaded_file and uploaded_file.filename:
+        content = uploaded_file.stream.read().decode("utf-8-sig")
+        source_label = "csv"
+    else:
+        return [], "Paste rows or choose a CSV file."
+
+    if not content.strip():
+        return [], "We couldn't read any rows from this file."
+
+    sample = content[:4096]
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=",\t")
+    except csv.Error:
+        dialect = csv.excel_tab if "\t" in content and content.count("\t") >= content.count(",") else csv.excel
+
+    reader = csv.DictReader(io.StringIO(content), dialect=dialect)
+    raw_headers = [header.strip() for header in (reader.fieldnames or []) if header and header.strip()]
+    mapped_headers = {_completion_field_name(header) for header in raw_headers}
+    if "person" not in mapped_headers or "sku" not in mapped_headers:
+        return [], "Please include a header row with person and sku."
+
+    parsed_rows: list[dict] = []
+    for row_num, row in enumerate(reader, start=2):
+        if not any((cell or "").strip() for cell in row.values() if cell is not None):
+            continue
+        normalized: dict[str, str] = {}
+        for orig_key, val in row.items():
+            field_name = _completion_field_name(orig_key)
+            if not field_name:
+                continue
+            normalized[field_name] = val.strip() if val is not None else ""
+        normalized["source_label"] = source_label
+        normalized["row_num"] = row_num
+        parsed_rows.append(normalized)
+    return parsed_rows, None
+
+
+def _build_completion_preview(
+    parsed_rows: list[dict],
+    *,
+    person_override: str | None = None,
+) -> dict:
+    """Resolve completion rows into expanded, rolled-up, and unresolved preview data."""
+    existing_items = _build_item_sku_lookup(
+        Item.query.options(selectinload(Item.variants)).all()
+    )
+    existing_sets = _build_set_sku_lookup(
+        Set.query.options(selectinload(Set.members).selectinload(ItemSetMember.item)).all()
+    )
+    existing_persons = {person.name.lower(): person for person in Person.query.all()}
+    existing_ownerships = {}
+    for ownership in Ownership.query.options(
+        selectinload(Ownership.person),
+        selectinload(Ownership.variant).selectinload(ItemVariant.item),
+    ).all():
+        existing_ownerships[(ownership.person.name.lower(), ownership.variant.item_id, ownership.variant.color.lower())] = ownership
+
+    unresolved_rows: list[dict] = []
+    expanded_rows: list[dict] = []
+    set_rows_expanded = 0
+
+    for row in parsed_rows:
+        row_num = row.get("row_num")
+        person = (person_override or row.get("person", "") or "").strip()
+        sku = normalize_sku_value(row.get("sku", ""))
+        note = row.get("note", "").strip() or None
+        quantity, qty_error = _parse_completion_quantity(row.get("quantity", ""))
+
+        if qty_error:
+            unresolved_rows.append({
+                "row": row_num,
+                "person": person or "—",
+                "sku": sku or "—",
+                "quantity": row.get("quantity", "") or "—",
+                "note": note or "—",
+                "reason": qty_error,
+            })
+            continue
+        if not person:
+            unresolved_rows.append({
+                "row": row_num,
+                "person": "—",
+                "sku": sku or "—",
+                "quantity": quantity,
+                "note": note or "—",
+                "reason": "Missing person.",
+            })
+            continue
+        if not sku:
+            unresolved_rows.append({
+                "row": row_num,
+                "person": person,
+                "sku": "—",
+                "quantity": quantity,
+                "note": note or "—",
+                "reason": "Missing sku.",
+            })
+            continue
+
+        matched_set = existing_sets.get(sku)
+        matched_item = None if matched_set else existing_items.get(sku)
+
+        if matched_set:
+            set_rows_expanded += 1
+            if not matched_set.members:
+                unresolved_rows.append({
+                    "row": row_num,
+                    "person": person,
+                    "sku": sku,
+                    "quantity": quantity,
+                    "note": note or "—",
+                    "reason": "Set SKU not found in member data.",
+                })
+                continue
+            for membership in matched_set.members:
+                member_item = membership.item
+                if not member_item or not member_item.sku:
+                    unresolved_rows.append({
+                        "row": row_num,
+                        "person": person,
+                        "sku": sku,
+                        "quantity": quantity,
+                        "note": note or "—",
+                        "reason": f"Set member missing from catalog: {member_item.name if member_item else 'unknown item'}.",
+                    })
+                    continue
+                member_qty = quantity * (membership.quantity or 1)
+                expanded_rows.append({
+                    "input_row": row_num,
+                    "person": person,
+                    "person_key": person.lower(),
+                    "original_sku": sku,
+                    "resolved_sku": member_item.sku,
+                    "item_id": member_item.id,
+                    "item_name": member_item.name,
+                    "color": UNKNOWN_COLOR,
+                    "display_color": "—",
+                    "quantity": member_qty,
+                    "source": "Set member",
+                    "note": note,
+                    "source_rows": [row_num],
+                })
+            continue
+
+        if matched_item:
+            expanded_rows.append({
+                "input_row": row_num,
+                "person": person,
+                "person_key": person.lower(),
+                "original_sku": sku,
+                "resolved_sku": matched_item.sku or sku,
+                "item_id": matched_item.id,
+                "item_name": matched_item.name,
+                "color": UNKNOWN_COLOR,
+                "display_color": "—",
+                "quantity": quantity,
+                "source": "Item",
+                "note": note,
+                "source_rows": [row_num],
+            })
+            continue
+
+        unresolved_rows.append({
+            "row": row_num,
+            "person": person,
+            "sku": sku,
+            "quantity": quantity,
+            "note": note or "—",
+            "reason": "Item SKU not found." if sku not in existing_sets else "Set SKU not found.",
+        })
+
+    rolled_map: dict[tuple[str, int, str], dict] = {}
+    for expanded in expanded_rows:
+        key = (expanded["person_key"], expanded["item_id"], expanded["color"].lower())
+        bucket = rolled_map.setdefault(key, {
+            "person": expanded["person"],
+            "person_key": expanded["person_key"],
+            "item_id": expanded["item_id"],
+            "item_name": expanded["item_name"],
+            "sku": expanded["resolved_sku"],
+            "color": expanded["color"],
+            "display_color": expanded["display_color"],
+            "quantity": 0,
+            "notes": [],
+            "source_rows": [],
+            "source_count": 0,
+            "action": "",
+            "is_new_variant": False,
+        })
+        bucket["quantity"] += expanded["quantity"]
+        bucket["source_count"] += 1
+        bucket["source_rows"].extend(expanded["source_rows"])
+        if expanded["note"]:
+            bucket["notes"].append(expanded["note"])
+
+    rolled_rows: list[dict] = []
+    new_ownership_rows = 0
+    updated_ownership_rows = 0
+    for bucket in rolled_map.values():
+        item = db.session.get(Item, bucket["item_id"])
+        if not item:
+            unresolved_rows.append({
+                "row": min(bucket["source_rows"]) if bucket["source_rows"] else None,
+                "person": bucket["person"],
+                "sku": bucket["sku"],
+                "quantity": bucket["quantity"],
+                "note": "—",
+                "reason": "Matched item vanished before preview.",
+            })
+            continue
+        target_color = UNKNOWN_COLOR if (item.category or "") in COOKWARE_CATEGORIES else bucket["color"]
+        variant = next((variant for variant in item.variants if variant.color.lower() == target_color.lower()), None)
+        person_obj = existing_persons.get(bucket["person_key"])
+        existing_o = None
+        if person_obj and variant:
+            existing_o = existing_ownerships.get((bucket["person_key"], item.id, variant.color.lower()))
+        bucket["display_color"] = "—" if target_color == UNKNOWN_COLOR else target_color
+        bucket["action"] = "Update ownership" if existing_o else "Create ownership"
+        bucket["is_new_variant"] = variant is None
+        bucket["notes_text"] = "; ".join(dict.fromkeys(bucket["notes"])) or None
+        if existing_o:
+            updated_ownership_rows += 1
+        else:
+            new_ownership_rows += 1
+        rolled_rows.append(bucket)
+
+    merged_rows = [row for row in rolled_rows if row["source_count"] > 1]
+
+    return {
+        "unresolved_rows": unresolved_rows,
+        "expanded_rows": expanded_rows,
+        "rolled_rows": rolled_rows,
+        "merged_rows": merged_rows,
+        "summary": {
+            "rows_received": len(parsed_rows),
+            "rows_resolved": len(expanded_rows),
+            "set_rows_expanded": set_rows_expanded,
+            "duplicate_rows_merged": max(len(expanded_rows) - len(rolled_rows), 0),
+            "new_ownership_rows": new_ownership_rows,
+            "existing_ownership_rows_updated": updated_ownership_rows,
+            "unresolved_skus": len(unresolved_rows),
+        },
+    }
 
 
 def _read_confirm_quantity_field(raw_value: str, label: str) -> tuple[int | None, str | None]:
@@ -579,6 +874,172 @@ def import_page():
                            edge_types=EDGE_TYPES,
                            status_options=STATUS_OPTIONS,
                            person_override=person_override)
+
+
+@data_bp.route("/completion-import", methods=["GET", "POST"])
+@admin_required
+def completion_import_page():
+    if request.method == "GET":
+        return render_template(
+            "completion_import.html",
+            people=Person.query.order_by(Person.name).all(),
+            preview=None,
+        )
+
+    pasted_rows = request.form.get("rows_text", "")
+    uploaded_file = request.files.get("csvfile")
+
+    parsed_rows, parse_error = _read_completion_rows(uploaded_file, pasted_rows)
+    if parse_error:
+        flash(parse_error, "error")
+        return render_template(
+            "completion_import.html",
+            people=Person.query.order_by(Person.name).all(),
+            preview=None,
+        )
+
+    person_override = request.form.get("person_override", "").strip() or None
+    preview = _build_completion_preview(parsed_rows, person_override=person_override)
+    return render_template(
+        "completion_import_preview.html",
+        preview=preview,
+        person_override=person_override,
+        people=Person.query.order_by(Person.name).all(),
+    )
+
+
+@data_bp.route("/completion-import/confirm", methods=["POST"])
+@admin_required
+def completion_import_confirm():
+    from sqlalchemy.exc import SQLAlchemyError
+
+    existing_persons = {person.name.lower(): person for person in Person.query.all()}
+    item_count = int(request.form.get("rolled_count", 0) or 0)
+    total_rows = int(request.form.get("total_rows", 0) or 0)
+    selected_rows = 0
+    processed_rows = 0
+    created_ownership = 0
+    updated_ownership = 0
+    created_people = 0
+    skipped_details = []
+
+    try:
+        for row_index in range(item_count):
+            row_num = request.form.get(f"row_input_{row_index}", type=int)
+            person_name = request.form.get(f"row_person_{row_index}", "").strip()
+            sku = request.form.get(f"row_sku_{row_index}", "").strip()
+            item_name = request.form.get(f"row_item_{row_index}", "").strip() or None
+
+            if request.form.get(f"row_accept_{row_index}") != "on":
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, item_name, sku),
+                    "reason": "Not selected during import review.",
+                })
+                continue
+            selected_rows += 1
+
+            item_id = int(request.form.get(f"row_item_id_{row_index}", 0) or 0)
+            item = db.session.get(Item, item_id)
+            if not item:
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, item_name, sku),
+                    "reason": "Matched catalog item was not found during confirmation.",
+                })
+                continue
+
+            quantity, qty_error = _parse_completion_quantity(request.form.get(f"row_quantity_{row_index}", ""))
+            if qty_error:
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, item_name, sku),
+                    "reason": qty_error,
+                })
+                continue
+
+            notes = request.form.get(f"row_note_{row_index}", "").strip() or None
+            color = request.form.get(f"row_color_{row_index}", "").strip() or UNKNOWN_COLOR
+            target_color = UNKNOWN_COLOR if (item.category or "") in COOKWARE_CATEGORIES else color
+
+            person = existing_persons.get(person_name.lower())
+            if not person:
+                person = Person(name=person_name)
+                db.session.add(person)
+                db.session.flush()
+                existing_persons[person_name.lower()] = person
+                created_people += 1
+
+            variant = next((existing_variant for existing_variant in item.variants
+                            if existing_variant.color.lower() == target_color.lower()), None)
+            if not variant:
+                variant = ItemVariant(item_id=item.id, color=target_color)
+                db.session.add(variant)
+                db.session.flush()
+
+            existing_o = Ownership.query.filter_by(person_id=person.id, variant_id=variant.id).first()
+            if existing_o:
+                existing_o.status = "Owned"
+                existing_o.quantity_purchased = (existing_o.quantity_purchased or 0) + quantity
+                if notes:
+                    existing_o.notes = _merge_note_text(existing_o.notes, notes)
+                updated_ownership += 1
+            else:
+                db.session.add(Ownership(
+                    person_id=person.id,
+                    variant_id=variant.id,
+                    status="Owned",
+                    quantity_purchased=quantity,
+                    notes=notes,
+                ))
+                created_ownership += 1
+
+            db.session.flush()
+            reconcile_unknown_variant(item)
+            processed_rows += 1
+
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("Completion import flush failed: %s", exc)
+        flash("Completion import failed — database error during processing. No changes were saved.", "error")
+        return redirect(url_for("data.completion_import_page"))
+
+    if db_commit(db.session):
+        for idx in range(int(request.form.get("unresolved_count", 0) or 0)):
+            skipped_details.append({
+                "row": request.form.get(f"unresolved_row_{idx}", type=int),
+                "label": _import_row_label(
+                    request.form.get(f"unresolved_row_{idx}", type=int),
+                    request.form.get(f"unresolved_person_{idx}", "").strip() or None,
+                    request.form.get(f"unresolved_sku_{idx}", "").strip() or None,
+                ),
+                "reason": request.form.get(f"unresolved_reason_{idx}", "").strip() or "Could not resolve row.",
+            })
+
+        skipped_details.sort(key=lambda entry: (entry["row"] is None, entry["row"] or 0, entry["label"]))
+        summary = (
+            f"Completion import complete — processed {processed_rows} row{'s' if processed_rows != 1 else ''}, "
+            f"created {created_ownership} ownership entr{'ies' if created_ownership != 1 else 'y'}, "
+            f"updated {updated_ownership} ownership entr{'ies' if updated_ownership != 1 else 'y'}."
+        )
+        record_activity(
+            "import",
+            "Completion import complete",
+            f"Processed {processed_rows} rows, created {created_ownership} ownership entries, updated {updated_ownership} ownership entries.",
+        )
+        db.session.commit()
+        return render_template(
+            "completion_import_result.html",
+            summary=summary,
+            total_rows=total_rows,
+            selected_rows=selected_rows,
+            processed_rows=processed_rows,
+            skipped_details=skipped_details,
+            created_people=created_people,
+            created_ownership=created_ownership,
+            updated_ownership=updated_ownership,
+        )
+    return redirect(url_for("data.completion_import_page"))
 
 
 @data_bp.route("/import/confirm", methods=["POST"])

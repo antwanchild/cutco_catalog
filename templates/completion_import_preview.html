@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Completion Import Preview – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">All SKU Completion Import Preview</h1>
+  <a href="{{ url_for('data.completion_import_page') }}" class="btn btn-ghost">← Back</a>
+</div>
+
+{% if preview.summary.unresolved_skus %}
+<div class="flash flash-warning">
+  <strong>{{ preview.summary.unresolved_skus }} unresolved SKU(s) were skipped.</strong>
+  <div class="muted small">Only known items and sets will be applied.</div>
+</div>
+{% endif %}
+
+<div class="form-card completion-summary-card">
+  <h2>Summary</h2>
+  <div class="stat-grid completion-summary-grid">
+    <div class="stat-card"><div class="stat-number">{{ preview.summary.rows_received }}</div><div class="stat-label">Rows received</div></div>
+    <div class="stat-card"><div class="stat-number">{{ preview.summary.rows_resolved }}</div><div class="stat-label">Rows resolved</div></div>
+    <div class="stat-card"><div class="stat-number">{{ preview.summary.set_rows_expanded }}</div><div class="stat-label">Set rows expanded</div></div>
+    <div class="stat-card"><div class="stat-number">{{ preview.summary.duplicate_rows_merged }}</div><div class="stat-label">Duplicate rows merged</div></div>
+    <div class="stat-card"><div class="stat-number">{{ preview.summary.new_ownership_rows }}</div><div class="stat-label">New ownership rows</div></div>
+    <div class="stat-card"><div class="stat-number">{{ preview.summary.existing_ownership_rows_updated }}</div><div class="stat-label">Ownership rows updated</div></div>
+    <div class="stat-card"><div class="stat-number">{{ preview.summary.unresolved_skus }}</div><div class="stat-label">Unresolved SKUs</div></div>
+  </div>
+</div>
+
+{% if preview.rolled_rows %}
+<form method="post" action="{{ url_for('data.completion_import_confirm') }}" class="completion-confirm-form">
+  <input type="hidden" name="total_rows" value="{{ preview.summary.rows_received }}">
+  <input type="hidden" name="rolled_count" value="{{ preview.rolled_rows | length }}">
+  <input type="hidden" name="unresolved_count" value="{{ preview.unresolved_rows | length }}">
+  {% for unresolved in preview.unresolved_rows %}
+    <input type="hidden" name="unresolved_row_{{ loop.index0 }}" value="{{ unresolved.row if unresolved.row is not none else '' }}">
+    <input type="hidden" name="unresolved_person_{{ loop.index0 }}" value="{{ unresolved.person }}">
+    <input type="hidden" name="unresolved_sku_{{ loop.index0 }}" value="{{ unresolved.sku }}">
+    <input type="hidden" name="unresolved_reason_{{ loop.index0 }}" value="{{ unresolved.reason }}">
+  {% endfor %}
+
+  <div class="form-card">
+    <h2>Rolled-Up Totals ({{ preview.rolled_rows | length }})</h2>
+    <p class="muted">This is the final ownership result that would be written on confirm.</p>
+    <table class="data-table completion-rollup-table">
+      <thead>
+        <tr>
+          <th>Accept</th><th>Person</th><th>SKU</th><th>Item</th><th>Color</th><th>Total Qty</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in preview.rolled_rows %}
+        <tr>
+          <td><input type="checkbox" name="row_accept_{{ loop.index0 }}" checked></td>
+          <td>
+            <input type="hidden" name="row_input_{{ loop.index0 }}" value="{{ row.source_rows[0] if row.source_rows else '' }}">
+            <input type="hidden" name="row_person_{{ loop.index0 }}" value="{{ row.person }}">
+            <input type="hidden" name="row_item_id_{{ loop.index0 }}" value="{{ row.item_id }}">
+            <input type="hidden" name="row_item_{{ loop.index0 }}" value="{{ row.item_name }}">
+            <input type="hidden" name="row_sku_{{ loop.index0 }}" value="{{ row.sku }}">
+            <input type="hidden" name="row_color_{{ loop.index0 }}" value="{{ row.color }}">
+            <input type="hidden" name="row_quantity_{{ loop.index0 }}" value="{{ row.quantity }}">
+            <input type="hidden" name="row_note_{{ loop.index0 }}" value="{{ row.notes_text or '' }}">
+            {{ row.person }}
+          </td>
+          <td><span class="mono">{{ row.sku or '—' }}</span></td>
+          <td>{{ row.item_name }}</td>
+          <td>{{ row.display_color or '—' }}</td>
+          <td><span class="mono">{{ row.quantity }}</span></td>
+          <td>
+            <span class="badge badge-{{ 'info' if row.action == 'Update ownership' else 'new' }}">{{ row.action }}</span>
+            {% if row.is_new_variant %}<span class="badge badge-new badge-mini">new variant</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if preview.unresolved_rows %}
+  <details class="diff-section" open>
+    <summary>Unresolved SKUs ({{ preview.unresolved_rows | length }})</summary>
+    <p class="muted">These rows could not be matched to a known item or set and will be skipped.</p>
+    <table class="data-table completion-unresolved-table">
+      <thead>
+        <tr><th>Row</th><th>Person</th><th>SKU</th><th>Quantity</th><th>Note</th><th>Reason</th></tr>
+      </thead>
+      <tbody>
+        {% for row in preview.unresolved_rows %}
+        <tr>
+          <td>{{ row.row if row.row is not none else '—' }}</td>
+          <td>{{ row.person }}</td>
+          <td><span class="mono">{{ row.sku }}</span></td>
+          <td><span class="mono">{{ row.quantity }}</span></td>
+          <td>{{ row.note }}</td>
+          <td>{{ row.reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endif %}
+
+  {% if preview.expanded_rows %}
+  <details class="diff-section">
+    <summary>Expanded Details ({{ preview.expanded_rows | length }})</summary>
+    <p class="muted">Set SKUs expand to member items before totals are rolled up.</p>
+    <table class="data-table completion-expanded-table">
+      <thead>
+        <tr><th>Row</th><th>Person</th><th>Original SKU</th><th>Resolved SKU</th><th>Item</th><th>Color</th><th>Qty</th><th>Source</th><th>Note</th></tr>
+      </thead>
+      <tbody>
+        {% for row in preview.expanded_rows %}
+        <tr>
+          <td>{{ row.input_row }}</td>
+          <td>{{ row.person }}</td>
+          <td><span class="mono">{{ row.original_sku }}</span></td>
+          <td><span class="mono">{{ row.resolved_sku }}</span></td>
+          <td>{{ row.item_name }}</td>
+          <td>{{ row.display_color }}</td>
+          <td><span class="mono">{{ row.quantity }}</span></td>
+          <td>{{ row.source }}</td>
+          <td>{{ row.note or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endif %}
+
+  {% if preview.merged_rows %}
+  <details class="diff-section">
+    <summary>Merge Details ({{ preview.merged_rows | length }})</summary>
+    <p class="muted">Duplicate rows for the same person, item, and color are combined here.</p>
+    <table class="data-table completion-merge-table">
+      <thead>
+        <tr><th>Person</th><th>SKU</th><th>Item</th><th>Rows Merged</th><th>Combined Qty</th></tr>
+      </thead>
+      <tbody>
+        {% for row in preview.merged_rows %}
+        <tr>
+          <td>{{ row.person }}</td>
+          <td><span class="mono">{{ row.sku }}</span></td>
+          <td>{{ row.item_name }}</td>
+          <td><span class="mono">{{ row.source_rows | join(', ') }}</span></td>
+          <td><span class="mono">{{ row.quantity }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endif %}
+
+  <div class="completion-confirm-note flash flash-info">
+    Set SKUs expand before totals are rolled up, and only known items will be applied.
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Confirm completion import</button>
+    <a href="{{ url_for('data.completion_import_page') }}" class="btn btn-secondary">Back</a>
+  </div>
+</form>
+{% else %}
+<div class="flash flash-info">No valid SKUs were found in this file. Add item SKUs or set SKUs and try again.</div>
+<div class="form-actions">
+  <a href="{{ url_for('data.completion_import_page') }}" class="btn btn-secondary">Back</a>
+</div>
+{% endif %}
+{% endblock %}

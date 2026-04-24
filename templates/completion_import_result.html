@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Completion Import Result – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Completion Import Result</h1>
+  <a href="{{ url_for('data.completion_import_page') }}" class="btn btn-ghost">← Another Import</a>
+</div>
+
+<div class="flash flash-success">{{ summary }}</div>
+
+<div class="form-card">
+  <h2>Summary</h2>
+  <table class="data-table compact" style="max-width: 760px;">
+    <tbody>
+      <tr><th>Total rows read</th><td>{{ total_rows }}</td></tr>
+      <tr><th>Rows selected</th><td>{{ selected_rows }}</td></tr>
+      <tr><th>Rows processed</th><td>{{ processed_rows }}</td></tr>
+      <tr><th>Rows skipped / unresolved</th><td>{{ skipped_details | length }}</td></tr>
+      <tr><th>Collectors added</th><td>{{ created_people }}</td></tr>
+      <tr><th>Ownership entries created</th><td>{{ created_ownership }}</td></tr>
+      <tr><th>Ownership entries updated</th><td>{{ updated_ownership }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% if skipped_details %}
+<div class="form-card">
+  <h2>Skipped or Unresolved Rows ({{ skipped_details | length }})</h2>
+  <p class="muted">These rows were not applied because they were either unchecked or could not be resolved safely.</p>
+  <table class="data-table">
+    <thead>
+      <tr><th>Row</th><th>Row / Item</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+      {% for entry in skipped_details %}
+      <tr>
+        <td>{{ entry.row if entry.row is not none else "—" }}</td>
+        <td>{{ entry.label }}</td>
+        <td>{{ entry.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="form-actions">
+  <a href="{{ url_for('data.completion_import_page') }}" class="btn btn-secondary">Import Again</a>
+  <a href="{{ url_for('catalog.catalog') }}" class="btn btn-primary">Back to Catalog</a>
+</div>
+{% endblock %}

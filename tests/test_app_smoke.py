@@ -1496,6 +1496,114 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Rep only", response.data)
         self.assertIn(b"Costco", response.data)
 
+    def test_completion_import_page_renders(self):
+        self._login_as_admin()
+
+        response = self.client.get("/completion-import")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"All SKU Completion Import", response.data)
+        self.assertIn(b"Paste rows or drop CSV", response.data)
+        self.assertIn(b"person, sku, quantity, note", response.data)
+
+    def test_completion_import_rolls_up_set_members_and_updates_ownership(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        member_item_id, _member_variant_id = self._add_catalog_item(
+            name="Completion Knife",
+            sku="COMP-1",
+        )
+        other_item_id, _other_variant_id = self._add_catalog_item(
+            name="Completion Fork",
+            sku="COMP-2",
+        )
+        self._add_set(
+            name="Completion Set",
+            sku="COMP-SET",
+            item_ids=(member_item_id, other_item_id),
+        )
+        person_id = self._add_person(name="Completion Collector", notes="")
+
+        with self.app.app_context():
+            item = db.session.get(Item, member_item_id)
+            variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=item.id, color="Unknown / Unspecified")
+            ).scalar_one()
+            db.session.add(Ownership(
+                person_id=person_id,
+                variant_id=variant.id,
+                status="Owned",
+                quantity_purchased=1,
+            ))
+            db.session.commit()
+
+        preview_response = self.client.post(
+            "/completion-import",
+            data={
+                "csrf_token": "test-csrf-token",
+                "rows_text": (
+                    "person,sku,quantity,note\n"
+                    "Completion Collector,COMP-1,2,direct order\n"
+                    "Completion Collector,COMP-SET,2,from set\n"
+                    "Completion Collector,NOPE-1,1,missing sku\n"
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"All SKU Completion Import Preview", preview_response.data)
+        self.assertIn(b"Rolled-Up Totals", preview_response.data)
+        self.assertIn(b"Unresolved SKUs", preview_response.data)
+        self.assertIn(b"Update ownership", preview_response.data)
+        self.assertIn(b"Create ownership", preview_response.data)
+        self.assertIn(b"Set member", preview_response.data)
+        self.assertIn(b"Item SKU not found", preview_response.data)
+
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        confirm_payload = {"csrf_token": "test-csrf-token"}
+        for inp in soup.select('form[action="/completion-import/confirm"] input'):
+            name = inp.get("name")
+            if not name:
+                continue
+            if inp.get("type") == "checkbox":
+                if inp.has_attr("checked"):
+                    confirm_payload[name] = "on"
+                continue
+            confirm_payload[name] = inp.get("value", "")
+
+        confirm_response = self.client.post(
+            "/completion-import/confirm",
+            data=confirm_payload,
+            follow_redirects=False,
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        self.assertIn(b"Completion Import Result", confirm_response.data)
+        self.assertIn(b"Ownership entries updated", confirm_response.data)
+        self.assertIn(b"Ownership entries created", confirm_response.data)
+
+        with self.app.app_context():
+            item = db.session.get(Item, member_item_id)
+            variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=item.id, color="Unknown / Unspecified")
+            ).scalar_one()
+            ownership = db.session.execute(
+                db.select(Ownership).filter_by(person_id=person_id, variant_id=variant.id)
+            ).scalar_one()
+            other_variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=other_item_id, color="Unknown / Unspecified")
+            ).scalar_one()
+            other_ownership = db.session.execute(
+                db.select(Ownership).filter_by(person_id=person_id, variant_id=other_variant.id)
+            ).scalar_one()
+            no_item_count = Item.query.filter_by(sku="NOPE-1").count()
+
+        self.assertEqual(ownership.quantity_purchased, 5)
+        self.assertEqual(other_ownership.quantity_purchased, 2)
+        self.assertEqual(no_item_count, 0)
+
     def test_import_preview_warns_on_same_sku_different_name(self):
         self._login_as_admin()
         self._set_csrf_token()
