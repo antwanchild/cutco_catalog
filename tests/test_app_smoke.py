@@ -1391,6 +1391,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Catalog Items (1)", response.data)
         self.assertIn(b"Preview Knife", response.data)
         self.assertIn(b"Preview New Knife", response.data)
+        self.assertIn(b"<th>SKU</th>", response.data)
         self.assertIn(b"Price: 12.50", response.data)
         self.assertIn(b"Rep only", response.data)
         self.assertIn(b"badge-off-catalog", response.data)
