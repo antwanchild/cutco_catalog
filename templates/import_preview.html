@@ -357,7 +357,12 @@
   <input type="hidden" name="own_count" value="{{ ownership_entries | length }}">
   <table class="data-table import-ownership-table">
     <thead>
-      <tr><th>Accept</th><th>Person</th><th>Item</th><th>SKU</th><th>Color</th><th>Status</th><th>Flags</th><th>Qty Purchased</th><th>Qty Given Away</th><th>Notes</th></tr>
+      <tr>
+        <th>Accept</th><th>Person</th><th>Item</th><th>SKU</th><th>Color</th><th>Status</th><th>Flags</th>
+        <th><span class="stacked-head"><span>Qty</span><span>Purchased</span></span></th>
+        <th><span class="stacked-head"><span>Qty</span><span>Given Away</span></span></th>
+        <th>Notes</th>
+      </tr>
     </thead>
     <tbody>
       {% for entry in ownership_entries %}
@@ -378,8 +383,10 @@
         <td><span class="mono">{{ entry.sku or '—' }}</span></td>
         <td>
           <input type="hidden" name="own_color_{{ loop.index0 }}" value="{{ entry.color }}">
-          {{ entry.display_color or entry.color }}
-          {% if entry.is_new_variant %}<span class="badge badge-new">new variant</span>{% endif %}
+          <div class="ownership-color-cell">
+            <span class="ownership-color-label">{{ entry.display_color or entry.color }}</span>
+            {% if entry.is_new_variant %}<span class="badge badge-new">new variant</span>{% endif %}
+          </div>
         </td>
         <td>
           <select name="own_status_{{ loop.index0 }}" class="select-xs">

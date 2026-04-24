@@ -1400,8 +1400,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b'item_quantity_given_away_0" value="2"', response.data)
         self.assertIn(b'own_quantity_purchased_0" value="2"', response.data)
         self.assertIn(b'own_quantity_given_away_0" value="1"', response.data)
-        self.assertIn(b"Qty Purchased", response.data)
-        self.assertIn(b"Qty Given Away", response.data)
+        self.assertIn(b"stacked-head", response.data)
+        self.assertIn(b"Purchased", response.data)
+        self.assertIn(b"Given Away", response.data)
         self.assertNotIn(b"Gift Box:", response.data)
         self.assertNotIn(b"Sheath:", response.data)
 

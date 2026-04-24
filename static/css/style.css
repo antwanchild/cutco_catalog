@@ -444,15 +444,32 @@ a:hover { text-decoration: underline; }
   padding: .25rem .45rem;
 }
 .import-ownership-table th:nth-child(1), .import-ownership-table td:nth-child(1) { width: 4%; }
-.import-ownership-table th:nth-child(2), .import-ownership-table td:nth-child(2) { width: 14%; }
-.import-ownership-table th:nth-child(3), .import-ownership-table td:nth-child(3) { width: 17%; }
-.import-ownership-table th:nth-child(4), .import-ownership-table td:nth-child(4) { width: 5.5%; }
-.import-ownership-table th:nth-child(5), .import-ownership-table td:nth-child(5) { width: 9%; }
-.import-ownership-table th:nth-child(6), .import-ownership-table td:nth-child(6) { width: 7%; }
+.import-ownership-table th:nth-child(2), .import-ownership-table td:nth-child(2) { width: 13%; }
+.import-ownership-table th:nth-child(3), .import-ownership-table td:nth-child(3) { width: 15%; }
+.import-ownership-table th:nth-child(4), .import-ownership-table td:nth-child(4) { width: 5%; }
+.import-ownership-table th:nth-child(5), .import-ownership-table td:nth-child(5) { width: 11%; }
+.import-ownership-table th:nth-child(6), .import-ownership-table td:nth-child(6) { width: 6%; }
 .import-ownership-table th:nth-child(7), .import-ownership-table td:nth-child(7) { width: 11%; }
-.import-ownership-table th:nth-child(8), .import-ownership-table td:nth-child(8) { width: 6%; }
-.import-ownership-table th:nth-child(9), .import-ownership-table td:nth-child(9) { width: 6%; }
-.import-ownership-table th:nth-child(10), .import-ownership-table td:nth-child(10) { width: 22.5%; }
+.import-ownership-table th:nth-child(8), .import-ownership-table td:nth-child(8) { width: 8%; }
+.import-ownership-table th:nth-child(9), .import-ownership-table td:nth-child(9) { width: 8%; }
+.import-ownership-table th:nth-child(10), .import-ownership-table td:nth-child(10) { width: 19%; }
+.stacked-head {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+  text-align: center;
+}
+.ownership-color-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .2rem;
+}
+.ownership-color-label {
+  text-align: center;
+  line-height: 1.15;
+}
 .member-sort-btn {
   background: transparent;
   border: 0;
