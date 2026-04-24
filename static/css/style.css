@@ -517,6 +517,11 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .badge-uncategorized { background: rgba(122, 128, 153, .14); color: var(--muted); }
 .badge-alias    { background: #1c2334; color: #b2c7ff; }
 .badge-warning  { background: #2f2610; color: #f0c36a; }
+.badge-mini {
+  padding: .1rem .3rem;
+  font-size: .64rem;
+  letter-spacing: .01em;
+}
 .chip {
   display: inline-block;
   background: var(--bg3);

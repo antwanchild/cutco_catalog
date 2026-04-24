@@ -146,6 +146,24 @@ def _read_confirm_quantity_field(raw_value: str, label: str) -> tuple[int | None
     return None, f"{label} must be a whole number."
 
 
+def _merge_import_ownership(
+    ownership: Ownership,
+    *,
+    status: str,
+    notes: str | None = None,
+    quantity_purchased: int | None = None,
+    quantity_given_away: int | None = None,
+) -> None:
+    """Update an existing ownership row from an import row."""
+    ownership.status = status
+    if notes is not None:
+        ownership.notes = notes
+    if quantity_purchased is not None:
+        ownership.quantity_purchased = quantity_purchased
+    if quantity_given_away is not None:
+        ownership.quantity_given_away = quantity_given_away
+
+
 def _safe_csv_filename(raw_name: str) -> str:
     """Normalize a user-provided filename into a safe CSV filename."""
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (raw_name or "").strip()).strip("._")
@@ -681,6 +699,7 @@ def import_confirm():
             elif is_variant_unicorn and not variant.is_unicorn:
                 variant.is_unicorn = True
 
+            person = None
             if person_name:
                 person = existing_persons.get(person_name.lower())
                 if not person:
@@ -689,13 +708,24 @@ def import_confirm():
                     db.session.flush()
                     existing_persons[person_name.lower()] = person
                     added_persons += 1
-                if not Ownership.query.filter_by(person_id=person.id,
-                                                 variant_id=variant.id).first():
-                    db.session.add(Ownership(person_id=person.id,
-                                             variant_id=variant.id,
-                                             status=status,
-                                             quantity_purchased=quantity_purchased,
-                                             quantity_given_away=quantity_given_away))
+                existing_o = Ownership.query.filter_by(person_id=person.id, variant_id=variant.id).first()
+                if existing_o:
+                    if existing_o.status != status:
+                        continue
+                    _merge_import_ownership(
+                        existing_o,
+                        status=status,
+                        quantity_purchased=quantity_purchased,
+                        quantity_given_away=quantity_given_away,
+                    )
+                else:
+                    db.session.add(Ownership(
+                        person_id=person.id,
+                        variant_id=variant.id,
+                        status=status,
+                        quantity_purchased=quantity_purchased,
+                        quantity_given_away=quantity_given_away,
+                    ))
                     added_ownership += 1
 
             db.session.flush()
@@ -785,14 +815,26 @@ def import_confirm():
             elif is_variant_unicorn and not variant.is_unicorn:
                 variant.is_unicorn = True
 
-            if not Ownership.query.filter_by(person_id=person.id,
-                                              variant_id=variant.id).first():
-                db.session.add(Ownership(person_id=person.id,
-                                         variant_id=variant.id,
-                                         status=status,
-                                         notes=notes,
-                                         quantity_purchased=quantity_purchased,
-                                         quantity_given_away=quantity_given_away))
+            existing_o = Ownership.query.filter_by(person_id=person.id, variant_id=variant.id).first()
+            if existing_o:
+                if existing_o.status != status:
+                    continue
+                _merge_import_ownership(
+                    existing_o,
+                    status=status,
+                    notes=notes,
+                    quantity_purchased=quantity_purchased,
+                    quantity_given_away=quantity_given_away,
+                )
+            else:
+                db.session.add(Ownership(
+                    person_id=person.id,
+                    variant_id=variant.id,
+                    status=status,
+                    notes=notes,
+                    quantity_purchased=quantity_purchased,
+                    quantity_given_away=quantity_given_away,
+                ))
                 added_ownership += 1
 
             db.session.flush()

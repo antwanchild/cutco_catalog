@@ -1127,6 +1127,81 @@ class ImportSmokeTests(SmokeBaseTest):
             self.assertEqual(ownership.quantity_purchased, 2)
             self.assertEqual(ownership.quantity_given_away, 1)
 
+    def test_import_confirm_updates_existing_ownership_quantities(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        first_response = self.client.post(
+            "/import/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_count": "1",
+                "own_count": "0",
+                "total_rows": "1",
+                "item_accept_0": "on",
+                "item_row_0": "2",
+                "item_name_0": "Upsert Knife",
+                "item_sku_0": "UP-1",
+                "item_color_0": "Classic Brown",
+                "item_edge_0": "Straight",
+                "item_category_0": "Kitchen Knives",
+                "item_notes_0": "",
+                "item_person_0": "Upsert Collector",
+                "item_status_0": "Owned",
+                "item_quantity_purchased_0": "2",
+                "item_quantity_given_away_0": "1",
+                "item_sku_unicorn_0": "",
+                "item_variant_unicorn_0": "",
+                "item_edge_unicorn_0": "",
+                "error_count": "0",
+                "conflict_count": "0",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(first_response.status_code, 200)
+
+        second_response = self.client.post(
+            "/import/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_count": "1",
+                "own_count": "0",
+                "total_rows": "1",
+                "item_accept_0": "on",
+                "item_row_0": "2",
+                "item_name_0": "Upsert Knife",
+                "item_sku_0": "UP-1",
+                "item_color_0": "Classic Brown",
+                "item_edge_0": "Straight",
+                "item_category_0": "Kitchen Knives",
+                "item_notes_0": "",
+                "item_person_0": "Upsert Collector",
+                "item_status_0": "Owned",
+                "item_quantity_purchased_0": "5",
+                "item_quantity_given_away_0": "2",
+                "item_sku_unicorn_0": "",
+                "item_variant_unicorn_0": "",
+                "item_edge_unicorn_0": "",
+                "error_count": "0",
+                "conflict_count": "0",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(second_response.status_code, 200)
+        with self.app.app_context():
+            item = db.session.execute(db.select(Item).filter_by(sku="UP-1")).scalar_one()
+            variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=item.id, color="Classic Brown")
+            ).scalar_one()
+            ownerships = db.session.execute(
+                db.select(Ownership).filter_by(variant_id=variant.id)
+            ).scalars().all()
+            self.assertEqual(len(ownerships), 1)
+            ownership = ownerships[0]
+            self.assertEqual(ownership.quantity_purchased, 5)
+            self.assertEqual(ownership.quantity_given_away, 2)
+
     def test_import_confirm_marks_non_catalog_items_off_catalog(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -1277,6 +1352,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Price: 12.50", response.data)
         self.assertIn(b"Rep only", response.data)
         self.assertIn(b"badge-off-catalog", response.data)
+        self.assertIn(b"item + own", response.data)
         self.assertIn(b'item_quantity_purchased_0" value="4"', response.data)
         self.assertIn(b'item_quantity_given_away_0" value="2"', response.data)
         self.assertIn(b'own_quantity_purchased_0" value="2"', response.data)

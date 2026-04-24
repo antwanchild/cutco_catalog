@@ -158,6 +158,9 @@
         <td><input type="checkbox" name="item_edge_unicorn_{{ loop.index0 }}" {% if item.is_edge_unicorn %}checked{% endif %}></td>
         <td>
           <input type="text" name="item_person_{{ loop.index0 }}" value="{{ item.person or '' }}" class="input-xs">
+          {% if item.person %}
+            <span class="badge badge-info badge-mini" title="Accepting this row creates both a catalog item and ownership">item + own</span>
+          {% endif %}
         </td>
         <td>
           <select name="item_status_{{ loop.index0 }}" class="select-xs">
@@ -239,6 +242,9 @@
         <td><input type="checkbox" name="item_edge_unicorn_{{ form_field_index }}" {% if item.is_edge_unicorn %}checked{% endif %}></td>
         <td>
           <input type="text" name="item_person_{{ form_field_index }}" value="{{ item.person or '' }}" class="input-xs">
+          {% if item.person %}
+            <span class="badge badge-info badge-mini" title="Accepting this row creates both a catalog item and ownership">item + own</span>
+          {% endif %}
         </td>
         <td>
           <select name="item_status_{{ form_field_index }}" class="select-xs">
@@ -313,9 +319,12 @@
           <td><input type="checkbox" name="item_sku_unicorn_{{ form_field_index }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
           <td><input type="checkbox" name="item_variant_unicorn_{{ form_field_index }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
           <td><input type="checkbox" name="item_edge_unicorn_{{ form_field_index }}" {% if item.is_edge_unicorn %}checked{% endif %}></td>
-          <td>
-            <input type="text" name="item_person_{{ form_field_index }}" value="{{ item.person or '' }}" class="input-xs">
-          </td>
+        <td>
+          <input type="text" name="item_person_{{ form_field_index }}" value="{{ item.person or '' }}" class="input-xs">
+          {% if item.person %}
+            <span class="badge badge-info badge-mini" title="Accepting this row creates both a catalog item and ownership">item + own</span>
+          {% endif %}
+        </td>
         <td>
           <select name="item_status_{{ form_field_index }}" class="select-xs">
             {% for status_option in status_options %}
