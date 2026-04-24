@@ -5,7 +5,6 @@
   <h1 class="page-title">
     📋 {{ item.name }} {{ help_btn("item_detail") }}
     {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
-    {% if item.availability_label %}<span class="badge {{ item.availability_badge_class }}" title="Availability">{{ item.availability_label }}</span>{% endif %}
     {% if item.set_only %}<span class="badge badge-off-catalog" title="Available only as part of a set">set-only</span>{% endif %}
     {% if not item.in_catalog and not item.set_only %}<span class="badge badge-off-catalog" title="Not in current catalog">discontinued</span>{% endif %}
   </h1>
