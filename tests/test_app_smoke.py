@@ -1279,6 +1279,48 @@ class ImportSmokeTests(SmokeBaseTest):
             self.assertEqual(item.name, "Original Knife")
             self.assertEqual(item.sku, "IM-KEEP-1")
 
+    def test_import_confirm_keeps_existing_category_for_matching_sku(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        existing_item_id, _existing_variant_id = self._add_catalog_item(
+            name="Category Knife",
+            sku="IM-CAT-1",
+            category="Kitchen Knives",
+        )
+
+        response = self.client.post(
+            "/import/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_count": "1",
+                "own_count": "0",
+                "total_rows": "1",
+                "item_accept_0": "on",
+                "item_row_0": "2",
+                "item_name_0": "Category Knife",
+                "item_sku_0": "IM-CAT-1",
+                "item_color_0": "Classic Brown",
+                "item_edge_0": "Straight",
+                "item_category_0": "Cookware",
+                "item_notes_0": "Should not change category",
+                "item_person_0": "",
+                "item_status_0": "Owned",
+                "item_sku_unicorn_0": "",
+                "item_variant_unicorn_0": "",
+                "item_edge_unicorn_0": "",
+                "error_count": "0",
+                "conflict_count": "0",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Import complete", response.data)
+        with self.app.app_context():
+            item = db.session.get(Item, existing_item_id)
+            self.assertEqual(item.category, "Kitchen Knives")
+
     def test_import_preview_renders_xlsx_rows(self):
         self._login_as_admin()
         self._set_csrf_token()
