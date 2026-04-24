@@ -1633,6 +1633,32 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b'name="item_color_1" value="Unknown / Unspecified"', preview_response.data)
         self.assertNotIn(b"BLACK", preview_response.data)
 
+    def test_import_preview_hides_cookware_unknown_color(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color,category\n"
+                        b"Cookware Piece,CW-UNK,yes,,Cookware\n"
+                    ),
+                    "cookware_unknown.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Cookware Piece", preview_response.data)
+        self.assertIn(b"\xe2\x80\x94", preview_response.data)
+        self.assertIn(b'name="item_color_0" value="Unknown / Unspecified"', preview_response.data)
+        self.assertNotIn(b'<td>\n          Unknown\n        </td>', preview_response.data)
+
     def test_import_preview_csv_and_error_paths(self):
         self._login_as_admin()
         self._set_csrf_token()

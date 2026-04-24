@@ -75,6 +75,13 @@ def _display_import_color(color: str) -> str:
     return "Unknown" if color == UNKNOWN_COLOR else color
 
 
+def _preview_import_color(color: str, is_cookware: bool = False) -> str:
+    """Return a preview color, hiding meaningless cookware color labels."""
+    if is_cookware:
+        return "—"
+    return _display_import_color(color)
+
+
 def _build_item_sku_lookup(items: list[Item]) -> dict[str, Item]:
     lookup: dict[str, Item] = {}
     for item in items:
@@ -470,9 +477,10 @@ def import_page():
         dedup_key = (sku or name.lower(), color.lower())
 
         if matched_item:
+            is_cookware = (matched_item.category or "") in COOKWARE_CATEGORIES
             already_in_catalog.append({"item": matched_item, "row": row,
                                        "row_num": row_num,
-                                       "color": color, "display_color": _display_import_color(color),
+                                       "color": color, "display_color": _preview_import_color(color, is_cookware),
                                        "non_catalog": non_catalog,
                                        "availability": availability,
                                        "availability_label": _availability_preview_fields(availability)[0],
@@ -500,7 +508,7 @@ def import_page():
                 bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku else new_items_list
             bucket.append({
                 "name": name, "sku": sku, "color": color,
-                "display_color": _display_import_color(color),
+                "display_color": _preview_import_color(color, is_cookware),
                 "edge_type": edge_type,
                 "non_catalog": non_catalog,
                 "availability": availability,
@@ -544,7 +552,7 @@ def import_page():
                 "sku": matched_item.sku,
                 "item_id":   matched_item.id,
                 "color":     target_color,
-                "display_color": _display_import_color(target_color),
+                "display_color": _preview_import_color(target_color, is_cookware),
                 "status":    status,
                 "notes":     notes,
                 "non_catalog": non_catalog,
