@@ -666,7 +666,7 @@ select.input-full, select.select-sm, select.select-xs {
   cursor: pointer;
 }
 .select-sm { padding: .28rem .5rem; font-size: .875rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); box-sizing: border-box; height: 2.1rem; line-height: 1.2; font-family: var(--font); }
-.select-xs { padding: .18rem .35rem; font-size: .78rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); box-sizing: border-box; }
+.select-xs { padding: .18rem .35rem; font-size: .78rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); box-sizing: border-box; height: 2.1rem; line-height: 1.2; font-family: var(--font); }
 textarea { resize: vertical; }
 .inline-form { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 
