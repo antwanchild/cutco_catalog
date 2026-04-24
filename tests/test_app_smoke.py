@@ -1099,6 +1099,8 @@ class ImportSmokeTests(SmokeBaseTest):
                 "item_notes_0": "Imported note",
                 "item_person_0": "Importer",
                 "item_status_0": "Owned",
+                "item_quantity_purchased_0": "2",
+                "item_quantity_given_away_0": "1",
                 "item_sku_unicorn_0": "on",
                 "item_variant_unicorn_0": "on",
                 "item_edge_unicorn_0": "on",
@@ -1122,6 +1124,8 @@ class ImportSmokeTests(SmokeBaseTest):
 
             self.assertEqual(item.notes, "Imported note")
             self.assertEqual(ownership.status, "Owned")
+            self.assertEqual(ownership.quantity_purchased, 2)
+            self.assertEqual(ownership.quantity_given_away, 1)
 
     def test_import_confirm_marks_non_catalog_items_off_catalog(self):
         self._login_as_admin()
@@ -1246,9 +1250,9 @@ class ImportSmokeTests(SmokeBaseTest):
             "34.00",
             "",
             "",
+            "4",
+            "2",
             "",
-            "",
-            "yes",
         ])
         upload = BytesIO()
         workbook.save(upload)
@@ -1273,6 +1277,8 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Price: 12.50", response.data)
         self.assertIn(b"Rep only", response.data)
         self.assertIn(b"badge-off-catalog", response.data)
+        self.assertIn(b'item_quantity_purchased_0" value="4"', response.data)
+        self.assertIn(b'item_quantity_given_away_0" value="2"', response.data)
         self.assertIn(b'own_quantity_purchased_0" value="2"', response.data)
         self.assertIn(b'own_quantity_given_away_0" value="1"', response.data)
         self.assertIn(b"Qty Purchased", response.data)

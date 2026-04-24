@@ -491,6 +491,8 @@ def import_page():
                 "is_sku_unicorn": is_sku_unicorn,
                 "is_variant_unicorn": is_variant_unicorn,
                 "is_edge_unicorn": is_edge_unicorn,
+                "quantity_purchased": quantity_purchased,
+                "quantity_given_away": quantity_given_away,
                 "category": category, "notes": notes,
                 "person": person_name, "status": status,
                 "row": row_num,
@@ -601,6 +603,28 @@ def import_confirm():
             is_sku_unicorn = request.form.get(f"item_sku_unicorn_{row_index}") == "on"
             is_variant_unicorn = request.form.get(f"item_variant_unicorn_{row_index}") == "on"
             is_edge_unicorn = request.form.get(f"item_edge_unicorn_{row_index}") == "on"
+            quantity_purchased, qty_error = _read_confirm_quantity_field(
+                request.form.get(f"item_quantity_purchased_{row_index}", ""),
+                "Quantity Purchased",
+            )
+            if qty_error:
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, name_hint, sku_hint),
+                    "reason": qty_error,
+                })
+                continue
+            quantity_given_away, qty_error = _read_confirm_quantity_field(
+                request.form.get(f"item_quantity_given_away_{row_index}", ""),
+                "Quantity Given Away",
+            )
+            if qty_error:
+                skipped_details.append({
+                    "row": row_num,
+                    "label": _import_row_label(row_num, name_hint, sku_hint),
+                    "reason": qty_error,
+                })
+                continue
             if availability == "public" and (non_catalog or is_sku_unicorn or is_variant_unicorn or is_edge_unicorn):
                 availability = "non-catalog"
             non_catalog = non_catalog or availability != "public" or is_sku_unicorn or is_variant_unicorn or is_edge_unicorn
@@ -668,7 +692,10 @@ def import_confirm():
                 if not Ownership.query.filter_by(person_id=person.id,
                                                  variant_id=variant.id).first():
                     db.session.add(Ownership(person_id=person.id,
-                                             variant_id=variant.id, status=status))
+                                             variant_id=variant.id,
+                                             status=status,
+                                             quantity_purchased=quantity_purchased,
+                                             quantity_given_away=quantity_given_away))
                     added_ownership += 1
 
             db.session.flush()

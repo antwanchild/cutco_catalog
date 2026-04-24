@@ -106,6 +106,7 @@
   {% if new_items %}
   <h2>New Catalog Items ({{ new_items | length }})</h2>
   <p class="muted">Check items to add them to the catalog.</p>
+  <p class="muted small">If a person is filled in, accepting the row also creates ownership and carries any quantity values through.</p>
   <input type="hidden" name="item_count" value="{{ new_items | length }}">
   <table class="data-table import-item-table">
     <thead>
@@ -122,6 +123,8 @@
           <input type="hidden" name="item_row_{{ loop.index0 }}" value="{{ item.row }}">
           <input type="hidden" name="item_name_{{ loop.index0 }}" value="{{ item.name }}">
           <input type="hidden" name="item_availability_{{ loop.index0 }}" value="{{ item.availability }}">
+          <input type="hidden" name="item_quantity_purchased_{{ loop.index0 }}" value="{{ item.quantity_purchased if item.quantity_purchased is not none else '' }}">
+          <input type="hidden" name="item_quantity_given_away_{{ loop.index0 }}" value="{{ item.quantity_given_away if item.quantity_given_away is not none else '' }}">
           {{ item.name }}
         </td>
         <td>
@@ -174,9 +177,10 @@
   {% endif %}
 
   {# ── Likely Unicorns ────────────────────────────────────────────────── #}
-{% if likely_unicorns %}
+  {% if likely_unicorns %}
   <h2>🦄 Likely Unicorns / Off-Catalog ({{ likely_unicorns | length }})</h2>
   <p class="muted">No SKU match found or the row was explicitly flagged. Review before accepting.</p>
+  <p class="muted small">If a person is filled in, accepting the row also creates ownership and carries any quantity values through.</p>
   <input type="hidden" name="item_count"
          value="{{ (new_items | length) + (likely_unicorns | length) + (set_sku_collisions | length) }}"
          id="item_count_override">
@@ -197,6 +201,8 @@
           <input type="hidden" name="item_row_{{ form_field_index }}" value="{{ item.row }}">
           <input type="hidden" name="item_name_{{ form_field_index }}" value="{{ item.name }}">
           <input type="hidden" name="item_availability_{{ form_field_index }}" value="{{ item.availability }}">
+          <input type="hidden" name="item_quantity_purchased_{{ form_field_index }}" value="{{ item.quantity_purchased if item.quantity_purchased is not none else '' }}">
+          <input type="hidden" name="item_quantity_given_away_{{ form_field_index }}" value="{{ item.quantity_given_away if item.quantity_given_away is not none else '' }}">
           {{ item.name }}
         </td>
         <td>
@@ -255,6 +261,7 @@
   <details class="diff-section">
     <summary>⚠️ Set SKU Collisions ({{ set_sku_collisions | length }})</summary>
     <p class="muted">These rows match an existing set SKU. They are unchecked by default because they usually should not import as standalone items.</p>
+    <p class="muted small">If a person is filled in, accepting the row also creates ownership and carries any quantity values through.</p>
     <table class="data-table import-item-table">
       <thead>
       <tr>
@@ -272,6 +279,8 @@
             <input type="hidden" name="item_row_{{ form_field_index }}" value="{{ item.row }}">
             <input type="hidden" name="item_name_{{ form_field_index }}" value="{{ item.name }}">
             <input type="hidden" name="item_availability_{{ form_field_index }}" value="{{ item.availability }}">
+            <input type="hidden" name="item_quantity_purchased_{{ form_field_index }}" value="{{ item.quantity_purchased if item.quantity_purchased is not none else '' }}">
+            <input type="hidden" name="item_quantity_given_away_{{ form_field_index }}" value="{{ item.quantity_given_away if item.quantity_given_away is not none else '' }}">
             {{ item.name }}
           </td>
           <td>
