@@ -32,7 +32,7 @@
   <table class="data-table import-item-table">
     <thead>
       <tr>
-        <th>Row</th><th>Name</th><th>SKU</th><th>Color</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Non-catalog</th>
+        <th>Row</th><th>Name</th><th>SKU</th><th>Color</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th>
       </tr>
     </thead>
     <tbody>
@@ -42,12 +42,18 @@
         <td>{{ matched.item.name }}</td>
         <td><span class="mono">{{ matched.item.sku or '—' }}</span></td>
         <td>{{ matched.display_color }}</td>
+        <td>
+          {% if matched.availability_label %}
+            <span class="badge {{ matched.availability_badge_class }}">{{ matched.availability_label }}</span>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
         <td>{% if matched.is_sku_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if matched.is_variant_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if matched.is_edge_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{{ matched.person or '—' }}</td>
         <td>{{ matched.status }}</td>
-        <td>{% if matched.non_catalog %}<span class="badge badge-off-catalog">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -105,7 +111,7 @@
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-        <th>Edge</th><th>Category</th><th>Non-catalog</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
+        <th>Edge</th><th>Category</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
       </tr>
     </thead>
     <tbody>
@@ -115,6 +121,7 @@
         <td>
           <input type="hidden" name="item_row_{{ loop.index0 }}" value="{{ item.row }}">
           <input type="hidden" name="item_name_{{ loop.index0 }}" value="{{ item.name }}">
+          <input type="hidden" name="item_availability_{{ loop.index0 }}" value="{{ item.availability }}">
           {{ item.name }}
         </td>
         <td>
@@ -137,7 +144,11 @@
         </td>
         <td>
           <input type="hidden" name="item_non_catalog_{{ loop.index0 }}" value="{% if item.non_catalog %}on{% endif %}">
-          {% if item.non_catalog %}<span class="badge badge-off-catalog">yes</span>{% else %}<span class="muted">—</span>{% endif %}
+          {% if item.availability_label %}
+            <span class="badge {{ item.availability_badge_class }}">{{ item.availability_label }}</span>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
         </td>
         <td><input type="checkbox" name="item_sku_unicorn_{{ loop.index0 }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
         <td><input type="checkbox" name="item_variant_unicorn_{{ loop.index0 }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
@@ -173,7 +184,7 @@
     <thead>
       <tr>
         <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-        <th>Edge</th><th>Category</th><th>Non-catalog</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
+        <th>Edge</th><th>Category</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
       </tr>
     </thead>
     <tbody>
@@ -185,6 +196,7 @@
         <td>
           <input type="hidden" name="item_row_{{ form_field_index }}" value="{{ item.row }}">
           <input type="hidden" name="item_name_{{ form_field_index }}" value="{{ item.name }}">
+          <input type="hidden" name="item_availability_{{ form_field_index }}" value="{{ item.availability }}">
           {{ item.name }}
         </td>
         <td>
@@ -210,7 +222,11 @@
         </td>
         <td>
           <input type="hidden" name="item_non_catalog_{{ form_field_index }}" value="{% if item.non_catalog %}on{% endif %}">
-          {% if item.non_catalog %}<span class="badge badge-off-catalog">yes</span>{% else %}<span class="muted">—</span>{% endif %}
+          {% if item.availability_label %}
+            <span class="badge {{ item.availability_badge_class }}">{{ item.availability_label }}</span>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
         </td>
         <td><input type="checkbox" name="item_sku_unicorn_{{ form_field_index }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
         <td><input type="checkbox" name="item_variant_unicorn_{{ form_field_index }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
@@ -243,7 +259,7 @@
       <thead>
       <tr>
           <th>Accept</th><th>Name</th><th>SKU</th><th>Color</th>
-          <th>Edge</th><th>Category</th><th>Non-catalog</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
+          <th>Edge</th><th>Category</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
         </tr>
       </thead>
       <tbody>
@@ -255,6 +271,7 @@
           <td>
             <input type="hidden" name="item_row_{{ form_field_index }}" value="{{ item.row }}">
             <input type="hidden" name="item_name_{{ form_field_index }}" value="{{ item.name }}">
+            <input type="hidden" name="item_availability_{{ form_field_index }}" value="{{ item.availability }}">
             {{ item.name }}
           </td>
           <td>
@@ -278,7 +295,11 @@
           </td>
           <td>
             <input type="hidden" name="item_non_catalog_{{ form_field_index }}" value="{% if item.non_catalog %}on{% endif %}">
-            {% if item.non_catalog %}<span class="badge badge-off-catalog">yes</span>{% else %}<span class="muted">—</span>{% endif %}
+            {% if item.availability_label %}
+              <span class="badge {{ item.availability_badge_class }}">{{ item.availability_label }}</span>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
           </td>
           <td><input type="checkbox" name="item_sku_unicorn_{{ form_field_index }}" {% if item.is_sku_unicorn %}checked{% endif %}></td>
           <td><input type="checkbox" name="item_variant_unicorn_{{ form_field_index }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>

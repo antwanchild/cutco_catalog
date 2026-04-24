@@ -108,6 +108,7 @@
         {% else %}—{% endif %}
       </td>
       <td>
+        {% if item.availability_label %}<span class="badge {{ item.availability_badge_class }}" title="Availability">{{ item.availability_label }}</span>{% endif %}
         {% if item.is_unicorn %}<span class="badge badge-unicorn" title="SKU unicorn">SKU 🦄</span>{% endif %}
         {% if item.edge_is_unicorn %}<span class="badge badge-unicorn" title="Edge unicorn">Edge 🦄</span>{% endif %}
         {% if item.variants | selectattr('is_unicorn') | list | length %}

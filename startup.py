@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Callable
 
-from constants import KNIFE_TASK_PRESETS, canonicalize_category
+from constants import KNIFE_TASK_PRESETS, canonicalize_availability, canonicalize_category
 from extensions import db
 from models import Item, KnifeTask, Ownership, ensure_unknown_variant
 from schema_migrations import apply_schema_migrations
@@ -114,6 +114,7 @@ BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
     BootstrapMigration(3, "normalize_categories", lambda: _normalize_categories()),
     BootstrapMigration(4, "ensure_unknown_variants", lambda: _ensure_unknown_variants()),
     BootstrapMigration(5, "split_ownership_quantity_notes", lambda: _split_quantity_notes()),
+    BootstrapMigration(6, "normalize_availability", lambda: _normalize_availability()),
 )
 
 BOOTSTRAP_VERSION = BOOTSTRAP_MIGRATIONS[-1].version
@@ -144,6 +145,21 @@ def _normalize_categories() -> None:
             renamed_categories += 1
     if renamed_categories:
         logger.info("Category normalization: updated %d item category value(s)", renamed_categories)
+
+
+def _normalize_availability() -> None:
+    updated = 0
+    for item in Item.query.all():
+        target = "non-catalog" if item.set_only or not item.in_catalog else "public"
+        canonical_availability = canonicalize_availability(item.availability)
+        if canonical_availability != target:
+            item.availability = target
+            updated += 1
+        elif item.availability != canonical_availability:
+            item.availability = canonical_availability
+            updated += 1
+    if updated:
+        logger.info("Availability normalization: updated %d item value(s)", updated)
 
 
 def _ensure_unknown_variants() -> None:

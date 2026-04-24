@@ -7,6 +7,23 @@ from pathlib import Path
 EDGE_TYPES = ["Straight", "Double-D", "Micro Double-D", "Serrated", "Micro-D", "Tec Edge", "N/A", "Unknown"]
 STATUS_OPTIONS = ["Owned", "Wishlist", "Sold", "Traded"]
 STATUS_RANK = {"Owned": 0, "Wishlist": 1, "Traded": 2, "Sold": 3}
+AVAILABILITY_CHOICES = [
+    ("public", "Public"),
+    ("rep only", "Rep only"),
+    ("Costco", "Costco"),
+    ("non-catalog", "Non-catalog"),
+]
+_AVAILABILITY_ALIAS_MAP = {
+    "rep": "rep only",
+    "rep only": "rep only",
+    "costco": "Costco",
+    "costco only": "Costco",
+    "non-catalog": "non-catalog",
+    "non catalog": "non-catalog",
+    "off-catalog": "non-catalog",
+    "off catalog": "non-catalog",
+    "public": "public",
+}
 
 ADMIN_TOKEN             = os.environ.get("ADMIN_TOKEN", "admin")
 if ADMIN_TOKEN == "admin":
@@ -109,6 +126,20 @@ def canonicalize_category(category: str | None) -> str | None:
     return CANONICAL_CATEGORY_ALIASES.get(normalized.lower(), normalized)
 
 
+def canonicalize_availability(availability: str | None) -> str:
+    """Normalize an item availability value to its canonical form."""
+    normalized = (availability or "").strip()
+    if not normalized:
+        return "public"
+    lowered = normalized.lower()
+    if lowered in _AVAILABILITY_ALIAS_MAP:
+        return _AVAILABILITY_ALIAS_MAP[lowered]
+    for canonical, _label in AVAILABILITY_CHOICES:
+        if lowered == canonical.lower():
+            return canonical
+    return "public"
+
+
 def _resolve_category(sku: str, scraped_category: str, name: str = "") -> str:
     """Return the effective category for an item, applying overrides."""
     if sku in CATEGORY_OVERRIDES:
@@ -151,6 +182,7 @@ XLSX_COL_MAP = {
     "model#":                "sku",
     "owned":                 "owned_raw",
     "color":                 "color",
+    "availability":          "availability",
     "non_catalog":           "non_catalog",
     "category":              "category",
     "edge":                  "edge_type",

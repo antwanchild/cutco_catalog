@@ -76,7 +76,7 @@ class SmokeBaseTest(unittest.TestCase):
             "cutco_url": "https://example.com/test-knife",
             "notes": "Initial note",
             "colors": "",
-            "in_catalog": "on",
+            "availability": "public",
         }
         if category is not None:
             payload["category"] = category
@@ -513,7 +513,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(import_template_response.status_code, 200)
         self.assertEqual(import_template_response.mimetype, "text/csv")
         self.assertIn(
-            b"name,sku,owned,color,non_catalog,quantity purchased,quantity given away,category,edge,"
+            b"name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,"
             b"is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price",
             import_template_response.data,
         )
@@ -1158,6 +1158,7 @@ class ImportSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.execute(db.select(Item).filter_by(sku="RO-1")).scalar_one()
             self.assertFalse(item.in_catalog)
+            self.assertEqual(item.availability, "non-catalog")
 
     def test_import_confirm_keeps_existing_name_for_matching_sku(self):
         self._login_as_admin()
@@ -1212,7 +1213,7 @@ class ImportSmokeTests(SmokeBaseTest):
             "Model #",
             "COLOR",
             "Owned?",
-            "non_catalog",
+            "availability",
             "person",
             "Price",
             "Gift Box",
@@ -1226,7 +1227,7 @@ class ImportSmokeTests(SmokeBaseTest):
             "PR-1",
             "Classic Brown",
             "Anthony",
-            "no",
+            "rep",
             "",
             "12.50",
             "yes",
@@ -1240,7 +1241,7 @@ class ImportSmokeTests(SmokeBaseTest):
             "PN-1",
             "Pearl White",
             "Wishlist",
-            "yes",
+            "non-catalog",
             "Collector Two",
             "34.00",
             "",
@@ -1270,6 +1271,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Preview Knife", response.data)
         self.assertIn(b"Preview New Knife", response.data)
         self.assertIn(b"Price: 12.50", response.data)
+        self.assertIn(b"Rep only", response.data)
         self.assertIn(b"badge-off-catalog", response.data)
         self.assertIn(b'own_quantity_purchased_0" value="2"', response.data)
         self.assertIn(b'own_quantity_given_away_0" value="1"', response.data)
@@ -1355,8 +1357,9 @@ class ImportSmokeTests(SmokeBaseTest):
         response = self.client.get("/import")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"<code>non_catalog</code>", response.data)
-        self.assertIn(b"mark the item as not in the catalog", response.data)
+        self.assertIn(b"<code>availability</code>", response.data)
+        self.assertIn(b"Rep only", response.data)
+        self.assertIn(b"Costco", response.data)
 
     def test_import_preview_warns_on_same_sku_different_name(self):
         self._login_as_admin()
@@ -1438,6 +1441,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"SKU or alias already exists", preview_response.data)
         self.assertIn(b"Imported Pan", preview_response.data)
         self.assertIn(b"Existing Pan", preview_response.data)
+        self.assertIn(b"Non-catalog", preview_response.data)
         self.assertIn(b"badge badge-unicorn", preview_response.data)
         self.assertNotIn(b"New Catalog Items (1)", preview_response.data)
 
@@ -1509,11 +1513,11 @@ class ImportSmokeTests(SmokeBaseTest):
                 "csrf_token": "test-csrf-token",
                 "csvfile": (
                     BytesIO(
-                        b"name,sku,owned,color,non_catalog,quantity purchased,quantity given away,category,edge,"
+                        b"name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,"
                         b"sku_unicorn,variant_unicorn,edge_unicorn,price,Gift Box,Sheath\n"
-                        b"Import Existing Knife,IM-EX-1,Import Existing Collector,Classic Brown,no,2,n/a,Kitchen Knives,Straight,"
+                        b"Import Existing Knife,IM-EX-1,Import Existing Collector,Classic Brown,public,2,n/a,Kitchen Knives,Straight,"
                         b"no,no,no,12.50,yes,Leather\n"
-                        b"Import New Knife,IM-NEW-1,no,Pearl White,yes,,,,x,x,x,34.00,,\n"
+                        b"Import New Knife,IM-NEW-1,no,Pearl White,non-catalog,,,,x,x,x,34.00,,\n"
                     ),
                     "preview.csv",
                 ),
@@ -1763,9 +1767,10 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             item.is_unicorn = True
+            item.availability = "rep only"
             db.session.add(Item(name="Uncategorized Knife", sku="UC-1", category=None))
-            db.session.add(Item(name="Set Only Knife", sku="SO-1", category="Kitchen Knives", set_only=True, in_catalog=False))
-            db.session.add(Item(name="Off Catalog Knife", sku="OC-1", category="Kitchen Knives", set_only=False, in_catalog=False))
+            db.session.add(Item(name="Set Only Knife", sku="SO-1", category="Kitchen Knives", set_only=True, in_catalog=False, availability="non-catalog"))
+            db.session.add(Item(name="Off Catalog Knife", sku="OC-1", category="Kitchen Knives", set_only=False, in_catalog=False, availability="non-catalog"))
             db.session.commit()
 
         catalog_response = self.client.get("/catalog?q=Filter&category=Kitchen+Knives&unicorn=1&sort=sku&dir=desc")
@@ -1778,6 +1783,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(catalog_response.status_code, 200)
         self.assertIn(b"Filter Knife", catalog_response.data)
+        self.assertIn(b"Rep only", catalog_response.data)
         self.assertEqual(uncategorized_response.status_code, 200)
         self.assertIn(b"Uncategorized Knife", uncategorized_response.data)
         self.assertIn(b"Set-only", set_only_response.data)
@@ -1787,8 +1793,18 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Off Catalog Knife", non_catalog_response.data)
         self.assertEqual(add_page_response.status_code, 200)
         self.assertIn(b"Add Item", add_page_response.data)
+        self.assertIn(b"Availability", add_page_response.data)
         self.assertEqual(edit_page_response.status_code, 200)
         self.assertIn(b"Filter Knife", edit_page_response.data)
+        self.assertIn(b"Availability", edit_page_response.data)
+
+        item_detail_response = self.client.get(f"/views/item/{item_id}")
+        self.assertEqual(item_detail_response.status_code, 200)
+        self.assertIn(b"Rep only", item_detail_response.data)
+
+        search_response = self.client.get("/search?q=Filter")
+        self.assertEqual(search_response.status_code, 200)
+        self.assertIn(b"Rep only", search_response.data)
 
     def test_catalog_category_sort_uses_name_tiebreaker(self):
         self._login_as_admin()
@@ -1987,7 +2003,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "notes": "Updated note",
                 "is_unicorn": "on",
                 "edge_is_unicorn": "on",
-                "in_catalog": "on",
+                "availability": "public",
             },
             follow_redirects=False,
         )

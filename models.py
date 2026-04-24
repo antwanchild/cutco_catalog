@@ -31,6 +31,7 @@ class Item(db.Model):
     sku        = db.Column(db.String(60),  nullable=True, unique=True)
     alternate_skus = db.Column(db.Text, nullable=True)
     category   = db.Column(db.String(80),  nullable=True)
+    availability = db.Column(db.String(40), nullable=False, default="public")
     edge_type  = db.Column(db.String(40),  nullable=False, default="Unknown")
     is_unicorn = db.Column(db.Boolean,     nullable=False, default=False)
     edge_is_unicorn = db.Column(db.Boolean, nullable=False, default=False)
@@ -61,6 +62,24 @@ class Item(db.Model):
     @property
     def alternate_sku_values(self) -> list[str]:
         return parse_alternate_skus(self.alternate_skus)
+
+    @property
+    def availability_label(self) -> str | None:
+        labels = {
+            "rep only": "Rep only",
+            "Costco": "Costco",
+            "non-catalog": "Non-catalog",
+        }
+        return labels.get((self.availability or "").strip())
+
+    @property
+    def availability_badge_class(self) -> str | None:
+        badge_classes = {
+            "rep only": "badge-warning",
+            "Costco": "badge-info",
+            "non-catalog": "badge-off-catalog",
+        }
+        return badge_classes.get((self.availability or "").strip())
 
 
 class ItemVariant(db.Model):

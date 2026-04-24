@@ -169,6 +169,14 @@ def _schema_item_alternate_skus_migrations() -> None:
     )
 
 
+def _schema_item_availability_migrations() -> None:
+    _add_column(
+        "items",
+        "availability",
+        "ALTER TABLE items ADD COLUMN availability VARCHAR(40) NOT NULL DEFAULT 'public'",
+    )
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
@@ -176,6 +184,7 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(4, "ownership_quantity_fields", lambda: None),
     SchemaMigration(5, "repair_ownership_quantity_fields", _schema_repair_ownership_quantity_fields),
     SchemaMigration(6, "item_alternate_skus", _schema_item_alternate_skus_migrations),
+    SchemaMigration(7, "item_availability", _schema_item_availability_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

@@ -42,6 +42,17 @@
   </div>
 
   <div class="form-row">
+    <label>Availability
+      <span class="hint">Leave as Public unless the item is rep-only, Costco-only, or otherwise not public.</span>
+      <select name="availability" class="input-full">
+        {% for value, label in availability_choices %}
+          <option value="{{ value }}" {% if item and item.availability == value %}selected{% elif not item and value == 'public' %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="form-row">
     <label>Cutco URL
       <input type="url" name="cutco_url" value="{{ item.cutco_url if item and item.cutco_url else '' }}" class="input-full">
     </label>
@@ -63,10 +74,6 @@
     <label class="checkbox-label">
       <input type="checkbox" name="edge_is_unicorn" {% if item and item.edge_is_unicorn %}checked{% endif %}>
       🦄 Edge Unicorn (blade-type rarity)
-    </label>
-    <label class="checkbox-label">
-      <input type="checkbox" name="in_catalog" {% if not item or item.in_catalog %}checked{% endif %}>
-      In Cutco catalog
     </label>
     <label class="checkbox-label">
       <input type="checkbox" name="set_only" {% if item and item.set_only %}checked{% endif %}>

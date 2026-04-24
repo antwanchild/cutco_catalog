@@ -5,8 +5,9 @@ from collections import OrderedDict
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from constants import (
-    COOKWARE_CATEGORIES, EDGE_TYPES,
+    AVAILABILITY_CHOICES, COOKWARE_CATEGORIES, EDGE_TYPES,
     SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR, canonicalize_category,
+    canonicalize_availability,
 )
 from extensions import db
 from helpers import admin_required, db_commit, is_admin
@@ -234,6 +235,7 @@ def _create_missing_set_member_item(member: dict, set_name: str) -> Item:
         sku=sku,
         category=None,
         edge_type="Unknown",
+        availability="non-catalog",
         in_catalog=False,
         set_only=True,
         cutco_url=None,
@@ -386,16 +388,18 @@ def catalog():
 def catalog_add():
     next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
     if request.method == "POST":
+        availability = canonicalize_availability(request.form.get("availability", "public"))
         item = Item(
             name       = request.form["name"].strip(),
             sku        = normalize_sku_value(request.form.get("sku", "")),
             alternate_skus = ", ".join(parse_alternate_skus(request.form.get("alternate_skus", ""))) or None,
             category   = canonicalize_category(request.form.get("category", "")),
+            availability = availability,
             edge_type  = request.form.get("edge_type", "Unknown"),
             is_unicorn = request.form.get("is_unicorn") == "on",
             edge_is_unicorn = request.form.get("edge_is_unicorn") == "on",
             set_only   = request.form.get("set_only") == "on",
-            in_catalog = request.form.get("in_catalog") == "on" and request.form.get("set_only") != "on",
+            in_catalog = availability == "public" and request.form.get("set_only") != "on",
             cutco_url  = request.form.get("cutco_url", "").strip() or None,
             notes      = request.form.get("notes", "").strip() or None,
         )
@@ -417,6 +421,7 @@ def catalog_add():
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            all_sets=Set.query.order_by(Set.name).all(),
                            categories=_catalog_category_options(),
+                           availability_choices=AVAILABILITY_CHOICES,
                            alternate_skus_text="",
                            next_target=_safe_redirect_target(next_target))
 
@@ -429,15 +434,17 @@ def catalog_edit(item_id):
         abort(404)
     next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
     if request.method == "POST":
+        availability = canonicalize_availability(request.form.get("availability", "public"))
         item.name       = request.form["name"].strip()
         item.sku        = normalize_sku_value(request.form.get("sku", ""))
         item.alternate_skus = ", ".join(parse_alternate_skus(request.form.get("alternate_skus", ""))) or None
         item.category   = canonicalize_category(request.form.get("category", ""))
+        item.availability = availability
         item.edge_type  = request.form.get("edge_type", "Unknown")
         item.is_unicorn = request.form.get("is_unicorn") == "on"
         item.edge_is_unicorn = request.form.get("edge_is_unicorn") == "on"
         item.set_only   = request.form.get("set_only") == "on"
-        item.in_catalog = request.form.get("in_catalog") == "on" and request.form.get("set_only") != "on"
+        item.in_catalog = availability == "public" and request.form.get("set_only") != "on"
         item.cutco_url  = request.form.get("cutco_url", "").strip() or None
         item.notes      = request.form.get("notes", "").strip() or None
 
@@ -474,6 +481,7 @@ def catalog_edit(item_id):
                            UNKNOWN_COLOR=UNKNOWN_COLOR,
                            all_sets=Set.query.order_by(Set.name).all(),
                            categories=_catalog_category_options(),
+                           availability_choices=AVAILABILITY_CHOICES,
                            alternate_skus_text=_item_alternate_skus_text(item),
                            next_target=_safe_redirect_target(next_target))
 
@@ -1268,7 +1276,7 @@ def catalog_sync_confirm():
             msrp = None
         item = Item(name=data.get("name", sku), sku=sku,
                     category=canonicalize_category(data.get("category")), cutco_url=data.get("url"),
-                    in_catalog=True, set_only=False, is_unicorn=False, edge_is_unicorn=False,
+                    availability="public", in_catalog=True, set_only=False, is_unicorn=False, edge_is_unicorn=False,
                     edge_type=data.get("edge_type") or "Unknown",
                     msrp=msrp,
                     blade_length=data.get("blade_length") or None,

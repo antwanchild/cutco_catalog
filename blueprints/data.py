@@ -9,7 +9,7 @@ from flask import Blueprint, Response, flash, redirect, render_template, request
 
 from constants import (
     COOKWARE_CATEGORIES, EDGE_TYPES, STATUS_OPTIONS, TRUTHY, UNKNOWN_COLOR,
-    XLSX_COL_MAP, canonicalize_category,
+    XLSX_COL_MAP, canonicalize_availability, canonicalize_category,
 )
 from extensions import db
 from helpers import admin_required, db_commit
@@ -124,6 +124,16 @@ def _parse_quantity_fields(row: dict) -> tuple[int | None, int | None, list[str]
 def _parse_truthy_field(value: str) -> bool:
     """Interpret a spreadsheet cell as a yes/no flag."""
     return (value or "").strip().lower() in TRUTHY
+
+
+def _availability_preview_fields(availability: str) -> tuple[str, str | None]:
+    """Return preview-friendly availability label and badge class."""
+    labels = {
+        "rep only": ("Rep only", "badge-warning"),
+        "Costco": ("Costco", "badge-info"),
+        "non-catalog": ("Non-catalog", "badge-off-catalog"),
+    }
+    return labels.get(availability, ("", None))
 
 
 def _read_confirm_quantity_field(raw_value: str, label: str) -> tuple[int | None, str | None]:
@@ -261,12 +271,12 @@ def export_csv():
 def import_template():
     csv_buffer = io.StringIO()
     writer = csv.writer(csv_buffer)
-    writer.writerow(["name", "sku", "owned", "color", "non_catalog", "quantity purchased",
+    writer.writerow(["name", "sku", "owned", "color", "availability", "quantity purchased",
                      "quantity given away", "category", "edge",
                      "is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn", "price"])
-    writer.writerow(["2-3/4\" Paring Knife", "1720", "Anthony", "Classic Brown", "no", "1",
+    writer.writerow(["2-3/4\" Paring Knife", "1720", "Anthony", "Classic Brown", "public", "1",
                      "0", "Kitchen Knives", "Double-D", "no", "no", "no", "12.50"])
-    writer.writerow(["Super Shears", "2137", "yes", "Pearl White", "yes", "", "",
+    writer.writerow(["Super Shears", "2137", "yes", "Pearl White", "non-catalog", "", "",
                      "Kitchen Knives", "Straight", "no", "no", "no", ""])
     csv_buffer.seek(0)
     return Response(csv_buffer.getvalue(), mimetype="text/csv",
@@ -381,12 +391,17 @@ def import_page():
         name       = row.get("name", "").strip()
         sku        = normalize_sku_value(row.get("sku", ""))
         color      = _normalize_import_color(row.get("color", ""))
-        non_catalog = _parse_truthy_field(row.get("non_catalog", ""))
+        availability_raw = row.get("availability", "").strip()
+        availability = canonicalize_availability(availability_raw)
+        legacy_non_catalog = _parse_truthy_field(row.get("non_catalog", ""))
         edge_type  = row.get("edge_type", "").strip() or "Unknown"
         is_sku_unicorn = row.get("is_sku_unicorn", row.get("item_is_unicorn", "")).strip().lower() in TRUTHY
         is_variant_unicorn = row.get("is_variant_unicorn", "").strip().lower() in TRUTHY
         is_edge_unicorn = row.get("is_edge_unicorn", row.get("edge_is_unicorn", "")).strip().lower() in TRUTHY
-        non_catalog = non_catalog or is_sku_unicorn or is_variant_unicorn or is_edge_unicorn
+        non_catalog = legacy_non_catalog or is_sku_unicorn or is_variant_unicorn or is_edge_unicorn
+        if availability == "public" and non_catalog:
+            availability = "non-catalog"
+        non_catalog = non_catalog or availability != "public"
         category   = canonicalize_category(row.get("category", ""))
         note_text, note_errors = _build_notes(row)
         quantity_purchased, quantity_given_away, quantity_errors = _parse_quantity_fields(row)
@@ -441,6 +456,9 @@ def import_page():
                                        "row_num": row_num,
                                        "color": color, "display_color": _display_import_color(color),
                                        "non_catalog": non_catalog,
+                                       "availability": availability,
+                                       "availability_label": _availability_preview_fields(availability)[0],
+                                       "availability_badge_class": _availability_preview_fields(availability)[1],
                                        "person": person_name,
                                        "status": status})
             already_in_catalog[-1]["row"] = row_num
@@ -467,6 +485,9 @@ def import_page():
                 "display_color": _display_import_color(color),
                 "edge_type": edge_type,
                 "non_catalog": non_catalog,
+                "availability": availability,
+                "availability_label": _availability_preview_fields(availability)[0],
+                "availability_badge_class": _availability_preview_fields(availability)[1],
                 "is_sku_unicorn": is_sku_unicorn,
                 "is_variant_unicorn": is_variant_unicorn,
                 "is_edge_unicorn": is_edge_unicorn,
@@ -507,6 +528,7 @@ def import_page():
                 "status":    status,
                 "notes":     notes,
                 "non_catalog": non_catalog,
+                "availability": matched_item.availability,
                 "is_sku_unicorn": is_sku_unicorn,
                 "is_variant_unicorn": is_variant_unicorn,
                 "is_edge_unicorn": is_edge_unicorn,
@@ -572,10 +594,16 @@ def import_confirm():
             sku         = normalize_sku_value(request.form.get(f"item_sku_{row_index}", ""))
             color       = _normalize_import_color(request.form.get(f"item_color_{row_index}", ""))
             edge_type   = request.form.get(f"item_edge_{row_index}", "Unknown")
+            availability_raw = request.form.get(f"item_availability_{row_index}", "").strip()
+            availability_specified = bool(availability_raw)
+            availability = canonicalize_availability(availability_raw)
             non_catalog = request.form.get(f"item_non_catalog_{row_index}") == "on"
             is_sku_unicorn = request.form.get(f"item_sku_unicorn_{row_index}") == "on"
             is_variant_unicorn = request.form.get(f"item_variant_unicorn_{row_index}") == "on"
             is_edge_unicorn = request.form.get(f"item_edge_unicorn_{row_index}") == "on"
+            if availability == "public" and (non_catalog or is_sku_unicorn or is_variant_unicorn or is_edge_unicorn):
+                availability = "non-catalog"
+            non_catalog = non_catalog or availability != "public" or is_sku_unicorn or is_variant_unicorn or is_edge_unicorn
             category    = canonicalize_category(request.form.get(f"item_category_{row_index}", ""))
             notes       = request.form.get(f"item_notes_{row_index}", "").strip() or None
             person_name = request.form.get(f"item_person_{row_index}", "").strip()
@@ -599,7 +627,8 @@ def import_confirm():
                 item = Item(name=name, sku=sku, category=category,
                             edge_type=edge_type, is_unicorn=is_sku_unicorn,
                             edge_is_unicorn=is_edge_unicorn,
-                            in_catalog=bool(sku) and not non_catalog, notes=notes)
+                            availability=availability,
+                            in_catalog=availability == "public" and not non_catalog, notes=notes)
                 db.session.add(item)
                 db.session.flush()
                 if sku:
@@ -607,6 +636,9 @@ def import_confirm():
                 existing_names[name.lower()] = item
                 added_items += 1
             else:
+                if availability_specified or non_catalog:
+                    item.availability = availability
+                    item.in_catalog = availability == "public" and not item.set_only
                 if is_sku_unicorn and not item.is_unicorn:
                     item.is_unicorn = True
                 if is_edge_unicorn and not item.edge_is_unicorn:

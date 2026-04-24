@@ -48,6 +48,7 @@
             <div class="search-result-main">
               <a class="search-result-title" href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
               {% if item.sku %}<span class="badge badge-info mono">{{ item.sku }}</span>{% endif %}
+              {% if item.availability_label %}<span class="badge {{ item.availability_badge_class }}">{{ item.availability_label }}</span>{% endif %}
               {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
               {% if item.set_only %}<span class="badge badge-off-catalog">Set-only</span>{% endif %}
             </div>
