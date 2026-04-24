@@ -295,6 +295,7 @@ def catalog():
     cat_filter = request.args.get("category", "")
     unicorn_f  = request.args.get("unicorn", "")
     status_f   = request.args.get("status", "")
+    availability_f = request.args.get("availability", "")
     sort       = request.args.get("sort", "name")
     direction  = request.args.get("dir", "asc")
 
@@ -319,6 +320,8 @@ def catalog():
         query = query.filter(Item.set_only.is_(False), Item.in_catalog.is_(False))
     elif status_f == "non_catalog":
         query = query.filter(Item.in_catalog.is_(False))
+    if availability_f:
+        query = query.filter(Item.availability == availability_f)
 
     from sqlalchemy.orm import selectinload
     sort_cols = {"name": Item.name, "sku": Item.sku, "category": Item.category, "edge_type": Item.edge_type}
@@ -372,8 +375,9 @@ def catalog():
 
     return render_template("catalog.html", items=items, categories=categories,
                            q=search_query, cat_filter=cat_filter, unicorn_f=unicorn_f,
-                           status_f=status_f,
+                           status_f=status_f, availability_f=availability_f,
                            sort=sort, direction=direction,
+                           availability_choices=AVAILABILITY_CHOICES,
                            edge_types=EDGE_TYPES,
                            UNCATEGORIZED_FILTER=UNCATEGORIZED_FILTER,
                            COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
