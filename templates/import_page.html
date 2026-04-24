@@ -55,6 +55,7 @@
 {% if import_check %}
 <div class="form-card">
   <h2>Header Check Result ({{ import_check.file_type }})</h2>
+  <p class="muted small">Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
   {% if import_check.ok %}
     <p class="flash flash-success">Required headers look good.</p>
   {% else %}

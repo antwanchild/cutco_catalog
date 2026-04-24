@@ -1449,6 +1449,10 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Header Check Result (CSV)", response.data)
+        self.assertIn(
+            b"Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code>",
+            response.data,
+        )
         self.assertIn(b"Missing required headers: name", response.data)
         self.assertIn(b"No ownership/status column found", response.data)
 
