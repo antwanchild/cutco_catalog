@@ -133,6 +133,7 @@
     {% elif page in ['import', 'import_page'] %}
       <p>Bulk-import ownership data from a CSV or XLSX file.</p>
       <ul>
+        <li>Recommended header order: <code>name, sku, owned, color, availability, quantity purchased, quantity given away, category, edge, is_sku_unicorn, is_variant_unicorn, is_edge_unicorn, price</code>.</li>
         <li>Core columns: <code>name</code>, <code>sku</code>, <code>owned</code>.</li>
         <li>Optional columns: <code>color</code>, <code>quantity_purchased</code>, <code>quantity_given_away</code>, <code>category</code>, <code>edge</code>, <code>is_sku_unicorn</code>, <code>is_variant_unicorn</code>, <code>is_edge_unicorn</code>, <code>price</code>.</li>
         <li>Unicorn flags accept truthy values like <code>yes</code>, <code>x</code>, <code>true</code>, and <code>1</code>.</li>

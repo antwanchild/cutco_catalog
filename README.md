@@ -221,6 +221,10 @@ Set `DISCORD_WEBHOOK_URL` to an [incoming webhook](https://support.discord.com/h
 
 Bulk-import ownership data from a CSV or XLSX file. Download a pre-formatted template from the **Import** page.
 
+Recommended header order:
+
+`name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price`
+
 ### Common Columns
 
 | Column | Description |
