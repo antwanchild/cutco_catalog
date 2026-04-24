@@ -83,8 +83,75 @@
     document.querySelector('.nav-toggle').addEventListener('click', function() {
       var links = document.querySelector('.nav-links');
       var open = links.classList.toggle('open');
-      this.setAttribute('aria-expanded', open);
+      this.setAttribute('aria-expanded', open ? 'true' : 'false');
       this.textContent = open ? '✕' : '☰';
+      if (!open) {
+        document.querySelectorAll('.nav-group[open]').forEach(function(group) {
+          group.removeAttribute('open');
+        });
+      }
+    });
+
+    function closeMobileNav() {
+      var navToggle = document.querySelector('.nav-toggle');
+      var links = document.querySelector('.nav-links');
+      if (links) {
+        links.classList.remove('open');
+      }
+      if (navToggle) {
+        navToggle.setAttribute('aria-expanded', 'false');
+        navToggle.textContent = '☰';
+      }
+      document.querySelectorAll('.nav-group[open]').forEach(function(group) {
+        group.removeAttribute('open');
+      });
+    }
+
+    document.querySelectorAll('.nav-links a').forEach(function(link) {
+      link.addEventListener('click', function() {
+        closeMobileNav();
+      });
+    });
+
+    document.querySelectorAll('.nav-group').forEach(function(group) {
+      group.addEventListener('toggle', function() {
+        if (!group.open) return;
+        document.querySelectorAll('.nav-group[open]').forEach(function(other) {
+          if (other !== group) {
+            other.removeAttribute('open');
+          }
+        });
+      });
+    });
+
+    document.querySelectorAll('.nav-group-menu a').forEach(function(link) {
+      link.addEventListener('click', function() {
+        document.querySelectorAll('.nav-group[open]').forEach(function(group) {
+          group.removeAttribute('open');
+        });
+      });
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      document.querySelectorAll('.nav-group[open]').forEach(function(group) {
+        group.removeAttribute('open');
+      });
+    });
+
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('.navbar')) return;
+      document.querySelectorAll('.nav-group[open]').forEach(function(group) {
+        group.removeAttribute('open');
+      });
+    });
+
+    window.addEventListener('scroll', function() {
+      closeMobileNav();
+    }, { passive: true });
+
+    window.addEventListener('resize', function() {
+      closeMobileNav();
     });
 
     document.addEventListener('DOMContentLoaded', function() {
