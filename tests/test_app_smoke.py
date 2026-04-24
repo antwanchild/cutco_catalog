@@ -331,6 +331,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Matrix", matrix_response.data)
         self.assertEqual(stats_response.status_code, 200)
         self.assertIn(b"Coverage", stats_response.data)
+        self.assertIn(b"Includes public items plus unicorn, rep only, Costco, and non-catalog items that are marked Owned.", stats_response.data)
         self.assertEqual(gift_share_response.status_code, 200)
         self.assertIn(b"Share Gift List", gift_share_response.data)
         self.assertEqual(collection_share_response.status_code, 200)
