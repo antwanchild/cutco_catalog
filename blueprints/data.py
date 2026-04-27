@@ -441,6 +441,51 @@ def _build_completion_preview(
     }
 
 
+def _build_completion_missing_rows(person_names: list[str]) -> list[dict]:
+    """Build per-person missing public catalog item rows for completion reporting."""
+    if not person_names:
+        return []
+
+    target_items = (
+        Item.query.filter_by(set_only=False, in_catalog=True)
+        .order_by(Item.name)
+        .all()
+    )
+    people = {
+        person.name.lower(): person
+        for person in Person.query.filter(Person.name.in_(person_names)).all()
+    }
+
+    missing_rows: list[dict] = []
+    for person_name in sorted({name.strip() for name in person_names if name.strip()}, key=str.lower):
+        person = people.get(person_name.lower())
+        if not person:
+            continue
+        owned_item_ids = set(
+            db.session.execute(
+                db.select(ItemVariant.item_id)
+                .join(Ownership, Ownership.variant_id == ItemVariant.id)
+                .where(
+                    Ownership.person_id == person.id,
+                    Ownership.status == "Owned",
+                )
+                .distinct()
+            ).scalars().all()
+        )
+        for item in target_items:
+            if item.id in owned_item_ids:
+                continue
+            missing_rows.append({
+                "person": person.name,
+                "missing_sku": item.sku,
+                "item": item.name,
+                "category": item.category or "—",
+                "availability": item.availability or "public",
+            })
+
+    return missing_rows
+
+
 def _read_confirm_quantity_field(raw_value: str, label: str) -> tuple[int | None, str | None]:
     """Parse a posted ownership quantity field."""
     cleaned = (raw_value or "").strip()
@@ -990,6 +1035,41 @@ def completion_import_export():
     )
 
 
+@data_bp.route("/completion-import/missing-export", methods=["POST"])
+@admin_required
+def completion_import_missing_export():
+    export_count = int(request.form.get("export_count", 0) or 0)
+    rows = []
+    for idx in range(export_count):
+        rows.append({
+            "person": request.form.get(f"missing_person_{idx}", "").strip(),
+            "missing_sku": request.form.get(f"missing_sku_{idx}", "").strip(),
+            "item": request.form.get(f"missing_item_{idx}", "").strip(),
+            "category": request.form.get(f"missing_category_{idx}", "").strip() or "—",
+            "availability": request.form.get(f"missing_availability_{idx}", "").strip() or "public",
+        })
+
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(["person", "missing_sku", "item", "category", "availability"])
+    for row in rows:
+        writer.writerow([
+            row["person"],
+            row["missing_sku"],
+            row["item"],
+            row["category"],
+            row["availability"],
+        ])
+    csv_buffer.seek(0)
+    filename = _safe_csv_filename(request.form.get("filename", f"cutco_completion_missing_{date.today().isoformat()}.csv"))
+    logger.info("Completion missing export requested: %d rows (%s)", len(rows), filename)
+    return Response(
+        csv_buffer.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @data_bp.route("/completion-import/confirm", methods=["POST"])
 @admin_required
 def completion_import_confirm():
@@ -1124,6 +1204,7 @@ def completion_import_confirm():
             f"updated {updated_ownership} ownership entr{'ies' if updated_ownership != 1 else 'y'}; "
             f"{outcome_note}."
         )
+        missing_export_rows = _build_completion_missing_rows([row["person"] for row in export_rows])
         record_activity(
             "import",
             "Completion import complete",
@@ -1142,6 +1223,10 @@ def completion_import_confirm():
             updated_ownership=updated_ownership,
             export_rows=export_rows,
             export_name=f"cutco_completion_result_{date.today().isoformat()}.csv",
+            missing_export_rows=missing_export_rows,
+            missing_export_name=f"cutco_completion_missing_{date.today().isoformat()}.csv",
+            missing_people_count=len({row["person"] for row in missing_export_rows}),
+            missing_catalog_items_count=len(Item.query.filter_by(set_only=False, in_catalog=True).all()),
         )
     return redirect(url_for("data.completion_import_page"))
 

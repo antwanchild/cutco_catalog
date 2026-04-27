@@ -74,6 +74,45 @@
 </div>
 {% endif %}
 
+{% if missing_export_rows is defined %}
+<div class="form-card completion-export-card">
+  <h2>Missing Catalog SKUs</h2>
+  <p class="muted">Download the public catalog item SKUs that each imported collector still does not own in any variant.</p>
+  <div class="stat-grid" style="margin-top:.75rem;">
+    <div class="stat-card">
+      <div class="stat-number">{{ missing_export_rows | length }}</div>
+      <div class="stat-label">Missing SKUs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ missing_people_count }}</div>
+      <div class="stat-label">Collectors covered</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ missing_catalog_items_count }}</div>
+      <div class="stat-label">Catalog items checked</div>
+    </div>
+  </div>
+  {% if missing_export_rows %}
+  <form method="post" action="{{ url_for('data.completion_import_missing_export') }}">
+    <input type="hidden" name="filename" value="{{ missing_export_name }}">
+    <input type="hidden" name="export_count" value="{{ missing_export_rows | length }}">
+    {% for row in missing_export_rows %}
+      <input type="hidden" name="missing_person_{{ loop.index0 }}" value="{{ row.person }}">
+      <input type="hidden" name="missing_sku_{{ loop.index0 }}" value="{{ row.missing_sku }}">
+      <input type="hidden" name="missing_item_{{ loop.index0 }}" value="{{ row.item }}">
+      <input type="hidden" name="missing_category_{{ loop.index0 }}" value="{{ row.category }}">
+      <input type="hidden" name="missing_availability_{{ loop.index0 }}" value="{{ row.availability }}">
+    {% endfor %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-secondary">Download missing SKUs CSV</button>
+    </div>
+  </form>
+  {% else %}
+    <p class="muted" style="margin-top:.75rem;">No missing public catalog SKUs were found for the imported collectors.</p>
+  {% endif %}
+</div>
+{% endif %}
+
 {% if skipped_details %}
 <div class="form-card">
   <h2>Skipped or Unresolved Rows ({{ skipped_details | length }})</h2>

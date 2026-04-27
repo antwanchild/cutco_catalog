@@ -1521,6 +1521,10 @@ class ImportSmokeTests(SmokeBaseTest):
             name="Completion Fork",
             sku="COMP-2",
         )
+        _missing_item_id, _missing_variant_id = self._add_catalog_item(
+            name="Completion Missing",
+            sku="COMP-MISS",
+        )
         self._add_set(
             name="Completion Set",
             sku="COMP-SET",
@@ -1598,6 +1602,16 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Ownership entries updated", confirm_response.data)
         self.assertIn(b"Ownership entries created", confirm_response.data)
         self.assertIn(b"Download rolled-up CSV", confirm_response.data)
+        self.assertIn(b"Missing Catalog SKUs", confirm_response.data)
+        self.assertIn(b"Download missing SKUs CSV", confirm_response.data)
+
+        confirm_soup = BeautifulSoup(confirm_response.data, "html.parser")
+        missing_payload = {"csrf_token": "test-csrf-token"}
+        for inp in confirm_soup.select('form[action="/completion-import/missing-export"] input'):
+            name = inp.get("name")
+            if not name:
+                continue
+            missing_payload[name] = inp.get("value", "")
 
         export_response = self.client.post(
             "/completion-import/export",
@@ -1610,6 +1624,18 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn("attachment; filename=cutco_completion_result_", export_response.headers["Content-Disposition"])
         self.assertIn("person,sku,item,color,total_quantity,action,notes,source_rows", export_response.data.decode())
         self.assertIn("Completion Collector,COMP-1,Completion Knife", export_response.data.decode())
+
+        missing_response = self.client.post(
+            "/completion-import/missing-export",
+            data=missing_payload,
+            follow_redirects=False,
+        )
+
+        self.assertEqual(missing_response.status_code, 200)
+        self.assertEqual(missing_response.mimetype, "text/csv")
+        self.assertIn("attachment; filename=cutco_completion_missing_", missing_response.headers["Content-Disposition"])
+        self.assertIn("person,missing_sku,item,category,availability", missing_response.data.decode())
+        self.assertIn("Completion Collector,COMP-MISS,Completion Missing", missing_response.data.decode())
 
         history_response = self.client.get("/completion-import")
         self.assertEqual(history_response.status_code, 200)
