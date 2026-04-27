@@ -7,6 +7,7 @@ from datetime import date
 import openpyxl
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
 from sqlalchemy.orm import selectinload
+from sqlalchemy import desc
 
 from constants import (
     COOKWARE_CATEGORIES, EDGE_TYPES, STATUS_OPTIONS, TRUTHY, UNKNOWN_COLOR,
@@ -19,6 +20,7 @@ from models import (
     ItemVariant,
     ItemSetMember,
     Ownership,
+    ActivityEvent,
     Person,
     Set,
     normalize_sku_value,
@@ -26,6 +28,7 @@ from models import (
     record_activity,
     reconcile_unknown_variant,
 )
+from time_utils import format_container_time
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
@@ -879,10 +882,29 @@ def import_page():
 @data_bp.route("/completion-import", methods=["GET", "POST"])
 @admin_required
 def completion_import_page():
+    recent_completion_imports = (
+        db.session.execute(
+            db.select(ActivityEvent)
+            .filter_by(kind="import")
+            .where(ActivityEvent.title == "Completion import complete")
+            .order_by(desc(ActivityEvent.occurred_at), desc(ActivityEvent.id))
+            .limit(5)
+        )
+        .scalars()
+        .all()
+    )
     if request.method == "GET":
         return render_template(
             "completion_import.html",
             people=Person.query.order_by(Person.name).all(),
+            recent_completion_imports=[
+                {
+                    "title": event.title,
+                    "details": event.details,
+                    "time": format_container_time(event.occurred_at),
+                }
+                for event in recent_completion_imports
+            ],
             preview=None,
         )
 
@@ -895,6 +917,14 @@ def completion_import_page():
         return render_template(
             "completion_import.html",
             people=Person.query.order_by(Person.name).all(),
+            recent_completion_imports=[
+                {
+                    "title": event.title,
+                    "details": event.details,
+                    "time": format_container_time(event.occurred_at),
+                }
+                for event in recent_completion_imports
+            ],
             preview=None,
         )
 
@@ -905,6 +935,14 @@ def completion_import_page():
         preview=preview,
         person_override=person_override,
         people=Person.query.order_by(Person.name).all(),
+        recent_completion_imports=[
+            {
+                "title": event.title,
+                "details": event.details,
+                "time": format_container_time(event.occurred_at),
+            }
+            for event in recent_completion_imports
+        ],
     )
 
 

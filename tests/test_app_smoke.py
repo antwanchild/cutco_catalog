@@ -1507,6 +1507,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"person, sku, quantity, note", response.data)
         self.assertIn(b"ordered from rep", response.data)
         self.assertIn(b"roll set SKUs into their member items", response.data)
+        self.assertIn(b"Recent Completion Imports", response.data)
 
     def test_completion_import_rolls_up_set_members_and_updates_ownership(self):
         self._login_as_admin()
@@ -1588,6 +1589,11 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"balanced mix of new and updated ownership entries", confirm_response.data)
         self.assertIn(b"Ownership entries updated", confirm_response.data)
         self.assertIn(b"Ownership entries created", confirm_response.data)
+
+        history_response = self.client.get("/completion-import")
+        self.assertEqual(history_response.status_code, 200)
+        self.assertIn(b"Recent Completion Imports", history_response.data)
+        self.assertIn(b"Completion import complete", history_response.data)
 
         with self.app.app_context():
             item = db.session.get(Item, member_item_id)

@@ -828,6 +828,7 @@ textarea { resize: vertical; }
 }
 .stat-number { font-size: 2rem; font-weight: 700; color: var(--accent); line-height: 1.1; }
 .stat-label  { font-size: .75rem; color: var(--muted); margin-top: .2rem; }
+.nowrap { white-space: nowrap; }
 .dash-row {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

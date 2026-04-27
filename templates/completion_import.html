@@ -51,6 +51,33 @@ Anthony Child,326,2,ordered again</code></pre>
     <a href="{{ url_for('data.import_page') }}" class="btn btn-secondary">Standard Import</a>
   </div>
 </form>
+
+<div class="form-card">
+  <div class="section-heading-actions" style="margin-bottom:.6rem">
+    <h2>Recent Completion Imports</h2>
+    <span class="muted small">Latest completion import runs</span>
+  </div>
+  {% if recent_completion_imports %}
+    <table class="data-table compact">
+      <thead>
+        <tr><th>When</th><th>Summary</th></tr>
+      </thead>
+      <tbody>
+        {% for entry in recent_completion_imports %}
+        <tr>
+          <td class="nowrap">{{ entry.time }}</td>
+          <td>
+            <strong>{{ entry.title }}</strong>
+            {% if entry.details %}<div class="muted small">{{ entry.details }}</div>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No completion imports yet.</p>
+  {% endif %}
+</div>
 {% endblock %}
 
 {% block scripts %}
