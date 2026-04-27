@@ -23,12 +23,18 @@ def _safe_parse_iso_date(raw: str) -> date | None:
         return None
 
 
+def _is_sharpening_item(item: Item) -> bool:
+    return item.category not in COOKWARE_CATEGORIES
+
+
 # ── Sharpening Log ────────────────────────────────────────────────────────────
 
 @logs_bp.route("/sharpening")
 def sharpening():
     today       = date.today()
     all_entries = (SharpeningLog.query
+                   .join(Item, SharpeningLog.item_id == Item.id)
+                   .filter(db.or_(Item.category.is_(None), ~Item.category.in_(COOKWARE_CATEGORIES)))
                    .order_by(SharpeningLog.sharpened_on.desc())
                    .all())
 
@@ -42,7 +48,7 @@ def sharpening():
     tracked: list[dict] = []
     for item_id, last_str in last_by_item.items():
         item = db.session.get(Item, item_id)
-        if not item:
+        if not item or not _is_sharpening_item(item):
             continue
         parsed_last = _safe_parse_iso_date(last_str)
         if not parsed_last:
@@ -66,7 +72,9 @@ def sharpening():
         overdue_count   = sum(1 for row in tracked if row["overdue"]),
         threshold_days  = SHARPEN_THRESHOLD_DAYS,
         today           = today.isoformat(),
-        items_list      = Item.query.order_by(Item.name).all(),
+        items_list      = (Item.query
+                           .filter(db.or_(Item.category.is_(None), ~Item.category.in_(COOKWARE_CATEGORIES)))
+                           .order_by(Item.name).all()),
         methods         = SHARPEN_METHODS,
         has_discord     = bool(DISCORD_WEBHOOK_URL),
     )
@@ -87,8 +95,12 @@ def sharpening_add():
         flash("Date must be valid YYYY-MM-DD.", "error")
         return redirect(url_for("logs.sharpening"))
 
-    if not db.session.get(Item, item_id):
+    item = db.session.get(Item, item_id)
+    if not item:
         flash("Item not found.", "error")
+        return redirect(url_for("logs.sharpening"))
+    if not _is_sharpening_item(item):
+        flash("Cookware and bakeware use the cookware log.", "error")
         return redirect(url_for("logs.sharpening"))
 
     db.session.add(SharpeningLog(
@@ -166,7 +178,11 @@ def sharpening_purge_all():
 @admin_required
 def sharpening_notify():
     today       = date.today()
-    all_entries = SharpeningLog.query.order_by(SharpeningLog.sharpened_on.desc()).all()
+    all_entries = (SharpeningLog.query
+                   .join(Item, SharpeningLog.item_id == Item.id)
+                   .filter(db.or_(Item.category.is_(None), ~Item.category.in_(COOKWARE_CATEGORIES)))
+                   .order_by(SharpeningLog.sharpened_on.desc())
+                   .all())
     last_by_item: dict[int, str] = {}
     for entry in all_entries:
         if entry.item_id not in last_by_item:

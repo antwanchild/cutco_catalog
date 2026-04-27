@@ -300,6 +300,7 @@ class PublicSmokeTests(SmokeBaseTest):
             sku="VW-1",
             alternate_skus="VW-ALT1, VW-ALT2",
         )
+        _matrix_sort_item_id, _ = self._add_catalog_item(name="A Matrix Knife", sku="AA-1")
         person_id = self._add_person(name="Viewer", notes="")
         set_id = self._add_set(name="View Set", sku="VS-1", item_ids=(item_id,))
 
@@ -317,18 +318,22 @@ class PublicSmokeTests(SmokeBaseTest):
         )
 
         item_response = self.client.get(f"/views/item/{item_id}")
-        matrix_response = self.client.get("/views/matrix")
+        matrix_response = self.client.get("/views/matrix?sort=sku")
         stats_response = self.client.get("/stats")
         gift_share_response = self.client.get(f"/sets/{set_id}/gift-token?person={person_id}")
         collection_share_response = self.client.get(f"/people/{person_id}/collection-token")
 
         self.assertEqual(item_response.status_code, 200)
         self.assertIn(b"View Knife", item_response.data)
+        self.assertIn(b'SKU:</strong> <span class="mono">VW-1</span>', item_response.data)
         self.assertIn(b"Aliases:", item_response.data)
         self.assertIn(b"2 alt SKUs", item_response.data)
         self.assertIn(b'data-clamp-rows="2"', item_response.data)
         self.assertEqual(matrix_response.status_code, 200)
         self.assertIn(b"Matrix", matrix_response.data)
+        self.assertIn(b"Sort: SKU", matrix_response.data)
+        self.assertIn(b"#AA-1", matrix_response.data)
+        self.assertLess(matrix_response.data.index(b"#AA-1"), matrix_response.data.index(b"#VW-1"))
         self.assertEqual(stats_response.status_code, 200)
         self.assertIn(b"Coverage", stats_response.data)
         self.assertIn(b"Includes public items plus unicorn, rep only, Costco, and non-catalog items that are marked Owned.", stats_response.data)
@@ -384,6 +389,8 @@ class PublicSmokeTests(SmokeBaseTest):
 
         item_id, variant_id = self._add_catalog_item(name="People Knife", sku="PL-1")
         person_id = self._add_person(name="People Viewer", notes="")
+        _wishlist_low_item_id, wishlist_low_variant_id = self._add_catalog_item(name="Alpha Wishlist Knife", sku="AA-2")
+        _wishlist_high_item_id, wishlist_high_variant_id = self._add_catalog_item(name="Zulu Wishlist Knife", sku="ZZ-2")
 
         add_ownership_response = self.client.post(
             "/ownership/add",
@@ -399,10 +406,35 @@ class PublicSmokeTests(SmokeBaseTest):
         )
         self.assertEqual(add_ownership_response.status_code, 302)
 
+        self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(wishlist_low_variant_id),
+                "status": "Wishlist",
+                "target_price": "24.99",
+                "notes": "First wishlist item",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(wishlist_high_variant_id),
+                "status": "Wishlist",
+                "target_price": "34.99",
+                "notes": "Second wishlist item",
+            },
+            follow_redirects=False,
+        )
+
         people_response = self.client.get("/people")
         collection_response = self.client.get(f"/people/{person_id}/collection")
         edit_page_response = self.client.get(f"/people/{person_id}/edit")
-        wishlist_response = self.client.get("/wishlist")
+        wishlist_response = self.client.get("/wishlist?sort=name")
 
         self.assertEqual(people_response.status_code, 200)
         self.assertIn(b"People Viewer", people_response.data)
@@ -415,6 +447,10 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"People Viewer", edit_page_response.data)
         self.assertEqual(wishlist_response.status_code, 200)
         self.assertIn(b"Wishlist", wishlist_response.data)
+        self.assertIn(b"Sort: Name", wishlist_response.data)
+        self.assertIn(b"#AA-2", wishlist_response.data)
+        self.assertIn(b"#ZZ-2", wishlist_response.data)
+        self.assertLess(wishlist_response.data.index(b"#AA-2"), wishlist_response.data.index(b"#ZZ-2"))
 
     def test_empty_collection_page_renders_shell(self):
         self._login_as_admin()
@@ -552,6 +588,17 @@ class PublicSmokeTests(SmokeBaseTest):
             follow_redirects=False,
         )
         self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(cookware_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "Should be blocked",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
             "/tasks/add",
             data={
                 "csrf_token": "test-csrf-token",
@@ -571,6 +618,7 @@ class PublicSmokeTests(SmokeBaseTest):
 
         self.assertEqual(sharpening_response.status_code, 200)
         self.assertIn(b"Sharpening", sharpening_response.data)
+        self.assertNotIn(b'option value="2">Cook View Piece', sharpening_response.data)
         self.assertEqual(cookware_response.status_code, 200)
         self.assertIn(b"Cookware", cookware_response.data)
         self.assertEqual(tasks_response.status_code, 200)
@@ -579,6 +627,12 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Slice onions", tasks_manage_response.data)
         self.assertEqual(task_detail_response.status_code, 200)
         self.assertIn(b"Slice onions", task_detail_response.data)
+
+        with self.app.app_context():
+            cookware_logs = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=cookware_item_id)
+            ).all()
+            self.assertEqual(len(cookware_logs), 0)
 
         with mock.patch("blueprints.logs._notify_discord", return_value=True) as notify_mock, \
              mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \

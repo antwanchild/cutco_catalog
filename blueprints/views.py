@@ -24,10 +24,12 @@ def item_owners(item_id):
                       .filter(~Person.id.in_(owner_ids))
                       .order_by(Person.name).all())
 
-    sharpening = (SharpeningLog.query
-                  .filter_by(item_id=item_id)
-                  .order_by(SharpeningLog.sharpened_on.desc())
-                  .all())
+    sharpening = []
+    if item.category not in COOKWARE_CATEGORIES:
+        sharpening = (SharpeningLog.query
+                      .filter_by(item_id=item_id)
+                      .order_by(SharpeningLog.sharpened_on.desc())
+                      .all())
 
     task_log = (KnifeTaskLog.query
                 .filter_by(item_id=item_id)
@@ -51,7 +53,21 @@ def item_owners(item_id):
 @views_bp.route("/views/matrix")
 def matrix():
     people_list = Person.query.order_by(Person.name).all()
-    items_list  = Item.query.order_by(Item.name).all()
+    sort_field  = (request.args.get("sort", "name") or "name").strip().lower()
+    if sort_field not in {"name", "sku"}:
+        sort_field = "name"
+
+    items_list = Item.query.order_by(Item.name).all()
+    if sort_field == "sku":
+        items_list = sorted(
+            items_list,
+            key=lambda item: ((item.sku or "").lower(), (item.name or "").lower()),
+        )
+    else:
+        items_list = sorted(
+            items_list,
+            key=lambda item: ((item.name or "").lower(), (item.sku or "").lower()),
+        )
 
     item_lookup = {}
     for ownership in Ownership.query.all():
@@ -71,6 +87,7 @@ def matrix():
     return render_template("matrix.html",
                            people=people_list,
                            items=items_list,
+                           sort_field=sort_field,
                            item_lookup=item_lookup,
                            variant_lookup=variant_lookup,
                            variants_by_item=variants_by_item,

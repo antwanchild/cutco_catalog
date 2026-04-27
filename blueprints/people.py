@@ -317,6 +317,9 @@ def bulk_status_update(person_id):
 @people_bp.route("/wishlist")
 def wishlist():
     person_id   = request.args.get("person", type=int)
+    sort_field  = (request.args.get("sort", "target") or "target").strip().lower()
+    if sort_field not in {"target", "name", "sku"}:
+        sort_field = "target"
     people_list = Person.query.order_by(Person.name).all()
 
     wl_q = Ownership.query.filter_by(status="Wishlist")
@@ -338,16 +341,30 @@ def wishlist():
             delta     = delta,
         ))
 
-    rows.sort(key=lambda row: (
-        0 if row["hit"] else (1 if row["delta"] is not None else 2),
-        row["delta"] if row["delta"] is not None else float("inf"),
-    ))
+    if sort_field == "name":
+        rows.sort(key=lambda row: (
+            (row["ownership"].variant.item.name or "").lower(),
+            (row["ownership"].variant.item.sku or "").lower(),
+            row["ownership"].person.name.lower(),
+        ))
+    elif sort_field == "sku":
+        rows.sort(key=lambda row: (
+            (row["ownership"].variant.item.sku or "").lower(),
+            (row["ownership"].variant.item.name or "").lower(),
+            row["ownership"].person.name.lower(),
+        ))
+    else:
+        rows.sort(key=lambda row: (
+            0 if row["hit"] else (1 if row["delta"] is not None else 2),
+            row["delta"] if row["delta"] is not None else float("inf"),
+        ))
 
     return render_template(
         "wishlist.html",
         rows        = rows,
         people      = people_list,
         person_id   = person_id,
+        sort_field  = sort_field,
         has_discord = bool(DISCORD_WEBHOOK_URL),
         hit_count   = sum(1 for row in rows if row["hit"]),
     )
