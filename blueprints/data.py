@@ -486,6 +486,22 @@ def _build_completion_missing_rows(person_names: list[str]) -> list[dict]:
     return missing_rows
 
 
+def _build_completion_missing_csv(missing_rows: list[dict]) -> str:
+    """Serialize completion gaps rows to CSV text."""
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(["person", "missing_sku", "item", "category", "availability"])
+    for row in missing_rows:
+        writer.writerow([
+            row["person"],
+            row["missing_sku"],
+            row["item"],
+            row["category"],
+            row["availability"],
+        ])
+    return csv_buffer.getvalue()
+
+
 def _resolve_completion_gap_people(selected_person_id: str, people: list[Person]) -> tuple[list[Person], str | int, str | None]:
     """Resolve a completion gaps collector selection."""
     if selected_person_id == "all":
@@ -665,13 +681,18 @@ def completion_gaps_page():
         view_mode = (request.args.get("view") or "").strip().lower()
         if selection_error:
             flash(selection_error, "error")
-        missing_rows = _build_completion_missing_rows([person.name for person in selected_people]) if view_mode == "screen" and not selection_error else None
+        missing_rows = None
+        missing_rows_csv = None
+        if view_mode == "screen" and not selection_error:
+            missing_rows = _build_completion_missing_rows([person.name for person in selected_people])
+            missing_rows_csv = _build_completion_missing_csv(missing_rows)
         return render_template(
             "completion_gaps.html",
             people=people,
             public_catalog_count=public_catalog_count,
             default_person_id=selected_person_value,
             missing_rows=missing_rows,
+            missing_rows_csv=missing_rows_csv,
             view_mode=view_mode,
         )
 
@@ -687,30 +708,19 @@ def completion_gaps_page():
             public_catalog_count=public_catalog_count,
             default_person_id=selected_person_value,
             missing_rows=None,
+            missing_rows_csv=None,
             view_mode="",
         )
 
     filename_prefix = "all_collectors" if selected_person_value == "all" else selected_people[0].name or "collector"
     missing_rows = _build_completion_missing_rows([person.name for person in selected_people])
-
-    csv_buffer = io.StringIO()
-    writer = csv.writer(csv_buffer)
-    writer.writerow(["person", "missing_sku", "item", "category", "availability"])
-    for row in missing_rows:
-        writer.writerow([
-            row["person"],
-            row["missing_sku"],
-            row["item"],
-            row["category"],
-            row["availability"],
-        ])
-    csv_buffer.seek(0)
+    csv_text = _build_completion_missing_csv(missing_rows)
     filename = _safe_csv_filename(
         f"cutco_completion_gaps_{filename_prefix}_{date.today().isoformat()}.csv"
     )
     logger.info("Completion gaps export requested: %d rows (%s)", len(missing_rows), filename)
     return Response(
-        csv_buffer.getvalue(),
+        csv_text,
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )

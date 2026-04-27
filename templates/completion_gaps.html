@@ -59,7 +59,12 @@
 <div class="form-card">
   <div class="section-heading-actions" style="margin-bottom:.6rem">
     <h2>Screen View</h2>
-    <span class="muted small">{{ missing_rows | length }} missing SKU{{ 's' if missing_rows | length != 1 }}</span>
+    <div class="inline-actions" style="gap:.5rem; align-items:center;">
+      <span class="muted small">{{ missing_rows | length }} missing SKU{{ 's' if missing_rows | length != 1 }}</span>
+      {% if missing_rows %}
+      <button type="button" class="btn btn-secondary btn-xs" id="completion-gaps-copy-csv">Copy CSV</button>
+      {% endif %}
+    </div>
   </div>
   {% if missing_rows %}
     <div class="table-wrap">
@@ -86,6 +91,7 @@
         </tbody>
       </table>
     </div>
+    <textarea id="completion-gaps-csv" class="sr-only" aria-hidden="true">{{ missing_rows_csv | e }}</textarea>
   {% else %}
     <p class="empty">No missing SKUs found for this collector.</p>
   {% endif %}
@@ -94,5 +100,28 @@
 <div class="form-card">
   <p class="muted">Choose a collector and click <strong>View on screen</strong> to see the report here.</p>
 </div>
+{% endif %}
+
+{% if missing_rows_csv %}
+<script>
+(function() {
+  const button = document.getElementById('completion-gaps-copy-csv');
+  const textarea = document.getElementById('completion-gaps-csv');
+  if (!button || !textarea) return;
+  button.addEventListener('click', async function() {
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      button.textContent = 'Copied';
+      setTimeout(() => { button.textContent = 'Copy CSV'; }, 1200);
+    } catch (err) {
+      textarea.focus();
+      textarea.select();
+      document.execCommand('copy');
+      button.textContent = 'Copied';
+      setTimeout(() => { button.textContent = 'Copy CSV'; }, 1200);
+    }
+  });
+})();
+</script>
 {% endif %}
 {% endblock %}

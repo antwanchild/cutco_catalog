@@ -1675,6 +1675,7 @@ class ImportSmokeTests(SmokeBaseTest):
         screen_response = self.client.get(f"/completion-gaps?view=screen&person_id={person_id}")
         self.assertEqual(screen_response.status_code, 200)
         self.assertIn(b"Screen View", screen_response.data)
+        self.assertIn(b"Copy CSV", screen_response.data)
         self.assertIn(b"Gap Collector", screen_response.data)
         self.assertIn(b"GAP-2", screen_response.data)
         self.assertNotIn(b"GAP-1", screen_response.data)
