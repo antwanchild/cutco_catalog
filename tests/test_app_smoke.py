@@ -569,6 +569,7 @@ class PublicSmokeTests(SmokeBaseTest):
         gadget_item_id, _ = self._add_catalog_item(name="Gadget Sharpener", sku="GD-1", category="Gadgets")
         sheath_item_id, _ = self._add_catalog_item(name="Sheath Sharpener", sku="SH-1", category="Sheaths")
         storage_item_id, _ = self._add_catalog_item(name="Storage Sharpener", sku="ST-1", category="Storage")
+        cutting_board_item_id, _ = self._add_catalog_item(name="Cutting Board Sharpener", sku="CB-1", category="Cutting Boards")
         cookware_item_id, _ = self._add_catalog_item(name="Cook View Piece", sku="CV-1", category="Cookware")
         task_item_id, _ = self._add_catalog_item(name="Task View Knife", sku="TV-1")
         task_id = self._add_task(name="Slice onions")
@@ -652,6 +653,17 @@ class PublicSmokeTests(SmokeBaseTest):
             follow_redirects=False,
         )
         self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(cutting_board_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "Allowed in logs, hidden from page lists",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
             "/tasks/add",
             data={
                 "csrf_token": "test-csrf-token",
@@ -679,6 +691,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertNotIn("Gadget Sharpener", sharpening_select)
         self.assertNotIn("Sheath Sharpener", sharpening_select)
         self.assertNotIn("Storage Sharpener", sharpening_select)
+        self.assertNotIn("Cutting Board Sharpener", sharpening_select)
         self.assertEqual(cookware_response.status_code, 200)
         self.assertIn(b"Cookware", cookware_response.data)
         self.assertEqual(tasks_response.status_code, 200)
