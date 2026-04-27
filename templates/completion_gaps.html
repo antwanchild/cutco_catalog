@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Completion Gaps – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">📉 Completion Gaps {{ help_btn("completion_gaps") }}</h1>
+  <a href="{{ url_for('data.export_page') }}" class="btn btn-ghost">← Export CSV</a>
+</div>
+
+<div class="form-card">
+  <h2>Missing Catalog SKUs</h2>
+  <p class="muted">
+    Download the public catalog item SKUs that a collector still does not own in any variant.
+  </p>
+  <div class="stat-grid" style="margin-top:.75rem;">
+    <div class="stat-card">
+      <div class="stat-number">{{ public_catalog_count }}</div>
+      <div class="stat-label">Public catalog items checked</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ people | length }}</div>
+      <div class="stat-label">Collectors available</div>
+    </div>
+  </div>
+
+  <form method="post" class="completion-gaps-form" style="margin-top:1rem;">
+    <label>Collector
+      <select name="person_id" class="select-full">
+        <option value="all">All collectors</option>
+        {% for person in people %}
+          <option value="{{ person.id }}">{{ person.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <p class="hint">This report checks public catalog items only. If a collector owns any variant of an item, it is not listed as missing.</p>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Download missing SKUs CSV</button>
+      <a href="{{ url_for('data.completion_import_page') }}" class="btn btn-secondary">Completion Import</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

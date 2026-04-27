@@ -1509,6 +1509,49 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"roll set SKUs into their member items", response.data)
         self.assertIn(b"Recent Completion Imports", response.data)
 
+    def test_completion_gaps_page_renders_and_exports_missing_csv(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        owned_item_id, owned_variant_id = self._add_catalog_item(name="Gap Owned", sku="GAP-1")
+        missing_item_id, _missing_variant_id = self._add_catalog_item(name="Gap Missing", sku="GAP-2")
+        person_id = self._add_person(name="Gap Collector", notes="")
+
+        with self.app.app_context():
+            item = db.session.get(Item, owned_item_id)
+            variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=item.id, color="Unknown / Unspecified")
+            ).scalar_one()
+            db.session.add(Ownership(
+                person_id=person_id,
+                variant_id=variant.id,
+                status="Owned",
+                quantity_purchased=1,
+            ))
+            db.session.commit()
+
+        response = self.client.get("/completion-gaps")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Completion Gaps", response.data)
+        self.assertIn(b"Download missing SKUs CSV", response.data)
+        self.assertIn(b"All collectors", response.data)
+
+        export_response = self.client.post(
+            "/completion-gaps",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response.mimetype, "text/csv")
+        self.assertIn("cutco_completion_gaps_", export_response.headers["Content-Disposition"])
+        self.assertIn(b"person,missing_sku,item,category,availability", export_response.data)
+        self.assertIn(b"Gap Collector,GAP-2,Gap Missing", export_response.data)
+        self.assertNotIn(b"GAP-1", export_response.data)
+
     def test_completion_import_rolls_up_set_members_and_updates_ownership(self):
         self._login_as_admin()
         self._set_csrf_token()

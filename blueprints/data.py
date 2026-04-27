@@ -635,6 +635,63 @@ def export_csv():
                              f"attachment; filename={filename}"})
 
 
+@data_bp.route("/completion-gaps", methods=["GET", "POST"])
+@admin_required
+def completion_gaps_page():
+    people = Person.query.order_by(Person.name).all()
+    public_catalog_count = Item.query.filter_by(set_only=False, in_catalog=True).count()
+
+    if request.method == "GET":
+        return render_template(
+            "completion_gaps.html",
+            people=people,
+            public_catalog_count=public_catalog_count,
+        )
+
+    selected_person_id = (request.form.get("person_id") or "all").strip()
+    if selected_person_id == "all":
+        selected_people = people
+        filename_prefix = "all_collectors"
+    else:
+        try:
+            person = db.session.get(Person, int(selected_person_id))
+        except ValueError:
+            person = None
+        if not person:
+            flash("Please choose a valid collector.", "error")
+            return render_template(
+                "completion_gaps.html",
+                people=people,
+                public_catalog_count=public_catalog_count,
+            )
+        selected_people = [person]
+        filename_prefix = person.name or "collector"
+
+    missing_rows = _build_completion_missing_rows([person.name for person in selected_people])
+
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(["person", "missing_sku", "item", "category", "availability"])
+    for row in missing_rows:
+        writer.writerow([
+            row["person"],
+            row["missing_sku"],
+            row["item"],
+            row["category"],
+            row["availability"],
+        ])
+    csv_buffer.seek(0)
+    filename = _safe_csv_filename(
+        f"cutco_completion_gaps_{filename_prefix}_{date.today().isoformat()}.csv"
+    )
+    logger.info("Completion gaps export requested: %d rows (%s)", len(missing_rows), filename)
+    return Response(
+        csv_buffer.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @data_bp.route("/import/template")
 def import_template():
     csv_buffer = io.StringIO()

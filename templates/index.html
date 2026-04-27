@@ -188,6 +188,7 @@
       <li><a href="{{ url_for('views.stats') }}">📈 Collection Stats</a></li>
       <li><a href="{{ url_for('data.import_page') }}">📥 Import XLSX / CSV</a></li>
       <li><a href="{{ url_for('data.completion_import_page') }}">🧾 All SKU Completion Import</a></li>
+      <li><a href="{{ url_for('data.completion_gaps_page') }}">📉 Completion Gaps</a></li>
       <li><a href="{{ url_for('data.export_page') }}">📤 Export CSV</a></li>
       {% if is_admin() %}
       <li><a href="{{ url_for('catalog.catalog_sync') }}">🔄 Sync Catalog</a></li>

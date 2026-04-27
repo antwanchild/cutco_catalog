@@ -36,7 +36,7 @@
 
     <details class="nav-group">
       <summary class="nav-group-toggle
-        {% if request.endpoint in ['views.matrix', 'people.wishlist', 'logs.sharpening', 'logs.cookware', 'logs.tasks', 'data.import_page', 'data.export_page', 'data.export_csv', 'data.import_template'] or (request.endpoint and ('cookware' in request.endpoint or 'task' in request.endpoint or 'wishlist' in request.endpoint or 'sharpening' in request.endpoint or 'import' in request.endpoint or 'export' in request.endpoint)) %}active{% endif %}">
+        {% if request.endpoint in ['views.matrix', 'people.wishlist', 'logs.sharpening', 'logs.cookware', 'logs.tasks', 'data.import_page', 'data.export_page', 'data.export_csv', 'data.import_template', 'data.completion_gaps_page'] or (request.endpoint and ('cookware' in request.endpoint or 'task' in request.endpoint or 'wishlist' in request.endpoint or 'sharpening' in request.endpoint or 'import' in request.endpoint or 'export' in request.endpoint or 'completion_gaps' in request.endpoint)) %}active{% endif %}">
         More
       </summary>
       <div class="nav-group-menu">
@@ -47,6 +47,7 @@
         <a href="{{ url_for('logs.tasks') }}" {% if request.endpoint and 'task' in request.endpoint %}class="active"{% endif %}>Tasks</a>
         <a href="{{ url_for('data.import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
         <a href="{{ url_for('data.completion_import_page') }}" {% if request.endpoint and 'completion_import' in request.endpoint %}class="active"{% endif %}>Completion Import</a>
+        <a href="{{ url_for('data.completion_gaps_page') }}" {% if request.endpoint and 'completion_gaps' in request.endpoint %}class="active"{% endif %}>Completion Gaps</a>
         <a href="{{ url_for('data.export_page') }}" {% if request.endpoint and 'export' in request.endpoint %}class="active"{% endif %}>Export CSV</a>
       </div>
     </details>
