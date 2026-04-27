@@ -448,7 +448,7 @@ def _build_completion_missing_rows(person_names: list[str]) -> list[dict]:
 
     target_items = (
         Item.query.filter_by(set_only=False, in_catalog=True)
-        .order_by(Item.name)
+        .order_by(Item.category, Item.sku, Item.name)
         .all()
     )
     people = {
@@ -480,7 +480,6 @@ def _build_completion_missing_rows(person_names: list[str]) -> list[dict]:
                 "missing_sku": item.sku,
                 "item": item.name,
                 "category": item.category or "—",
-                "availability": item.availability or "public",
             })
 
     return missing_rows
@@ -490,14 +489,13 @@ def _build_completion_missing_csv(missing_rows: list[dict]) -> str:
     """Serialize completion gaps rows to CSV text."""
     csv_buffer = io.StringIO()
     writer = csv.writer(csv_buffer)
-    writer.writerow(["person", "missing_sku", "item", "category", "availability"])
+    writer.writerow(["person", "missing_sku", "item", "category"])
     for row in missing_rows:
         writer.writerow([
             row["person"],
             row["missing_sku"],
             row["item"],
             row["category"],
-            row["availability"],
         ])
     return csv_buffer.getvalue()
 

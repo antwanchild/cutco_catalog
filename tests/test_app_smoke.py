@@ -1648,7 +1648,12 @@ class ImportSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         owned_item_id, owned_variant_id = self._add_catalog_item(name="Gap Owned", sku="GAP-1")
-        missing_item_id, _missing_variant_id = self._add_catalog_item(name="Gap Missing", sku="GAP-2")
+        _missing_item_id, _missing_variant_id = self._add_catalog_item(name="Gap Missing", sku="GAP-2")
+        second_missing_item_id, _second_missing_variant_id = self._add_catalog_item(
+            name="Gap Missing Other",
+            sku="A-GAP-3",
+            category="Accessories",
+        )
         person_id = self._add_person(name="Gap Collector", notes="")
 
         with self.app.app_context():
@@ -1678,7 +1683,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Copy CSV", screen_response.data)
         self.assertIn(b"Gap Collector", screen_response.data)
         self.assertIn(b"GAP-2", screen_response.data)
+        self.assertIn(b"A-GAP-3", screen_response.data)
         self.assertNotIn(b"GAP-1", screen_response.data)
+        self.assertLess(screen_response.data.index(b"A-GAP-3"), screen_response.data.index(b"GAP-2"))
 
         export_response = self.client.post(
             "/completion-gaps",
@@ -1692,8 +1699,10 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(export_response.mimetype, "text/csv")
         self.assertIn("cutco_completion_gaps_", export_response.headers["Content-Disposition"])
-        self.assertIn(b"person,missing_sku,item,category,availability", export_response.data)
+        self.assertIn(b"person,missing_sku,item,category", export_response.data)
+        self.assertLess(export_response.data.index(b"A-GAP-3"), export_response.data.index(b"GAP-2"))
         self.assertIn(b"Gap Collector,GAP-2,Gap Missing", export_response.data)
+        self.assertIn(b"Gap Collector,A-GAP-3,Gap Missing Other,Accessories", export_response.data)
         self.assertNotIn(b"GAP-1", export_response.data)
 
     def test_completion_import_rolls_up_set_members_and_updates_ownership(self):
