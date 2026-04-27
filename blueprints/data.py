@@ -1017,10 +1017,17 @@ def completion_import_confirm():
             })
 
         skipped_details.sort(key=lambda entry: (entry["row"] is None, entry["row"] or 0, entry["label"]))
+        if created_ownership > updated_ownership:
+            outcome_note = "mostly created new ownership entries"
+        elif updated_ownership > created_ownership:
+            outcome_note = "mostly updated existing ownership entries"
+        else:
+            outcome_note = "a balanced mix of new and updated ownership entries"
         summary = (
             f"Completion import complete — processed {processed_rows} row{'s' if processed_rows != 1 else ''}, "
             f"created {created_ownership} ownership entr{'ies' if created_ownership != 1 else 'y'}, "
-            f"updated {updated_ownership} ownership entr{'ies' if updated_ownership != 1 else 'y'}."
+            f"updated {updated_ownership} ownership entr{'ies' if updated_ownership != 1 else 'y'}; "
+            f"{outcome_note}."
         )
         record_activity(
             "import",
