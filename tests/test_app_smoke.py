@@ -566,6 +566,8 @@ class PublicSmokeTests(SmokeBaseTest):
 
         sharpening_item_id, _ = self._add_catalog_item(name="Sharpen View Knife", sku="SV-1")
         giftbox_item_id, _ = self._add_catalog_item(name="Gift Box Sharpener", sku="GB-1")
+        accessory_item_id, _ = self._add_catalog_item(name="Accessory Sharpener", sku="AC-1", category="Accessories")
+        shears_item_id, _ = self._add_catalog_item(name="Super Shears", sku="SS-1", category="Accessories")
         gadget_item_id, _ = self._add_catalog_item(name="Gadget Sharpener", sku="GD-1", category="Gadgets")
         sheath_item_id, _ = self._add_catalog_item(name="Sheath Sharpener", sku="SH-1", category="Sheaths")
         storage_item_id, _ = self._add_catalog_item(name="Storage Sharpener", sku="ST-1", category="Storage")
@@ -613,6 +615,28 @@ class PublicSmokeTests(SmokeBaseTest):
             data={
                 "csrf_token": "test-csrf-token",
                 "item_id": str(giftbox_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "Allowed in logs, hidden from page lists",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(accessory_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "Allowed in logs, hidden from page lists",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(shears_item_id),
                 "sharpened_on": "2026-04-15",
                 "method": "Whetstone",
                 "notes": "Allowed in logs, hidden from page lists",
@@ -688,6 +712,8 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Sharpening", sharpening_response.data)
         self.assertNotIn("Cook View Piece", sharpening_select)
         self.assertNotIn("Gift Box Sharpener", sharpening_select)
+        self.assertIn("Accessory Sharpener", sharpening_select)
+        self.assertNotIn("Super Shears", sharpening_select)
         self.assertNotIn("Gadget Sharpener", sharpening_select)
         self.assertNotIn("Sheath Sharpener", sharpening_select)
         self.assertNotIn("Storage Sharpener", sharpening_select)

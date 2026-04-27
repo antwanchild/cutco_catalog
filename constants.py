@@ -53,6 +53,10 @@ SHARPENING_PAGE_EXCLUDED_CATEGORIES = {
     "Storage",
     "Cutting Boards",
 }
+SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS = (
+    "gift box",
+    "shear",
+)
 KNIFE_TASK_PRESETS = [
     "Slicing bread", "Dicing vegetables", "Mincing herbs", "Carving meat",
     "Peeling fruit", "Filleting fish", "Chopping nuts", "Slicing cheese",

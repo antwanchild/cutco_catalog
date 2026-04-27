@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from constants import (
     COOKWARE_CATEGORIES, COOKWARE_THRESHOLD_DAYS,
     DISCORD_WEBHOOK_URL, SHARPEN_METHODS, SHARPENING_PAGE_EXCLUDED_CATEGORIES,
-    SHARPEN_THRESHOLD_DAYS,
+    SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS, SHARPEN_THRESHOLD_DAYS,
 )
 from extensions import db
 from helpers import _notify_discord, admin_required, db_commit
@@ -30,7 +30,7 @@ def _is_sharpening_page_item(item: Item) -> bool:
     name = (item.name or "").lower()
     if category in COOKWARE_CATEGORIES or category in SHARPENING_PAGE_EXCLUDED_CATEGORIES:
         return False
-    return "gift box" not in name
+    return not any(keyword in name for keyword in SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS)
 
 
 # ── Sharpening Log ────────────────────────────────────────────────────────────
