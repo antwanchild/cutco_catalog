@@ -7,7 +7,8 @@ from sqlalchemy.orm import selectinload
 from constants import (
     COOKWARE_CATEGORIES, COOKWARE_THRESHOLD_DAYS,
     DISCORD_WEBHOOK_URL, SHARPEN_METHODS, SHARPENING_PAGE_EXCLUDED_CATEGORIES,
-    SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS, SHARPEN_THRESHOLD_DAYS,
+    SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS, SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS,
+    SHARPEN_THRESHOLD_DAYS,
 )
 from extensions import db
 from helpers import _notify_discord, admin_required, db_commit
@@ -28,6 +29,8 @@ def _safe_parse_iso_date(raw: str) -> date | None:
 def _is_sharpening_page_item(item: Item) -> bool:
     category = item.category or ""
     name = (item.name or "").lower()
+    if any(keyword in name for keyword in SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS):
+        return True
     if category in COOKWARE_CATEGORIES or category in SHARPENING_PAGE_EXCLUDED_CATEGORIES:
         return False
     return not any(keyword in name for keyword in SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS)

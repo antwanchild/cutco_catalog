@@ -43,6 +43,7 @@ _cookware_env = os.environ.get("COOKWARE_CATEGORIES", "Cookware")
 COOKWARE_CATEGORIES = {cat.strip() for cat in _cookware_env.split(",") if cat.strip()}
 SHARPENING_PAGE_EXCLUDED_CATEGORIES = {
     "BBQ Tools",
+    "Accessories",
     "Cookware",
     "Bakeware",
     "Garden Tools",
@@ -53,9 +54,11 @@ SHARPENING_PAGE_EXCLUDED_CATEGORIES = {
     "Storage",
     "Cutting Boards",
 }
+SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS = (
+    "shear",
+)
 SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS = (
     "gift box",
-    "shear",
 )
 KNIFE_TASK_PRESETS = [
     "Slicing bread", "Dicing vegetables", "Mincing herbs", "Carving meat",
