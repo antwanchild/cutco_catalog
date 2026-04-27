@@ -486,6 +486,20 @@ def _build_completion_missing_rows(person_names: list[str]) -> list[dict]:
     return missing_rows
 
 
+def _resolve_completion_gap_people(selected_person_id: str, people: list[Person]) -> tuple[list[Person], str | int, str | None]:
+    """Resolve a completion gaps collector selection."""
+    if selected_person_id == "all":
+        return people, "all", None
+    try:
+        person_id = int(selected_person_id)
+    except ValueError:
+        return [], "all", "Please choose a valid collector."
+    person = db.session.get(Person, person_id)
+    if not person:
+        return [], "all", "Please choose a valid collector."
+    return [person], person.id, None
+
+
 def _read_confirm_quantity_field(raw_value: str, label: str) -> tuple[int | None, str | None]:
     """Parse a posted ownership quantity field."""
     cleaned = (raw_value or "").strip()
@@ -644,33 +658,39 @@ def completion_gaps_page():
     default_person_id = last_person_id if any(person.id == last_person_id for person in people) else "all"
 
     if request.method == "GET":
+        selected_person_id = str(request.args.get("person_id") or default_person_id or "all").strip()
+        selected_people, selected_person_value, selection_error = _resolve_completion_gap_people(
+            selected_person_id, people
+        )
+        view_mode = (request.args.get("view") or "").strip().lower()
+        if selection_error:
+            flash(selection_error, "error")
+        missing_rows = _build_completion_missing_rows([person.name for person in selected_people]) if view_mode == "screen" and not selection_error else None
         return render_template(
             "completion_gaps.html",
             people=people,
             public_catalog_count=public_catalog_count,
-            default_person_id=default_person_id,
+            default_person_id=selected_person_value,
+            missing_rows=missing_rows,
+            view_mode=view_mode,
         )
 
-    selected_person_id = (request.form.get("person_id") or "all").strip()
-    if selected_person_id == "all":
-        selected_people = people
-        filename_prefix = "all_collectors"
-    else:
-        try:
-            person = db.session.get(Person, int(selected_person_id))
-        except ValueError:
-            person = None
-        if not person:
-            flash("Please choose a valid collector.", "error")
-            return render_template(
-                "completion_gaps.html",
-                people=people,
-                public_catalog_count=public_catalog_count,
-                default_person_id=default_person_id,
-            )
-        selected_people = [person]
-        filename_prefix = person.name or "collector"
+    selected_person_id = str(request.form.get("person_id") or "all").strip()
+    selected_people, selected_person_value, selection_error = _resolve_completion_gap_people(
+        selected_person_id, people
+    )
+    if selection_error:
+        flash(selection_error, "error")
+        return render_template(
+            "completion_gaps.html",
+            people=people,
+            public_catalog_count=public_catalog_count,
+            default_person_id=selected_person_value,
+            missing_rows=None,
+            view_mode="",
+        )
 
+    filename_prefix = "all_collectors" if selected_person_value == "all" else selected_people[0].name or "collector"
     missing_rows = _build_completion_missing_rows([person.name for person in selected_people])
 
     csv_buffer = io.StringIO()

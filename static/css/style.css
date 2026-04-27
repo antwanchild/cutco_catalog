@@ -63,6 +63,25 @@ body {
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
+.sortable-th {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+}
+.sortable-th:hover { text-decoration: none; color: var(--accent); }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* ── Navbar ─────────────────────────────────────────────────────────────── */
 .navbar {
@@ -1190,6 +1209,17 @@ textarea { resize: vertical; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   margin-top: 1rem;
+}
+.completion-gaps-actions {
+  display: grid;
+  gap: .75rem;
+}
+.completion-gaps-form {
+  display: grid;
+  gap: .75rem;
+}
+.completion-gaps-form .form-actions {
+  margin-top: 0;
 }
 .gap-section summary {
   padding: .65rem 1rem;

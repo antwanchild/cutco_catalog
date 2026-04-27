@@ -9,7 +9,7 @@
 <div class="form-card">
   <h2>Missing Catalog SKUs</h2>
   <p class="muted">
-    Download the public catalog item SKUs that a collector still does not own in any variant.
+    View or download the public catalog item SKUs that a collector still does not own in any variant.
   </p>
   <div class="stat-grid" style="margin-top:.75rem;">
     <div class="stat-card">
@@ -22,20 +22,77 @@
     </div>
   </div>
 
-  <form method="post" class="completion-gaps-form" style="margin-top:1rem;">
-    <label>Collector
-      <select name="person_id" class="select-full">
+  <div class="completion-gaps-actions" style="margin-top:1rem;">
+    <form method="get" class="completion-gaps-form">
+      <label>Collector
+        <select name="person_id" class="select-full">
+          <option value="all" {% if default_person_id == 'all' %}selected{% endif %}>All collectors</option>
+          {% for person in people %}
+            <option value="{{ person.id }}" {% if default_person_id == person.id %}selected{% endif %}>{{ person.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <input type="hidden" name="view" value="screen">
+      <p class="hint">This report checks public catalog items only. If a collector owns any variant of an item, it is not listed as missing.</p>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">View on screen</button>
+        <a href="{{ url_for('data.completion_import_page') }}" class="btn btn-secondary">Completion Import</a>
+      </div>
+    </form>
+
+    <form method="post" class="completion-gaps-form">
+      <label class="sr-only" for="completion-gaps-download-person">Collector for CSV download</label>
+      <select name="person_id" class="select-full" id="completion-gaps-download-person">
         <option value="all" {% if default_person_id == 'all' %}selected{% endif %}>All collectors</option>
         {% for person in people %}
           <option value="{{ person.id }}" {% if default_person_id == person.id %}selected{% endif %}>{{ person.name }}</option>
         {% endfor %}
       </select>
-    </label>
-    <p class="hint">This report checks public catalog items only. If a collector owns any variant of an item, it is not listed as missing.</p>
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary">Download missing SKUs CSV</button>
-      <a href="{{ url_for('data.completion_import_page') }}" class="btn btn-secondary">Completion Import</a>
-    </div>
-  </form>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Download missing SKUs CSV</button>
+      </div>
+    </form>
+  </div>
 </div>
+
+{% if missing_rows is not none %}
+<div class="form-card">
+  <div class="section-heading-actions" style="margin-bottom:.6rem">
+    <h2>Screen View</h2>
+    <span class="muted small">{{ missing_rows | length }} missing SKU{{ 's' if missing_rows | length != 1 }}</span>
+  </div>
+  {% if missing_rows %}
+    <div class="table-wrap">
+      <table class="data-table compact">
+        <thead>
+          <tr>
+            <th>Person</th>
+            <th>Missing SKU</th>
+            <th>Item</th>
+            <th>Category</th>
+            <th>Availability</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in missing_rows %}
+          <tr>
+            <td>{{ row.person }}</td>
+            <td class="mono">{{ row.missing_sku }}</td>
+            <td>{{ row.item }}</td>
+            <td>{{ row.category }}</td>
+            <td>{{ row.availability }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No missing SKUs found for this collector.</p>
+  {% endif %}
+</div>
+{% else %}
+<div class="form-card">
+  <p class="muted">Choose a collector and click <strong>View on screen</strong> to see the report here.</p>
+</div>
+{% endif %}
 {% endblock %}

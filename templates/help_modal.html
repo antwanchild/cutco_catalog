@@ -96,6 +96,7 @@
       <ul>
         <li>Set a <strong>target price</strong> on a wishlist entry — when the item's MSRP drops to or below that price, it's highlighted as a 🎯 hit.</li>
         <li>Filter by person using the dropdown.</li>
+        <li>Click the column headers to sort by item name / SKU or target price.</li>
         <li>Admin users can trigger a <strong>price check</strong> that sends Discord alerts for any hits.</li>
       </ul>
 
@@ -104,6 +105,7 @@
       <ul>
         <li>Rows are items, columns are people.</li>
         <li>Each cell shows ownership status color-coded by badge.</li>
+        <li>Click the item header to sort by name or SKU.</li>
         <li>Useful for spotting gaps or duplicates across your group.</li>
       </ul>
 
@@ -160,11 +162,12 @@
       </ul>
 
     {% elif page in ['completion_gaps', 'completion_gaps_page'] %}
-      <p>Exports the public catalog SKUs a collector still does not own in any variant.</p>
+      <p>Shows the public catalog SKUs a collector still does not own in any variant, and can also export them as CSV.</p>
       <ul>
         <li>Choose one collector or all collectors from the dropdown.</li>
         <li>The report checks <strong>public catalog items only</strong>.</li>
         <li>If a collector owns any variant of an item, that item is not listed as missing.</li>
+        <li>Use <strong>View on screen</strong> to see the missing SKUs in a table before downloading.</li>
         <li>Download the result as a CSV you can keep or share.</li>
       </ul>
 

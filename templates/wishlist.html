@@ -11,11 +11,6 @@
           <option value="{{ person.id }}"{% if person_id == person.id %} selected{% endif %}>{{ person.name }}</option>
         {% endfor %}
       </select>
-      <select name="sort" class="select-sm" onchange="this.form.submit()">
-        <option value="target" {% if sort_field == 'target' %}selected{% endif %}>Sort: Target</option>
-        <option value="name" {% if sort_field == 'name' %}selected{% endif %}>Sort: Name</option>
-        <option value="sku" {% if sort_field == 'sku' %}selected{% endif %}>Sort: SKU</option>
-      </select>
     </form>
     {% if is_admin() and rows %}
     <form method="post" action="{{ url_for('people.wishlist_check') }}">
@@ -41,10 +36,18 @@
   <table class="data-table">
     <thead>
       <tr>
-        <th>Item</th>
+        <th>
+          <a class="sortable-th" href="{{ url_for('people.wishlist', sort='sku' if sort_field == 'name' else 'name') }}{% if person_id is not none %}&person={{ person_id }}{% endif %}">
+            {% if sort_field == 'sku' %}SKU ▲{% else %}Name ▲{% endif %}
+          </a>
+        </th>
         <th>Person</th>
         <th>Color</th>
-        <th>Target Price</th>
+        <th>
+          <a class="sortable-th" href="{{ url_for('people.wishlist', sort='target') }}{% if person_id is not none %}&person={{ person_id }}{% endif %}">
+            Target Price{% if sort_field == 'target' %} ▲{% endif %}
+          </a>
+        </th>
         <th>Current MSRP</th>
         <th>Δ</th>
         <th>Actions</th>

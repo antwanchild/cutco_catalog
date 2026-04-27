@@ -331,7 +331,8 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b'data-clamp-rows="2"', item_response.data)
         self.assertEqual(matrix_response.status_code, 200)
         self.assertIn(b"Matrix", matrix_response.data)
-        self.assertIn(b"Sort: SKU", matrix_response.data)
+        self.assertIn(b"?sort=name", matrix_response.data)
+        self.assertIn(b"SKU", matrix_response.data)
         self.assertIn(b"#AA-1", matrix_response.data)
         self.assertLess(matrix_response.data.index(b"#AA-1"), matrix_response.data.index(b"#VW-1"))
         self.assertEqual(stats_response.status_code, 200)
@@ -447,7 +448,8 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"People Viewer", edit_page_response.data)
         self.assertEqual(wishlist_response.status_code, 200)
         self.assertIn(b"Wishlist", wishlist_response.data)
-        self.assertIn(b"Sort: Name", wishlist_response.data)
+        self.assertIn(b"?sort=sku", wishlist_response.data)
+        self.assertIn(b"Name", wishlist_response.data)
         self.assertIn(b"#AA-2", wishlist_response.data)
         self.assertIn(b"#ZZ-2", wishlist_response.data)
         self.assertLess(wishlist_response.data.index(b"#AA-2"), wishlist_response.data.index(b"#ZZ-2"))
@@ -560,6 +562,9 @@ class PublicSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         sharpening_item_id, _ = self._add_catalog_item(name="Sharpen View Knife", sku="SV-1")
+        giftbox_item_id, _ = self._add_catalog_item(name="Gift Box Sharpener", sku="GB-1")
+        gadget_item_id, _ = self._add_catalog_item(name="Gadget Sharpener", sku="GD-1", category="Gadgets")
+        sheath_item_id, _ = self._add_catalog_item(name="Sheath Sharpener", sku="SH-1", category="Sheaths")
         cookware_item_id, _ = self._add_catalog_item(name="Cook View Piece", sku="CV-1", category="Cookware")
         task_item_id, _ = self._add_catalog_item(name="Task View Knife", sku="TV-1")
         task_id = self._add_task(name="Slice onions")
@@ -599,6 +604,39 @@ class PublicSmokeTests(SmokeBaseTest):
             follow_redirects=False,
         )
         self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(giftbox_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "Should be blocked",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(gadget_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "Should be blocked",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(sheath_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "Should be blocked",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
             "/tasks/add",
             data={
                 "csrf_token": "test-csrf-token",
@@ -615,10 +653,16 @@ class PublicSmokeTests(SmokeBaseTest):
         tasks_response = self.client.get("/tasks")
         tasks_manage_response = self.client.get("/tasks/manage")
         task_detail_response = self.client.get(f"/tasks/manage/{task_id}")
+        sharpening_select = sharpening_response.data.decode("utf-8").split(
+            '<select name="item_id" required class="select-sm" style="min-width:200px">'
+        )[1].split("</select>")[0]
 
         self.assertEqual(sharpening_response.status_code, 200)
         self.assertIn(b"Sharpening", sharpening_response.data)
-        self.assertNotIn(b'option value="2">Cook View Piece', sharpening_response.data)
+        self.assertNotIn("Cook View Piece", sharpening_select)
+        self.assertNotIn("Gift Box Sharpener", sharpening_select)
+        self.assertNotIn("Gadget Sharpener", sharpening_select)
+        self.assertNotIn("Sheath Sharpener", sharpening_select)
         self.assertEqual(cookware_response.status_code, 200)
         self.assertIn(b"Cookware", cookware_response.data)
         self.assertEqual(tasks_response.status_code, 200)
@@ -633,6 +677,22 @@ class PublicSmokeTests(SmokeBaseTest):
                 db.select(SharpeningLog).filter_by(item_id=cookware_item_id)
             ).all()
             self.assertEqual(len(cookware_logs), 0)
+            giftbox_logs = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=giftbox_item_id)
+            ).all()
+            self.assertEqual(len(giftbox_logs), 0)
+            gadget_logs = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=gadget_item_id)
+            ).all()
+            self.assertEqual(len(gadget_logs), 0)
+            sheath_logs = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=sheath_item_id)
+            ).all()
+            self.assertEqual(len(sheath_logs), 0)
+            giftbox_logs = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=giftbox_item_id)
+            ).all()
+            self.assertEqual(len(giftbox_logs), 0)
 
         with mock.patch("blueprints.logs._notify_discord", return_value=True) as notify_mock, \
              mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
@@ -1588,8 +1648,16 @@ class ImportSmokeTests(SmokeBaseTest):
         response = self.client.get("/completion-gaps")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Completion Gaps", response.data)
+        self.assertIn(b"View on screen", response.data)
         self.assertIn(b"Download missing SKUs CSV", response.data)
         self.assertIn(f'<option value="{person_id}" selected>'.encode(), response.data)
+
+        screen_response = self.client.get(f"/completion-gaps?view=screen&person_id={person_id}")
+        self.assertEqual(screen_response.status_code, 200)
+        self.assertIn(b"Screen View", screen_response.data)
+        self.assertIn(b"Gap Collector", screen_response.data)
+        self.assertIn(b"GAP-2", screen_response.data)
+        self.assertNotIn(b"GAP-1", screen_response.data)
 
         export_response = self.client.post(
             "/completion-gaps",

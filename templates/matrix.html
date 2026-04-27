@@ -4,12 +4,6 @@
 <div class="page-header">
   <h1 class="page-title">📊 Ownership Matrix {{ help_btn("matrix") }}</h1>
   <div class="page-actions">
-    <form method="get" action="{{ url_for('views.matrix') }}" class="inline-form">
-      <select name="sort" class="select-sm" onchange="this.form.submit()">
-        <option value="name" {% if sort_field == 'name' %}selected{% endif %}>Sort: Name</option>
-        <option value="sku" {% if sort_field == 'sku' %}selected{% endif %}>Sort: SKU</option>
-      </select>
-    </form>
     <label class="checkbox-label">
       <input type="checkbox" id="toggle-variants"> Show variants
     </label>
@@ -25,7 +19,11 @@
   <table class="matrix-table">
     <thead>
       <tr>
-        <th class="matrix-corner">Item</th>
+        <th class="matrix-corner">
+          <a class="sortable-th" href="{{ url_for('views.matrix', sort='sku' if sort_field == 'name' else 'name') }}">
+            {% if sort_field == 'sku' %}SKU ▲{% else %}Name ▲{% endif %}
+          </a>
+        </th>
         {% for person in people %}
           <th class="matrix-person">{{ person.name }}</th>
         {% endfor %}
