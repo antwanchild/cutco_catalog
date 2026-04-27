@@ -36,14 +36,16 @@
   <table class="data-table">
     <thead>
       <tr>
+        {% set name_dir = 'desc' if sort_field == 'name' and sort_dir == 'asc' else 'asc' %}
+        {% set sku_dir = 'desc' if sort_field == 'sku' and sort_dir == 'asc' else 'asc' %}
         <th>
-          <a class="sortable-th" href="{{ url_for('people.wishlist', sort='name') }}{% if person_id is not none %}&person={{ person_id }}{% endif %}">
-            Name{% if sort_field == 'name' %} ▲{% endif %}
+          <a class="sortable-th" href="{{ url_for('people.wishlist', sort='name', dir=name_dir) }}{% if person_id is not none %}&person={{ person_id }}{% endif %}">
+            Name{% if sort_field == 'name' %} {{ '▲' if sort_dir == 'asc' else '▼' }}{% endif %}
           </a>
         </th>
         <th>
-          <a class="sortable-th" href="{{ url_for('people.wishlist', sort='sku') }}{% if person_id is not none %}&person={{ person_id }}{% endif %}">
-            SKU{% if sort_field == 'sku' %} ▲{% endif %}
+          <a class="sortable-th" href="{{ url_for('people.wishlist', sort='sku', dir=sku_dir) }}{% if person_id is not none %}&person={{ person_id }}{% endif %}">
+            SKU{% if sort_field == 'sku' %} {{ '▲' if sort_dir == 'asc' else '▼' }}{% endif %}
           </a>
         </th>
         <th>Person</th>

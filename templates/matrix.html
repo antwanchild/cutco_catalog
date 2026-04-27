@@ -19,14 +19,16 @@
   <table class="matrix-table">
     <thead>
       <tr>
+        {% set name_dir = 'desc' if sort_field == 'name' and sort_dir == 'asc' else 'asc' %}
+        {% set sku_dir = 'desc' if sort_field == 'sku' and sort_dir == 'asc' else 'asc' %}
         <th class="matrix-name-header">
-          <a class="sortable-th" href="{{ url_for('views.matrix', sort='name') }}">
-            Name{% if sort_field == 'name' %} ▲{% endif %}
+          <a class="sortable-th" href="{{ url_for('views.matrix', sort='name', dir=name_dir) }}">
+            Name{% if sort_field == 'name' %} {{ '▲' if sort_dir == 'asc' else '▼' }}{% endif %}
           </a>
         </th>
         <th class="matrix-sku-header">
-          <a class="sortable-th" href="{{ url_for('views.matrix', sort='sku') }}">
-            SKU{% if sort_field == 'sku' %} ▲{% endif %}
+          <a class="sortable-th" href="{{ url_for('views.matrix', sort='sku', dir=sku_dir) }}">
+            SKU{% if sort_field == 'sku' %} {{ '▲' if sort_dir == 'asc' else '▼' }}{% endif %}
           </a>
         </th>
         {% for person in people %}

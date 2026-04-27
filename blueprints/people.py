@@ -320,6 +320,9 @@ def wishlist():
     sort_field  = (request.args.get("sort", "target") or "target").strip().lower()
     if sort_field not in {"target", "name", "sku"}:
         sort_field = "target"
+    sort_dir = (request.args.get("dir", "asc") or "asc").strip().lower()
+    if sort_dir not in {"asc", "desc"}:
+        sort_dir = "asc"
     people_list = Person.query.order_by(Person.name).all()
 
     wl_q = Ownership.query.filter_by(status="Wishlist")
@@ -346,13 +349,13 @@ def wishlist():
             (row["ownership"].variant.item.name or "").lower(),
             (row["ownership"].variant.item.sku or "").lower(),
             row["ownership"].person.name.lower(),
-        ))
+        ), reverse=(sort_dir == "desc"))
     elif sort_field == "sku":
         rows.sort(key=lambda row: (
             (row["ownership"].variant.item.sku or "").lower(),
             (row["ownership"].variant.item.name or "").lower(),
             row["ownership"].person.name.lower(),
-        ))
+        ), reverse=(sort_dir == "desc"))
     else:
         rows.sort(key=lambda row: (
             0 if row["hit"] else (1 if row["delta"] is not None else 2),
@@ -365,6 +368,7 @@ def wishlist():
         people      = people_list,
         person_id   = person_id,
         sort_field  = sort_field,
+        sort_dir    = sort_dir,
         has_discord = bool(DISCORD_WEBHOOK_URL),
         hit_count   = sum(1 for row in rows if row["hit"]),
     )

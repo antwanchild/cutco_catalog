@@ -56,17 +56,22 @@ def matrix():
     sort_field  = (request.args.get("sort", "name") or "name").strip().lower()
     if sort_field not in {"name", "sku"}:
         sort_field = "name"
+    sort_dir = (request.args.get("dir", "asc") or "asc").strip().lower()
+    if sort_dir not in {"asc", "desc"}:
+        sort_dir = "asc"
 
     items_list = Item.query.order_by(Item.name).all()
     if sort_field == "sku":
         items_list = sorted(
             items_list,
             key=lambda item: ((item.sku or "").lower(), (item.name or "").lower()),
+            reverse=(sort_dir == "desc"),
         )
     else:
         items_list = sorted(
             items_list,
             key=lambda item: ((item.name or "").lower(), (item.sku or "").lower()),
+            reverse=(sort_dir == "desc"),
         )
 
     item_lookup = {}
@@ -88,6 +93,7 @@ def matrix():
                            people=people_list,
                            items=items_list,
                            sort_field=sort_field,
+                           sort_dir=sort_dir,
                            item_lookup=item_lookup,
                            variant_lookup=variant_lookup,
                            variants_by_item=variants_by_item,

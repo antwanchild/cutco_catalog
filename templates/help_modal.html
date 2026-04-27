@@ -68,6 +68,7 @@
       <p>Tracks when each knife was last sharpened.</p>
       <ul>
         <li>Knives past the threshold (default 180 days) are marked <strong>overdue</strong>.</li>
+        <li>Cookware, bakeware, gift boxes, sheaths, gadgets, and storage are excluded because they do not have sharpenable edges.</li>
         <li>Log a new sharpening event with the form — pick the knife, date, and method.</li>
         <li>Admin users can send overdue reminders to Discord.</li>
         <li>The threshold is configurable via the <code>SHARPEN_THRESHOLD_DAYS</code> environment variable.</li>
@@ -96,7 +97,7 @@
       <ul>
         <li>Set a <strong>target price</strong> on a wishlist entry — when the item's MSRP drops to or below that price, it's highlighted as a 🎯 hit.</li>
         <li>Filter by person using the dropdown.</li>
-        <li>Click the column headers to sort by item name, SKU, or target price.</li>
+        <li>Click the column headers to sort by item name, SKU, or target price; clicking an active header toggles asc/desc.</li>
         <li>Admin users can trigger a <strong>price check</strong> that sends Discord alerts for any hits.</li>
       </ul>
 
@@ -105,7 +106,7 @@
       <ul>
         <li>Rows are items, columns are people.</li>
         <li>Each cell shows ownership status color-coded by badge.</li>
-        <li>Click the Name or SKU header to sort the item rows.</li>
+        <li>Click the Name or SKU header to sort the item rows; clicking the active header toggles asc/desc.</li>
         <li>Useful for spotting gaps or duplicates across your group.</li>
       </ul>
 

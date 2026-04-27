@@ -274,10 +274,11 @@ class PublicSmokeTests(SmokeBaseTest):
             item.msrp = 49.99
             db.session.commit()
 
-        wishlist_response = self.client.get(f"/wishlist?person={person_id}")
+        wishlist_response = self.client.get(f"/wishlist?person={person_id}&sort=name&dir=desc")
         self.assertEqual(wishlist_response.status_code, 200)
         self.assertIn(b"Wishlist Knife", wishlist_response.data)
         self.assertIn(b"target met", wishlist_response.data)
+        self.assertIn(b"?sort=name&amp;dir=asc", wishlist_response.data)
 
         with mock.patch("blueprints.people.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
              mock.patch("blueprints.people._notify_discord", return_value=True) as notify_mock:
@@ -318,7 +319,7 @@ class PublicSmokeTests(SmokeBaseTest):
         )
 
         item_response = self.client.get(f"/views/item/{item_id}")
-        matrix_response = self.client.get("/views/matrix?sort=sku")
+        matrix_response = self.client.get("/views/matrix?sort=sku&dir=desc")
         stats_response = self.client.get("/stats")
         gift_share_response = self.client.get(f"/sets/{set_id}/gift-token?person={person_id}")
         collection_share_response = self.client.get(f"/people/{person_id}/collection-token")
@@ -331,11 +332,11 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b'data-clamp-rows="2"', item_response.data)
         self.assertEqual(matrix_response.status_code, 200)
         self.assertIn(b"Matrix", matrix_response.data)
-        self.assertIn(b"?sort=name", matrix_response.data)
+        self.assertIn(b"?sort=name&amp;dir=asc", matrix_response.data)
         self.assertIn(b"Name", matrix_response.data)
-        self.assertIn(b"SKU \xe2\x96\xb2", matrix_response.data)
+        self.assertIn(b"SKU \xe2\x96\xbc", matrix_response.data)
         self.assertIn(b"#AA-1", matrix_response.data)
-        self.assertLess(matrix_response.data.index(b"#AA-1"), matrix_response.data.index(b"#VW-1"))
+        self.assertGreater(matrix_response.data.index(b"#AA-1"), matrix_response.data.index(b"#VW-1"))
         self.assertEqual(stats_response.status_code, 200)
         self.assertIn(b"Coverage", stats_response.data)
         self.assertIn(b"Includes public items plus unicorn, rep only, Costco, and non-catalog items that are marked Owned.", stats_response.data)
@@ -567,6 +568,7 @@ class PublicSmokeTests(SmokeBaseTest):
         giftbox_item_id, _ = self._add_catalog_item(name="Gift Box Sharpener", sku="GB-1")
         gadget_item_id, _ = self._add_catalog_item(name="Gadget Sharpener", sku="GD-1", category="Gadgets")
         sheath_item_id, _ = self._add_catalog_item(name="Sheath Sharpener", sku="SH-1", category="Sheaths")
+        storage_item_id, _ = self._add_catalog_item(name="Storage Sharpener", sku="ST-1", category="Storage")
         cookware_item_id, _ = self._add_catalog_item(name="Cook View Piece", sku="CV-1", category="Cookware")
         task_item_id, _ = self._add_catalog_item(name="Task View Knife", sku="TV-1")
         task_id = self._add_task(name="Slice onions")
@@ -639,6 +641,17 @@ class PublicSmokeTests(SmokeBaseTest):
             follow_redirects=False,
         )
         self.client.post(
+            "/sharpening/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_id": str(storage_item_id),
+                "sharpened_on": "2026-04-15",
+                "method": "Whetstone",
+                "notes": "Allowed in logs, hidden from page lists",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
             "/tasks/add",
             data={
                 "csrf_token": "test-csrf-token",
@@ -665,6 +678,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertNotIn("Gift Box Sharpener", sharpening_select)
         self.assertNotIn("Gadget Sharpener", sharpening_select)
         self.assertNotIn("Sheath Sharpener", sharpening_select)
+        self.assertNotIn("Storage Sharpener", sharpening_select)
         self.assertEqual(cookware_response.status_code, 200)
         self.assertIn(b"Cookware", cookware_response.data)
         self.assertEqual(tasks_response.status_code, 200)
@@ -695,6 +709,10 @@ class PublicSmokeTests(SmokeBaseTest):
                 db.select(SharpeningLog).filter_by(item_id=sheath_item_id)
             ).all()
             self.assertEqual(len(sheath_logs), 1)
+            storage_logs = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=storage_item_id)
+            ).all()
+            self.assertEqual(len(storage_logs), 1)
 
         with mock.patch("blueprints.logs._notify_discord", return_value=True) as notify_mock, \
              mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \

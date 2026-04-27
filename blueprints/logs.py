@@ -27,7 +27,7 @@ def _safe_parse_iso_date(raw: str) -> date | None:
 def _is_sharpening_page_item(item: Item) -> bool:
     category = item.category or ""
     name = (item.name or "").lower()
-    if category in COOKWARE_CATEGORIES or category in {"Gadgets", "Sheaths"}:
+    if category in COOKWARE_CATEGORIES or category in {"Gadgets", "Sheaths", "Storage"}:
         return False
     return "gift box" not in name
 
