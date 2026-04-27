@@ -1563,6 +1563,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Create ownership", preview_response.data)
         self.assertIn(b"Set member", preview_response.data)
         self.assertIn(b"Item SKU not found", preview_response.data)
+        self.assertIn(b"Download rolled-up CSV", preview_response.data)
 
         soup = BeautifulSoup(preview_response.data, "html.parser")
         confirm_payload = {"csrf_token": "test-csrf-token"}
@@ -1575,6 +1576,13 @@ class ImportSmokeTests(SmokeBaseTest):
                     confirm_payload[name] = "on"
                 continue
             confirm_payload[name] = inp.get("value", "")
+
+        export_payload = {"csrf_token": "test-csrf-token"}
+        for inp in soup.select('form[action="/completion-import/export"] input'):
+            name = inp.get("name")
+            if not name:
+                continue
+            export_payload[name] = inp.get("value", "")
 
         confirm_response = self.client.post(
             "/completion-import/confirm",
@@ -1589,6 +1597,19 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"balanced mix of new and updated ownership entries", confirm_response.data)
         self.assertIn(b"Ownership entries updated", confirm_response.data)
         self.assertIn(b"Ownership entries created", confirm_response.data)
+        self.assertIn(b"Download rolled-up CSV", confirm_response.data)
+
+        export_response = self.client.post(
+            "/completion-import/export",
+            data=export_payload,
+            follow_redirects=False,
+        )
+
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(export_response.mimetype, "text/csv")
+        self.assertIn("attachment; filename=cutco_completion_result_", export_response.headers["Content-Disposition"])
+        self.assertIn("person,sku,item,color,total_quantity,action,notes,source_rows", export_response.data.decode())
+        self.assertIn("Completion Collector,COMP-1,Completion Knife", export_response.data.decode())
 
         history_response = self.client.get("/completion-import")
         self.assertEqual(history_response.status_code, 200)

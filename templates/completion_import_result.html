@@ -50,6 +50,30 @@
   </table>
 </div>
 
+{% if export_rows %}
+<div class="form-card completion-export-card">
+  <h2>Export Rolled-Up Result</h2>
+  <p class="muted">Download the rows that were applied as a CSV file you can keep or share.</p>
+  <form method="post" action="{{ url_for('data.completion_import_export') }}">
+    <input type="hidden" name="filename" value="{{ export_name }}">
+    <input type="hidden" name="export_count" value="{{ export_rows | length }}">
+    {% for row in export_rows %}
+      <input type="hidden" name="export_person_{{ loop.index0 }}" value="{{ row.person }}">
+      <input type="hidden" name="export_sku_{{ loop.index0 }}" value="{{ row.sku }}">
+      <input type="hidden" name="export_item_{{ loop.index0 }}" value="{{ row.item }}">
+      <input type="hidden" name="export_display_color_{{ loop.index0 }}" value="{{ row.display_color }}">
+      <input type="hidden" name="export_quantity_{{ loop.index0 }}" value="{{ row.quantity }}">
+      <input type="hidden" name="export_action_{{ loop.index0 }}" value="{{ row.action }}">
+      <input type="hidden" name="export_note_{{ loop.index0 }}" value="{{ row.notes }}">
+      <input type="hidden" name="export_source_rows_{{ loop.index0 }}" value="{{ row.source_rows }}">
+    {% endfor %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-secondary">Download rolled-up CSV</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
 {% if skipped_details %}
 <div class="form-card">
   <h2>Skipped or Unresolved Rows ({{ skipped_details | length }})</h2>

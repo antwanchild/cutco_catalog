@@ -906,6 +906,7 @@ def completion_import_page():
                 for event in recent_completion_imports
             ],
             preview=None,
+            export_name=f"cutco_completion_result_{date.today().isoformat()}.csv",
         )
 
     pasted_rows = request.form.get("rows_text", "")
@@ -926,6 +927,7 @@ def completion_import_page():
                 for event in recent_completion_imports
             ],
             preview=None,
+            export_name=f"cutco_completion_result_{date.today().isoformat()}.csv",
         )
 
     person_override = request.form.get("person_override", "").strip() or None
@@ -943,6 +945,48 @@ def completion_import_page():
             }
             for event in recent_completion_imports
         ],
+        export_name=f"cutco_completion_result_{date.today().isoformat()}.csv",
+    )
+
+
+@data_bp.route("/completion-import/export", methods=["POST"])
+@admin_required
+def completion_import_export():
+    export_count = int(request.form.get("export_count", 0) or 0)
+    rows = []
+    for idx in range(export_count):
+        rows.append({
+            "person": request.form.get(f"export_person_{idx}", "").strip(),
+            "sku": request.form.get(f"export_sku_{idx}", "").strip(),
+            "item": request.form.get(f"export_item_{idx}", "").strip(),
+            "color": request.form.get(f"export_display_color_{idx}", "").strip() or "—",
+            "quantity": request.form.get(f"export_quantity_{idx}", "").strip(),
+            "action": request.form.get(f"export_action_{idx}", "").strip(),
+            "notes": request.form.get(f"export_note_{idx}", "").strip(),
+            "source_rows": request.form.get(f"export_source_rows_{idx}", "").strip(),
+        })
+
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(["person", "sku", "item", "color", "total_quantity", "action", "notes", "source_rows"])
+    for row in rows:
+        writer.writerow([
+            row["person"],
+            row["sku"],
+            row["item"],
+            row["color"],
+            row["quantity"],
+            row["action"],
+            row["notes"],
+            row["source_rows"],
+        ])
+    csv_buffer.seek(0)
+    filename = _safe_csv_filename(request.form.get("filename", f"cutco_completion_result_{date.today().isoformat()}.csv"))
+    logger.info("Completion export requested: %d rows (%s)", len(rows), filename)
+    return Response(
+        csv_buffer.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
@@ -960,6 +1004,7 @@ def completion_import_confirm():
     updated_ownership = 0
     created_people = 0
     skipped_details = []
+    export_rows = []
 
     try:
         for row_index in range(item_count):
@@ -1022,6 +1067,7 @@ def completion_import_confirm():
                 if notes:
                     existing_o.notes = _merge_note_text(existing_o.notes, notes)
                 updated_ownership += 1
+                action = "Update ownership"
             else:
                 db.session.add(Ownership(
                     person_id=person.id,
@@ -1031,10 +1077,21 @@ def completion_import_confirm():
                     notes=notes,
                 ))
                 created_ownership += 1
+                action = "Create ownership"
 
             db.session.flush()
             reconcile_unknown_variant(item)
             processed_rows += 1
+            export_rows.append({
+                "person": person.name,
+                "sku": item.sku or sku,
+                "item": item.name,
+                "display_color": "—" if target_color == UNKNOWN_COLOR else target_color,
+                "quantity": quantity,
+                "action": action,
+                "notes": notes or "",
+                "source_rows": str(row_num) if row_num is not None else "",
+            })
 
     except SQLAlchemyError as exc:
         db.session.rollback()
@@ -1083,6 +1140,8 @@ def completion_import_confirm():
             created_people=created_people,
             created_ownership=created_ownership,
             updated_ownership=updated_ownership,
+            export_rows=export_rows,
+            export_name=f"cutco_completion_result_{date.today().isoformat()}.csv",
         )
     return redirect(url_for("data.completion_import_page"))
 
