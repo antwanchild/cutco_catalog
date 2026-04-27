@@ -1,7 +1,7 @@
 import logging
 import re
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 
 from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
 from extensions import db
@@ -92,6 +92,7 @@ def person_collection(person_id):
     person     = db.session.get(Person, person_id)
     if not person:
         abort(404)
+    session["last_person_id"] = person_id
     ownerships = (Ownership.query.filter_by(person_id=person_id)
                   .order_by(Ownership.status).all())
 

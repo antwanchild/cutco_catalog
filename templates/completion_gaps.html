@@ -25,9 +25,9 @@
   <form method="post" class="completion-gaps-form" style="margin-top:1rem;">
     <label>Collector
       <select name="person_id" class="select-full">
-        <option value="all">All collectors</option>
+        <option value="all" {% if default_person_id == 'all' %}selected{% endif %}>All collectors</option>
         {% for person in people %}
-          <option value="{{ person.id }}">{{ person.name }}</option>
+          <option value="{{ person.id }}" {% if default_person_id == person.id %}selected{% endif %}>{{ person.name }}</option>
         {% endfor %}
       </select>
     </label>

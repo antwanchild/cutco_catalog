@@ -5,7 +5,7 @@ import re
 from datetime import date
 
 import openpyxl
-from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
+from flask import Blueprint, Response, flash, redirect, render_template, request, session, url_for
 from sqlalchemy.orm import selectinload
 from sqlalchemy import desc
 
@@ -640,12 +640,15 @@ def export_csv():
 def completion_gaps_page():
     people = Person.query.order_by(Person.name).all()
     public_catalog_count = Item.query.filter_by(set_only=False, in_catalog=True).count()
+    last_person_id = session.get("last_person_id")
+    default_person_id = last_person_id if any(person.id == last_person_id for person in people) else "all"
 
     if request.method == "GET":
         return render_template(
             "completion_gaps.html",
             people=people,
             public_catalog_count=public_catalog_count,
+            default_person_id=default_person_id,
         )
 
     selected_person_id = (request.form.get("person_id") or "all").strip()
@@ -663,6 +666,7 @@ def completion_gaps_page():
                 "completion_gaps.html",
                 people=people,
                 public_catalog_count=public_catalog_count,
+                default_person_id=default_person_id,
             )
         selected_people = [person]
         filename_prefix = person.name or "collector"

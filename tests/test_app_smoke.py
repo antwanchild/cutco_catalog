@@ -1530,11 +1530,12 @@ class ImportSmokeTests(SmokeBaseTest):
             ))
             db.session.commit()
 
+        self.assertEqual(self.client.get(f"/people/{person_id}/collection").status_code, 200)
         response = self.client.get("/completion-gaps")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Completion Gaps", response.data)
         self.assertIn(b"Download missing SKUs CSV", response.data)
-        self.assertIn(b"All collectors", response.data)
+        self.assertIn(f'<option value="{person_id}" selected>'.encode(), response.data)
 
         export_response = self.client.post(
             "/completion-gaps",
