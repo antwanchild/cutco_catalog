@@ -8,9 +8,7 @@
 
 <div class="form-card">
   <h2>Missing Catalog SKUs</h2>
-  <p class="muted">
-    View or download the public catalog item SKUs that a collector still does not own in any variant.
-  </p>
+  <p class="muted">Select a collector, then view the gaps on screen or download them as CSV.</p>
   <div class="stat-grid" style="margin-top:.75rem;">
     <div class="stat-card">
       <div class="stat-number">{{ public_catalog_count }}</div>
@@ -34,7 +32,6 @@
       </label>
       <input type="hidden" name="view" value="screen">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <p class="hint">This report checks public catalog items only. If a collector owns any variant of an item, it is not listed as missing.</p>
       <div class="form-actions" style="display:flex; flex-wrap:wrap; gap:.75rem;">
         <button type="submit" class="btn btn-primary">View on screen</button>
         <button type="submit"
