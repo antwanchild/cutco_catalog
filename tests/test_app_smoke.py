@@ -1506,6 +1506,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Paste rows or drop CSV", response.data)
         self.assertIn(b"person, sku, quantity, note", response.data)
         self.assertIn(b"ordered from rep", response.data)
+        self.assertIn(b"roll set SKUs into their member items", response.data)
 
     def test_completion_import_rolls_up_set_members_and_updates_ownership(self):
         self._login_as_admin()

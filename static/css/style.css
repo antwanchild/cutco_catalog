@@ -544,6 +544,9 @@ a:hover { text-decoration: underline; }
 .completion-example p {
   margin-top: .7rem;
 }
+.completion-next-step {
+  margin-top: .25rem;
+}
 .completion-summary-grid {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
