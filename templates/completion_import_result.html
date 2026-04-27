@@ -9,6 +9,33 @@
 <div class="flash flash-success">{{ summary }}</div>
 
 <div class="form-card">
+  <h2>What Happened</h2>
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-number">{{ processed_rows }}</div>
+      <div class="stat-label">Rows processed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ created_people }}</div>
+      <div class="stat-label">Collectors added</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ created_ownership }}</div>
+      <div class="stat-label">Ownership created</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ updated_ownership }}</div>
+      <div class="stat-label">Ownership updated</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ skipped_details | length }}</div>
+      <div class="stat-label">Rows skipped / unresolved</div>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:.75rem;">Set SKUs are expanded before totals are written, and you can review skipped rows below if anything needs a second look.</p>
+</div>
+
+<div class="form-card">
   <h2>Summary</h2>
   <table class="data-table compact" style="max-width: 760px;">
     <tbody>

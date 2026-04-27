@@ -1583,6 +1583,8 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(confirm_response.status_code, 200)
         self.assertIn(b"Completion Import Result", confirm_response.data)
+        self.assertIn(b"What Happened", confirm_response.data)
+        self.assertIn(b"Rows processed", confirm_response.data)
         self.assertIn(b"Ownership entries updated", confirm_response.data)
         self.assertIn(b"Ownership entries created", confirm_response.data)
 
