@@ -48,8 +48,8 @@ SHARPENING_PAGE_EXCLUDED_CATEGORIES = {
     "Garden Tools",
     "Gift Boxes",
     "Kitchen Tools",
-    "Sheaths",
     "Gadgets",
+    "Sheaths",
     "Storage",
     "Cutting Boards",
 }
