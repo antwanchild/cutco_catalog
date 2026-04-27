@@ -24,7 +24,7 @@ def _safe_parse_iso_date(raw: str) -> date | None:
         return None
 
 
-def _is_sharpening_item(item: Item) -> bool:
+def _is_sharpening_page_item(item: Item) -> bool:
     category = item.category or ""
     name = (item.name or "").lower()
     if category in COOKWARE_CATEGORIES or category in {"Gadgets", "Sheaths"}:
@@ -41,7 +41,7 @@ def sharpening():
                    .options(selectinload(SharpeningLog.item))
                    .order_by(SharpeningLog.sharpened_on.desc())
                    .all())
-    all_entries = [entry for entry in all_entries if entry.item and _is_sharpening_item(entry.item)]
+    all_entries = [entry for entry in all_entries if entry.item and _is_sharpening_page_item(entry.item)]
 
     last_by_item: dict[int, str] = {}
     count_by_item: dict[int, int] = {}
@@ -53,7 +53,7 @@ def sharpening():
     tracked: list[dict] = []
     for item_id, last_str in last_by_item.items():
         item = db.session.get(Item, item_id)
-        if not item or not _is_sharpening_item(item):
+        if not item or not _is_sharpening_page_item(item):
             continue
         parsed_last = _safe_parse_iso_date(last_str)
         if not parsed_last:
@@ -77,7 +77,7 @@ def sharpening():
         overdue_count   = sum(1 for row in tracked if row["overdue"]),
         threshold_days  = SHARPEN_THRESHOLD_DAYS,
         today           = today.isoformat(),
-        items_list      = [item for item in Item.query.order_by(Item.name).all() if _is_sharpening_item(item)],
+        items_list      = [item for item in Item.query.order_by(Item.name).all() if _is_sharpening_page_item(item)],
         methods         = SHARPEN_METHODS,
         has_discord     = bool(DISCORD_WEBHOOK_URL),
     )
@@ -101,9 +101,6 @@ def sharpening_add():
     item = db.session.get(Item, item_id)
     if not item:
         flash("Item not found.", "error")
-        return redirect(url_for("logs.sharpening"))
-    if not _is_sharpening_item(item):
-        flash("Cookware, bakeware, gift boxes, sheaths, and gadgets do not use the sharpening log.", "error")
         return redirect(url_for("logs.sharpening"))
 
     db.session.add(SharpeningLog(
@@ -185,7 +182,6 @@ def sharpening_notify():
                    .options(selectinload(SharpeningLog.item))
                    .order_by(SharpeningLog.sharpened_on.desc())
                    .all())
-    all_entries = [entry for entry in all_entries if entry.item and _is_sharpening_item(entry.item)]
     last_by_item: dict[int, str] = {}
     for entry in all_entries:
         if entry.item_id not in last_by_item:

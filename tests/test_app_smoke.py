@@ -599,7 +599,7 @@ class PublicSmokeTests(SmokeBaseTest):
                 "item_id": str(cookware_item_id),
                 "sharpened_on": "2026-04-15",
                 "method": "Whetstone",
-                "notes": "Should be blocked",
+                "notes": "Allowed in logs, hidden from page lists",
             },
             follow_redirects=False,
         )
@@ -610,7 +610,7 @@ class PublicSmokeTests(SmokeBaseTest):
                 "item_id": str(giftbox_item_id),
                 "sharpened_on": "2026-04-15",
                 "method": "Whetstone",
-                "notes": "Should be blocked",
+                "notes": "Allowed in logs, hidden from page lists",
             },
             follow_redirects=False,
         )
@@ -621,7 +621,7 @@ class PublicSmokeTests(SmokeBaseTest):
                 "item_id": str(gadget_item_id),
                 "sharpened_on": "2026-04-15",
                 "method": "Whetstone",
-                "notes": "Should be blocked",
+                "notes": "Allowed in logs, hidden from page lists",
             },
             follow_redirects=False,
         )
@@ -632,7 +632,7 @@ class PublicSmokeTests(SmokeBaseTest):
                 "item_id": str(sheath_item_id),
                 "sharpened_on": "2026-04-15",
                 "method": "Whetstone",
-                "notes": "Should be blocked",
+                "notes": "Allowed in logs, hidden from page lists",
             },
             follow_redirects=False,
         )
@@ -673,26 +673,26 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Slice onions", task_detail_response.data)
 
         with self.app.app_context():
+            sharpening_logs = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=sharpening_item_id)
+            ).all()
+            self.assertEqual(len(sharpening_logs), 1)
             cookware_logs = db.session.execute(
                 db.select(SharpeningLog).filter_by(item_id=cookware_item_id)
             ).all()
-            self.assertEqual(len(cookware_logs), 0)
+            self.assertEqual(len(cookware_logs), 1)
             giftbox_logs = db.session.execute(
                 db.select(SharpeningLog).filter_by(item_id=giftbox_item_id)
             ).all()
-            self.assertEqual(len(giftbox_logs), 0)
+            self.assertEqual(len(giftbox_logs), 1)
             gadget_logs = db.session.execute(
                 db.select(SharpeningLog).filter_by(item_id=gadget_item_id)
             ).all()
-            self.assertEqual(len(gadget_logs), 0)
+            self.assertEqual(len(gadget_logs), 1)
             sheath_logs = db.session.execute(
                 db.select(SharpeningLog).filter_by(item_id=sheath_item_id)
             ).all()
-            self.assertEqual(len(sheath_logs), 0)
-            giftbox_logs = db.session.execute(
-                db.select(SharpeningLog).filter_by(item_id=giftbox_item_id)
-            ).all()
-            self.assertEqual(len(giftbox_logs), 0)
+            self.assertEqual(len(sheath_logs), 1)
 
         with mock.patch("blueprints.logs._notify_discord", return_value=True) as notify_mock, \
              mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
