@@ -19,9 +19,14 @@
   <table class="matrix-table">
     <thead>
       <tr>
-        <th class="matrix-corner">
-          <a class="sortable-th" href="{{ url_for('views.matrix', sort='sku' if sort_field == 'name' else 'name') }}">
-            {% if sort_field == 'sku' %}SKU ▲{% else %}Name ▲{% endif %}
+        <th class="matrix-name-header">
+          <a class="sortable-th" href="{{ url_for('views.matrix', sort='name') }}">
+            Name{% if sort_field == 'name' %} ▲{% endif %}
+          </a>
+        </th>
+        <th class="matrix-sku-header">
+          <a class="sortable-th" href="{{ url_for('views.matrix', sort='sku') }}">
+            SKU{% if sort_field == 'sku' %} ▲{% endif %}
           </a>
         </th>
         {% for person in people %}
@@ -33,11 +38,13 @@
       {% for item in items %}
       <tr>
         <td class="matrix-label">
-          <div class="matrix-item-stack">
+          <div class="matrix-item-name">
             <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
-            {% if item.sku %}<span class="muted mono small">#{{ item.sku }}</span>{% endif %}
             {% if item.is_unicorn %}<span title="Unicorn">🦄</span>{% endif %}
           </div>
+        </td>
+        <td class="matrix-sku">
+          {% if item.sku %}<span class="muted mono small">#{{ item.sku }}</span>{% else %}<span class="muted">—</span>{% endif %}
         </td>
         {% for person in people %}
           {% set ownership = item_lookup.get((person.id, item.id)) %}
@@ -65,7 +72,8 @@
   <table class="matrix-table">
     <thead>
       <tr>
-        <th class="matrix-corner">Item / Variant</th>
+        <th class="matrix-name-header">Item / Variant</th>
+        <th class="matrix-sku-header">SKU</th>
         {% for person in people %}
           <th class="matrix-person">{{ person.name }}</th>
         {% endfor %}
@@ -75,9 +83,13 @@
       {% for item in items %}
         {% set variant_list = variants_by_item[item.id] %}
         <tr class="matrix-item-header">
-          <td colspan="{{ people | length + 1 }}">
+          <td>
             <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
           </td>
+          <td class="matrix-sku">
+            {% if item.sku %}<span class="muted mono small">#{{ item.sku }}</span>{% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td colspan="{{ people | length }}"></td>
         </tr>
         {% for variant in variant_list %}
         <tr>

@@ -1166,16 +1166,21 @@ textarea { resize: vertical; }
   padding: .3rem .5rem;
   white-space: nowrap;
 }
-.matrix-corner    { background: var(--bg2); min-width: 180px; }
+.matrix-name-header,
+.matrix-sku-header,
+.matrix-corner    { background: var(--bg2); }
+.matrix-name-header { min-width: 220px; text-align: left; }
+.matrix-sku-header  { min-width: 78px; text-align: center; }
 .matrix-person    { background: var(--bg2); text-align: center; font-size: .75rem; color: var(--muted); }
 .matrix-label     { background: var(--bg2); font-size: .82rem; }
 .matrix-label a   { color: var(--text); }
-.matrix-item-stack {
+.matrix-item-name {
   display: flex;
-  flex-direction: column;
-  gap: .05rem;
+  align-items: center;
+  gap: .35rem;
   min-width: 0;
 }
+.matrix-sku { background: var(--bg2); text-align: center; font-size: .78rem; }
 .matrix-variant-label { background: var(--bg); color: var(--muted); padding-left: 1.2rem; font-size: .78rem; }
 .matrix-item-header td { background: var(--bg3); font-weight: 600; font-size: .82rem; }
 .matrix-cell      { text-align: center; width: 40px; }

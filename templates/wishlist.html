@@ -37,8 +37,13 @@
     <thead>
       <tr>
         <th>
-          <a class="sortable-th" href="{{ url_for('people.wishlist', sort='sku' if sort_field == 'name' else 'name') }}{% if person_id is not none %}&person={{ person_id }}{% endif %}">
-            {% if sort_field == 'sku' %}SKU ▲{% else %}Name ▲{% endif %}
+          <a class="sortable-th" href="{{ url_for('people.wishlist', sort='name') }}{% if person_id is not none %}&person={{ person_id }}{% endif %}">
+            Name{% if sort_field == 'name' %} ▲{% endif %}
+          </a>
+        </th>
+        <th>
+          <a class="sortable-th" href="{{ url_for('people.wishlist', sort='sku') }}{% if person_id is not none %}&person={{ person_id }}{% endif %}">
+            SKU{% if sort_field == 'sku' %} ▲{% endif %}
           </a>
         </th>
         <th>Person</th>
@@ -58,12 +63,10 @@
       {% set o = row.ownership %}
       <tr{% if row.hit %} class="row-hit"{% endif %}>
         <td>
-          <div class="matrix-item-stack">
-            <a href="{{ url_for('views.item_owners', item_id=o.variant.item_id) }}">{{ o.variant.item.name }}</a>
-            {% if o.variant.item.sku %}<span class="muted mono small">#{{ o.variant.item.sku }}</span>{% endif %}
-          </div>
+          <a href="{{ url_for('views.item_owners', item_id=o.variant.item_id) }}">{{ o.variant.item.name }}</a>
           {% if row.hit %}<span class="hit-badge">🎯 target met</span>{% endif %}
         </td>
+        <td>{% if o.variant.item.sku %}<span class="muted mono small">#{{ o.variant.item.sku }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td><a href="{{ url_for('people.person_collection', person_id=o.person_id) }}">{{ o.person.name }}</a></td>
         <td>{% if o.variant.color != UNKNOWN_COLOR %}{{ o.variant.color }}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if row.target %}${{ "%.2f"|format(row.target) }}{% else %}<span class="muted">—</span>{% endif %}</td>
