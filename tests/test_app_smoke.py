@@ -1593,6 +1593,7 @@ class ImportSmokeTests(SmokeBaseTest):
         history_response = self.client.get("/completion-import")
         self.assertEqual(history_response.status_code, 200)
         self.assertIn(b"Recent Completion Imports", history_response.data)
+        self.assertIn(b'href="/completion-import"', history_response.data)
         self.assertIn(b"Completion import complete", history_response.data)
 
         with self.app.app_context():

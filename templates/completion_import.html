@@ -67,7 +67,7 @@ Anthony Child,326,2,ordered again</code></pre>
         <tr>
           <td class="nowrap">{{ entry.time }}</td>
           <td>
-            <strong>{{ entry.title }}</strong>
+            <strong><a href="{{ url_for('data.completion_import_page') }}">{{ entry.title }}</a></strong>
             {% if entry.details %}<div class="muted small">{{ entry.details }}</div>{% endif %}
           </td>
         </tr>
