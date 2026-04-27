@@ -250,6 +250,25 @@ Import headers are matched case-insensitively, so lowercase headers are recommen
 
 You can also store alternate SKUs on an item so imports can match the same product under a different vendor or legacy model number. During import preview, rows where the SKU or an alias already exists but the name differs are grouped into a collapsed `SKU or alias already exists` section so you can review naming differences before confirming.
 
+## 🧾 All SKU Completion Import
+
+This separate import page is for rep-style completion lists, where you want to roll up individual SKUs and set SKUs into summed ownership totals for a person.
+
+It accepts pasted spreadsheet rows or CSV uploads with:
+
+`person,sku,quantity,note`
+
+Example:
+
+```text
+person,sku,quantity,note
+Anthony Child,1726,1,ordered from rep
+Anthony Child,326,1,from set
+Anthony Child,326,2,ordered again
+```
+
+Set SKUs expand into member item SKUs, duplicate rows are summed, unknown SKUs are skipped, and existing ownership rows are updated by adding to `Quantity Purchased`.
+
 ---
 
 ## 🗺️ Navigation

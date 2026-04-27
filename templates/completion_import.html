@@ -16,6 +16,14 @@
     <li>Existing ownership rows are updated, not duplicated.</li>
     <li>Quantity is added to <strong>Quantity Purchased</strong> for matching ownership rows.</li>
   </ul>
+  <div class="completion-example">
+    <h3>Example Paste</h3>
+    <pre><code>person,sku,quantity,note
+Anthony Child,1726,1,ordered from rep
+Anthony Child,326,1,from set
+Anthony Child,326,2,ordered again</code></pre>
+    <p class="muted">That would roll into one direct item row and one expanded set row, with duplicate quantities summed before confirm.</p>
+  </div>
 </div>
 
 <form method="post" enctype="multipart/form-data" class="form-card completion-import-form">
