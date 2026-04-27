@@ -33,23 +33,15 @@
         </select>
       </label>
       <input type="hidden" name="view" value="screen">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <p class="hint">This report checks public catalog items only. If a collector owns any variant of an item, it is not listed as missing.</p>
-      <div class="form-actions">
+      <div class="form-actions" style="display:flex; flex-wrap:wrap; gap:.75rem;">
         <button type="submit" class="btn btn-primary">View on screen</button>
+        <button type="submit"
+                class="btn btn-secondary"
+                formmethod="post"
+                formaction="{{ url_for('data.completion_gaps_page') }}">Download missing SKUs CSV</button>
         <a href="{{ url_for('data.completion_import_page') }}" class="btn btn-secondary">Completion Import</a>
-      </div>
-    </form>
-
-    <form method="post" class="completion-gaps-form">
-      <label class="sr-only" for="completion-gaps-download-person">Collector for CSV download</label>
-      <select name="person_id" class="select-full" id="completion-gaps-download-person">
-        <option value="all" {% if default_person_id == 'all' %}selected{% endif %}>All collectors</option>
-        {% for person in people %}
-          <option value="{{ person.id }}" {% if default_person_id == person.id %}selected{% endif %}>{{ person.name }}</option>
-        {% endfor %}
-      </select>
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Download missing SKUs CSV</button>
       </div>
     </form>
   </div>
