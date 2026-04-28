@@ -2927,7 +2927,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"existing", preview_response.data)
         self.assertIn(b"create", preview_response.data)
         self.assertIn(b"not seen in sync", preview_response.data)
-        self.assertIn(b"2 swatches", preview_response.data)
+        self.assertIn(b"2 swatch options", preview_response.data)
 
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')

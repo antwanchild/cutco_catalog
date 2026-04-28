@@ -36,8 +36,8 @@
     <details class="diff-section" open>
       <summary>
         {{ item.item_name }} <span class="muted mono">#{{ item.sku }}</span>
-        <span class="badge badge-info badge-mini">{{ item.scraped_variant_count }} found</span>
-        <span class="badge badge-info badge-mini">{{ item.swatch_count }} swatches</span>
+        <span class="badge badge-info badge-mini">{{ item.scraped_variant_count }} variant{{ 's' if item.scraped_variant_count != 1 }}</span>
+        <span class="badge badge-info badge-mini">{{ item.swatch_count }} swatch option{{ 's' if item.swatch_count != 1 }}</span>
         {% if item.create_count %}<span class="badge badge-new badge-mini">{{ item.create_count }} create</span>{% endif %}
         {% if item.retained_count %}<span class="badge badge-warning badge-mini">{{ item.retained_count }} retained</span>{% endif %}
         {% if item.no_clear_variants %}<span class="badge badge-warning badge-mini">no clear variants</span>{% endif %}
