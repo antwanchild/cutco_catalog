@@ -704,6 +704,11 @@ def scrape_item_variant_colors(url: str) -> tuple[str, ...]:
     return _extract_product_variant_colors(url)
 
 
+# Preserve cache helpers on the public alias used by callers.
+scrape_item_variant_colors.cache_clear = _extract_product_variant_colors.cache_clear  # type: ignore[attr-defined]
+scrape_item_variant_colors.cache_info = _extract_product_variant_colors.cache_info  # type: ignore[attr-defined]
+
+
 # Keep old name as alias so existing callers still work
 def scrape_edge_type(url: str) -> str:
     return scrape_item_specs(url)["edge_type"]
