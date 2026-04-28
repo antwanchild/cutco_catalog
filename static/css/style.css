@@ -713,7 +713,7 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 }
 .form-card.compact { padding: 1rem; max-width: 100%; }
 .form-card.centered { margin: 4rem auto; }
-.variant-sync-category-block { margin-top: 1rem; }
+.variant-sync-category-block { margin-top: 1.5rem; }
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

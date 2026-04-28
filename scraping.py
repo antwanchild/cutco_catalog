@@ -631,6 +631,49 @@ _VARIANT_SKIP_LABELS = {
     "add personalization",
 }
 
+_VARIANT_SWATCH_CLASS_HINTS = {
+    "color",
+    "color-swatch",
+    "finish",
+    "finish-swatch",
+    "block-finish",
+    "block-finish-swatch",
+    "handle-color",
+    "handle-color-swatch",
+    "handle-finish",
+    "handle-finish-swatch",
+}
+
+_VARIANT_SWATCH_FALLBACK_BLOCKLIST = {
+    "add",
+    "american",
+    "board",
+    "box",
+    "chat",
+    "choose",
+    "customer",
+    "design",
+    "gift",
+    "guarantee",
+    "home",
+    "image",
+    "knife",
+    "live",
+    "made",
+    "monogram",
+    "page",
+    "personalization",
+    "plate",
+    "press",
+    "product",
+    "service",
+    "set",
+    "sheath",
+    "shop",
+    "style",
+    "text",
+}
+
 
 def _collect_variant_candidate(candidates: list[str], seen: set[str], value: str | None) -> None:
     candidate = _normalize_variant_label(value or "")
@@ -641,6 +684,28 @@ def _collect_variant_candidate(candidates: list[str], seen: set[str], value: str
         return
     seen.add(key)
     candidates.append(candidate)
+
+
+def _looks_like_variant_color(label: str | None) -> bool:
+    candidate = re.sub(r"\s+", " ", (label or "").strip()).strip(" \t\r\n:-|")
+    if not candidate:
+        return False
+    if any(char.isdigit() for char in candidate):
+        return False
+    if len(candidate) > 32:
+        return False
+    lowered = candidate.lower()
+    if lowered in _VARIANT_SKIP_LABELS:
+        return False
+    if lowered.startswith(("select ", "choose ", "add ", "image ")):
+        return False
+    words = re.findall(r"[A-Za-z]+", candidate)
+    if not words or len(words) > 3:
+        return False
+    word_set = {word.lower() for word in words}
+    if word_set & _VARIANT_SWATCH_FALLBACK_BLOCKLIST:
+        return False
+    return True
 
 
 def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str, ...]:
@@ -657,10 +722,19 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
         ).lower()
         if not any(keyword in group_text for keyword in ("color", "finish")):
             continue
+        preferred_swatch_nodes: list = []
+        generic_swatch_nodes: list = []
         for swatch in fieldset.select(".swatch.product-option"):
             swatch_classes = {cls.lower() for cls in swatch.get("class", [])}
             if swatch_classes & {"engraving-swatch", "design-button", "location-button", "font-swatch"}:
                 continue
+            if swatch_classes & _VARIANT_SWATCH_CLASS_HINTS:
+                preferred_swatch_nodes.append(swatch)
+            else:
+                generic_swatch_nodes.append(swatch)
+
+        swatch_nodes = preferred_swatch_nodes or generic_swatch_nodes
+        for swatch in swatch_nodes:
             swatch_sources = (
                 swatch.get("data-option"),
                 swatch.get("data-value"),
@@ -668,16 +742,31 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
                 swatch.get("title"),
                 swatch.get("data-code"),
             )
+            added = False
             for source in swatch_sources:
-                if _normalize_variant_label(source or ""):
-                    _collect_variant_candidate(candidates, seen, source)
-                    break
+                if not source:
+                    continue
+                normalized = _normalize_variant_label(source)
+                if not normalized:
+                    continue
+                if swatch in generic_swatch_nodes and not _looks_like_variant_color(normalized):
+                    continue
+                _collect_variant_candidate(candidates, seen, source)
+                added = True
+                break
+            if added:
+                continue
+            reader_only = swatch.select_one(".reader-only")
+            if reader_only:
+                reader_text = reader_only.get_text(" ", strip=True)
+                if swatch in generic_swatch_nodes and not _looks_like_variant_color(reader_text):
+                    continue
+                _collect_variant_candidate(candidates, seen, reader_text)
             else:
-                reader_only = swatch.select_one(".reader-only")
-                if reader_only:
-                    _collect_variant_candidate(candidates, seen, reader_only.get_text(" ", strip=True))
-                else:
-                    _collect_variant_candidate(candidates, seen, swatch.get_text(" ", strip=True))
+                swatch_text = swatch.get_text(" ", strip=True)
+                if swatch in generic_swatch_nodes and not _looks_like_variant_color(swatch_text):
+                    continue
+                _collect_variant_candidate(candidates, seen, swatch_text)
     return tuple(candidates)
 
 

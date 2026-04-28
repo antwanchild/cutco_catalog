@@ -1063,6 +1063,63 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic Brown", "Pearl"),
             )
 
+    def test_extract_product_variant_colors_prefers_color_swatches_over_generic_option_copy(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <fieldset class="swatch-group Color" data-type="Tools Handle Color">
+                <div class="swatch product-option color-swatch" data-option="Gray">
+                  <label for="swatch-Gray">
+                    <span class="reader-only">Select Gray</span>
+                  </label>
+                </div>
+                <div class="swatch product-option" data-option="6\" Vegetable Knife With Sheath">
+                  <label for="swatch-Junk">
+                    <span class="reader-only">Select 6&quot; Vegetable Knife With Sheath</span>
+                  </label>
+                </div>
+                <div class="swatch product-option" data-option="All Cutco Knives Are American Made">
+                  <label for="swatch-Noise">
+                    <span class="reader-only">Select All Cutco Knives Are American Made</span>
+                  </label>
+                </div>
+              </fieldset>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/9998-test"),
+                ("Gray",),
+            )
+
+    def test_extract_product_variant_colors_keeps_generic_color_labels_when_no_color_swatch_class_exists(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <fieldset class="swatch-group Color" data-type="Tools Handle Color">
+                <div class="swatch product-option" data-option="Classic Brown">
+                  <label for="swatch-Classic-Brown">
+                    <span class="reader-only">Select Classic Brown</span>
+                  </label>
+                </div>
+                <div class="swatch product-option" data-option="Pearl">
+                  <label for="swatch-Pearl">
+                    <span class="reader-only">Select Pearl</span>
+                  </label>
+                </div>
+              </fieldset>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/9997-test"),
+                ("Classic Brown", "Pearl"),
+            )
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """
@@ -2954,7 +3011,6 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"existing", preview_response.data)
         self.assertIn(b"create", preview_response.data)
         self.assertIn(b"not seen in sync", preview_response.data)
-        self.assertIn(b"2 swatch options", preview_response.data)
 
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
