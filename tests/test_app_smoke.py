@@ -29,7 +29,6 @@ from scraping import (
     _build_set_member_entries,
     _dedupe_product_links,
     _extract_sku_from_href,
-    _extract_product_variant_colors,
     _product_link_name,
     _member_hover_title,
     _infer_visible_member_sku,
@@ -975,18 +974,6 @@ class UtilitySmokeTests(SmokeBaseTest):
         )
         anchor = soup.find("a")
         self.assertEqual(_product_link_name(anchor), "5-Pc. Garden Tool Set w/FREE Garden Bag")
-
-    def test_extract_product_variant_colors_reads_color_section(self):
-        html = """
-            <html><body>
-              <div>Color: Classic</div>
-              <div>* [Input] Select Classic Image: Classic</div>
-              <div>* [Input] Select Pearl Image: Pearl</div>
-              <div>* [Input] Select Red Image: Red</div>
-              <div>Add Gift Wrap for $5</div>
-            </body></html>
-        """
-        self.assertEqual(_extract_product_variant_colors(html), ["Classic", "Pearl", "Red"])
 
     def test_should_queue_slug_allows_sheaths_to_override_seen_urls(self):
         seen = {"https://www.cutco.com/p/4135-2&view=product"}
@@ -2857,7 +2844,6 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "blade_length_SX-NEW-1": "4 in",
                 "overall_length_SX-NEW-1": "8 in",
                 "weight_SX-NEW-1": "1 lb",
-                "variant_colors_SX-NEW-1": json.dumps(["Classic", "Pearl", "Classic"]),
                 "selected_sets": ["Sync New Set"],
                 "set_count": "1",
                 "set_name_0": "Sync New Set",
@@ -2887,7 +2873,6 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             new_item = db.session.execute(db.select(Item).filter_by(sku="SX-NEW-1")).scalar_one()
             self.assertIsNone(new_item.msrp)
-            self.assertEqual([variant.color for variant in new_item.variants], ["Classic", "Pearl"])
             new_set = db.session.execute(db.select(Set).filter_by(name="Sync New Set")).scalar_one()
             self.assertEqual(len(new_set.members), 2)
             new_member_quantities = {db.session.get(Item, membership.item_id).sku: membership.quantity for membership in new_set.members}

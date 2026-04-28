@@ -1208,7 +1208,6 @@ def catalog_sync():
             item["blade_length"]   = specs.get("blade_length")
             item["overall_length"] = specs.get("overall_length")
             item["weight"]         = specs.get("weight")
-            item["variant_colors"] = specs.get("variant_colors", [])
 
     existing_sets = {item_set.name.lower() for item_set in Set.query.all()}
     new_sets      = sorted(
@@ -1265,8 +1264,7 @@ def catalog_sync_confirm():
     item_data = {}
     for key, val in request.form.items():
         for prefix in ("name_", "category_", "url_", "edge_type_",
-                       "msrp_", "blade_length_", "overall_length_", "weight_",
-                       "variant_colors_"):
+                       "msrp_", "blade_length_", "overall_length_", "weight_"):
             if key.startswith(prefix):
                 sku = key[len(prefix):]
                 item_data.setdefault(sku, {})[prefix.rstrip("_")] = val
@@ -1289,25 +1287,6 @@ def catalog_sync_confirm():
                     overall_length=data.get("overall_length") or None,
                     weight=data.get("weight") or None)
         db.session.add(item)
-        db.session.flush()
-        variant_colors_raw = data.get("variant_colors") or "[]"
-        try:
-            variant_colors = json.loads(variant_colors_raw) if isinstance(variant_colors_raw, str) else list(variant_colors_raw)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            variant_colors = []
-        if (item.category or "") not in COOKWARE_CATEGORIES:
-            seen_variant_colors: set[str] = set()
-            for raw_color in variant_colors:
-                color = str(raw_color or "").strip()
-                if not color or color == UNKNOWN_COLOR:
-                    continue
-                key = color.lower()
-                if key in seen_variant_colors:
-                    continue
-                seen_variant_colors.add(key)
-                if any(existing_variant.color.lower() == key for existing_variant in item.variants):
-                    continue
-                item.variants.append(ItemVariant(color=color))
         db.session.flush()
         reconcile_unknown_variant(item)
         added_items += 1
