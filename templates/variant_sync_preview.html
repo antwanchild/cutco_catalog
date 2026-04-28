@@ -6,7 +6,7 @@
   <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-ghost">← Back</a>
 </div>
 
-<div class="form-card">
+<div class="form-card variant-sync-summary-card">
   <h2>Summary</h2>
   <p class="muted">Scope: {{ preview.scope_label }}</p>
   <div class="stat-grid">
@@ -19,7 +19,7 @@
   <p class="muted" style="margin-top:.75rem;">Missing variants are kept, not deleted. Items that do not expose clear variant choices are skipped.</p>
 </div>
 
-<div class="flash flash-info">Existing variants are left alone, new colors are created, and nothing is deleted.</div>
+<div class="flash flash-info variant-sync-alert">Existing variants are left alone, new colors are created, and nothing is deleted.</div>
 
 <form method="post" action="{{ url_for('data.variant_sync_confirm') }}">
   <input type="hidden" name="preview_json" value="{{ preview_json | e }}">
@@ -81,7 +81,7 @@
   </div>
   {% endfor %}
 
-  <div class="completion-confirm-note flash flash-info">
+  <div class="completion-confirm-note flash flash-info variant-sync-confirm-note">
     Missing variants are kept rather than deleted. Unknown fallback variants are left untouched.
   </div>
 
