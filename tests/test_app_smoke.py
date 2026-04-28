@@ -3181,7 +3181,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"fallback only", preview_response.data)
-        self.assertIn(b"Unknown / Unspecified", preview_response.data)
+        self.assertIn(b"Unknown", preview_response.data)
 
     def test_catalog_sync_uses_populates_tasks(self):
         self._login_as_admin()

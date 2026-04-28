@@ -58,7 +58,7 @@
           {% for row in item.variant_rows %}
           <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% endif %}">
             <td>
-              {{ row.color }}
+              {{ row.display_color or row.color }}
               {% if row.status == 'fallback only' %}
                 <span class="badge badge-alias badge-mini">fallback only</span>
               {% endif %}
