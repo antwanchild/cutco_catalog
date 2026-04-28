@@ -1179,6 +1179,40 @@ class UtilitySmokeTests(SmokeBaseTest):
                 (),
             )
 
+    def test_extract_product_variant_colors_prefers_selected_color_on_size_pages(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <fieldset class="swatch-group Color" data-type="Color">
+                <div class="swatch product-option color-swatch" data-option="Gray">
+                  <label for="swatch-Gray">
+                    <span class="reader-only">Select Gray</span>
+                  </label>
+                </div>
+                <div class="swatch product-option color-swatch" data-option="Red">
+                  <label for="swatch-Red">
+                    <span class="reader-only">Select Red</span>
+                  </label>
+                </div>
+              </fieldset>
+              <fieldset class="swatch-group Size" data-type="Size">
+                <div class="swatch product-option" data-option="S (8&quot; × 12&quot;)">
+                  <label for="swatch-Size-S">
+                    <span class="reader-only">S (8&quot; × 12&quot;)</span>
+                  </label>
+                </div>
+              </fieldset>
+              <p>Color: Gray</p>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/cutting-boards"),
+                ("Gray",),
+            )
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """

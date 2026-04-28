@@ -726,6 +726,8 @@ _VARIANT_COLOR_WORDS = {
     "yellow",
 }
 
+_PAGE_COLOR_RE = re.compile(r"\bColor:\s*([A-Za-z][A-Za-z0-9'’&()./\-\s]{0,60})", re.IGNORECASE)
+
 
 def _collect_variant_candidate(candidates: list[str], seen: set[str], value: str | None) -> None:
     candidate = _normalize_variant_label(value or "")
@@ -822,6 +824,30 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
     return tuple(candidates)
 
 
+def _extract_selected_page_color(soup: BeautifulSoup) -> str | None:
+    """Return the currently selected color label when the page exposes one."""
+    page_text = soup.get_text(" ", strip=True)
+    match = _PAGE_COLOR_RE.search(page_text)
+    if not match:
+        return None
+    return _normalize_variant_label(match.group(1))
+
+
+def _page_has_size_selector(soup: BeautifulSoup) -> bool:
+    """Return True if the page exposes a size swatch group."""
+    for fieldset in soup.select("fieldset.swatch-group"):
+        group_text = " ".join(
+            [
+                " ".join(fieldset.get("class", [])),
+                str(fieldset.get("data-type", "")),
+                fieldset.get_text(" ", strip=True),
+            ]
+        ).lower()
+        if "size" in group_text:
+            return True
+    return False
+
+
 def _normalize_variant_label(value: str) -> str | None:
     cleaned = re.sub(r"\s+", " ", (value or "").strip()).strip(" \t\r\n:-|")
     if not cleaned:
@@ -856,6 +882,10 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
         candidates: list[str] = []
         seen: set[str] = set()
         swatch_candidates = _collect_variant_candidates_from_swatches(soup)
+        selected_color = _extract_selected_page_color(soup)
+        if selected_color and _page_has_size_selector(soup):
+            if selected_color in swatch_candidates:
+                swatch_candidates = (selected_color,)
         for candidate in swatch_candidates:
             key = candidate.lower()
             if key in seen:
