@@ -723,31 +723,32 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
                 continue
             seen.add(key)
             candidates.append(candidate)
-        patterns = [
-            re.compile(r"Select\s+([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\s+Image:", re.IGNORECASE),
-            re.compile(r"(?:Color|Block Finish|Handle Color|Finish)\s*:\s*([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\b", re.IGNORECASE),
-        ]
-        sources = [raw_html, text]
-        for tag in soup.find_all(True):
-            tag_text = tag.get_text(" ", strip=True)
-            if tag_text:
-                sources.append(tag_text)
-        for source in sources:
-            for pattern in patterns:
-                for match in pattern.finditer(source):
-                    candidate = _normalize_variant_label(match.group(1))
-                    if not candidate:
-                        continue
-                    key = candidate.lower()
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    candidates.append(candidate)
-        for tag in soup.find_all(True):
-            for attr in ("aria-label", "title", "alt", "value", "data-color", "data-variant", "data-name", "data-value"):
-                attr_value = tag.get(attr)
-                if attr_value:
-                    _collect_variant_candidate(candidates, seen, str(attr_value))
+        if not swatch_candidates:
+            patterns = [
+                re.compile(r"Select\s+([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\s+Image:", re.IGNORECASE),
+                re.compile(r"(?:Color|Block Finish|Handle Color|Finish)\s*:\s*([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\b", re.IGNORECASE),
+            ]
+            sources = [raw_html, text]
+            for tag in soup.find_all(True):
+                tag_text = tag.get_text(" ", strip=True)
+                if tag_text:
+                    sources.append(tag_text)
+            for source in sources:
+                for pattern in patterns:
+                    for match in pattern.finditer(source):
+                        candidate = _normalize_variant_label(match.group(1))
+                        if not candidate:
+                            continue
+                        key = candidate.lower()
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        candidates.append(candidate)
+            for tag in soup.find_all(True):
+                for attr in ("aria-label", "title", "alt", "value", "data-color", "data-variant", "data-name", "data-value"):
+                    attr_value = tag.get(attr)
+                    if attr_value:
+                        _collect_variant_candidate(candidates, seen, str(attr_value))
 
         logger.debug("Variant fetch: %s → %d candidates", clean_url, len(candidates))
         return tuple(candidates)
