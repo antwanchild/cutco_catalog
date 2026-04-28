@@ -3123,13 +3123,34 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Variant Sync Result", confirm_response.data)
         self.assertIn(b"Variants created", confirm_response.data)
 
+    def test_variant_sync_skips_cutting_boards(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _unknown_variant_id = self._add_catalog_item(
+            name="Cutting Board Test",
+            sku="CB-1",
+            category="Cutting Boards",
+        )
+
+        with mock.patch("blueprints.data.scrape_item_variant_colors") as scrape_mock:
+            page_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "CB-1",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(page_response.status_code, 200)
+        self.assertIn(b"Cutting board items are treated as a single fallback variant.", page_response.data)
+        scrape_mock.assert_not_called()
         with self.app.app_context():
             item = db.session.get(Item, item_id)
-            colors = [variant.color for variant in item.variants]
-            self.assertIn("Unknown / Unspecified", colors)
-            self.assertIn("Classic Brown", colors)
-            self.assertIn("Pearl White", colors)
-            self.assertIn("Red", colors)
+            self.assertEqual(len(item.variants), 1)
 
     def test_catalog_sync_uses_populates_tasks(self):
         self._login_as_admin()

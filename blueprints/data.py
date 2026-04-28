@@ -13,6 +13,7 @@ from sqlalchemy import desc
 
 from constants import (
     COOKWARE_CATEGORIES, EDGE_TYPES, STATUS_OPTIONS, TRUTHY, UNKNOWN_COLOR,
+    VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
     XLSX_COL_MAP, canonicalize_availability, canonicalize_category,
 )
 from extensions import db
@@ -570,7 +571,7 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
         future_map = {
             pool.submit(scrape_item_variant_colors, item.cutco_url or ""): item.id
             for item in items
-            if item.cutco_url and (item.category or "") not in COOKWARE_CATEGORIES
+            if item.cutco_url and (item.category or "") not in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
         }
         for future in as_completed(future_map):
             fetched_variants[future_map[future]] = future.result()
@@ -596,14 +597,17 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
             })
             items_with_no_clear_variants += 1
             continue
-        if (item.category or "") in COOKWARE_CATEGORIES:
+        if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES:
+            skip_reason = "Cookware items use a single fallback variant."
+            if (item.category or "") == "Cutting Boards":
+                skip_reason = "Cutting board items are treated as a single fallback variant."
             preview_items.append({
                 "item_id": item.id,
                 "item_name": item.name,
                 "sku": item.sku or "—",
                 "category": item.category or "—",
                 "status": "skipped",
-                "skip_reason": "Cookware items use a single fallback variant.",
+                "skip_reason": skip_reason,
                 "variant_rows": [],
                 "create_colors": [],
                 "retained_colors": [],
