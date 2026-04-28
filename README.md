@@ -26,7 +26,9 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 🎯 **Suggested Uses** — Sync Cutco.com's recommended uses per knife into the task system; task dropdown highlights tasks suggested for the selected knife; task detail page shows all knives that can perform a given task
 - 🗂️ **Set Completion** — Track progress through Cutco sets with per-person completion bars and owned/missing panels; one-click wishlist from missing items
 - 🔄 **Catalog Sync** — Scrape Cutco.com to discover new items and sets automatically
+- 🎨 **Variant Sync** — Separate page for color-variant cleanup; previews existing/create/retained colors without touching catalog sync
 - 📥 **Import / Export** — Bulk import ownership data via CSV or XLSX; export full collection as CSV
+- 🧩 **Completion Reports** — Standalone completion-gaps reporting and completion-import rollups for rep-style collection lists
 - 📊 **Matrix View** — Cross-tabulate items vs. collectors at a glance
 - 🔒 **Admin Controls** — Token-protected admin mode for catalog edits, syncing, and MSRP diffs
 - 🔔 **Discord Notifications** — Optional webhook integration for wishlist price alerts, sharpening reminders, and cookware reminders
@@ -129,6 +131,8 @@ To block specific categories from ever appearing in the sync preview, set `SYNC_
 ```
 SYNC_BLOCKED_CATEGORIES=Tableware,Accessories
 ```
+
+Variant color maintenance lives on a separate **Variant Sync** page. It scans product pages for color options, previews `existing` / `create` / `not seen in sync` states, and only creates missing variants. Missing variants are retained so possible unicorn colors are not deleted by accident. You can open it from the catalog page or the More menu.
 
 ---
 
@@ -250,6 +254,10 @@ Import headers are matched case-insensitively, so lowercase headers are recommen
 
 You can also store alternate SKUs on an item so imports can match the same product under a different vendor or legacy model number. During import preview, rows where the SKU or an alias already exists but the name differs are grouped into a collapsed `SKU or alias already exists` section so you can review naming differences before confirming.
 
+## 🧩 Completion Reports
+
+The app includes a standalone **Completion Gaps** page for rep-style follow-up lists. It defaults to the last collector you viewed, and you can switch to any collector or all collectors. The report shows public catalog SKUs the collector still does not own in any variant, and it can be viewed on screen or downloaded as CSV.
+
 ## 🧾 All SKU Completion Import
 
 This separate import page is for rep-style completion lists, where you want to roll up individual SKUs and set SKUs into summed ownership totals for a person.
@@ -257,6 +265,8 @@ This separate import page is for rep-style completion lists, where you want to r
 It accepts pasted spreadsheet rows or CSV uploads with:
 
 `person,sku,quantity,note`
+
+Set SKUs expand into member item SKUs, duplicate rows roll up, and missing item/set SKUs are skipped rather than created. The result page includes a history log and export buttons for the rolled-up totals and missing-SKU report.
 
 Example:
 

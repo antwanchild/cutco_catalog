@@ -36,6 +36,7 @@ from scraping import (
     _collect_visible_set_piece_rows,
     _resolve_visible_member_sku,
     _should_queue_slug,
+    _extract_product_variant_colors,
 )
 from blueprints.catalog import _load_member_snapshot
 from time_utils import container_timezone, format_container_time
@@ -943,6 +944,23 @@ class UtilitySmokeTests(SmokeBaseTest):
             _extract_sku_from_href("https://www.cutco.com/p/2135-2", preserve_lettered_code=True),
             "2135-2",
         )
+
+    def test_extract_product_variant_colors_parses_selection_labels(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <div>Color: Classic</div>
+              <button>Select Classic Image: Classic</button>
+              <button>Select Pearl Image: Pearl</button>
+              <button>Select Red Image: Red</button>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/1738C"),
+                ("Classic", "Pearl", "Red"),
+            )
 
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
@@ -2798,6 +2816,69 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Scrapes Cutco.com to discover new items and sets.", response.data)
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)
+
+    def test_variant_sync_page_renders_and_creates_missing_variants(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _unknown_variant_id = self._add_catalog_item(name="Variant Sync Knife", sku="VS-1")
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            db.session.add(ItemVariant(item_id=item.id, color="Classic Brown"))
+            db.session.add(ItemVariant(item_id=item.id, color="Red"))
+            db.session.commit()
+
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=("Classic Brown", "Pearl White"),
+        ):
+            page_response = self.client.get("/variant-sync")
+            self.assertEqual(page_response.status_code, 200)
+            self.assertIn(b"Variant Sync", page_response.data)
+            self.assertIn(b"Entire catalog", page_response.data)
+
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "VS-1",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Variant Sync Preview", preview_response.data)
+        self.assertIn(b"existing", preview_response.data)
+        self.assertIn(b"create", preview_response.data)
+        self.assertIn(b"not seen in sync", preview_response.data)
+
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+        preview_json = preview_json_input["value"]
+
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json,
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+        self.assertEqual(confirm_response.status_code, 200)
+        self.assertIn(b"Variant Sync Result", confirm_response.data)
+        self.assertIn(b"Variants created", confirm_response.data)
+
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            colors = [variant.color for variant in item.variants]
+            self.assertIn("Unknown / Unspecified", colors)
+            self.assertIn("Classic Brown", colors)
+            self.assertIn("Pearl White", colors)
+            self.assertIn("Red", colors)
 
     def test_catalog_sync_uses_populates_tasks(self):
         self._login_as_admin()

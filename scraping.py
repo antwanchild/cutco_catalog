@@ -613,6 +613,86 @@ def scrape_item_specs(url: str) -> dict:
     return result
 
 
+_VARIANT_SKIP_LABELS = {
+    "",
+    "select",
+    "variant",
+    "variants",
+    "color",
+    "colors",
+    "finish",
+    "block finish",
+    "handle color",
+    "default",
+    "choose",
+    "choose a color",
+    "choose color",
+    "add gift wrap",
+    "add personalization",
+}
+
+
+def _normalize_variant_label(value: str) -> str | None:
+    cleaned = re.sub(r"\s+", " ", (value or "").strip()).strip(" \t\r\n:-|")
+    if not cleaned:
+        return None
+    lowered = cleaned.lower()
+    if lowered in _VARIANT_SKIP_LABELS:
+        return None
+    if lowered.startswith("select "):
+        return None
+    if lowered.startswith("image "):
+        return None
+    if not any(char.isalpha() for char in cleaned):
+        return None
+    if len(cleaned) > 60:
+        return None
+    return cleaned.title()
+
+
+@lru_cache(maxsize=1024)
+def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
+    """Fetch a product page and return a tuple of candidate color/variant names."""
+    clean_url = url.split("&view=")[0].split("?view=")[0]
+    try:
+        resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
+            logger.debug("Variant fetch: HTTP %d for %s", resp.status_code, clean_url)
+            return ()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for noise in soup.find_all(["script", "style"]):
+            noise.decompose()
+        text = soup.get_text("\n", strip=True)
+
+        candidates: list[str] = []
+        seen: set[str] = set()
+        patterns = [
+            re.compile(r"Select\s+([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\s+Image:", re.IGNORECASE),
+            re.compile(r"(?:Color|Block Finish|Handle Color|Finish)\s*:\s*([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\b", re.IGNORECASE),
+        ]
+        for pattern in patterns:
+            for match in pattern.finditer(text):
+                candidate = _normalize_variant_label(match.group(1))
+                if not candidate:
+                    continue
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(candidate)
+
+        logger.debug("Variant fetch: %s → %d candidates", clean_url, len(candidates))
+        return tuple(candidates)
+    except Exception as exc:
+        logger.warning("Variant scrape failed for %s: %s", url, exc)
+        return ()
+
+
+def scrape_item_variant_colors(url: str) -> tuple[str, ...]:
+    """Public alias for the product-page variant color scraper."""
+    return _extract_product_variant_colors(url)
+
+
 # Keep old name as alias so existing callers still work
 def scrape_edge_type(url: str) -> str:
     return scrape_item_specs(url)["edge_type"]

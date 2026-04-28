@@ -1,8 +1,10 @@
+import json
 import csv
 import io
 import logging
 import re
 from datetime import date
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import openpyxl
 from flask import Blueprint, Response, flash, redirect, render_template, request, session, url_for
@@ -28,6 +30,7 @@ from models import (
     record_activity,
     reconcile_unknown_variant,
 )
+from scraping import scrape_item_variant_colors
 from time_utils import format_container_time
 
 data_bp = Blueprint("data", __name__)
@@ -500,6 +503,200 @@ def _build_completion_missing_csv(missing_rows: list[dict]) -> str:
     return csv_buffer.getvalue()
 
 
+def _parse_variant_sync_selected_skus(raw_value: str) -> list[str]:
+    """Parse pasted SKU text for the variant sync scope picker."""
+    seen: set[str] = set()
+    skus: list[str] = []
+    for part in re.split(r"[\n,;]+", raw_value or ""):
+        sku = normalize_sku_value(part)
+        if not sku or sku in seen:
+            continue
+        seen.add(sku)
+        skus.append(sku)
+    return skus
+
+
+def _resolve_variant_sync_items(scope: str, category: str | None, selected_skus: list[str]) -> tuple[list[Item], str | None]:
+    """Resolve the item set to scan for variant sync."""
+    items = Item.query.options(selectinload(Item.variants)).filter(Item.cutco_url.isnot(None)).all()
+    if scope == "all":
+        return sorted(items, key=lambda item: ((item.category or "").lower(), (item.sku or "").lower(), (item.name or "").lower())), None
+
+    if scope == "category":
+        if not category:
+            return [], "Please choose a category."
+        filtered = [item for item in items if (item.category or "") == category]
+        if not filtered:
+            return [], f'No items with URLs were found in "{category}".'
+        return sorted(filtered, key=lambda item: ((item.sku or "").lower(), (item.name or "").lower())), None
+
+    if scope == "selected":
+        if not selected_skus:
+            return [], "Please enter one or more item SKUs."
+        lookup = _build_item_sku_lookup(items)
+        selected_items: list[Item] = []
+        selected_ids: set[int] = set()
+        missing: list[str] = []
+        for sku in selected_skus:
+            item = lookup.get(sku)
+            if not item:
+                missing.append(sku)
+                continue
+            if item.id in selected_ids:
+                continue
+            selected_ids.add(item.id)
+            selected_items.append(item)
+        selected_items.sort(key=lambda item: ((item.category or "").lower(), (item.sku or "").lower(), (item.name or "").lower()))
+        if missing and selected_items:
+            flash(f"Some selected SKUs were not found and were skipped: {', '.join(missing[:6])}{'…' if len(missing) > 6 else ''}", "warning")
+        if not selected_items:
+            return [], "None of the selected SKUs matched a catalog item with a URL."
+        return selected_items, None
+
+    return [], "Please choose a valid scan scope."
+
+
+def _build_variant_sync_preview(items: list[Item]) -> dict:
+    """Scrape variant colors for a set of items and build preview rows."""
+    preview_items: list[dict] = []
+    scanned_items = 0
+    scraped_variant_total = 0
+    variants_to_create = 0
+    variants_retained = 0
+    items_with_no_clear_variants = 0
+
+    fetched_variants: dict[int, tuple[str, ...]] = {}
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        future_map = {
+            pool.submit(scrape_item_variant_colors, item.cutco_url or ""): item.id
+            for item in items
+            if item.cutco_url and (item.category or "") not in COOKWARE_CATEGORIES
+        }
+        for future in as_completed(future_map):
+            fetched_variants[future_map[future]] = future.result()
+
+    for item in items:
+        scanned_items += 1
+        if not item.cutco_url:
+            preview_items.append({
+                "item_id": item.id,
+                "item_name": item.name,
+                "sku": item.sku or "—",
+                "category": item.category or "—",
+                "status": "skipped",
+                "skip_reason": "No Cutco URL stored.",
+                "variant_rows": [],
+                "create_colors": [],
+                "retained_colors": [],
+                "existing_count": 0,
+                "create_count": 0,
+                "retained_count": 0,
+                "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
+                "no_clear_variants": True,
+            })
+            items_with_no_clear_variants += 1
+            continue
+        if (item.category or "") in COOKWARE_CATEGORIES:
+            preview_items.append({
+                "item_id": item.id,
+                "item_name": item.name,
+                "sku": item.sku or "—",
+                "category": item.category or "—",
+                "status": "skipped",
+                "skip_reason": "Cookware items use a single fallback variant.",
+                "variant_rows": [],
+                "create_colors": [],
+                "retained_colors": [],
+                "existing_count": 0,
+                "create_count": 0,
+                "retained_count": 0,
+                "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
+                "no_clear_variants": True,
+            })
+            items_with_no_clear_variants += 1
+            continue
+
+        scraped_colors = list(fetched_variants.get(item.id, ()))
+        scraped_variant_total += len(scraped_colors)
+        existing_real_variants = [variant for variant in item.variants if variant.color != UNKNOWN_COLOR]
+        existing_lookup = {variant.color.lower(): variant for variant in existing_real_variants}
+        scraped_lookup = {color.lower() for color in scraped_colors}
+
+        variant_rows: list[dict] = []
+        create_colors: list[str] = []
+        retained_colors: list[str] = []
+        existing_count = 0
+        create_count = 0
+
+        for color in scraped_colors:
+            status = "existing" if color.lower() in existing_lookup else "create"
+            if status == "existing":
+                existing_count += 1
+            else:
+                create_count += 1
+                create_colors.append(color)
+            variant_rows.append({"color": color, "status": status})
+
+        for variant in existing_real_variants:
+            if variant.color.lower() in scraped_lookup:
+                continue
+            retained_colors.append(variant.color)
+            variant_rows.append({"color": variant.color, "status": "not seen in sync"})
+
+        retained_count = len(retained_colors)
+        variants_to_create += create_count
+        variants_retained += retained_count
+        has_unknown_variant = any(variant.color == UNKNOWN_COLOR for variant in item.variants)
+        no_clear_variants = not scraped_colors
+        if no_clear_variants:
+            items_with_no_clear_variants += 1
+
+        variant_rows.sort(key=lambda row: (row["color"].lower(), row["status"]))
+        preview_items.append({
+            "item_id": item.id,
+            "item_name": item.name,
+            "sku": item.sku or "—",
+            "category": item.category or "—",
+            "status": "ready" if scraped_colors else "skipped",
+            "skip_reason": None if scraped_colors else "No clear color variants were detected.",
+            "variant_rows": variant_rows,
+            "create_colors": create_colors,
+            "retained_colors": retained_colors,
+            "existing_count": existing_count,
+            "create_count": create_count,
+            "retained_count": retained_count,
+            "has_unknown_variant": has_unknown_variant,
+            "no_clear_variants": no_clear_variants,
+            "scraped_variant_count": len(scraped_colors),
+        })
+
+    grouped_items: dict[str, list[dict]] = {}
+    for item in preview_items:
+        grouped_items.setdefault(item["category"], []).append(item)
+    grouped_preview = [
+        {
+            "category": category,
+            "items": sorted(
+                category_items,
+                key=lambda item: ((item["sku"] or "").lower(), (item["item_name"] or "").lower()),
+            ),
+        }
+        for category, category_items in sorted(grouped_items.items(), key=lambda kv: kv[0].lower())
+    ]
+
+    return {
+        "items": preview_items,
+        "grouped_items": grouped_preview,
+        "summary": {
+            "items_scanned": scanned_items,
+            "variants_found": scraped_variant_total,
+            "variants_to_create": variants_to_create,
+            "variants_retained": variants_retained,
+            "items_with_no_clear_variants": items_with_no_clear_variants,
+        },
+    }
+
+
 def _resolve_completion_gap_people(selected_person_id: str, people: list[Person]) -> tuple[list[Person], str | int, str | None]:
     """Resolve a completion gaps collector selection."""
     if selected_person_id == "all":
@@ -722,6 +919,162 @@ def completion_gaps_page():
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@data_bp.route("/variant-sync", methods=["GET", "POST"])
+@admin_required
+def variant_sync_page():
+    all_items = Item.query.options(selectinload(Item.variants)).filter(Item.cutco_url.isnot(None)).all()
+    categories = sorted(
+        {item.category for item in all_items if item.category},
+        key=lambda value: value.lower(),
+    )
+
+    if request.method == "GET":
+        return render_template(
+            "variant_sync.html",
+            categories=categories,
+            preview=None,
+            scope="all",
+            category="",
+            selected_skus_text="",
+        )
+
+    scope = (request.form.get("scope") or "all").strip().lower()
+    category = (request.form.get("category") or "").strip()
+    selected_skus_text = request.form.get("selected_skus", "").strip()
+    selected_skus = _parse_variant_sync_selected_skus(selected_skus_text)
+
+    items, selection_error = _resolve_variant_sync_items(scope, category, selected_skus)
+    if selection_error:
+        flash(selection_error, "error")
+        return render_template(
+            "variant_sync.html",
+            categories=categories,
+            preview=None,
+            scope=scope or "all",
+            category=category,
+            selected_skus_text=selected_skus_text,
+        )
+    if not items:
+        flash("No catalog items with URLs were found for that scope.", "warning")
+        return render_template(
+            "variant_sync.html",
+            categories=categories,
+            preview=None,
+            scope=scope or "all",
+            category=category,
+            selected_skus_text=selected_skus_text,
+        )
+
+    preview = _build_variant_sync_preview(items)
+    preview["scope"] = scope
+    preview["scope_label"] = {
+        "all": "Entire catalog",
+        "category": f"Category: {category}",
+        "selected": "Selected SKUs",
+    }.get(scope, "Entire catalog")
+    preview["category"] = category
+    preview["selected_skus_text"] = selected_skus_text
+    preview_json = json.dumps(preview, ensure_ascii=False)
+    return render_template(
+        "variant_sync_preview.html",
+        preview=preview,
+        preview_json=preview_json,
+        categories=categories,
+        scope=scope,
+        category=category,
+        selected_skus_text=selected_skus_text,
+    )
+
+
+@data_bp.route("/variant-sync/confirm", methods=["POST"])
+@admin_required
+def variant_sync_confirm():
+    preview_raw = request.form.get("preview_json", "")
+    if not preview_raw:
+        flash("Variant sync preview data was missing.", "error")
+        return redirect(url_for("data.variant_sync_page"))
+
+    try:
+        preview = json.loads(preview_raw)
+    except json.JSONDecodeError:
+        flash("Variant sync preview data could not be read.", "error")
+        return redirect(url_for("data.variant_sync_page"))
+
+    created_variants = 0
+    retained_variants = 0
+    skipped_items = 0
+    touched_items = 0
+    skipped_details: list[dict] = []
+
+    try:
+        for item_data in preview.get("items", []):
+            item_id = item_data.get("item_id")
+            if not item_id:
+                continue
+            item = db.session.get(Item, item_id)
+            if not item:
+                skipped_items += 1
+                skipped_details.append({
+                    "item": item_data.get("item_name", "Unknown item"),
+                    "sku": item_data.get("sku", "—"),
+                    "reason": "Item was not found during confirmation.",
+                })
+                continue
+
+            if item_data.get("status") == "skipped":
+                skipped_items += 1
+                skipped_details.append({
+                    "item": item.name,
+                    "sku": item.sku or "—",
+                    "reason": item_data.get("skip_reason") or "No clear variants were detected.",
+                })
+                continue
+
+            existing_real = {variant.color.lower() for variant in item.variants if variant.color != UNKNOWN_COLOR}
+            create_colors = []
+            for color in item_data.get("create_colors", []):
+                color_value = (color or "").strip()
+                if not color_value:
+                    continue
+                if color_value.lower() in existing_real:
+                    retained_variants += 1
+                    continue
+                db.session.add(ItemVariant(item_id=item.id, color=color_value))
+                create_colors.append(color_value)
+                created_variants += 1
+            retained_variants += len(item_data.get("retained_colors", []))
+            if create_colors or item_data.get("retained_colors"):
+                touched_items += 1
+
+        record_activity(
+            "sync",
+            "Variant sync complete",
+            (
+                f"Items scanned {preview.get('summary', {}).get('items_scanned', 0)}, "
+                f"variants created {created_variants}, retained {retained_variants}, "
+                f"skipped {skipped_items}."
+            ),
+        )
+        if db_commit(db.session):
+            return render_template(
+                "variant_sync_result.html",
+                summary=preview.get("summary", {}),
+                created_variants=created_variants,
+                retained_variants=retained_variants,
+                skipped_items=skipped_items,
+                touched_items=touched_items,
+                skipped_details=skipped_details,
+                scope_label=preview.get("scope_label", "Entire catalog"),
+            )
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Variant sync failed: %s", exc)
+        flash("Variant sync failed — no changes were saved.", "error")
+        return redirect(url_for("data.variant_sync_page"))
+
+    return redirect(url_for("data.variant_sync_page"))
 
 
 @data_bp.route("/import/template")

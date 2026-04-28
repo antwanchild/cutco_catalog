@@ -63,6 +63,11 @@
       <span class="quick-action-status" id="dashboard-sync-status" hidden>Preparing sync preview...</span>
     </div>
     <div class="dashboard-card quick-action-card">
+      <span class="quick-action-title">Variant sync</span>
+      <span class="quick-action-note">Review color variants without touching catalog sync.</span>
+      <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('data.variant_sync_page') }}">Open Variant Sync</a>
+    </div>
+    <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">MSRP diff</span>
       <span class="quick-action-note">Review price changes before applying them.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('admin.msrp_diff_page') }}">Open MSRP Diff</a>

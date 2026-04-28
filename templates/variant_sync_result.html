@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Variant Sync Result – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Variant Sync Result</h1>
+  <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-ghost">← Sync Again</a>
+</div>
+
+<div class="flash flash-success">
+  Variant sync complete — scanned {{ summary.items_scanned }} item{{ 's' if summary.items_scanned != 1 else '' }},
+  created {{ created_variants }} variant{{ 's' if created_variants != 1 else '' }},
+  retained {{ retained_variants }} variant{{ 's' if retained_variants != 1 else '' }},
+  skipped {{ skipped_items }} item{{ 's' if skipped_items != 1 else '' }}.
+</div>
+
+<div class="form-card">
+  <h2>What Happened</h2>
+  <p class="muted">Scope: {{ scope_label }}</p>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-number">{{ summary.items_scanned }}</div><div class="stat-label">Items scanned</div></div>
+    <div class="stat-card"><div class="stat-number">{{ created_variants }}</div><div class="stat-label">Variants created</div></div>
+    <div class="stat-card"><div class="stat-number">{{ retained_variants }}</div><div class="stat-label">Variants retained</div></div>
+    <div class="stat-card"><div class="stat-number">{{ skipped_items }}</div><div class="stat-label">Items skipped</div></div>
+    <div class="stat-card"><div class="stat-number">0</div><div class="stat-label">Variants deleted</div></div>
+  </div>
+  <p class="muted" style="margin-top:.75rem;">Missing variants were kept in place so history and ownership stay intact.</p>
+</div>
+
+{% if skipped_details %}
+<div class="form-card">
+  <h2>Skipped Items</h2>
+  <table class="data-table compact">
+    <thead>
+      <tr><th>Item</th><th>SKU</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+      {% for entry in skipped_details %}
+      <tr>
+        <td>{{ entry.item }}</td>
+        <td class="mono">{{ entry.sku }}</td>
+        <td>{{ entry.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="form-actions">
+  <a href="{{ url_for('catalog.catalog') }}" class="btn btn-primary">Back to Catalog</a>
+  <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-secondary">Run Another Sync</a>
+</div>
+{% endblock %}

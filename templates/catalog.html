@@ -7,6 +7,7 @@
     {% if is_admin() %}
       <a class="btn btn-primary" href="{{ url_for('catalog.catalog_add') }}">+ Add Item</a>
       <a class="btn btn-secondary" id="sync-btn" href="{{ url_for('catalog.catalog_sync') }}">🔄 Sync</a>
+      <a class="btn btn-secondary" href="{{ url_for('data.variant_sync_page') }}">🎨 Variant Sync</a>
       <button type="button" class="btn btn-danger btn-sm" onclick="document.getElementById('purge-dialog').showModal()">🗑 Purge</button>
     {% endif %}
   </div>

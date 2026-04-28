@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Variant Sync – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🎨 Variant Sync {{ help_btn("variant_sync") }}</h1>
+  <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">← Catalog</a>
+</div>
+
+<div class="form-card">
+  <h2>How It Works</h2>
+  <p class="muted">Scan product pages for color variants without touching the main catalog sync.</p>
+  <ul class="completion-rules">
+    <li>Missing variants are kept, not deleted.</li>
+    <li>Existing variants are left alone.</li>
+    <li>If a page is unclear, no variant is created.</li>
+    <li>This does not change ownership or set membership.</li>
+  </ul>
+</div>
+
+<form method="post" class="form-card variant-sync-form">
+  <h2>Scan Scope</h2>
+  <div class="variant-scope-group">
+    <label class="checkbox-label">
+      <input type="radio" name="scope" value="all" {% if scope != 'category' and scope != 'selected' %}checked{% endif %}>
+      Entire catalog
+    </label>
+    <label class="checkbox-label">
+      <input type="radio" name="scope" value="category" {% if scope == 'category' %}checked{% endif %}>
+      Category
+    </label>
+    <label class="checkbox-label">
+      <input type="radio" name="scope" value="selected" {% if scope == 'selected' %}checked{% endif %}>
+      Selected SKUs
+    </label>
+  </div>
+
+  <div class="variant-scope-field" data-scope-field="category">
+    <label>Category
+      <select name="category" class="select-full">
+        <option value="">Choose a category</option>
+        {% for cat in categories %}
+          <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="variant-scope-field" data-scope-field="selected">
+    <label>Selected SKUs
+      <span class="hint">Paste one SKU per line, or separate them with commas.</span>
+      <textarea name="selected_skus" rows="6" class="input-full" placeholder="1726&#10;1738C&#10;1759C">{{ selected_skus_text or '' }}</textarea>
+    </label>
+  </div>
+
+  <p class="muted">Preview will show <strong>existing</strong>, <strong>create</strong>, and <strong>not seen in sync</strong> variant statuses before anything is saved.</p>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Preview Variants</button>
+    <a href="{{ url_for('catalog.catalog') }}" class="btn btn-secondary">Back</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function() {
+  const radios = document.querySelectorAll('input[name="scope"]');
+  const fields = document.querySelectorAll('.variant-scope-field');
+  function updateVisibility() {
+    const selected = document.querySelector('input[name="scope"]:checked');
+    const value = selected ? selected.value : 'all';
+    fields.forEach(function(field) {
+      field.style.display = field.dataset.scopeField === value ? '' : 'none';
+    });
+  }
+  radios.forEach(function(radio) {
+    radio.addEventListener('change', updateVisibility);
+  });
+  updateVisibility();
+})();
+</script>
+{% endblock %}

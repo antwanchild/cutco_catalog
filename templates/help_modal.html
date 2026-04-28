@@ -16,6 +16,7 @@
       {% elif page == 'stats' %}📈 Stats
       {% elif page == 'item_detail' %}📋 Item Detail
       {% elif page in ['sync', 'sync_preview'] %}🔄 Catalog Sync
+      {% elif page in ['variant_sync', 'variant_sync_preview'] %}🎨 Variant Sync
       {% elif page in ['import', 'import_page'] %}📥 Import
       {% elif page in ['completion_import', 'completion_import_page'] %}🧾 All SKU Completion Import
       {% elif page in ['completion_gaps', 'completion_gaps_page'] %}📉 Completion Gaps
@@ -134,6 +135,15 @@
         <li>New sets are listed separately — check any you want to add.</li>
         <li>Items in blocked categories (e.g. Accessories) are hidden by default.</li>
         <li>Only items with SKUs not already in the database are shown.</li>
+      </ul>
+
+    {% elif page in ['variant_sync', 'variant_sync_preview'] %}
+      <p>Scans product pages for color variants without touching catalog sync.</p>
+      <ul>
+        <li>Choose <strong>Entire catalog</strong>, a single <strong>category</strong>, or a pasted list of <strong>selected SKUs</strong>.</li>
+        <li>Existing variants are kept, missing variants are created, and nothing is deleted.</li>
+        <li>Items that do not expose clear variant choices are skipped and reviewed separately.</li>
+        <li>The preview shows <strong>existing</strong>, <strong>create</strong>, and <strong>not seen in sync</strong> status labels.</li>
       </ul>
 
     {% elif page in ['import', 'import_page'] %}
