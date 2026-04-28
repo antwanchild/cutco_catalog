@@ -945,6 +945,8 @@ def variant_sync_page():
     selected_skus_text = request.form.get("selected_skus", "").strip()
     selected_skus = _parse_variant_sync_selected_skus(selected_skus_text)
 
+    # Variant color pages can change over time, so always start with a fresh scrape.
+    scrape_item_variant_colors.cache_clear()
     items, selection_error = _resolve_variant_sync_items(scope, category, selected_skus)
     if selection_error:
         flash(selection_error, "error")
