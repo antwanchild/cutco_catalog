@@ -978,6 +978,36 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic", "Pearl", "Red"),
             )
 
+    def test_extract_product_variant_colors_parses_color_swatches(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <fieldset class="swatch-group Color" data-type="Tools Handle Color">
+                <div class="swatch product-option color-swatch" data-option="Classic">
+                  <label for="swatch-Classic">
+                    <span class="reader-only">Select Classic</span>
+                  </label>
+                </div>
+                <div class="swatch product-option color-swatch" data-option="Pearl">
+                  <label for="swatch-Pearl">
+                    <span class="reader-only">Select Pearl</span>
+                  </label>
+                </div>
+                <div class="swatch product-option color-swatch" data-option="Red">
+                  <label for="swatch-Red">
+                    <span class="reader-only">Select Red</span>
+                  </label>
+                </div>
+              </fieldset>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/1726C"),
+                ("Classic", "Pearl", "Red"),
+            )
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """

@@ -632,6 +632,44 @@ _VARIANT_SKIP_LABELS = {
 }
 
 
+def _collect_variant_candidate(candidates: list[str], seen: set[str], value: str | None) -> None:
+    candidate = _normalize_variant_label(value or "")
+    if not candidate:
+        return
+    key = candidate.lower()
+    if key in seen:
+        return
+    seen.add(key)
+    candidates.append(candidate)
+
+
+def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str, ...]:
+    """Extract color-like choices from product swatch groups."""
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for fieldset in soup.select("fieldset.swatch-group"):
+        group_text = " ".join(
+            [
+                " ".join(fieldset.get("class", [])),
+                str(fieldset.get("data-type", "")),
+                fieldset.get_text(" ", strip=True),
+            ]
+        ).lower()
+        if not any(keyword in group_text for keyword in ("color", "finish")):
+            continue
+        for swatch in fieldset.select(".swatch.product-option"):
+            swatch_classes = {cls.lower() for cls in swatch.get("class", [])}
+            if swatch_classes & {"engraving-swatch", "design-button", "location-button", "font-swatch"}:
+                continue
+            for attr in ("data-option", "data-code", "data-value", "aria-label", "title"):
+                _collect_variant_candidate(candidates, seen, swatch.get(attr))
+            reader_only = swatch.select_one(".reader-only")
+            if reader_only:
+                _collect_variant_candidate(candidates, seen, reader_only.get_text(" ", strip=True))
+            _collect_variant_candidate(candidates, seen, swatch.get_text(" ", strip=True))
+    return tuple(candidates)
+
+
 def _normalize_variant_label(value: str) -> str | None:
     cleaned = re.sub(r"\s+", " ", (value or "").strip()).strip(" \t\r\n:-|")
     if not cleaned:
@@ -667,6 +705,13 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
 
         candidates: list[str] = []
         seen: set[str] = set()
+        swatch_candidates = _collect_variant_candidates_from_swatches(soup)
+        for candidate in swatch_candidates:
+            key = candidate.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(candidate)
         patterns = [
             re.compile(r"Select\s+([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\s+Image:", re.IGNORECASE),
             re.compile(r"(?:Color|Block Finish|Handle Color|Finish)\s*:\s*([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\b", re.IGNORECASE),
