@@ -661,12 +661,23 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
             swatch_classes = {cls.lower() for cls in swatch.get("class", [])}
             if swatch_classes & {"engraving-swatch", "design-button", "location-button", "font-swatch"}:
                 continue
-            for attr in ("data-option", "data-code", "data-value", "aria-label", "title"):
-                _collect_variant_candidate(candidates, seen, swatch.get(attr))
-            reader_only = swatch.select_one(".reader-only")
-            if reader_only:
-                _collect_variant_candidate(candidates, seen, reader_only.get_text(" ", strip=True))
-            _collect_variant_candidate(candidates, seen, swatch.get_text(" ", strip=True))
+            swatch_sources = (
+                swatch.get("data-option"),
+                swatch.get("data-value"),
+                swatch.get("aria-label"),
+                swatch.get("title"),
+                swatch.get("data-code"),
+            )
+            for source in swatch_sources:
+                if _normalize_variant_label(source or ""):
+                    _collect_variant_candidate(candidates, seen, source)
+                    break
+            else:
+                reader_only = swatch.select_one(".reader-only")
+                if reader_only:
+                    _collect_variant_candidate(candidates, seen, reader_only.get_text(" ", strip=True))
+                else:
+                    _collect_variant_candidate(candidates, seen, swatch.get_text(" ", strip=True))
     return tuple(candidates)
 
 
@@ -721,10 +732,6 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
             tag_text = tag.get_text(" ", strip=True)
             if tag_text:
                 sources.append(tag_text)
-            for attr in ("aria-label", "title", "alt", "value", "data-color", "data-variant", "data-name", "data-value"):
-                attr_value = tag.get(attr)
-                if attr_value:
-                    sources.append(str(attr_value))
         for source in sources:
             for pattern in patterns:
                 for match in pattern.finditer(source):
@@ -736,6 +743,11 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
                         continue
                     seen.add(key)
                     candidates.append(candidate)
+        for tag in soup.find_all(True):
+            for attr in ("aria-label", "title", "alt", "value", "data-color", "data-variant", "data-name", "data-value"):
+                attr_value = tag.get(attr)
+                if attr_value:
+                    _collect_variant_candidate(candidates, seen, str(attr_value))
 
         logger.debug("Variant fetch: %s → %d candidates", clean_url, len(candidates))
         return tuple(candidates)

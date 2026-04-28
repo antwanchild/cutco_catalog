@@ -26,7 +26,7 @@
   <input type="hidden" name="scope_label" value="{{ preview.scope_label }}">
 
   {% for category_block in preview.grouped_items %}
-  <div class="form-card">
+  <div class="form-card variant-sync-category-block">
     <div class="section-heading-actions" style="margin-bottom:.5rem">
       <h2>{{ category_block.category }}</h2>
       <span class="muted small">{{ category_block['items'] | length }} item{{ 's' if category_block['items'] | length != 1 }}</span>

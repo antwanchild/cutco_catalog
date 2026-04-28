@@ -957,8 +957,9 @@ class UtilitySmokeTests(SmokeBaseTest):
             </body></html>
         """
         with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
             self.assertEqual(
-                _extract_product_variant_colors("https://www.cutco.com/p/1738C"),
+                _extract_product_variant_colors("https://www.cutco.com/p/1738C-test-1"),
                 ("Classic", "Pearl", "Red"),
             )
 
@@ -973,8 +974,9 @@ class UtilitySmokeTests(SmokeBaseTest):
             </body></html>
         """
         with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
             self.assertEqual(
-                _extract_product_variant_colors("https://www.cutco.com/p/1738C"),
+                _extract_product_variant_colors("https://www.cutco.com/p/1738C-test-2"),
                 ("Classic", "Pearl", "Red"),
             )
 
@@ -1004,8 +1006,34 @@ class UtilitySmokeTests(SmokeBaseTest):
         """
         with mock.patch("scraping.requests.get", return_value=response):
             self.assertEqual(
-                _extract_product_variant_colors("https://www.cutco.com/p/1726C"),
+                _extract_product_variant_colors("https://www.cutco.com/p/1726C-test-1"),
                 ("Classic", "Pearl", "Red"),
+            )
+
+    def test_extract_product_variant_colors_keeps_compound_swatch_labels_together(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <fieldset class="swatch-group Color" data-type="Tools Handle Color">
+                <div class="swatch product-option color-swatch" data-option="Classic Brown" data-code="Brown">
+                  <label for="swatch-Classic-Brown">
+                    <span class="reader-only">Select Classic Brown</span>
+                  </label>
+                </div>
+                <div class="swatch product-option color-swatch" data-option="Pearl">
+                  <label for="swatch-Pearl">
+                    <span class="reader-only">Select Pearl</span>
+                  </label>
+                </div>
+              </fieldset>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/1726C-test-2"),
+                ("Classic Brown", "Pearl"),
             )
 
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
