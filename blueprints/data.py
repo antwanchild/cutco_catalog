@@ -84,11 +84,6 @@ def _display_import_color(color: str) -> str:
     return "Unknown" if color == UNKNOWN_COLOR else color
 
 
-def _display_variant_sync_color(color: str) -> str:
-    """Shorten the long unknown variant label in variant sync previews."""
-    return "Unknown" if color == UNKNOWN_COLOR else color
-
-
 def _preview_import_color(color: str, is_cookware: bool = False) -> str:
     """Return a preview color, hiding meaningless cookware color labels."""
     if is_cookware:
@@ -644,13 +639,13 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
             else:
                 create_count += 1
                 create_colors.append(color)
-            variant_rows.append({"color": color, "display_color": _display_variant_sync_color(color), "status": status})
+            variant_rows.append({"color": color, "status": status})
 
         for variant in existing_real_variants:
             if variant.color.lower() in scraped_lookup:
                 continue
             retained_colors.append(variant.color)
-            variant_rows.append({"color": variant.color, "display_color": _display_variant_sync_color(variant.color), "status": "not seen in sync"})
+            variant_rows.append({"color": variant.color, "status": "not seen in sync"})
 
         retained_count = len(retained_colors)
         variants_to_create += create_count
@@ -659,13 +654,6 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
         no_clear_variants = not scraped_colors
         if no_clear_variants:
             items_with_no_clear_variants += 1
-        if has_unknown_variant and not no_clear_variants:
-            variant_rows.append({
-                "color": UNKNOWN_COLOR,
-                "display_color": _display_variant_sync_color(UNKNOWN_COLOR),
-                "status": "fallback only",
-            })
-
         variant_rows.sort(key=lambda row: (row["color"].lower(), row["status"]))
         preview_items.append({
             "item_id": item.id,

@@ -58,7 +58,7 @@
           {% for row in item.variant_rows %}
           <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% endif %}">
             <td>
-              {{ row.display_color or row.color }}
+              {{ row.color }}
               {% if row.status == 'fallback only' %}
                 <span class="badge badge-alias badge-mini">fallback only</span>
               {% endif %}
@@ -80,16 +80,13 @@
       </table>
       {% endif %}
 
-      {% if item.has_unknown_variant and not item.no_clear_variants %}
-        <p class="muted small">Unknown fallback variant is retained for older imports and generic ownership rows.</p>
-      {% endif %}
     </details>
     {% endfor %}
   </div>
   {% endfor %}
 
   <div class="completion-confirm-note flash flash-info variant-sync-confirm-note">
-    Missing variants are kept rather than deleted. Unknown fallback variants are left untouched.
+    Missing variants are kept rather than deleted.
   </div>
 
   <div class="form-actions">
