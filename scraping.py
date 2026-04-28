@@ -50,6 +50,61 @@ def _extract_sku_from_image_src(src: str | None) -> str | None:
     return None
 
 
+def _extract_product_variant_colors(raw_html: str) -> list[str]:
+    """Extract product color choices from a Cutco product page."""
+    soup = BeautifulSoup(raw_html, "html.parser")
+    lines = [
+        re.sub(r"\s+", " ", line).strip()
+        for line in soup.get_text("\n", strip=True).splitlines()
+        if line.strip()
+    ]
+    colors: list[str] = []
+    current_color: str | None = None
+    in_color_section = False
+    stop_prefixes = (
+        "add gift wrap",
+        "add personalization",
+        "add monogram",
+        "add your custom text",
+        "choose your",
+        "shears:",
+        "knife:",
+        "size:",
+        "handle:",
+        "blade:",
+    )
+    option_re = re.compile(r"(?:Select|Choose)\s+(.+?)(?:\s+Image:\s+.*)?$", re.IGNORECASE)
+
+    for line in lines:
+        lowered = line.lower()
+        if lowered.startswith("color:"):
+            in_color_section = True
+            current_color = line.split(":", 1)[1].strip() or None
+            continue
+        if not in_color_section:
+            continue
+        if any(lowered.startswith(prefix) for prefix in stop_prefixes):
+            break
+        match = option_re.search(line)
+        if match:
+            color = match.group(1).strip()
+            if color:
+                colors.append(color)
+
+    if not colors and current_color:
+        colors.append(current_color)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for color in colors:
+        key = color.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(color)
+    return deduped
+
+
 def _discover_categories() -> list[tuple[str, str]]:
     """Scrape the Cutco shop index to discover all category pages automatically."""
     discovery_urls = [
@@ -528,6 +583,7 @@ def scrape_item_specs(url: str) -> dict:
         "blade_length":   None,
         "overall_length": None,
         "weight":         None,
+        "variant_colors": [],
     }
     try:
         resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
@@ -606,6 +662,8 @@ def scrape_item_specs(url: str) -> dict:
                     result["msrp"] = float(og_tag["content"].replace(",", ""))
                 except ValueError:
                     pass
+
+        result["variant_colors"] = _extract_product_variant_colors(raw_html)
 
         logger.debug("Specs: %s → %s", clean_url, result)
     except Exception as exc:
