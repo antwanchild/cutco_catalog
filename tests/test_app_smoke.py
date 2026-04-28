@@ -1156,6 +1156,29 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Gray",),
             )
 
+    def test_extract_product_variant_colors_returns_empty_when_no_swatch_group_exists(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <h1>Handle Mitt</h1>
+              <p>All Cutco Knives Are American Made</p>
+              <p>Exclusive for Cutco</p>
+              <p>Customer Service</p>
+              <p>Chat Live</p>
+              <p>Color: Classic</p>
+              <p>Select Classic Image: Classic</p>
+              <p>Select Pearl Image: Pearl</p>
+              <p>Select Red Image: Red</p>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/278-test"),
+                (),
+            )
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """
