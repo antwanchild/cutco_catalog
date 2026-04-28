@@ -56,13 +56,20 @@
         </thead>
         <tbody>
           {% for row in item.variant_rows %}
-          <tr>
-            <td>{{ row.color }}</td>
+          <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% endif %}">
+            <td>
+              {{ row.color }}
+              {% if row.status == 'fallback only' %}
+                <span class="badge badge-alias badge-mini">fallback only</span>
+              {% endif %}
+            </td>
             <td>
               {% if row.status == 'existing' %}
                 <span class="badge badge-info">existing</span>
               {% elif row.status == 'create' %}
                 <span class="badge badge-new">create</span>
+              {% elif row.status == 'fallback only' %}
+                <span class="badge badge-alias">fallback only</span>
               {% else %}
                 <span class="badge badge-warning">not seen in sync</span>
               {% endif %}
@@ -74,7 +81,7 @@
       {% endif %}
 
       {% if item.has_unknown_variant and not item.no_clear_variants %}
-        <p class="muted small">Unknown fallback variant is retained.</p>
+        <p class="muted small">Unknown fallback variant is retained for older imports and generic ownership rows.</p>
       {% endif %}
     </details>
     {% endfor %}

@@ -654,6 +654,8 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
         no_clear_variants = not scraped_colors
         if no_clear_variants:
             items_with_no_clear_variants += 1
+        if has_unknown_variant and not no_clear_variants:
+            variant_rows.append({"color": UNKNOWN_COLOR, "status": "fallback only"})
 
         variant_rows.sort(key=lambda row: (row["color"].lower(), row["status"]))
         preview_items.append({

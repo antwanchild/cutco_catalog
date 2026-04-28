@@ -727,6 +727,12 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .variant-sync-confirm-note {
   margin-top: 1rem;
 }
+.variant-sync-fallback-row td {
+  color: var(--muted);
+}
+.variant-sync-fallback-row .badge-alias {
+  margin-left: .35rem;
+}
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

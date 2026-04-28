@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 from app import create_app
+from constants import UNKNOWN_COLOR
 from extensions import db
 from helpers import _collection_token, _gift_token, _notify_discord, _verify_collection_token, _verify_gift_token, check_wishlist_targets
 from models import (
@@ -3151,6 +3152,36 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             self.assertEqual(len(item.variants), 1)
+
+    def test_variant_sync_shows_fallback_only_variant(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _unknown_variant_id = self._add_catalog_item(name="Fallback Variant Knife", sku="FV-1")
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            db.session.add(ItemVariant(item_id=item.id, color="Classic"))
+            db.session.add(ItemVariant(item_id=item.id, color=UNKNOWN_COLOR))
+            db.session.commit()
+
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=("Classic",),
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "FV-1",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"fallback only", preview_response.data)
+        self.assertIn(b"Unknown / Unspecified", preview_response.data)
 
     def test_catalog_sync_uses_populates_tasks(self):
         self._login_as_admin()
