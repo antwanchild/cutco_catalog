@@ -1120,6 +1120,42 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic Brown", "Pearl"),
             )
 
+    def test_extract_product_variant_colors_rejects_non_color_labels_in_generic_swatch_groups(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <fieldset class="swatch-group Color" data-type="Tools Handle Color">
+                <div class="swatch product-option" data-option="Gray">
+                  <label for="swatch-Gray">
+                    <span class="reader-only">Select Gray</span>
+                  </label>
+                </div>
+                <div class="swatch product-option" data-option="Chat Live">
+                  <label for="swatch-Chat">
+                    <span class="reader-only">Select Chat Live</span>
+                  </label>
+                </div>
+                <div class="swatch product-option" data-option="Customer Service">
+                  <label for="swatch-Service">
+                    <span class="reader-only">Select Customer Service</span>
+                  </label>
+                </div>
+                <div class="swatch product-option" data-option="All Cutco Knives Are American Made">
+                  <label for="swatch-Noise">
+                    <span class="reader-only">Select All Cutco Knives Are American Made</span>
+                  </label>
+                </div>
+              </fieldset>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/9996-test"),
+                ("Gray",),
+            )
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """

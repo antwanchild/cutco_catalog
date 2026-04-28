@@ -674,6 +674,58 @@ _VARIANT_SWATCH_FALLBACK_BLOCKLIST = {
     "text",
 }
 
+_VARIANT_COLOR_WORDS = {
+    "amber",
+    "beige",
+    "black",
+    "blue",
+    "bronze",
+    "brown",
+    "brass",
+    "burgundy",
+    "champagne",
+    "charcoal",
+    "chrome",
+    "classic",
+    "clear",
+    "copper",
+    "coral",
+    "cream",
+    "dark",
+    "gold",
+    "gray",
+    "grey",
+    "green",
+    "ivory",
+    "light",
+    "mahogany",
+    "maple",
+    "natural",
+    "navy",
+    "nickel",
+    "onyx",
+    "pearl",
+    "pewter",
+    "pink",
+    "platinum",
+    "purple",
+    "red",
+    "rose",
+    "rosewood",
+    "rust",
+    "sand",
+    "satin",
+    "silver",
+    "smoke",
+    "stainless",
+    "steel",
+    "stone",
+    "tan",
+    "teal",
+    "white",
+    "yellow",
+}
+
 
 def _collect_variant_candidate(candidates: list[str], seen: set[str], value: str | None) -> None:
     candidate = _normalize_variant_label(value or "")
@@ -705,7 +757,7 @@ def _looks_like_variant_color(label: str | None) -> bool:
     word_set = {word.lower() for word in words}
     if word_set & _VARIANT_SWATCH_FALLBACK_BLOCKLIST:
         return False
-    return True
+    return all(word in _VARIANT_COLOR_WORDS for word in word_set)
 
 
 def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str, ...]:
