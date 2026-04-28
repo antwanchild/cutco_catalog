@@ -962,6 +962,22 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic", "Pearl", "Red"),
             )
 
+    def test_extract_product_variant_colors_reads_attribute_sources(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <button aria-label="Select Classic Image: Classic">Classic</button>
+              <div data-color="Pearl">Pearl</div>
+              <option value="Red">Red</option>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/1738C"),
+                ("Classic", "Pearl", "Red"),
+            )
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """

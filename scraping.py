@@ -662,6 +662,7 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
         soup = BeautifulSoup(resp.text, "html.parser")
         for noise in soup.find_all(["script", "style"]):
             noise.decompose()
+        raw_html = resp.text
         text = soup.get_text("\n", strip=True)
 
         candidates: list[str] = []
@@ -670,16 +671,26 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
             re.compile(r"Select\s+([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\s+Image:", re.IGNORECASE),
             re.compile(r"(?:Color|Block Finish|Handle Color|Finish)\s*:\s*([A-Za-z0-9][A-Za-z0-9 /&'\"().,-]{0,60}?)\b", re.IGNORECASE),
         ]
-        for pattern in patterns:
-            for match in pattern.finditer(text):
-                candidate = _normalize_variant_label(match.group(1))
-                if not candidate:
-                    continue
-                key = candidate.lower()
-                if key in seen:
-                    continue
-                seen.add(key)
-                candidates.append(candidate)
+        sources = [raw_html, text]
+        for tag in soup.find_all(True):
+            tag_text = tag.get_text(" ", strip=True)
+            if tag_text:
+                sources.append(tag_text)
+            for attr in ("aria-label", "title", "alt", "value", "data-color", "data-variant", "data-name", "data-value"):
+                attr_value = tag.get(attr)
+                if attr_value:
+                    sources.append(str(attr_value))
+        for source in sources:
+            for pattern in patterns:
+                for match in pattern.finditer(source):
+                    candidate = _normalize_variant_label(match.group(1))
+                    if not candidate:
+                        continue
+                    key = candidate.lower()
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    candidates.append(candidate)
 
         logger.debug("Variant fetch: %s → %d candidates", clean_url, len(candidates))
         return tuple(candidates)

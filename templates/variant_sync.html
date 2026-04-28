@@ -18,6 +18,12 @@
 </div>
 
 <form method="post" class="form-card variant-sync-form">
+  <div id="variant-sync-overlay" style="display:none">
+    <div class="sync-overlay-inner">
+      <div class="sync-spinner"></div>
+      <p>Scanning variants... this may take a minute…</p>
+    </div>
+  </div>
   <h2>Scan Scope</h2>
   <div class="variant-scope-group">
     <label class="checkbox-label">
@@ -55,7 +61,7 @@
   <p class="muted">Preview will show <strong>existing</strong>, <strong>create</strong>, and <strong>not seen in sync</strong> variant statuses before anything is saved.</p>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Preview Variants</button>
+    <button type="submit" id="variant-sync-preview-btn" class="btn btn-primary">Preview Variants</button>
     <a href="{{ url_for('catalog.catalog') }}" class="btn btn-secondary">Back</a>
   </div>
 </form>
@@ -65,8 +71,11 @@
 {{ super() }}
 <script>
 (function() {
+  const form = document.querySelector('.variant-sync-form');
   const radios = document.querySelectorAll('input[name="scope"]');
   const fields = document.querySelectorAll('.variant-scope-field');
+  const previewBtn = document.getElementById('variant-sync-preview-btn');
+  const overlay = document.getElementById('variant-sync-overlay');
   function updateVisibility() {
     const selected = document.querySelector('input[name="scope"]:checked');
     const value = selected ? selected.value : 'all';
@@ -78,6 +87,33 @@
     radio.addEventListener('change', updateVisibility);
   });
   updateVisibility();
+
+  if (form && previewBtn && overlay) {
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+      previewBtn.textContent = 'Scanning...';
+      previewBtn.classList.add('btn-disabled');
+      previewBtn.style.pointerEvents = 'none';
+      overlay.style.display = 'flex';
+
+      fetch(form.action || window.location.href, {
+        method: 'POST',
+        body: new FormData(form),
+      })
+        .then(function(response) {
+          history.pushState({}, '', response.url);
+          return response.text();
+        })
+        .then(function(html) {
+          document.open();
+          document.write(html);
+          document.close();
+        })
+        .catch(function() {
+          form.submit();
+        });
+    });
+  }
 })();
 </script>
 {% endblock %}
