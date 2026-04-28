@@ -668,6 +668,7 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
             "has_unknown_variant": has_unknown_variant,
             "no_clear_variants": no_clear_variants,
             "scraped_variant_count": len(scraped_colors),
+            "swatch_count": len(scraped_colors),
         })
 
     grouped_items: dict[str, list[dict]] = {}
