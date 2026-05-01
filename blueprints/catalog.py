@@ -1,3 +1,5 @@
+"""Catalog, item, set, and sync routes."""
+
 import json
 import logging
 import re
@@ -291,6 +293,7 @@ def _aggregate_resolved_members(
 
 @catalog_bp.route("/catalog")
 def catalog():
+    """Render the catalog browser."""
     search_query = request.args.get("q", "").strip()
     cat_filter = request.args.get("category", "")
     unicorn_f  = request.args.get("unicorn", "")
@@ -390,6 +393,7 @@ def catalog():
 @catalog_bp.route("/catalog/add", methods=["GET", "POST"])
 @admin_required
 def catalog_add():
+    """Create a catalog item."""
     next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
     if request.method == "POST":
         availability = canonicalize_availability(request.form.get("availability", "public"))
@@ -433,6 +437,7 @@ def catalog_add():
 @catalog_bp.route("/catalog/<int:item_id>/edit", methods=["GET", "POST"])
 @admin_required
 def catalog_edit(item_id):
+    """Edit an existing catalog item."""
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)
@@ -529,6 +534,7 @@ def catalog_purge_all():
 
 @catalog_bp.route("/catalog/<int:item_id>/delete", methods=["POST"])
 def catalog_delete(item_id):
+    """Delete a catalog item."""
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))
@@ -547,6 +553,7 @@ def catalog_delete(item_id):
 
 @catalog_bp.route("/catalog/<int:item_id>/variants")
 def variants(item_id):
+    """Render the variants view for an item."""
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)
@@ -557,6 +564,7 @@ def variants(item_id):
 @catalog_bp.route("/catalog/<int:item_id>/variants/add", methods=["POST"])
 @admin_required
 def variant_add(item_id):
+    """Add a variant to an item."""
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)
@@ -583,6 +591,7 @@ def variant_add(item_id):
 @catalog_bp.route("/variants/<int:vid>/edit", methods=["POST"])
 @admin_required
 def variant_edit(vid):
+    """Edit an item variant."""
     variant = db.session.get(ItemVariant, vid)
     if not variant:
         abort(404)
@@ -608,6 +617,7 @@ def variant_edit(vid):
 @catalog_bp.route("/variants/<int:vid>/delete", methods=["POST"])
 @admin_required
 def variant_delete(vid):
+    """Delete an item variant."""
     variant = db.session.get(ItemVariant, vid)
     if not variant:
         abort(404)
@@ -629,6 +639,7 @@ def variant_delete(vid):
 
 @catalog_bp.route("/sets")
 def sets_list():
+    """Render the set list page."""
     from models import Ownership, Person
     all_sets    = Set.query.order_by(Set.name).all()
     all_persons = Person.query.order_by(Person.name).all()
@@ -680,6 +691,7 @@ def sets_list():
 @catalog_bp.route("/sets/add", methods=["GET", "POST"])
 @admin_required
 def set_add():
+    """Create a set."""
     next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -712,6 +724,7 @@ def set_add():
 @catalog_bp.route("/sets/<int:sid>/edit", methods=["GET", "POST"])
 @admin_required
 def set_edit(set_id=None, sid=None):
+    """Edit a set."""
     set_id = set_id if set_id is not None else sid
     item_set = db.session.get(Set, set_id)
     if not item_set:
@@ -830,6 +843,7 @@ def _reconcile_set_memberships_from_entries(
 @catalog_bp.route("/sets/<int:sid>/restore-memberships", methods=["POST"])
 @admin_required
 def set_restore_memberships(set_id=None, sid=None):
+    """Restore set memberships from the stored snapshot."""
     set_id = set_id if set_id is not None else sid
     item_set = db.session.get(Set, set_id)
     if not item_set:
@@ -848,6 +862,7 @@ def set_restore_memberships(set_id=None, sid=None):
 @catalog_bp.route("/sets/bulk-resync-memberships", methods=["POST"])
 @admin_required
 def bulk_resync_set_memberships():
+    """Resync memberships for selected sets from scrape data."""
     selected_set_ids: set[int] = set()
     invalid_seen = False
     for raw_set_id in request.form.getlist("set_ids"):
@@ -925,6 +940,7 @@ def bulk_resync_set_memberships():
 @catalog_bp.route("/sets/bulk-restore-memberships", methods=["POST"])
 @admin_required
 def bulk_restore_set_memberships():
+    """Restore memberships for selected sets from snapshots."""
     selected_set_ids: set[int] = set()
     invalid_seen = False
     for raw_set_id in request.form.getlist("set_ids"):
@@ -983,6 +999,7 @@ def bulk_restore_set_memberships():
 @catalog_bp.route("/sets/<int:set_id>/delete", methods=["POST"])
 @catalog_bp.route("/sets/<int:sid>/delete", methods=["POST"])
 def set_delete(set_id=None, sid=None):
+    """Delete a set."""
     set_id = set_id if set_id is not None else sid
     if not is_admin():
         flash("Admin access required.", "error")
@@ -1001,6 +1018,7 @@ def set_delete(set_id=None, sid=None):
 @catalog_bp.route("/sets/<int:set_id>")
 @catalog_bp.route("/sets/<int:sid>")
 def set_detail(set_id=None, sid=None):
+    """Render a set detail page."""
     set_id = set_id if set_id is not None else sid
     from models import Ownership, Person
     item_set    = db.session.get(Set, set_id)
@@ -1159,6 +1177,7 @@ def catalog_sync_uses():
 
 @catalog_bp.route("/catalog/sync")
 def catalog_sync():
+    """Render the catalog sync preview page."""
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))
@@ -1256,6 +1275,7 @@ def catalog_sync():
 
 @catalog_bp.route("/catalog/sync/confirm", methods=["POST"])
 def catalog_sync_confirm():
+    """Apply a catalog sync preview."""
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))

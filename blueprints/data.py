@@ -1,3 +1,5 @@
+"""Import, export, and completion-sync routes."""
+
 import json
 import csv
 import io
@@ -824,12 +826,14 @@ def _build_import_header_report(uploaded_file, ext: str) -> dict:
 
 @data_bp.route("/export")
 def export_page():
+    """Render the export page."""
     suggested_name = f"cutco_collection_{date.today().isoformat()}.csv"
     return render_template("export_page.html", suggested_name=suggested_name)
 
 
 @data_bp.route("/export/csv")
 def export_csv():
+    """Export the collection as CSV."""
     rows = (db.session.query(Ownership, ItemVariant, Item, Person)
             .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
             .join(Item,        ItemVariant.item_id   == Item.id)
@@ -867,6 +871,7 @@ def export_csv():
 @data_bp.route("/completion-gaps", methods=["GET", "POST"])
 @admin_required
 def completion_gaps_page():
+    """Render the completion gaps page."""
     people = Person.query.order_by(Person.name).all()
     public_catalog_count = Item.query.filter_by(set_only=False, in_catalog=True).count()
     last_person_id = session.get("last_person_id")
@@ -928,6 +933,7 @@ def completion_gaps_page():
 @data_bp.route("/variant-sync", methods=["GET", "POST"])
 @admin_required
 def variant_sync_page():
+    """Render the variant sync preview page."""
     all_items = Item.query.options(selectinload(Item.variants)).filter(Item.cutco_url.isnot(None)).all()
     categories = sorted(
         {item.category for item in all_items if item.category},
@@ -997,6 +1003,7 @@ def variant_sync_page():
 @data_bp.route("/variant-sync/confirm", methods=["POST"])
 @admin_required
 def variant_sync_confirm():
+    """Apply the variant sync preview."""
     preview_raw = request.form.get("preview_json", "")
     if not preview_raw:
         flash("Variant sync preview data was missing.", "error")
@@ -1085,6 +1092,7 @@ def variant_sync_confirm():
 
 @data_bp.route("/import/template")
 def import_template():
+    """Download a starter CSV template for imports."""
     csv_buffer = io.StringIO()
     writer = csv.writer(csv_buffer)
     writer.writerow(["name", "sku", "owned", "color", "availability", "quantity purchased",
@@ -1103,6 +1111,7 @@ def import_template():
 @data_bp.route("/import", methods=["GET", "POST"])
 @admin_required
 def import_page():
+    """Render the import page."""
     if request.method == "GET":
         return render_template("import_page.html",
                                people=Person.query.order_by(Person.name).all(),
@@ -1375,6 +1384,7 @@ def import_page():
 @data_bp.route("/completion-import", methods=["GET", "POST"])
 @admin_required
 def completion_import_page():
+    """Render the completion import page."""
     recent_completion_imports = (
         db.session.execute(
             db.select(ActivityEvent)
@@ -1445,6 +1455,7 @@ def completion_import_page():
 @data_bp.route("/completion-import/export", methods=["POST"])
 @admin_required
 def completion_import_export():
+    """Export completion import rows as CSV."""
     export_count = int(request.form.get("export_count", 0) or 0)
     rows = []
     for idx in range(export_count):
@@ -1486,6 +1497,7 @@ def completion_import_export():
 @data_bp.route("/completion-import/missing-export", methods=["POST"])
 @admin_required
 def completion_import_missing_export():
+    """Export unresolved completion rows as CSV."""
     export_count = int(request.form.get("export_count", 0) or 0)
     rows = []
     for idx in range(export_count):
@@ -1521,6 +1533,7 @@ def completion_import_missing_export():
 @data_bp.route("/completion-import/confirm", methods=["POST"])
 @admin_required
 def completion_import_confirm():
+    """Apply a completion import preview."""
     from sqlalchemy.exc import SQLAlchemyError
 
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
@@ -1682,6 +1695,7 @@ def completion_import_confirm():
 @data_bp.route("/import/confirm", methods=["POST"])
 @admin_required
 def import_confirm():
+    """Apply an item and ownership import preview."""
     from sqlalchemy.exc import SQLAlchemyError
 
     added_items     = 0

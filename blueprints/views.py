@@ -1,3 +1,5 @@
+"""Read-only views and public share links."""
+
 from flask import Blueprint, abort, render_template, request
 
 from constants import COOKWARE_CATEGORIES, STATUS_RANK, UNKNOWN_COLOR
@@ -11,6 +13,7 @@ views_bp = Blueprint("views", __name__)
 
 @views_bp.route("/views/item/<int:item_id>")
 def item_owners(item_id):
+    """Render the ownership view for a single item."""
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)
@@ -52,6 +55,7 @@ def item_owners(item_id):
 
 @views_bp.route("/views/matrix")
 def matrix():
+    """Render the ownership matrix view."""
     people_list = Person.query.order_by(Person.name).all()
     sort_field  = (request.args.get("sort", "name") or "name").strip().lower()
     if sort_field not in {"name", "sku"}:
@@ -102,6 +106,7 @@ def matrix():
 
 @views_bp.route("/stats")
 def stats():
+    """Render collection summary statistics."""
     person_id   = request.args.get("person", type=int)
     people_list = Person.query.order_by(Person.name).all()
 
@@ -203,7 +208,7 @@ def stats():
 @views_bp.route("/sets/<int:set_id>/gift-token")
 @views_bp.route("/sets/<int:sid>/gift-token")
 def gift_token(set_id=None, sid=None):
-    """Generate a shareable gift list token for a set + person combination."""
+    """Generate a shareable gift list token."""
     set_id = set_id if set_id is not None else sid
     person_id = request.args.get("person", type=int)
     if not person_id:
@@ -221,7 +226,7 @@ def gift_token(set_id=None, sid=None):
 
 @views_bp.route("/gifts/<token>")
 def gift_list(token):
-    """Public read-only gift list page — no login required."""
+    """Render a public gift list page."""
     ids = _verify_gift_token(token)
     if ids is None:
         abort(404)
@@ -253,7 +258,7 @@ def gift_list(token):
 
 @views_bp.route("/people/<int:person_id>/collection-token")
 def collection_token(person_id):
-    """Generate a shareable collection card token for a person."""
+    """Generate a shareable collection token."""
     person = db.session.get(Person, person_id)
     if not person:
         abort(404)
@@ -265,7 +270,7 @@ def collection_token(person_id):
 
 @views_bp.route("/collection-card/<token>")
 def collection_card(token):
-    """Public read-only collection card — no login required."""
+    """Render a public collection card page."""
     person_id = _verify_collection_token(token)
     if person_id is None:
         abort(404)

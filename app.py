@@ -1,3 +1,5 @@
+"""Flask application factory, logging setup, and global route wiring."""
+
 import logging
 import os
 from datetime import datetime, timedelta
@@ -377,6 +379,7 @@ def _register_routes(app: Flask) -> None:
 
 
 def create_app(test_config: dict | None = None) -> Flask:
+    """Build and configure the Flask application."""
     app = Flask(__name__)
     app.config.update(
         SECRET_KEY=os.environ.get("SECRET_KEY", "cutco-vault-dev-key"),

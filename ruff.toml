@@ -1,2 +1,8 @@
 [lint]
-ignore = ["D100", "D101", "D103", "D104"]
+extend-select = ["D", "D400", "D401", "D404", "D413"]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.per-file-ignores]
+"tests/**/*.py" = ["D"]

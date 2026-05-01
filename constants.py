@@ -1,3 +1,5 @@
+"""Application-wide constants and normalization helpers."""
+
 import os
 import re
 import subprocess
@@ -71,6 +73,7 @@ APP_VERSION = os.environ.get("APP_VERSION", "dev")
 
 
 def _read_git_sha_from_repo() -> str | None:
+    """Read the current Git SHA from the repository checkout."""
     repo_root = Path(__file__).resolve().parent
     try:
         result = subprocess.run(
@@ -88,6 +91,7 @@ def _read_git_sha_from_repo() -> str | None:
 
 @lru_cache(maxsize=1)
 def get_git_sha_info() -> tuple[str, str]:
+    """Return the best available Git SHA and where it came from."""
     sha = os.environ.get("GIT_SHA", "").strip()
     if sha:
         return sha, "image"
@@ -98,6 +102,7 @@ def get_git_sha_info() -> tuple[str, str]:
 
 
 def get_git_sha() -> str:
+    """Return the resolved Git SHA string."""
     return get_git_sha_info()[0]
 
 

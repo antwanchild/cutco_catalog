@@ -1,3 +1,5 @@
+"""Admin-only routes and runtime diagnostics."""
+
 import logging
 import os
 import platform
@@ -114,6 +116,7 @@ def _runtime_details():
 
 @admin_bp.route("/admin/msrp-diff")
 def msrp_diff_page():
+    """Render the MSRP diff admin page."""
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("index"))
@@ -126,6 +129,7 @@ def msrp_diff_page():
 
 @admin_bp.route("/admin/msrp-diff/run", methods=["POST"])
 def msrp_diff_run():
+    """Start the MSRP diff background job."""
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("index"))
@@ -147,6 +151,7 @@ def msrp_diff_run():
 
 @admin_bp.route("/admin/msrp-diff/status")
 def msrp_diff_status():
+    """Return the current MSRP diff job status."""
     if not is_admin():
         return jsonify(error="Unauthorized"), 403
     return jsonify(_read_msrp_job())
@@ -154,6 +159,7 @@ def msrp_diff_status():
 
 @admin_bp.route("/admin/specs-backfill")
 def specs_backfill_page():
+    """Render the specs backfill admin page."""
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("index"))
@@ -166,6 +172,7 @@ def specs_backfill_page():
 
 @admin_bp.route("/admin/specs-backfill/run", methods=["POST"])
 def specs_backfill_run():
+    """Start the specs backfill background job."""
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("index"))
@@ -184,6 +191,7 @@ def specs_backfill_run():
 
 @admin_bp.route("/admin/specs-backfill/status")
 def specs_backfill_status():
+    """Return the current specs backfill job status."""
     if not is_admin():
         return jsonify(error="Unauthorized"), 403
     return jsonify(_read_specs_job())
@@ -191,6 +199,7 @@ def specs_backfill_status():
 
 @admin_bp.route("/admin/diagnostics")
 def diagnostics_page():
+    """Render the runtime diagnostics page."""
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("index"))
@@ -204,6 +213,7 @@ def diagnostics_page():
 
 @admin_bp.context_processor
 def inject_admin_status_strip():
+    """Expose the admin status strip to admin templates."""
     if not is_admin() or not request.endpoint or not request.endpoint.startswith("admin."):
         return {}
     git_sha, git_sha_source = get_git_sha_info()
@@ -222,6 +232,7 @@ def inject_admin_status_strip():
 @admin_bp.route("/admin/login", methods=["GET", "POST"])
 @limiter.limit("10 per minute; 30 per hour")
 def admin_login():
+    """Handle admin login requests."""
     if request.method == "POST":
         if request.form.get("token") == ADMIN_TOKEN:
             session["is_admin"] = True
@@ -237,6 +248,7 @@ def admin_login():
 
 @admin_bp.route("/admin/logout")
 def admin_logout():
+    """Log the admin user out."""
     logger.info("Admin logged out")
     session.pop("is_admin", None)
     return redirect(url_for("index"))
@@ -244,6 +256,7 @@ def admin_logout():
 
 @admin_bp.route("/api/variants/<int:item_id>")
 def api_variants(item_id):
+    """Return item variants as JSON for admin tooling."""
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)

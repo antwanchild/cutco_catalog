@@ -1,3 +1,5 @@
+"""Scraping helpers for Cutco catalog, product, and set data."""
+
 import json
 import logging
 import re
@@ -912,14 +914,12 @@ scrape_item_variant_colors.cache_info = _extract_product_variant_colors.cache_in
 
 # Keep old name as alias so existing callers still work
 def scrape_edge_type(url: str) -> str:
+    """Return the scraped edge type for a product page."""
     return scrape_item_specs(url)["edge_type"]
 
 
 def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
-    """Scrape all item categories.
-
-    Returns (items, set_candidates).
-    """
+    """Scrape all item categories and return items plus set candidates."""
     results        = []
     set_candidates: list[tuple[str, str]] = []
     seen_skus      = set()

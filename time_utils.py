@@ -1,9 +1,12 @@
+"""Helpers for parsing and formatting container-local timestamps."""
+
 from datetime import datetime, timezone
 import os
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 def container_timezone() -> tuple[timezone | ZoneInfo, str]:
+    """Return the configured container timezone and its display name."""
     tz_name = os.environ.get("TZ", "UTC").strip() or "UTC"
     try:
         return ZoneInfo(tz_name), tz_name
@@ -12,6 +15,7 @@ def container_timezone() -> tuple[timezone | ZoneInfo, str]:
 
 
 def format_container_time(value: str | None) -> str:
+    """Format an ISO timestamp in the container timezone."""
     if not value:
         return "—"
     try:

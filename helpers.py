@@ -1,3 +1,5 @@
+"""Shared authentication, CSRF, persistence, and notification helpers."""
+
 import base64
 import hashlib
 import hmac
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def is_admin() -> bool:
+    """Return whether the current session has admin access."""
     # Primary auth path: signed Flask session flag.
     if session.get("is_admin") is True:
         return True

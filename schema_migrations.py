@@ -1,3 +1,5 @@
+"""Database schema version tracking and migration helpers."""
+
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -13,6 +15,8 @@ SCHEMA_STATE_NAME = "schema"
 
 
 class SchemaState(db.Model):
+    """Current schema version metadata."""
+
     __tablename__ = "schema_state"
 
     name = db.Column(db.String(40), primary_key=True)
@@ -21,6 +25,8 @@ class SchemaState(db.Model):
 
 
 class SchemaHistory(db.Model):
+    """Applied schema migration history."""
+
     __tablename__ = "schema_history"
 
     version = db.Column(db.Integer, primary_key=True)
@@ -30,21 +36,26 @@ class SchemaHistory(db.Model):
 
 @dataclass(frozen=True, slots=True)
 class SchemaMigration:
+    """A single schema migration step."""
+
     version: int
     name: str
     apply: Callable[[], None]
 
 
 def _now_utc() -> str:
+    """Return the current UTC timestamp as an ISO string."""
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _get_schema_version() -> int:
+    """Return the current schema version."""
     state = db.session.get(SchemaState, SCHEMA_STATE_NAME)
     return state.version if state else 0
 
 
 def get_schema_state() -> dict:
+    """Return schema state metadata as a dictionary."""
     state = db.session.get(SchemaState, SCHEMA_STATE_NAME)
     if state is None:
         return {"name": SCHEMA_STATE_NAME, "version": 0, "updated_at": None}
@@ -52,6 +63,7 @@ def get_schema_state() -> dict:
 
 
 def get_schema_history(limit: int = 10) -> list[dict]:
+    """Return the most recent schema migration history rows."""
     history = (
         db.session.execute(db.select(SchemaHistory).order_by(SchemaHistory.version.desc()).limit(limit))
         .scalars()
@@ -64,6 +76,7 @@ def get_schema_history(limit: int = 10) -> list[dict]:
 
 
 def _set_schema_version(version: int) -> None:
+    """Update the stored schema version."""
     state = db.session.get(SchemaState, SCHEMA_STATE_NAME)
     if state is None:
         state = SchemaState(name=SCHEMA_STATE_NAME, version=version, updated_at=_now_utc())
@@ -74,6 +87,7 @@ def _set_schema_version(version: int) -> None:
 
 
 def _record_history(version: int, name: str) -> None:
+    """Record or refresh a schema history entry."""
     history = db.session.get(SchemaHistory, version)
     if history is None:
         db.session.add(SchemaHistory(version=version, name=name, applied_at=_now_utc()))
@@ -83,6 +97,7 @@ def _record_history(version: int, name: str) -> None:
 
 
 def _backfill_history(current_version: int, migrations: tuple[SchemaMigration, ...]) -> bool:
+    """Backfill missing history rows for already-applied migrations."""
     if current_version <= 0:
         return False
 
@@ -105,6 +120,7 @@ def _backfill_history(current_version: int, migrations: tuple[SchemaMigration, .
 
 
 def _add_column(table_name: str, column_name: str, statement: str) -> None:
+    """Add a missing column to a table if needed."""
     inspector = sa_inspect(db.engine)
     existing = {column["name"] for column in inspector.get_columns(table_name)}
     if column_name not in existing:
@@ -115,6 +131,7 @@ def _add_column(table_name: str, column_name: str, statement: str) -> None:
 
 
 def _schema_column_migrations() -> None:
+    """Apply baseline column migrations."""
     _add_column("sets", "sku", "ALTER TABLE sets ADD COLUMN sku VARCHAR(20)")
     _add_column(
         "item_variants",
@@ -137,6 +154,7 @@ def _schema_column_migrations() -> None:
 
 
 def _schema_set_only_migrations() -> None:
+    """Add the set-only flag to items when needed."""
     _add_column(
         "items",
         "set_only",
@@ -145,10 +163,12 @@ def _schema_set_only_migrations() -> None:
 
 
 def _schema_set_member_snapshot_migrations() -> None:
+    """Add set member snapshot storage."""
     _add_column("sets", "member_data", "ALTER TABLE sets ADD COLUMN member_data TEXT")
 
 
 def _schema_repair_ownership_quantity_fields() -> None:
+    """Repair missing ownership quantity columns."""
     _add_column(
         "ownership",
         "quantity_purchased",
@@ -162,6 +182,7 @@ def _schema_repair_ownership_quantity_fields() -> None:
 
 
 def _schema_item_alternate_skus_migrations() -> None:
+    """Add alternate SKU storage to items."""
     _add_column(
         "items",
         "alternate_skus",
@@ -170,6 +191,7 @@ def _schema_item_alternate_skus_migrations() -> None:
 
 
 def _schema_item_availability_migrations() -> None:
+    """Add item availability storage."""
     _add_column(
         "items",
         "availability",
@@ -191,6 +213,7 @@ SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version
 
 
 def apply_schema_migrations() -> None:
+    """Apply all pending schema migrations."""
     current_version = _get_schema_version()
     backfilled = _backfill_history(current_version, SCHEMA_MIGRATIONS)
 

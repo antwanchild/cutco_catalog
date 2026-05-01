@@ -1,3 +1,5 @@
+"""Database bootstrap helpers and initial data migrations."""
+
 import logging
 import re
 from dataclasses import dataclass
@@ -15,6 +17,8 @@ BOOTSTRAP_STATE_NAME = "bootstrap"
 
 
 class BootstrapState(db.Model):
+    """Current bootstrap version metadata."""
+
     __tablename__ = "bootstrap_state"
 
     name = db.Column(db.String(40), primary_key=True)
@@ -23,6 +27,8 @@ class BootstrapState(db.Model):
 
 
 class BootstrapHistory(db.Model):
+    """Applied bootstrap migration history."""
+
     __tablename__ = "bootstrap_history"
 
     version = db.Column(db.Integer, primary_key=True)
@@ -32,21 +38,26 @@ class BootstrapHistory(db.Model):
 
 @dataclass(frozen=True, slots=True)
 class BootstrapMigration:
+    """A single bootstrap migration step."""
+
     version: int
     name: str
     apply: Callable[[], None]
 
 
 def _now_utc() -> str:
+    """Return the current UTC timestamp as an ISO string."""
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _get_bootstrap_version() -> int:
+    """Return the current bootstrap version."""
     state = db.session.get(BootstrapState, BOOTSTRAP_STATE_NAME)
     return state.version if state else 0
 
 
 def get_bootstrap_state() -> dict:
+    """Return bootstrap state metadata as a dictionary."""
     state = db.session.get(BootstrapState, BOOTSTRAP_STATE_NAME)
     if state is None:
         return {"name": BOOTSTRAP_STATE_NAME, "version": 0, "updated_at": None}
@@ -54,6 +65,7 @@ def get_bootstrap_state() -> dict:
 
 
 def get_bootstrap_history(limit: int = 10) -> list[dict]:
+    """Return the most recent bootstrap migration rows."""
     history = (
         db.session.execute(
             db.select(BootstrapHistory).order_by(BootstrapHistory.version.desc()).limit(limit)
@@ -68,6 +80,7 @@ def get_bootstrap_history(limit: int = 10) -> list[dict]:
 
 
 def _set_bootstrap_version(version: int) -> None:
+    """Update the stored bootstrap version."""
     state = db.session.get(BootstrapState, BOOTSTRAP_STATE_NAME)
     if state is None:
         state = BootstrapState(name=BOOTSTRAP_STATE_NAME, version=version, updated_at=_now_utc())
@@ -78,6 +91,7 @@ def _set_bootstrap_version(version: int) -> None:
 
 
 def _record_history(version: int, name: str) -> None:
+    """Record or refresh a bootstrap history entry."""
     history = db.session.get(BootstrapHistory, version)
     if history is None:
         db.session.add(BootstrapHistory(version=version, name=name, applied_at=_now_utc()))
@@ -87,6 +101,7 @@ def _record_history(version: int, name: str) -> None:
 
 
 def _backfill_history(current_version: int) -> bool:
+    """Backfill missing history rows for already-applied migrations."""
     if current_version <= 0:
         return False
 
@@ -121,6 +136,7 @@ BOOTSTRAP_VERSION = BOOTSTRAP_MIGRATIONS[-1].version
 
 
 def _seed_default_tasks() -> None:
+    """Seed the default knife tasks."""
     existing_task_names = {task.name for task in KnifeTask.query.all()}
     for preset in KNIFE_TASK_PRESETS:
         if preset not in existing_task_names:
@@ -129,6 +145,7 @@ def _seed_default_tasks() -> None:
 
 
 def _cleanup_invalid_items() -> None:
+    """Remove obviously invalid imported items."""
     invalid_items = Item.query.filter(Item.sku.op("GLOB")("[0-9]")).all()
     for item in invalid_items:
         logger.info("Removing item with invalid single-digit SKU: %s (sku=%s)", item.name, item.sku)
@@ -136,6 +153,7 @@ def _cleanup_invalid_items() -> None:
 
 
 def _normalize_categories() -> None:
+    """Normalize stored item categories."""
     renamed_categories = 0
     items = Item.query.all()
     for item in items:
@@ -148,6 +166,7 @@ def _normalize_categories() -> None:
 
 
 def _normalize_availability() -> None:
+    """Normalize stored item availability values."""
     updated = 0
     for item in Item.query.all():
         target = "non-catalog" if item.set_only or not item.in_catalog else "public"
@@ -163,11 +182,13 @@ def _normalize_availability() -> None:
 
 
 def _ensure_unknown_variants() -> None:
+    """Ensure every item has an Unknown variant."""
     for item in Item.query.all():
         ensure_unknown_variant(item)
 
 
 def _split_quantity_fields_from_notes(notes: str | None) -> tuple[int | None, int | None, str | None]:
+    """Extract quantity fields from legacy ownership notes."""
     if not notes:
         return None, None, None
 
@@ -191,6 +212,7 @@ def _split_quantity_fields_from_notes(notes: str | None) -> tuple[int | None, in
 
 
 def _split_quantity_notes() -> None:
+    """Backfill ownership quantity fields from notes."""
     updated = 0
     for ownership in Ownership.query.all():
         purchased, given_away, cleaned_notes = _split_quantity_fields_from_notes(ownership.notes)
@@ -211,6 +233,7 @@ def _split_quantity_notes() -> None:
 
 
 def initialize_database() -> None:
+    """Create tables and apply bootstrap migrations."""
     db.Model.metadata.create_all(db.engine, checkfirst=True)
     apply_schema_migrations()
 

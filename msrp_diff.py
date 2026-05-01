@@ -226,10 +226,12 @@ def build_diff(db_items: list[Item], live: dict[str, dict]) -> dict:
 # ── Output helpers ─────────────────────────────────────────────────────────────
 
 def _fmt_price(val: float | None) -> str:
+    """Format a price for display."""
     return f"${val:,.2f}" if val is not None else "—"
 
 
 def _fmt_delta(val: float | None) -> str:
+    """Format a price delta for display."""
     if val is None:
         return ""
     sign = "+" if val > 0 else ""
@@ -237,6 +239,7 @@ def _fmt_delta(val: float | None) -> str:
 
 
 def print_report(diff: dict) -> None:
+    """Print a human-readable MSRP diff report."""
     today = date.today().isoformat()
     total = sum(len(section_rows) for section_rows in diff.values())
     changes = len(diff["increased"]) + len(diff["decreased"])
@@ -276,6 +279,7 @@ def print_report(diff: dict) -> None:
 
 
 def write_csv(diff: dict, path: str) -> None:
+    """Write the diff report to a CSV file."""
     all_rows = []
     for category, rows in diff.items():
         for row in rows:
@@ -297,6 +301,7 @@ def write_csv(diff: dict, path: str) -> None:
 
 
 def post_discord(diff: dict, webhook_url: str) -> None:
+    """Post a compact MSRP diff summary to Discord."""
     today = date.today().isoformat()
     increased = diff["increased"]
     decreased = diff["decreased"]
@@ -355,6 +360,7 @@ def post_discord(diff: dict, webhook_url: str) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    """Run the MSRP diff CLI."""
     parser = argparse.ArgumentParser(
         description="Compare DB MSRP prices against live Cutco prices."
     )

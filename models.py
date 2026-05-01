@@ -1,3 +1,5 @@
+"""Database models and item normalization helpers."""
+
 from extensions import db
 from constants import COOKWARE_CATEGORIES, UNKNOWN_COLOR
 import re
@@ -6,6 +8,8 @@ from datetime import UTC, datetime
 
 # Association object: items <-> sets (with quantity per member)
 class ItemSetMember(db.Model):
+    """Association row linking items to sets with quantities."""
+
     __tablename__ = "item_sets"
 
     item_id  = db.Column(db.Integer, db.ForeignKey("items.id"), primary_key=True)
@@ -24,6 +28,8 @@ item_tasks = db.Table(
 
 
 class Item(db.Model):
+    """A cataloged item that may have one or more variants."""
+
     __tablename__ = "items"
 
     id         = db.Column(db.Integer, primary_key=True)
@@ -61,10 +67,12 @@ class Item(db.Model):
 
     @property
     def alternate_sku_values(self) -> list[str]:
+        """Return the parsed alternate SKU list."""
         return parse_alternate_skus(self.alternate_skus)
 
     @property
     def availability_label(self) -> str | None:
+        """Return a display label for the item's availability."""
         labels = {
             "rep only": "Rep only",
             "Costco": "Costco",
@@ -74,6 +82,7 @@ class Item(db.Model):
 
     @property
     def availability_badge_class(self) -> str | None:
+        """Return the CSS badge class for the item's availability."""
         badge_classes = {
             "rep only": "badge-warning",
             "Costco": "badge-info",
@@ -83,6 +92,8 @@ class Item(db.Model):
 
 
 class ItemVariant(db.Model):
+    """A color-specific variant of a catalog item."""
+
     __tablename__ = "item_variants"
 
     id         = db.Column(db.Integer, primary_key=True)
@@ -96,6 +107,8 @@ class ItemVariant(db.Model):
 
 
 class Set(db.Model):
+    """A knife set or bundle that can contain multiple items."""
+
     __tablename__ = "sets"
 
     id    = db.Column(db.Integer, primary_key=True)
@@ -111,6 +124,8 @@ class Set(db.Model):
 
 
 class Person(db.Model):
+    """A person or collector tracked by the application."""
+
     __tablename__ = "people"
 
     id    = db.Column(db.Integer, primary_key=True)
@@ -122,6 +137,8 @@ class Person(db.Model):
 
 
 class Ownership(db.Model):
+    """A person's ownership record for a specific item variant."""
+
     __tablename__ = "ownership"
 
     id           = db.Column(db.Integer, primary_key=True)
@@ -138,6 +155,8 @@ class Ownership(db.Model):
 
 
 class ActivityEvent(db.Model):
+    """A recorded activity item for dashboard summaries."""
+
     __tablename__ = "activity_events"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -148,6 +167,8 @@ class ActivityEvent(db.Model):
 
 
 class CookwareSession(db.Model):
+    """A log entry for cookware usage."""
+
     __tablename__ = "cookware_sessions"
 
     id         = db.Column(db.Integer, primary_key=True)
@@ -164,6 +185,8 @@ class CookwareSession(db.Model):
 
 
 class SharpeningLog(db.Model):
+    """A log entry for sharpening activity."""
+
     __tablename__ = "sharpening_log"
 
     id           = db.Column(db.Integer, primary_key=True)
@@ -179,6 +202,8 @@ class SharpeningLog(db.Model):
 
 
 class KnifeTask(db.Model):
+    """A suggested use or task associated with an item."""
+
     __tablename__ = "knife_tasks"
 
     id        = db.Column(db.Integer, primary_key=True)
@@ -190,6 +215,8 @@ class KnifeTask(db.Model):
 
 
 class KnifeTaskLog(db.Model):
+    """A history row linking an item to a task log entry."""
+
     __tablename__ = "knife_task_log"
 
     id        = db.Column(db.Integer, primary_key=True)
@@ -255,11 +282,13 @@ def get_or_create_set(name: str) -> Set:
 
 
 def normalize_sku_value(value: str | None) -> str | None:
+    """Normalize an SKU string for comparison and storage."""
     cleaned = re.sub(r"\s+", "", (value or "").strip()).upper()
     return cleaned or None
 
 
 def parse_alternate_skus(raw_value: str | None) -> list[str]:
+    """Parse a comma-separated alternate SKU field."""
     if not raw_value:
         return []
     values: list[str] = []
@@ -274,10 +303,12 @@ def parse_alternate_skus(raw_value: str | None) -> list[str]:
 
 
 def _now_utc() -> str:
+    """Return the current UTC timestamp as an ISO string."""
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def record_activity(kind: str, title: str, details: str | None = None, occurred_at: str | None = None) -> None:
+    """Record a dashboard activity event."""
     db.session.add(ActivityEvent(
         kind=kind,
         title=title,
@@ -287,6 +318,7 @@ def record_activity(kind: str, title: str, details: str | None = None, occurred_
 
 
 def get_latest_activity(kind: str) -> dict | None:
+    """Return the most recent activity event for a kind."""
     event = (
         db.session.execute(
             db.select(ActivityEvent)

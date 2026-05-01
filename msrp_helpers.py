@@ -1,3 +1,5 @@
+"""Background jobs for MSRP diffing and specs backfill."""
+
 import json
 import logging
 import os
