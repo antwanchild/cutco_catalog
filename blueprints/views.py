@@ -1,14 +1,79 @@
 """Read-only views and public share links."""
 
-from flask import Blueprint, abort, render_template, request
+from pathlib import Path
+from uuid import uuid4
+
+from flask import Blueprint, abort, current_app, flash, render_template, request, redirect, send_from_directory, url_for
 
 from constants import COOKWARE_CATEGORIES, STATUS_RANK, UNKNOWN_COLOR
 from extensions import db
+from helpers import admin_required, db_commit
 from helpers import (_collection_token, _gift_token,
                      _verify_collection_token, _verify_gift_token)
-from models import Item, ItemVariant, KnifeTaskLog, Ownership, Person, Set, SharpeningLog
+from models import Item, ItemAttachment, ItemVariant, KnifeTaskLog, Ownership, Person, Set, SharpeningLog
 
 views_bp = Blueprint("views", __name__)
+_ALLOWED_ATTACHMENT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
+
+def _attachments_root() -> Path:
+    """Return the base upload directory for item attachments."""
+    return Path(current_app.config["ATTACHMENTS_DIR"]).expanduser()
+
+
+def _attachment_dir(item_id: int) -> Path:
+    """Return the storage directory for one item's attachments."""
+    return _attachments_root() / str(item_id)
+
+
+def _allowed_attachment(filename: str | None) -> bool:
+    """Return whether a filename looks like a supported image upload."""
+    if not filename:
+        return False
+    return Path(filename).suffix.lower() in _ALLOWED_ATTACHMENT_EXTENSIONS
+
+
+def _store_attachment(item: Item, uploaded_file, caption: str | None) -> ItemAttachment | None:
+    """Persist an uploaded attachment and return the database row."""
+    original_filename = Path(uploaded_file.filename or "").name
+    if not _allowed_attachment(original_filename):
+        return None
+    if uploaded_file.mimetype and not uploaded_file.mimetype.startswith("image/"):
+        return None
+
+    storage_dir = _attachment_dir(item.id)
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    suffix = Path(original_filename).suffix.lower()
+    stored_filename = f"{uuid4().hex}{suffix}"
+    uploaded_file.save(storage_dir / stored_filename)
+
+    attachment = ItemAttachment(
+        item=item,
+        original_filename=original_filename,
+        stored_filename=stored_filename,
+        content_type=uploaded_file.mimetype or None,
+        caption=(caption or "").strip() or None,
+    )
+    db.session.add(attachment)
+    if not db_commit(db.session, error_msg="Could not save attachment."):
+        stored_path = storage_dir / stored_filename
+        if stored_path.exists():
+            stored_path.unlink()
+        return None
+    return attachment
+
+
+@views_bp.route("/attachments/<int:attachment_id>")
+def attachment_file(attachment_id):
+    """Serve a stored attachment file."""
+    attachment = db.session.get(ItemAttachment, attachment_id)
+    if not attachment:
+        abort(404)
+    storage_dir = _attachment_dir(attachment.item_id)
+    file_path = storage_dir / attachment.stored_filename
+    if not file_path.exists():
+        abort(404)
+    return send_from_directory(storage_dir, attachment.stored_filename, as_attachment=False)
 
 
 @views_bp.route("/views/item/<int:item_id>")
@@ -45,12 +110,56 @@ def item_owners(item_id):
         task_counts[entry.task.name] = task_counts.get(entry.task.name, 0) + 1
     top_tasks = sorted(task_counts.items(), key=lambda kv: kv[1], reverse=True)
 
+    attachments = item.attachments
+
     return render_template("item_owners.html", item=item,
                            entries=entries, people_without=people_without,
                            sharpening=sharpening, task_log=task_log,
                            top_tasks=top_tasks,
+                           attachments=attachments,
                            COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
+
+
+@views_bp.route("/views/item/<int:item_id>/attachments", methods=["POST"])
+@admin_required
+def item_attachment_upload(item_id):
+    """Upload one image attachment for an item."""
+    item = db.session.get(Item, item_id)
+    if not item:
+        abort(404)
+
+    uploaded_file = request.files.get("attachment")
+    if not uploaded_file or not uploaded_file.filename:
+        flash("Choose an image to upload.", "warning")
+        return redirect(url_for("views.item_owners", item_id=item_id))
+
+    attachment = _store_attachment(item, uploaded_file, request.form.get("caption"))
+    if attachment is None:
+        flash("That file type is not supported. Please upload a JPG, PNG, GIF, or WEBP image.", "error")
+        return redirect(url_for("views.item_owners", item_id=item_id))
+
+    flash(f'Added attachment "{attachment.original_filename}".', "success")
+    return redirect(url_for("views.item_owners", item_id=item_id))
+
+
+@views_bp.route("/attachments/<int:attachment_id>/delete", methods=["POST"])
+@admin_required
+def attachment_delete(attachment_id):
+    """Delete a stored attachment and its backing file."""
+    attachment = db.session.get(ItemAttachment, attachment_id)
+    if not attachment:
+        abort(404)
+
+    item_id = attachment.item_id
+    file_path = _attachment_dir(item_id) / attachment.stored_filename
+    db.session.delete(attachment)
+    if not db_commit(db.session, error_msg="Could not delete attachment."):
+        return redirect(url_for("views.item_owners", item_id=item_id))
+    if file_path.exists():
+        file_path.unlink()
+    flash("Attachment deleted.", "info")
+    return redirect(url_for("views.item_owners", item_id=item_id))
 
 
 @views_bp.route("/views/matrix")

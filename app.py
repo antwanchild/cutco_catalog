@@ -12,6 +12,7 @@ from constants import (
     ADMIN_TOKEN,
     APP_VERSION,
     GIT_SHA,
+    DATA_DIR,
     UNKNOWN_COLOR,
     get_git_sha_info,
 )
@@ -391,6 +392,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         SESSION_COOKIE_SECURE=_env_flag("SESSION_COOKIE_SECURE"),
         SESSION_REFRESH_EACH_REQUEST=False,
         LOG_DIR=os.environ.get("LOG_DIR", "/data/logs"),
+        ATTACHMENTS_DIR=os.environ.get("ATTACHMENTS_DIR", os.path.join(DATA_DIR, "uploads", "items")),
         LOG_LEVEL=os.environ.get("LOG_LEVEL", "INFO").upper(),
         TESTING=False,
     )

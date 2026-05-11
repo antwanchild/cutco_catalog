@@ -218,6 +218,13 @@ def _schema_activity_event_audit_migrations() -> None:
     _add_column("activity_events", "payload", "ALTER TABLE activity_events ADD COLUMN payload TEXT")
 
 
+def _schema_item_attachment_migrations() -> None:
+    """Create the item attachment table when needed."""
+    from models import ItemAttachment
+
+    ItemAttachment.__table__.create(db.engine, checkfirst=True)
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
@@ -227,6 +234,7 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(6, "item_alternate_skus", _schema_item_alternate_skus_migrations),
     SchemaMigration(7, "item_availability", _schema_item_availability_migrations),
     SchemaMigration(8, "activity_event_audit_fields", _schema_activity_event_audit_migrations),
+    SchemaMigration(9, "item_attachments", _schema_item_attachment_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

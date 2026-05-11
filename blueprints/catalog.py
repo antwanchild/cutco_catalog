@@ -4,7 +4,9 @@ import json
 import logging
 import re
 from collections import OrderedDict
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from pathlib import Path
+
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 
 from constants import (
     AVAILABILITY_CHOICES, COOKWARE_CATEGORIES, EDGE_TYPES,
@@ -15,6 +17,7 @@ from extensions import db
 from helpers import admin_required, db_commit, is_admin
 from models import (
     Item,
+    ItemAttachment,
     ItemSetMember,
     ItemVariant,
     KnifeTask,
@@ -41,6 +44,16 @@ def _safe_redirect_target(target: str | None) -> str | None:
     if not target.startswith("/") or target.startswith("//"):
         return None
     return target
+
+
+def _delete_attachment_files(item: Item) -> None:
+    """Remove stored attachment files for an item."""
+    attachment_root = Path(current_app.config["ATTACHMENTS_DIR"]).expanduser()
+    item_dir = attachment_root / str(item.id)
+    for attachment in item.attachments:
+        file_path = item_dir / attachment.stored_filename
+        if file_path.exists():
+            file_path.unlink()
 
 
 def _item_alternate_skus_text(item: Item | None) -> str:
@@ -626,6 +639,7 @@ def catalog_purge_unreferenced():
     items = Item.query.filter(~Item.id.in_(referenced_item_ids)).all() if referenced_item_ids else Item.query.all()
     count = len(items)
     for item in items:
+        _delete_attachment_files(item)
         db.session.delete(item)
     if db_commit(db.session):
         logger.info("Purged %d unreferenced catalog items", count)
@@ -649,6 +663,10 @@ def catalog_purge_all():
         return redirect(url_for("catalog.catalog"))
     count = Item.query.count()
     set_count = Set.query.count()
+    items = Item.query.all()
+    for item in items:
+        _delete_attachment_files(item)
+    ItemAttachment.query.delete()
     Item.query.delete()
     Set.query.delete()
     if db_commit(db.session):
@@ -679,6 +697,7 @@ def catalog_delete(item_id):
     if not item:
         abort(404)
     name = item.name
+    _delete_attachment_files(item)
     db.session.delete(item)
     if db_commit(db.session):
         logger.info("Item deleted: %s", name)

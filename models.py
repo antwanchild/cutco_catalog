@@ -65,6 +65,13 @@ class Item(db.Model):
                                     back_populates="items", viewonly=True, lazy="select")
     suggested_tasks = db.relationship("KnifeTask", secondary="item_tasks",
                                     back_populates="suggested_items", lazy="select")
+    attachments     = db.relationship(
+        "ItemAttachment",
+        back_populates="item",
+        cascade="all, delete-orphan",
+        lazy="select",
+        order_by="ItemAttachment.created_at.desc()",
+    )
 
     @property
     def any_unicorn(self) -> bool:
@@ -110,6 +117,26 @@ class ItemVariant(db.Model):
 
     ownerships = db.relationship("Ownership", backref="variant",
                                  lazy=True, cascade="all, delete-orphan")
+
+
+class ItemAttachment(db.Model):
+    """An uploaded image or attachment for a catalog item."""
+
+    __tablename__ = "item_attachments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False, unique=True)
+    content_type = db.Column(db.String(80), nullable=True)
+    caption = db.Column(db.String(200), nullable=True)
+    created_at = db.Column(
+        db.String(32),
+        nullable=False,
+        default=lambda: datetime.now(UTC).isoformat(timespec="seconds"),
+    )
+
+    item = db.relationship("Item", back_populates="attachments")
 
 
 class Set(db.Model):
@@ -388,6 +415,9 @@ def _entity_label(obj) -> str | None:
         item_name = obj.item.name if obj.item else "Item"
         set_name = obj.set.name if obj.set else "Set"
         return f"{set_name} · {item_name}"
+    if isinstance(obj, ItemAttachment):
+        item_name = obj.item.name if obj.item else "Item"
+        return f"{item_name} · {obj.original_filename}"
     return obj.__class__.__name__
 
 
@@ -444,6 +474,7 @@ def _audit_tracked_models() -> tuple[type[db.Model], ...]:
         KnifeTask,
         KnifeTaskLog,
         ItemSetMember,
+        ItemAttachment,
     )
 
 

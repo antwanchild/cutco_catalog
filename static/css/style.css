@@ -1695,6 +1695,63 @@ textarea { resize: vertical; }
   font-size: .875rem;
   padding: .2rem 0;
 }
+.attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .8rem;
+  margin-top: .5rem;
+}
+.attachment-card {
+  margin: 0;
+  padding: .6rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+}
+.attachment-thumb-link { display: block; }
+.attachment-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: calc(var(--radius) - 1px);
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  display: block;
+}
+.attachment-meta {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.attachment-title {
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.attachment-subtitle {
+  color: var(--muted);
+}
+.attachment-upload {
+  margin-top: .9rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: .5rem;
+}
+.attachment-upload input[type="file"] {
+  max-width: 100%;
+}
+.attachment-caption {
+  flex: 1 1 220px;
+  min-width: 220px;
+}
+.attachment-actions {
+  margin: 0;
+}
 
 /* ── Bulk action bar ─────────────────────────────────────────────────────── */
 .bulk-bar {

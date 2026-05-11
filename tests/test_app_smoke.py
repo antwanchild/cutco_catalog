@@ -18,6 +18,7 @@ from models import (
     CookwareSession,
     ActivityEvent,
     Item,
+    ItemAttachment,
     ItemSetMember,
     ItemVariant,
     KnifeTask,
@@ -54,6 +55,7 @@ class SmokeBaseTest(unittest.TestCase):
                 "SECRET_KEY": "test-secret-key",
                 "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
                 "LOG_DIR": self.temp_dir.name,
+                "ATTACHMENTS_DIR": f"{self.temp_dir.name}/uploads/items",
             }
         )
         self.client = self.app.test_client()
@@ -378,6 +380,110 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Share Gift List", gift_share_response.data)
         self.assertEqual(collection_share_response.status_code, 200)
         self.assertIn(b"Share Collection Card", collection_share_response.data)
+
+    def test_item_attachments_upload_render_and_delete(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _variant_id = self._add_catalog_item(name="Attachment Knife", sku="AT-1")
+        image_bytes = (
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR"
+            b"\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01"
+            b"\x08\x02\x00\x00\x00"
+            b"\x90wS\xde"
+            b"\x00\x00\x00\x0cIDAT\x08\xd7c\xf8\x0f\x00\x01\x01\x01\x00"
+            b"\x18\xdd\x8d\x18"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+
+        upload_response = self.client.post(
+            f"/views/item/{item_id}/attachments",
+            data={
+                "csrf_token": "test-csrf-token",
+                "attachment": (BytesIO(image_bytes), "attachment.png", "image/png"),
+                "caption": "Front view",
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+        self.assertEqual(upload_response.status_code, 302)
+
+        with self.app.app_context():
+            attachment = db.session.execute(
+                db.select(ItemAttachment).filter_by(item_id=item_id)
+            ).scalar_one()
+            attachment_path = f"{self.temp_dir.name}/uploads/items/{item_id}/{attachment.stored_filename}"
+            self.assertTrue(os.path.exists(attachment_path))
+
+        item_response = self.client.get(f"/views/item/{item_id}")
+        self.assertEqual(item_response.status_code, 200)
+        self.assertIn(b"Attachments (1)", item_response.data)
+        self.assertIn(b"Front view", item_response.data)
+        self.assertIn(b"attachment.png", item_response.data)
+
+        file_response = self.client.get(f"/attachments/{attachment.id}")
+        self.assertEqual(file_response.status_code, 200)
+        self.assertEqual(file_response.mimetype, "image/png")
+        self.assertEqual(file_response.data, image_bytes)
+        file_response.close()
+
+        delete_response = self.client.post(
+            f"/attachments/{attachment.id}/delete",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(delete_response.status_code, 302)
+
+        with self.app.app_context():
+            remaining = db.session.execute(
+                db.select(ItemAttachment).filter_by(item_id=item_id)
+            ).scalars().all()
+        self.assertEqual(remaining, [])
+
+    def test_item_attachment_file_cleanup_on_item_delete(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _variant_id = self._add_catalog_item(name="Cleanup Knife", sku="CL-1")
+        image_bytes = (
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR"
+            b"\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01"
+            b"\x08\x02\x00\x00\x00"
+            b"\x90wS\xde"
+            b"\x00\x00\x00\x0cIDAT\x08\xd7c\xf8\x0f\x00\x01\x01\x01\x00"
+            b"\x18\xdd\x8d\x18"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+
+        upload_response = self.client.post(
+            f"/views/item/{item_id}/attachments",
+            data={
+                "csrf_token": "test-csrf-token",
+                "attachment": (BytesIO(image_bytes), "cleanup.png", "image/png"),
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+        self.assertEqual(upload_response.status_code, 302)
+
+        with self.app.app_context():
+            attachment = db.session.execute(
+                db.select(ItemAttachment).filter_by(item_id=item_id)
+            ).scalar_one()
+            attachment_path = f"{self.temp_dir.name}/uploads/items/{item_id}/{attachment.stored_filename}"
+            self.assertTrue(os.path.exists(attachment_path))
+
+        delete_item_response = self.client.post(
+            f"/catalog/{item_id}/delete",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(delete_item_response.status_code, 302)
+        self.assertFalse(os.path.exists(attachment_path))
 
     def test_catalog_pages_render(self):
         self._login_as_admin()

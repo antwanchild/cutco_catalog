@@ -92,6 +92,53 @@
     </section>
     {% endif %}
 
+    {# Attachments #}
+    {% if attachments or is_admin() %}
+    <section class="detail-section">
+      <h2 class="section-heading">Attachments{% if attachments %} ({{ attachments | length }}){% endif %}</h2>
+      {% if attachments %}
+      <div class="attachment-grid">
+        {% for attachment in attachments %}
+        <figure class="attachment-card">
+          <a href="{{ url_for('views.attachment_file', attachment_id=attachment.id) }}" target="_blank" rel="noopener" class="attachment-thumb-link">
+            <img
+              src="{{ url_for('views.attachment_file', attachment_id=attachment.id) }}"
+              alt="{{ attachment.caption or attachment.original_filename }}"
+              class="attachment-thumb"
+              loading="lazy"
+            >
+          </a>
+          <figcaption class="attachment-meta">
+            <div class="attachment-title">{{ attachment.caption or attachment.original_filename }}</div>
+            <div class="attachment-subtitle mono-sm">{{ attachment.created_at }}</div>
+            {% if is_admin() %}
+            <form method="post" action="{{ url_for('views.attachment_delete', attachment_id=attachment.id) }}" class="form-inline attachment-actions">
+              <button type="submit" class="btn btn-xs btn-danger"
+                      data-confirm-title="Delete attachment"
+                      data-confirm-message="This will remove the attachment from the item and delete the stored file."
+                      data-confirm-count="1 attachment"
+                      data-confirm-preview="Item: {{ item.name | e }} | File: {{ attachment.original_filename | e }}"
+                      data-confirm-button="Delete attachment">Delete</button>
+            </form>
+            {% endif %}
+          </figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">No attachments yet.</p>
+      {% endif %}
+      {% if is_admin() %}
+      <form method="post" action="{{ url_for('views.item_attachment_upload', item_id=item.id) }}" enctype="multipart/form-data" class="attachment-upload">
+        <label class="section-label" for="attachment-file">Add attachment</label>
+        <input id="attachment-file" type="file" name="attachment" accept="image/*" required>
+        <input type="text" name="caption" class="input-full attachment-caption" placeholder="Optional caption">
+        <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+      </form>
+      {% endif %}
+    </section>
+    {% endif %}
+
     {# Suggested uses from Cutco #}
     {% if item.suggested_tasks %}
     <section class="detail-section">
