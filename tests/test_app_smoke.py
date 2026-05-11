@@ -41,7 +41,7 @@ from scraping import (
     _should_queue_slug,
     _extract_product_variant_colors,
 )
-from blueprints.catalog import _load_member_snapshot
+from blueprints.catalog import _build_set_membership_preview, _load_member_snapshot
 from time_utils import container_timezone, format_container_time
 
 
@@ -3224,6 +3224,27 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Scrapes Cutco.com to discover new items and sets.", response.data)
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)
+
+    def test_set_membership_preview_ignores_sku_alias_changes_when_names_match(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _variant_id = self._add_catalog_item(name="Gift Box", sku="2130CD")
+
+        with self.app.app_context():
+            item_set = Set(name="Gift Set", sku="GS-1")
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1))
+            db.session.commit()
+
+            preview = _build_set_membership_preview(
+                db.session.get(Set, item_set.id),
+                [{"sku": "2026D", "name": "Gift Box", "quantity": 1}],
+            )
+
+        self.assertFalse(preview["has_changes"])
+        self.assertEqual(preview["summary"], "No membership changes detected.")
 
     def test_variant_sync_page_renders_and_creates_missing_variants(self):
         self._login_as_admin()

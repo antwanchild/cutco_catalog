@@ -307,12 +307,12 @@ def _aggregate_resolved_members(
 
 def _member_preview_key(sku: str | None, name: str | None) -> str | None:
     """Return a stable key for comparing set members."""
-    normalized_sku = _normalize_member_sku(sku)
-    if normalized_sku:
-        return f"sku:{normalized_sku}"
     normalized_name = _normalize_member_name(name)
     if normalized_name:
         return f"name:{normalized_name}"
+    normalized_sku = _normalize_member_sku(sku)
+    if normalized_sku:
+        return f"sku:{normalized_sku}"
     return None
 
 
