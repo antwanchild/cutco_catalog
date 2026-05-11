@@ -22,6 +22,7 @@ from models import (
     Set,
     normalize_sku_value,
     parse_alternate_skus,
+    record_audit_event,
     get_or_create_set,
     record_activity,
     reconcile_unknown_variant,
@@ -508,6 +509,14 @@ def catalog_purge_unreferenced():
         db.session.delete(item)
     if db_commit(db.session):
         logger.info("Purged %d unreferenced catalog items", count)
+        record_audit_event(
+            kind="audit",
+            title="Purged unreferenced catalog items",
+            action="delete",
+            entity_type="Item",
+            entity_name="Unreferenced catalog items",
+            payload={"items_deleted": count},
+        )
         flash(f"Removed {count} item{'s' if count != 1 else ''} with no ownership records.", "info")
     return redirect(url_for("catalog.catalog"))
 
@@ -524,6 +533,14 @@ def catalog_purge_all():
     Set.query.delete()
     if db_commit(db.session):
         logger.info("Full catalog purge: %d items deleted, %d sets deleted", count, set_count)
+        record_audit_event(
+            kind="audit",
+            title="Purged full catalog",
+            action="delete",
+            entity_type="Catalog",
+            entity_name="Catalog and sets",
+            payload={"items_deleted": count, "sets_deleted": set_count},
+        )
         flash(
             f"Catalog purged — {count} item{'s' if count != 1 else ''} and "
             f"{set_count} set{'s' if set_count != 1 else ''} deleted, plus related records.",

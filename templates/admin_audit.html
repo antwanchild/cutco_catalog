@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Audit Trail – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🧾 Audit Trail</h1>
+</div>
+
+<p class="muted" style="margin-bottom:1rem">
+  Review recent creates, updates, and deletes across the catalog, people, sets, and logs.
+</p>
+
+<section class="stats-panel stats-panel-wide" style="margin-bottom:1.5rem">
+  <div class="section-heading-actions" style="margin-bottom:.6rem">
+    <h2 class="stats-panel-title" style="margin:0">Filters</h2>
+    <button type="button" class="help-btn" onclick="document.getElementById('audit-help-modal').showModal()" aria-label="Audit trail help" title="What this means">?</button>
+  </div>
+  <form method="get" class="filter-bar" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:end">
+    <label>
+      <span class="small muted">Action</span><br>
+      <select name="action">
+        <option value="" {% if not action %}selected{% endif %}>All actions</option>
+        {% for opt in available_actions %}
+          <option value="{{ opt }}" {% if action == opt %}selected{% endif %}>{{ opt | capitalize }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span class="small muted">Entity type</span><br>
+      <select name="entity_type">
+        <option value="" {% if not entity_type %}selected{% endif %}>All entities</option>
+        {% for opt in entity_types %}
+          <option value="{{ opt }}" {% if entity_type == opt %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span class="small muted">Limit</span><br>
+      <input type="number" name="limit" min="25" max="250" step="25" value="{{ limit }}">
+    </label>
+    <button type="submit" class="btn btn-secondary btn-sm">Apply</button>
+    <a href="{{ url_for('admin.audit_page') }}" class="btn btn-secondary btn-sm">Reset</a>
+  </form>
+</section>
+
+<section class="stats-panel stats-panel-wide">
+  <div class="section-heading-actions" style="margin-bottom:.6rem">
+    <h2 class="stats-panel-title" style="margin:0">Recent Changes</h2>
+    <span class="muted small">{{ events | length }} event{% if events | length != 1 %}s{% endif %} shown</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table compact">
+      <thead>
+        <tr>
+          <th style="width:210px">When</th>
+          <th style="width:90px">Actor</th>
+          <th style="width:90px">Action</th>
+          <th style="width:190px">Entity</th>
+          <th>Details</th>
+          <th style="width:170px">Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+        <tr>
+          <td class="mono" title="{{ event.occurred_at }}">{{ event.occurred_at }}</td>
+          <td>{{ event.actor or "system" }}</td>
+          <td>
+            <span class="badge badge-{{ event.action or 'info' }}">{{ event.action or "audit" }}</span>
+          </td>
+          <td>
+            <div>{{ event.entity_type or event.kind }}</div>
+            <div class="muted small">
+              {% if event.entity_name %}{{ event.entity_name }}{% else %}{{ event.title }}{% endif %}
+              {% if event.entity_id is not none %}#{{ event.entity_id }}{% endif %}
+            </div>
+          </td>
+          <td>
+            <div>{{ event.title }}</div>
+            {% if event.details %}
+              <div class="muted small">{{ event.details }}</div>
+            {% endif %}
+            {% if event.payload %}
+              <details style="margin-top:.35rem">
+                <summary class="muted small">Show payload</summary>
+                <pre class="mono" style="white-space:pre-wrap;word-break:break-word;margin:.4rem 0 0">{{ event.payload | tojson(indent=2) }}</pre>
+              </details>
+            {% endif %}
+          </td>
+          <td class="mono small">{{ event.source or "—" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="muted">No audit entries recorded yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<dialog id="audit-help-modal" class="help-modal">
+  <h3>About the audit trail</h3>
+  <p>This page shows the most recent tracked changes across catalog items, collectors, ownership rows, sets, and logs.</p>
+  <p>Creates, updates, and deletes are captured automatically when the app saves changes.</p>
+</dialog>
+{% endblock %}

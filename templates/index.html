@@ -196,6 +196,7 @@
       <li><a href="{{ url_for('data.completion_gaps_page') }}">📉 Completion Gaps</a></li>
       <li><a href="{{ url_for('data.export_page') }}">📤 Export CSV</a></li>
       {% if is_admin() %}
+      <li><a href="{{ url_for('admin.audit_page') }}">🧾 Audit Trail</a></li>
       <li><a href="{{ url_for('catalog.catalog_sync') }}">🔄 Sync Catalog</a></li>
       <li><a href="{{ url_for('admin.msrp_diff_page') }}">💲 MSRP Diff</a></li>
       {% endif %}

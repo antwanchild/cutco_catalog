@@ -8,7 +8,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, s
 from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
 from extensions import db
 from helpers import _notify_discord, admin_required, check_wishlist_targets, db_commit
-from models import Item, Ownership, Person
+from models import Item, Ownership, Person, record_audit_event
 
 people_bp = Blueprint("people", __name__)
 logger = logging.getLogger(__name__)
@@ -90,6 +90,15 @@ def purge_collection(person_id):
     Ownership.query.filter_by(person_id=person_id).delete()
     if db_commit(db.session):
         logger.info("Collection purged: %s (%d entries)", person.name, count)
+        record_audit_event(
+            kind="audit",
+            title="Purged collector ownerships",
+            action="delete",
+            entity_type="Ownership",
+            entity_id=person.id,
+            entity_name=person.name,
+            payload={"person": person.name, "ownerships_deleted": count},
+        )
         flash(f"Removed all {count} ownership entr{'ies' if count != 1 else 'y'} for {person.name}.", "info")
     return redirect(url_for("people.person_collection", person_id=person_id))
 

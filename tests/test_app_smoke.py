@@ -16,6 +16,7 @@ from extensions import db
 from helpers import _collection_token, _gift_token, _notify_discord, _verify_collection_token, _verify_gift_token, check_wishlist_targets
 from models import (
     CookwareSession,
+    ActivityEvent,
     Item,
     ItemSetMember,
     ItemVariant,
@@ -201,6 +202,37 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertFalse(self.app.config["SESSION_REFRESH_EACH_REQUEST"])
         with self.client.session_transaction() as session:
             self.assertTrue(session.get("is_admin"))
+
+    def test_audit_trail_records_and_lists_changes(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        self._add_catalog_item(name="Audit Knife", sku="AUD-1")
+        person_id = self._add_person(name="Audit Collector", notes="Original note")
+
+        response = self.client.post(
+            f"/people/{person_id}/edit",
+            data={
+                "csrf_token": "test-csrf-token",
+                "name": "Audit Collector Updated",
+                "notes": "Updated note",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            audit_events = db.session.execute(
+                db.select(ActivityEvent).where(ActivityEvent.kind == "audit")
+            ).scalars().all()
+        self.assertGreaterEqual(len(audit_events), 3)
+
+        audit_page = self.client.get("/admin/audit")
+        self.assertEqual(audit_page.status_code, 200)
+        self.assertIn(b"Audit Knife", audit_page.data)
+        self.assertIn(b"Audit Collector Updated", audit_page.data)
+        self.assertIn(b"create", audit_page.data)
+        self.assertIn(b"update", audit_page.data)
 
     def test_gift_share_and_collection_card_pages_render(self):
         self._login_as_admin()

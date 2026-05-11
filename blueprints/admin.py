@@ -15,7 +15,7 @@ from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION, get_git_s
 from extensions import db
 from extensions import limiter
 from helpers import is_admin
-from models import Item
+from models import ActivityEvent, Item, get_recent_audit_events
 from schema_migrations import get_schema_history, get_schema_state, SCHEMA_VERSION
 from startup import BOOTSTRAP_VERSION, get_bootstrap_history, get_bootstrap_state
 from time_utils import format_container_time
@@ -208,6 +208,45 @@ def diagnostics_page():
         details=_runtime_details(),
         msrp_job=_read_msrp_job(),
         specs_job=_read_specs_job(),
+    )
+
+
+@admin_bp.route("/admin/audit")
+def audit_page():
+    """Render the audit history page."""
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("index"))
+
+    action = (request.args.get("action", "") or "").strip().lower() or None
+    entity_type = (request.args.get("entity_type", "") or "").strip() or None
+    try:
+        limit = int(request.args.get("limit", 100))
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(25, min(limit, 250))
+
+    entity_types = [
+        row[0]
+        for row in (
+            db.session.execute(
+                db.select(ActivityEvent.entity_type)
+                .where(ActivityEvent.kind == "audit", ActivityEvent.entity_type.isnot(None))
+                .distinct()
+                .order_by(ActivityEvent.entity_type)
+            )
+            .all()
+        )
+    ]
+    events = get_recent_audit_events(limit=limit, action=action, entity_type=entity_type)
+    return render_template(
+        "admin_audit.html",
+        events=events,
+        limit=limit,
+        action=action or "",
+        entity_type=entity_type or "",
+        available_actions=["create", "update", "delete"],
+        entity_types=entity_types,
     )
 
 

@@ -1,9 +1,15 @@
 """Database models and item normalization helpers."""
 
-from extensions import db
-from constants import COOKWARE_CATEGORIES, UNKNOWN_COLOR
+import json
 import re
 from datetime import UTC, datetime
+
+from flask import has_request_context, request, session
+from sqlalchemy import event, inspect as sa_inspect
+from sqlalchemy.orm import Session as SASession
+
+from constants import COOKWARE_CATEGORIES, UNKNOWN_COLOR
+from extensions import db
 
 
 # Association object: items <-> sets (with quantity per member)
@@ -164,6 +170,13 @@ class ActivityEvent(db.Model):
     title = db.Column(db.String(160), nullable=False)
     details = db.Column(db.Text, nullable=True)
     occurred_at = db.Column(db.String(32), nullable=False, index=True)
+    actor = db.Column(db.String(40), nullable=True, index=True)
+    action = db.Column(db.String(20), nullable=True, index=True)
+    entity_type = db.Column(db.String(40), nullable=True, index=True)
+    entity_id = db.Column(db.Integer, nullable=True, index=True)
+    entity_name = db.Column(db.String(160), nullable=True)
+    source = db.Column(db.String(160), nullable=True)
+    payload = db.Column(db.Text, nullable=True)
 
 
 class CookwareSession(db.Model):
@@ -307,14 +320,303 @@ def _now_utc() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def record_activity(kind: str, title: str, details: str | None = None, occurred_at: str | None = None) -> None:
-    """Record a dashboard activity event."""
+def _json_dump(value) -> str | None:
+    """Serialize a value for storage in the activity payload."""
+    if value is None:
+        return None
+    return json.dumps(value, sort_keys=True, default=str)
+
+
+def _json_safe(value):
+    """Convert a Python value into something JSON can represent cleanly."""
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    return str(value)
+
+
+def _current_actor() -> str:
+    """Return a compact label for the current request actor."""
+    if not has_request_context():
+        return "system"
+    if session.get("is_admin") is True:
+        return "admin"
+    return "user"
+
+
+def _current_source() -> str | None:
+    """Return a compact label for the request or job source."""
+    if not has_request_context():
+        return None
+    endpoint = request.endpoint or ""
+    if endpoint:
+        return endpoint
+    return f"{request.method} {request.path}"
+
+
+def _entity_label(obj) -> str | None:
+    """Return a human-friendly label for a tracked model instance."""
+    if isinstance(obj, Item):
+        return obj.name
+    if isinstance(obj, ItemVariant):
+        item_name = obj.item.name if obj.item else "Item variant"
+        return f"{item_name} · {obj.color}"
+    if isinstance(obj, Set):
+        return obj.name
+    if isinstance(obj, Person):
+        return obj.name
+    if isinstance(obj, Ownership):
+        item_name = obj.variant.item.name if obj.variant and obj.variant.item else "Item"
+        person_name = obj.person.name if obj.person else "Collector"
+        return f"{person_name} · {item_name}"
+    if isinstance(obj, CookwareSession):
+        return f"{obj.item.name if obj.item else 'Cookware'} · {obj.used_on}"
+    if isinstance(obj, SharpeningLog):
+        return f"{obj.item.name if obj.item else 'Knife'} · {obj.sharpened_on}"
+    if isinstance(obj, KnifeTask):
+        return obj.name
+    if isinstance(obj, KnifeTaskLog):
+        task_name = obj.task.name if obj.task else "Task"
+        item_name = obj.item.name if obj.item else "Item"
+        return f"{task_name} · {item_name}"
+    if isinstance(obj, ItemSetMember):
+        item_name = obj.item.name if obj.item else "Item"
+        set_name = obj.set.name if obj.set else "Set"
+        return f"{set_name} · {item_name}"
+    return obj.__class__.__name__
+
+
+def _humanize_model_name(model_name: str) -> str:
+    """Convert a CamelCase model name into a readable label."""
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", model_name).strip()
+
+
+def record_audit_event(
+    *,
+    kind: str = "audit",
+    title: str,
+    details: str | None = None,
+    actor: str | None = None,
+    action: str | None = None,
+    entity_type: str | None = None,
+    entity_id: int | None = None,
+    entity_name: str | None = None,
+    source: str | None = None,
+    payload=None,
+    occurred_at: str | None = None,
+) -> None:
+    """Record an activity event, optionally with audit metadata."""
     db.session.add(ActivityEvent(
         kind=kind,
         title=title,
         details=details,
         occurred_at=occurred_at or _now_utc(),
+        actor=actor or _current_actor(),
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        entity_name=entity_name,
+        source=source or _current_source(),
+        payload=_json_dump(payload),
     ))
+
+
+def record_activity(kind: str, title: str, details: str | None = None, occurred_at: str | None = None) -> None:
+    """Record a dashboard activity event."""
+    record_audit_event(kind=kind, title=title, details=details, occurred_at=occurred_at)
+
+
+def _audit_tracked_models() -> tuple[type[db.Model], ...]:
+    """Return the model classes that should appear in the audit trail."""
+    return (
+        Item,
+        ItemVariant,
+        Set,
+        Person,
+        Ownership,
+        CookwareSession,
+        SharpeningLog,
+        KnifeTask,
+        KnifeTaskLog,
+        ItemSetMember,
+    )
+
+
+def _audit_snapshot(obj, action: str) -> dict | None:
+    """Build a payload snapshot for a tracked ORM object."""
+    state = sa_inspect(obj)
+    if action == "update":
+        changes = {}
+        for attr in state.mapper.column_attrs:
+            key = attr.key
+            if key == "id":
+                continue
+            history = state.attrs[key].history
+            if not history.has_changes():
+                continue
+            before = history.deleted[-1] if history.deleted else None
+            after = history.added[-1] if history.added else getattr(obj, key, None)
+            changes[key] = {"before": _json_safe(before), "after": _json_safe(after)}
+        if not changes:
+            return None
+        return {"changes": changes}
+
+    if action == "create":
+        fields = {}
+        for attr in state.mapper.column_attrs:
+            key = attr.key
+            if key == "id":
+                continue
+            fields[key] = _json_safe(getattr(obj, key, None))
+        return {"fields": fields}
+
+    if action == "delete":
+        fields = {}
+        for attr in state.mapper.column_attrs:
+            key = attr.key
+            if key == "id":
+                continue
+            fields[key] = _json_safe(getattr(obj, key, None))
+        return {"fields": fields}
+
+    return None
+
+
+@event.listens_for(SASession, "before_flush")
+def _collect_audit_events(session, flush_context, instances) -> None:
+    """Capture ORM changes before SQLAlchemy flushes them."""
+    if session.info.get("_audit_write_in_progress"):
+        return
+
+    tracked = _audit_tracked_models()
+    pending = session.info.setdefault("_pending_audit_events", [])
+
+    for obj in session.new:
+        if isinstance(obj, ActivityEvent) or not isinstance(obj, tracked):
+            continue
+        snapshot = _audit_snapshot(obj, "create")
+        if snapshot is None:
+            continue
+        pending.append(
+            {
+                "obj": obj,
+                "title": f"Created {_humanize_model_name(obj.__class__.__name__).lower()}",
+                "action": "create",
+                "entity_type": obj.__class__.__name__,
+                "entity_name": _entity_label(obj),
+                "payload": snapshot,
+            }
+        )
+
+    for obj in session.dirty:
+        if isinstance(obj, ActivityEvent) or not isinstance(obj, tracked):
+            continue
+        if not session.is_modified(obj, include_collections=False):
+            continue
+        snapshot = _audit_snapshot(obj, "update")
+        if snapshot is None:
+            continue
+        pending.append(
+            {
+                "obj": obj,
+                "title": f"Updated {_humanize_model_name(obj.__class__.__name__).lower()}",
+                "action": "update",
+                "entity_type": obj.__class__.__name__,
+                "entity_name": _entity_label(obj),
+                "payload": snapshot,
+            }
+        )
+
+    for obj in session.deleted:
+        if isinstance(obj, ActivityEvent) or not isinstance(obj, tracked):
+            continue
+        snapshot = _audit_snapshot(obj, "delete")
+        if snapshot is None:
+            continue
+        pending.append(
+            {
+                "obj": obj,
+                "title": f"Deleted {_humanize_model_name(obj.__class__.__name__).lower()}",
+                "action": "delete",
+                "entity_type": obj.__class__.__name__,
+                "entity_name": _entity_label(obj),
+                "payload": snapshot,
+            }
+        )
+
+
+@event.listens_for(SASession, "after_flush_postexec")
+def _write_audit_events(session, flush_context) -> None:
+    """Persist captured audit events after primary rows have IDs."""
+    pending = session.info.pop("_pending_audit_events", [])
+    if not pending:
+        return
+
+    session.info["_audit_write_in_progress"] = True
+    try:
+        for entry in pending:
+            entity_id = getattr(entry.get("obj"), "id", None)
+            session.add(ActivityEvent(
+                kind="audit",
+                title=entry["title"],
+                details=entry["entity_name"],
+                occurred_at=_now_utc(),
+                actor=_current_actor(),
+                action=entry["action"],
+                entity_type=entry["entity_type"],
+                entity_id=entity_id,
+                entity_name=entry["entity_name"],
+                source=_current_source(),
+                payload=_json_dump(entry["payload"]),
+            ))
+    finally:
+        session.info.pop("_audit_write_in_progress", None)
+
+
+def get_recent_audit_events(limit: int = 50, *, action: str | None = None, entity_type: str | None = None) -> list[dict]:
+    """Return recent audit events as dictionaries."""
+    query = db.select(ActivityEvent).where(ActivityEvent.kind == "audit")
+    if action:
+        query = query.where(ActivityEvent.action == action)
+    if entity_type:
+        query = query.where(ActivityEvent.entity_type == entity_type)
+    rows = (
+        db.session.execute(
+            query.order_by(ActivityEvent.occurred_at.desc(), ActivityEvent.id.desc()).limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+    events = []
+    for row in rows:
+        payload = None
+        if row.payload:
+            try:
+                payload = json.loads(row.payload)
+            except json.JSONDecodeError:
+                payload = {"raw": row.payload}
+        events.append(
+            {
+                "id": row.id,
+                "kind": row.kind,
+                "title": row.title,
+                "details": row.details,
+                "occurred_at": row.occurred_at,
+                "actor": row.actor,
+                "action": row.action,
+                "entity_type": row.entity_type,
+                "entity_id": row.entity_id,
+                "entity_name": row.entity_name,
+                "source": row.source,
+                "payload": payload,
+            }
+        )
+    return events
 
 
 def get_latest_activity(kind: str) -> dict | None:

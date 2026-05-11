@@ -14,7 +14,15 @@ from constants import (
 )
 from extensions import db
 from helpers import _notify_discord, admin_required, db_commit
-from models import CookwareSession, Item, KnifeTask, KnifeTaskLog, Ownership, SharpeningLog
+from models import (
+    CookwareSession,
+    Item,
+    KnifeTask,
+    KnifeTaskLog,
+    Ownership,
+    SharpeningLog,
+    record_audit_event,
+)
 
 logs_bp = Blueprint("logs", __name__)
 logger = logging.getLogger(__name__)
@@ -152,9 +160,21 @@ def sharpening_delete(lid):
     entry = db.session.get(SharpeningLog, lid)
     if not entry:
         abort(404)
+    entry_id = entry.id
+    entry_item_name = entry.item.name if entry.item else None
+    entry_payload = {"item": entry_item_name, "sharpened_on": entry.sharpened_on}
     db.session.delete(entry)
     if db_commit(db.session):
         logger.info("Sharpening entry %d deleted", lid)
+        record_audit_event(
+            kind="audit",
+            title="Deleted sharpening log entry",
+            action="delete",
+            entity_type="SharpeningLog",
+            entity_id=entry_id,
+            entity_name=entry_item_name,
+            payload=entry_payload,
+        )
         flash("Event removed.", "info")
     return redirect(url_for("logs.sharpening"))
 
@@ -170,6 +190,15 @@ def sharpening_purge_item(item_id):
     SharpeningLog.query.filter_by(item_id=item_id).delete()
     if db_commit(db.session):
         logger.info("Sharpening logs purged for item %d (%d entries)", item_id, count)
+        record_audit_event(
+            kind="audit",
+            title="Purged sharpening logs for item",
+            action="delete",
+            entity_type="SharpeningLog",
+            entity_id=item_id,
+            entity_name=item.name,
+            payload={"item": item.name, "entries_deleted": count},
+        )
         flash(f"Removed all {count} sharpening event{'s' if count != 1 else ''} for {item.name}.", "info")
     return redirect(url_for("logs.sharpening"))
 
@@ -182,6 +211,14 @@ def sharpening_purge_all():
     SharpeningLog.query.delete()
     if db_commit(db.session):
         logger.info("All sharpening logs purged (%d entries)", count)
+        record_audit_event(
+            kind="audit",
+            title="Purged all sharpening logs",
+            action="delete",
+            entity_type="SharpeningLog",
+            entity_name="All sharpening logs",
+            payload={"entries_deleted": count},
+        )
         flash(f"Removed all {count} sharpening event{'s' if count != 1 else ''}.", "info")
     return redirect(url_for("logs.sharpening"))
 
@@ -377,9 +414,21 @@ def cookware_delete(session_id):
     cookware_session = db.session.get(CookwareSession, session_id)
     if not cookware_session:
         abort(404)
+    session_row_id = cookware_session.id
+    session_item_name = cookware_session.item.name if cookware_session.item else None
+    session_payload = {"item": session_item_name, "used_on": cookware_session.used_on}
     db.session.delete(cookware_session)
     if db_commit(db.session):
         logger.info("Cookware session %d deleted", session_id)
+        record_audit_event(
+            kind="audit",
+            title="Deleted cookware session",
+            action="delete",
+            entity_type="CookwareSession",
+            entity_id=session_row_id,
+            entity_name=session_item_name,
+            payload=session_payload,
+        )
         flash("Session removed.", "info")
     return redirect(url_for("logs.cookware"))
 
@@ -395,6 +444,15 @@ def cookware_purge_item(item_id):
     CookwareSession.query.filter_by(item_id=item_id).delete()
     if db_commit(db.session):
         logger.info("Cookware sessions purged for item %d (%d entries)", item_id, count)
+        record_audit_event(
+            kind="audit",
+            title="Purged cookware sessions for item",
+            action="delete",
+            entity_type="CookwareSession",
+            entity_id=item_id,
+            entity_name=item.name,
+            payload={"item": item.name, "entries_deleted": count},
+        )
         flash(f"Removed all {count} cookware session{'s' if count != 1 else ''} for {item.name}.", "info")
     return redirect(url_for("logs.cookware"))
 
@@ -407,6 +465,14 @@ def cookware_purge_all():
     CookwareSession.query.delete()
     if db_commit(db.session):
         logger.info("All cookware sessions purged (%d entries)", count)
+        record_audit_event(
+            kind="audit",
+            title="Purged all cookware sessions",
+            action="delete",
+            entity_type="CookwareSession",
+            entity_name="All cookware sessions",
+            payload={"entries_deleted": count},
+        )
         flash(f"Removed all {count} cookware session{'s' if count != 1 else ''}.", "info")
     return redirect(url_for("logs.cookware"))
 
@@ -550,9 +616,22 @@ def task_log_delete(lid):
     entry = db.session.get(KnifeTaskLog, lid)
     if not entry:
         abort(404)
+    entry_id = entry.id
+    entry_item_name = entry.item.name if entry.item else None
+    entry_task_name = entry.task.name if entry.task else None
+    entry_payload = {"item": entry_item_name, "task": entry_task_name, "logged_on": entry.logged_on}
     db.session.delete(entry)
     if db_commit(db.session):
         logger.info("Task log entry %d deleted", lid)
+        record_audit_event(
+            kind="audit",
+            title="Deleted task log entry",
+            action="delete",
+            entity_type="KnifeTaskLog",
+            entity_id=entry_id,
+            entity_name=entry_item_name,
+            payload=entry_payload,
+        )
         flash("Entry removed.", "info")
     return redirect(url_for("logs.tasks"))
 
@@ -568,6 +647,15 @@ def task_log_purge_item(item_id):
     KnifeTaskLog.query.filter_by(item_id=item_id).delete()
     if db_commit(db.session):
         logger.info("Task logs purged for item %d (%d entries)", item_id, count)
+        record_audit_event(
+            kind="audit",
+            title="Purged task logs for item",
+            action="delete",
+            entity_type="KnifeTaskLog",
+            entity_id=item_id,
+            entity_name=item.name,
+            payload={"item": item.name, "entries_deleted": count},
+        )
         flash(f"Removed all {count} task log entr{'ies' if count != 1 else 'y'} for {item.name}.", "info")
     return redirect(url_for("logs.tasks"))
 
@@ -580,6 +668,14 @@ def task_log_purge_all():
     KnifeTaskLog.query.delete()
     if db_commit(db.session):
         logger.info("All task logs purged (%d entries)", count)
+        record_audit_event(
+            kind="audit",
+            title="Purged all task logs",
+            action="delete",
+            entity_type="KnifeTaskLog",
+            entity_name="All task logs",
+            payload={"entries_deleted": count},
+        )
         flash(f"Removed all {count} task log entr{'ies' if count != 1 else 'y'}.", "info")
     return redirect(url_for("logs.tasks"))
 

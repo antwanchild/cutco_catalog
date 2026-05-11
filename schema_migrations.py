@@ -199,6 +199,25 @@ def _schema_item_availability_migrations() -> None:
     )
 
 
+def _schema_activity_event_audit_migrations() -> None:
+    """Add audit metadata columns to activity events."""
+    _add_column("activity_events", "actor", "ALTER TABLE activity_events ADD COLUMN actor VARCHAR(40)")
+    _add_column("activity_events", "action", "ALTER TABLE activity_events ADD COLUMN action VARCHAR(20)")
+    _add_column(
+        "activity_events",
+        "entity_type",
+        "ALTER TABLE activity_events ADD COLUMN entity_type VARCHAR(40)",
+    )
+    _add_column("activity_events", "entity_id", "ALTER TABLE activity_events ADD COLUMN entity_id INTEGER")
+    _add_column(
+        "activity_events",
+        "entity_name",
+        "ALTER TABLE activity_events ADD COLUMN entity_name VARCHAR(160)",
+    )
+    _add_column("activity_events", "source", "ALTER TABLE activity_events ADD COLUMN source VARCHAR(160)")
+    _add_column("activity_events", "payload", "ALTER TABLE activity_events ADD COLUMN payload TEXT")
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
@@ -207,6 +226,7 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(5, "repair_ownership_quantity_fields", _schema_repair_ownership_quantity_fields),
     SchemaMigration(6, "item_alternate_skus", _schema_item_alternate_skus_migrations),
     SchemaMigration(7, "item_availability", _schema_item_availability_migrations),
+    SchemaMigration(8, "activity_event_audit_fields", _schema_activity_event_audit_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version
