@@ -316,19 +316,32 @@ def _member_preview_key(sku: str | None, name: str | None) -> str | None:
     return None
 
 
+def _member_preview_name(name: str | None, quantity: int | None) -> str | None:
+    """Return a display name with redundant trailing quantity removed."""
+    normalized_name = str(name or "").strip() or None
+    if not normalized_name or quantity is None:
+        return normalized_name
+    qty_text = str(max(1, int(quantity)))
+    for suffix in (f" ({qty_text})", f" {qty_text}"):
+        if normalized_name.endswith(suffix):
+            stripped = normalized_name[: -len(suffix)].rstrip()
+            return stripped or normalized_name
+    return normalized_name
+
+
 def _aggregate_member_preview_rows(member_entries: list[dict]) -> OrderedDict[str, dict[str, object]]:
     """Aggregate member rows by stable preview key."""
     rows: OrderedDict[str, dict[str, object]] = OrderedDict()
     for entry in member_entries:
         sku = _normalize_member_sku(entry.get("sku"))
-        name = str(entry.get("name") or "").strip() or None
-        key = _member_preview_key(sku, name)
-        if not key:
-            continue
         try:
             quantity = max(1, int(entry.get("quantity") or 1))
         except (TypeError, ValueError):
             quantity = 1
+        name = _member_preview_name(entry.get("name"), quantity)
+        key = _member_preview_key(sku, name)
+        if not key:
+            continue
         current = rows.get(key)
         if current is None:
             rows[key] = {
@@ -351,7 +364,7 @@ def _build_set_membership_preview(item_set: Set, member_entries: list[dict]) -> 
     for membership in item_set.members:
         item = membership.item
         sku = _normalize_member_sku(item.sku if item else None)
-        name = item.name if item else None
+        name = _member_preview_name(item.name if item else None, membership.quantity)
         key = _member_preview_key(sku, name)
         if not key:
             continue

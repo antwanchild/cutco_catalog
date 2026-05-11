@@ -3246,6 +3246,27 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertFalse(preview["has_changes"])
         self.assertEqual(preview["summary"], "No membership changes detected.")
 
+    def test_set_membership_preview_ignores_quantity_suffix_name_formatting(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _variant_id = self._add_catalog_item(name="1952 Stainless Salad Fork", sku="1952")
+
+        with self.app.app_context():
+            item_set = Set(name="Salad Set", sku="SAL-1")
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=12))
+            db.session.commit()
+
+            preview = _build_set_membership_preview(
+                db.session.get(Set, item_set.id),
+                [{"sku": "1952", "name": "1952 Stainless Salad Fork (12)", "quantity": 12}],
+            )
+
+        self.assertFalse(preview["has_changes"])
+        self.assertEqual(preview["summary"], "No membership changes detected.")
+
     def test_variant_sync_page_renders_and_creates_missing_variants(self):
         self._login_as_admin()
         self._set_csrf_token()
