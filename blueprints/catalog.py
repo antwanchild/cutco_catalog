@@ -292,6 +292,126 @@ def _aggregate_resolved_members(
     return resolved_members, created_missing_items
 
 
+def _member_preview_key(sku: str | None, name: str | None) -> str | None:
+    """Return a stable key for comparing set members."""
+    normalized_sku = _normalize_member_sku(sku)
+    if normalized_sku:
+        return f"sku:{normalized_sku}"
+    normalized_name = _normalize_member_name(name)
+    if normalized_name:
+        return f"name:{normalized_name}"
+    return None
+
+
+def _aggregate_member_preview_rows(member_entries: list[dict]) -> OrderedDict[str, dict[str, object]]:
+    """Aggregate member rows by stable preview key."""
+    rows: OrderedDict[str, dict[str, object]] = OrderedDict()
+    for entry in member_entries:
+        sku = _normalize_member_sku(entry.get("sku"))
+        name = str(entry.get("name") or "").strip() or None
+        key = _member_preview_key(sku, name)
+        if not key:
+            continue
+        try:
+            quantity = max(1, int(entry.get("quantity") or 1))
+        except (TypeError, ValueError):
+            quantity = 1
+        current = rows.get(key)
+        if current is None:
+            rows[key] = {
+                "sku": sku,
+                "name": name,
+                "quantity": quantity,
+            }
+        else:
+            current["quantity"] = max(1, int(current.get("quantity") or 1)) + quantity
+            if not current.get("sku") and sku:
+                current["sku"] = sku
+            if not current.get("name") and name:
+                current["name"] = name
+    return rows
+
+
+def _build_set_membership_preview(item_set: Set, member_entries: list[dict]) -> dict:
+    """Build a before/after snapshot for an existing set."""
+    current_rows = OrderedDict()
+    for membership in item_set.members:
+        item = membership.item
+        sku = _normalize_member_sku(item.sku if item else None)
+        name = item.name if item else None
+        key = _member_preview_key(sku, name)
+        if not key:
+            continue
+        current_rows[key] = {
+            "sku": sku,
+            "name": name,
+            "quantity": max(1, int(membership.quantity or 1)),
+        }
+
+    incoming_rows = _aggregate_member_preview_rows(member_entries)
+    change_rows: list[dict[str, object]] = []
+    added = 0
+    removed = 0
+    quantity_changed = 0
+
+    for key, incoming in incoming_rows.items():
+        current = current_rows.get(key)
+        if current is None:
+            added += 1
+            change_rows.append({
+                "action": "added",
+                "sku": incoming.get("sku") or "—",
+                "name": incoming.get("name") or "—",
+                "current_quantity": None,
+                "incoming_quantity": incoming.get("quantity"),
+            })
+            continue
+        current_qty = int(current.get("quantity") or 1)
+        incoming_qty = int(incoming.get("quantity") or 1)
+        if current_qty != incoming_qty:
+            quantity_changed += 1
+            change_rows.append({
+                "action": "quantity",
+                "sku": incoming.get("sku") or current.get("sku") or "—",
+                "name": incoming.get("name") or current.get("name") or "—",
+                "current_quantity": current_qty,
+                "incoming_quantity": incoming_qty,
+            })
+
+    for key, current in current_rows.items():
+        if key in incoming_rows:
+            continue
+        removed += 1
+        change_rows.append({
+            "action": "removed",
+            "sku": current.get("sku") or "—",
+            "name": current.get("name") or "—",
+            "current_quantity": current.get("quantity"),
+            "incoming_quantity": None,
+        })
+
+    summary_parts = []
+    if added:
+        summary_parts.append(f"{added} added")
+    if removed:
+        summary_parts.append(f"{removed} removed")
+    if quantity_changed:
+        summary_parts.append(f"{quantity_changed} quantity changed")
+
+    return {
+        "has_changes": bool(change_rows),
+        "summary": ", ".join(summary_parts) if summary_parts else "No membership changes detected.",
+        "current_rows": list(current_rows.values()),
+        "incoming_rows": list(incoming_rows.values()),
+        "change_rows": change_rows,
+        "added": added,
+        "removed": removed,
+        "quantity_changed": quantity_changed,
+        "current_count": len(current_rows),
+        "incoming_count": len(incoming_rows),
+    }
+
+
 @catalog_bp.route("/catalog")
 def catalog():
     """Render the catalog browser."""
@@ -1253,6 +1373,12 @@ def catalog_sync():
     # Pass existing sets too so confirm can update member quantities
     existing_sets_data = [scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() in existing_sets]
 
+    from sqlalchemy.orm import selectinload
+    existing_set_lookup = {
+        item_set.name.lower(): item_set
+        for item_set in Set.query.options(selectinload(Set.members).selectinload(ItemSetMember.item)).all()
+    }
+
     catalog_sku_lookup = {
         _normalize_member_sku(item.sku): item
         for item in Item.query.filter(Item.sku.isnot(None)).all()
@@ -1279,6 +1405,29 @@ def catalog_sync():
         item_set["member_snapshot_rows"] = member_snapshot_rows
         item_set["not_in_catalog_skus"] = not_in_catalog_skus
         item_set["member_data_json"] = json.dumps(member_entries, ensure_ascii=False)
+        if item_set in existing_sets_data:
+            current_set = existing_set_lookup.get(item_set["name"].lower())
+            item_set["membership_preview"] = _build_set_membership_preview(
+                current_set,
+                member_entries,
+            ) if current_set else {
+                "has_changes": False,
+                "summary": "Unable to load current set state.",
+                "current_rows": [],
+                "incoming_rows": member_snapshot_rows,
+                "change_rows": [],
+                "added": 0,
+                "removed": 0,
+                "quantity_changed": 0,
+                "current_count": 0,
+                "incoming_count": len(member_snapshot_rows),
+            }
+
+    changed_existing_sets_data = [
+        item_set
+        for item_set in existing_sets_data
+        if item_set.get("membership_preview", {}).get("has_changes")
+    ]
 
     return render_template("sync_preview.html",
                            grouped=grouped,
@@ -1286,6 +1435,7 @@ def catalog_sync():
                            scraped_total=len(scraped),
                            new_sets=new_sets,
                            existing_sets_data=existing_sets_data,
+                           changed_existing_sets_data=changed_existing_sets_data,
                            scraped_sets_total=len(scraped_sets),
                            blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES))
 

@@ -3047,6 +3047,11 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         self._add_catalog_item(name="Existing Sync Knife", sku="EX-1")
+        existing_set_item_id, _existing_set_variant_id = self._add_catalog_item(
+            name="Existing Sync Set Knife",
+            sku="EXS-KNIFE-1",
+        )
+        self._add_set(name="Existing Sync Set", sku="EXS-1", item_ids=(existing_set_item_id,))
 
         scraped_items = [
             {
@@ -3063,6 +3068,16 @@ class CatalogSmokeTests(SmokeBaseTest):
             },
         ]
         scraped_sets = [
+            {
+                "name": "Existing Sync Set",
+                "sku": "EXS-1",
+                "url": "https://example.com/existing-set",
+                "member_skus": ["EXS-KNIFE-1"],
+                "member_quantities": {"EXS-KNIFE-1": 2},
+                "member_entries": [
+                    {"sku": "EXS-KNIFE-1", "name": "Existing Sync Set Knife", "quantity": 2},
+                ],
+            },
             {
                 "name": "New Sync Set",
                 "sku": "NSS-1",
@@ -3097,6 +3112,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Sync Knife", response.data)
         self.assertIn(b"New Sets", response.data)
         self.assertIn(b"New Sync Set", response.data)
+        self.assertIn(b"Set Quantity Updates", response.data)
+        self.assertIn(b"Existing Sync Set", response.data)
+        self.assertIn(b"quantity changed", response.data)
         self.assertIn(b"Scrapes Cutco.com to discover new items and sets.", response.data)
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)

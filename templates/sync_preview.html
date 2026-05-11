@@ -137,15 +137,17 @@
   {% endif %}
 
   {# ── Existing Sets with Quantity Updates #}
-  {% if existing_sets_data %}
-  <h2 class="mt-section">Set Quantity Updates <span class="muted">({{ existing_sets_data | length }})</span></h2>
-  <p class="muted">These sets already exist — member quantities will be updated on confirm.</p>
+  {% if changed_existing_sets_data %}
+  <h2 class="mt-section">Set Quantity Updates <span class="muted">({{ changed_existing_sets_data | length }})</span></h2>
+  <p class="muted">These sets already exist and have membership changes. The table below shows the current set contents, the incoming scrape, and the resulting member delta.</p>
   <div class="table-wrap">
   <table class="data-table">
     <thead>
       <tr>
         <th>Set Name</th>
-        <th>Members</th>
+        <th>Current</th>
+        <th>Incoming</th>
+        <th>Changes</th>
         <th></th>
       </tr>
     </thead>
@@ -154,9 +156,43 @@
       <tr>
         <td>{{ item_set.name }}</td>
         <td>
-          {% for member in item_set.member_snapshot_rows %}
-            <span class="mono small">{{ member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>{%- if not loop.last %}, {% endif -%}
-          {% endfor %}
+          {% if item_set.membership_preview.current_rows %}
+            <div class="muted small" style="margin-bottom:.35rem">Current ({{ item_set.membership_preview.current_count }})</div>
+            {% for member in item_set.membership_preview.current_rows %}
+              <span class="mono small">{{ member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>{%- if not loop.last %}, {% endif -%}
+            {% endfor %}
+          {% else %}
+            <span class="muted small">No current members.</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item_set.membership_preview.incoming_rows %}
+            <div class="muted small" style="margin-bottom:.35rem">Incoming ({{ item_set.membership_preview.incoming_count }})</div>
+            {% for member in item_set.membership_preview.incoming_rows %}
+              <span class="mono small">{{ member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>{%- if not loop.last %}, {% endif -%}
+            {% endfor %}
+            {% if item_set.not_in_catalog_skus %}
+              <div class="muted small" style="margin-top:.35rem">Not in catalog: {% for sku in item_set.not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</div>
+            {% endif %}
+          {% else %}
+            <span class="muted small">No incoming members.</span>
+          {% endif %}
+        </td>
+        <td>
+          <div style="margin-bottom:.35rem">{{ item_set.membership_preview.summary }}</div>
+          {% if item_set.membership_preview.change_rows %}
+            <div class="muted small" style="margin-bottom:.35rem">Diff</div>
+            {% for change in item_set.membership_preview.change_rows %}
+              <div class="sync-change-row">
+                <span class="badge badge-{% if change.action == 'added' %}new{% elif change.action == 'removed' %}missing{% else %}warning{% endif %}">{{ change.action }}</span>
+                <span class="mono small">{{ change.sku }}</span>
+                <span class="small">{{ change.name }}</span>
+                <span class="mono small">
+                  {{ change.current_quantity if change.current_quantity is not none else '—' }} -> {{ change.incoming_quantity if change.incoming_quantity is not none else '—' }}
+                </span>
+              </div>
+            {% endfor %}
+          {% endif %}
         </td>
         <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
       </tr>
@@ -164,6 +200,9 @@
     </tbody>
   </table>
   </div>
+  {% elif existing_sets_data %}
+  <h2 class="mt-section">Set Quantity Updates <span class="muted">(0)</span></h2>
+  <p class="flash flash-success">✓ No existing set membership changes detected.</p>
   {% endif %}
 
   <div class="form-actions" style="margin-top:1.25rem">
