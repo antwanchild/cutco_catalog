@@ -477,6 +477,23 @@ a:hover { text-decoration: underline; }
   white-space: normal;
 }
 .data-table.compact th, .data-table.compact td { padding: .35rem .6rem; }
+.imported-members-section { margin-top: 1rem; }
+.imported-members-section .section-heading { margin-bottom: .25rem; }
+.imported-members-section > .muted { margin-bottom: .6rem; }
+.imported-members-table th:nth-child(1),
+.imported-members-table td:nth-child(1) {
+  width: 14rem;
+}
+.imported-members-table th:nth-child(2),
+.imported-members-table td:nth-child(2) {
+  width: auto;
+}
+.imported-members-table td:last-child,
+.imported-members-table th:last-child {
+  width: 5rem;
+  text-align: right;
+  white-space: nowrap;
+}
 .import-item-table th:nth-child(1), .import-item-table td:nth-child(1) { width: 4%; }
 .import-item-table th:nth-child(2), .import-item-table td:nth-child(2) { width: 20%; }
 .import-item-table th:nth-child(3), .import-item-table td:nth-child(3) { width: 8%; }

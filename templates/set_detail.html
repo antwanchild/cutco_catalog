@@ -54,21 +54,21 @@
 {% endif %}
 
 {% if member_snapshot_rows %}
+<div class="imported-members-section">
 <h2 class="section-heading">📋 Imported Members ({{ member_snapshot_rows | length }})</h2>
-<p class="muted">These are the item numbers captured when this set was imported. Items not in the catalog are flagged below.</p>
+<p class="muted">These are the imported members captured when this set was imported. Items not in the catalog are flagged below.</p>
 <div class="table-wrap">
-<table class="data-table compact">
+<table class="data-table compact imported-members-table">
   <thead>
     <tr>
-      <th>#</th>
       <th>SKU</th>
+      <th>Item</th>
       <th>Qty</th>
     </tr>
   </thead>
   <tbody>
     {% for member in member_snapshot_rows %}
     <tr class="{% if member.status == 'missing' %}row-missing{% endif %}">
-      <td class="mono">{{ member.index }}</td>
       <td>
         {% if member.sku %}
           {% if member.matched_item %}
@@ -80,6 +80,13 @@
           <span class="muted" title="{{ member.hover_title or member.name or '' }}">{{ member.name or 'No item #' }}</span>
         {% endif %}
       </td>
+      <td>
+        {% if member.matched_item %}
+          <a href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}">{{ member.matched_item.name }}</a>
+        {% else %}
+          <span title="{{ member.hover_title or member.name or '' }}">{{ member.name or '—' }}</span>
+        {% endif %}
+      </td>
       <td>{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% else %}<span class="muted">1</span>{% endif %}</td>
     </tr>
     {% endfor %}
@@ -89,6 +96,7 @@
 {% if not_in_catalog_skus %}
 <p class="muted">Not in catalog: {% for sku in not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</p>
 {% endif %}
+</div>
 {% endif %}
 
 {% if owned_items %}

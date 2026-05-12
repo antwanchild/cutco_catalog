@@ -3667,6 +3667,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(set_detail_response.status_code, 200)
         self.assertIn(b"Imported Members", set_detail_response.data)
         self.assertIn(b"SX-MISS-1", set_detail_response.data)
+        self.assertIn(b"Sync Missing Knife", set_detail_response.data)
         self.assertEqual(existing_set_detail_response.status_code, 200)
         self.assertIn(b"Sync Existing Missing Knife", existing_set_detail_response.data)
 
