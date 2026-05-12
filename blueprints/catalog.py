@@ -238,6 +238,7 @@ def _build_member_status_rows(
             "status_label": status_label,
             "matched_item": item,
         })
+    rows.sort(key=_member_preview_sort_key)
     return rows, missing_skus
 
 
@@ -356,6 +357,16 @@ def _member_preview_name(name: str | None, quantity: int | None) -> str | None:
     return normalized_name
 
 
+def _member_preview_sort_key(member: dict[str, object]) -> tuple[int, int, str]:
+    """Sort set members by numeric SKU, then by SKU text, then by name."""
+    sku = str(member.get("sku") or "")
+    sku_match = re.match(r"^(\d+)", sku)
+    if sku_match:
+        return (0, int(sku_match.group(1)), sku)
+    name = str(member.get("name") or "")
+    return (1, 0, sku or name)
+
+
 def _aggregate_member_preview_rows(member_entries: list[dict]) -> OrderedDict[str, dict[str, object]]:
     """Aggregate member rows by stable preview key."""
     rows: OrderedDict[str, dict[str, object]] = OrderedDict()
@@ -402,6 +413,8 @@ def _build_set_membership_preview(item_set: Set, member_entries: list[dict]) -> 
         }
 
     incoming_rows = _aggregate_member_preview_rows(member_entries)
+    current_rows_list = sorted(current_rows.values(), key=_member_preview_sort_key)
+    incoming_rows_list = sorted(incoming_rows.values(), key=_member_preview_sort_key)
     change_rows: list[dict[str, object]] = []
     added = 0
     removed = 0
@@ -454,8 +467,8 @@ def _build_set_membership_preview(item_set: Set, member_entries: list[dict]) -> 
     return {
         "has_changes": bool(change_rows),
         "summary": ", ".join(summary_parts) if summary_parts else "No membership changes detected.",
-        "current_rows": list(current_rows.values()),
-        "incoming_rows": list(incoming_rows.values()),
+        "current_rows": current_rows_list,
+        "incoming_rows": incoming_rows_list,
         "change_rows": change_rows,
         "added": added,
         "removed": removed,

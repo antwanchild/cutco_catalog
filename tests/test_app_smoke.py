@@ -3289,6 +3289,32 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertFalse(preview["has_changes"])
         self.assertEqual(preview["summary"], "No membership changes detected.")
 
+    def test_set_membership_preview_sorts_members_by_sku(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        first_item_id, _ = self._add_catalog_item(name="Small Knife", sku="84")
+        second_item_id, _ = self._add_catalog_item(name="Cleaver", sku="1737")
+
+        with self.app.app_context():
+            item_set = Set(name="Sorted Set", sku="SORT-1")
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(ItemSetMember(item_id=second_item_id, set_id=item_set.id, quantity=1))
+            db.session.add(ItemSetMember(item_id=first_item_id, set_id=item_set.id, quantity=2))
+            db.session.commit()
+
+            preview = _build_set_membership_preview(
+                db.session.get(Set, item_set.id),
+                [
+                    {"sku": "1737", "name": "Cleaver", "quantity": 1},
+                    {"sku": "84", "name": "Small Knife", "quantity": 2},
+                ],
+            )
+
+        self.assertEqual([member["sku"] for member in preview["current_rows"]], ["84", "1737"])
+        self.assertEqual([member["sku"] for member in preview["incoming_rows"]], ["84", "1737"])
+
     def test_variant_sync_page_renders_and_creates_missing_variants(self):
         self._login_as_admin()
         self._set_csrf_token()
