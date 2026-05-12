@@ -3222,6 +3222,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Set Quantity Updates", response.data)
         self.assertIn(b"Existing Sync Set", response.data)
         self.assertIn(b"quantity changed", response.data)
+        self.assertIn(b"Create placeholder items for missing set members", response.data)
+        self.assertIn(b'name="create_missing_set_members" value="on" checked', response.data)
         self.assertIn(b"Scrapes Cutco.com to discover new items and sets.", response.data)
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)

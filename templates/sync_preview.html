@@ -27,6 +27,13 @@
   <input type="hidden" name="existing_set_member_entries_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
   {% endfor %}
 
+  {% if new_sets or existing_sets_data %}
+  <label class="checkbox-label" style="display:block;margin:0 0 1rem">
+    <input type="checkbox" name="create_missing_set_members" value="on" checked>
+    Create placeholder items for missing set members
+  </label>
+  {% endif %}
+
   {# ── New Items #}
   {% if new_items %}
   <h2>New Items <span class="muted">({{ new_items | length }})</span></h2>
@@ -94,10 +101,6 @@
   {% if new_sets %}
   <h2 class="mt-section">New Sets <span class="muted">({{ new_sets | length }})</span></h2>
   <p class="muted">Member items are matched by SKU. Items already in your catalog will be linked automatically.</p>
-  <label class="checkbox-label" style="margin:.5rem 0 1rem">
-    <input type="checkbox" name="create_missing_set_members" value="on">
-    Create placeholder items for missing set members
-  </label>
   <div class="table-wrap">
   <table class="data-table">
     <thead>
