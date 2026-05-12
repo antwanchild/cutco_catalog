@@ -14,6 +14,7 @@ from app import create_app
 from constants import UNKNOWN_COLOR
 from extensions import db
 from helpers import _collection_token, _gift_token, _notify_discord, _verify_collection_token, _verify_gift_token, check_wishlist_targets
+from msrp_helpers import _scrape_price_from_page
 from models import (
     CookwareSession,
     ActivityEvent,
@@ -157,6 +158,15 @@ class PublicSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'name="update_db" checked', response.data)
+
+    def test_msrp_scraper_reads_full_retail_fallback(self):
+        html = '<html><body><script>{"fullRetail":184.0,"actualPrice":184.0}</script></body></html>'
+
+        with mock.patch("msrp_helpers.requests.get") as mocked_get:
+            mocked_get.return_value.status_code = 200
+            mocked_get.return_value.text = html
+
+            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/1766C"), 184.0)
 
     def test_health_endpoint_reports_ok(self):
         response = self.client.get("/health")

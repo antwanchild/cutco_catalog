@@ -166,6 +166,13 @@ def _scrape_price_from_page(url: str) -> float | None:
             except ValueError:
                 pass
 
+        retail_match = re.search(r'"(?:fullRetail|actualPrice)"\s*:\s*([\d.]+)', resp.text)
+        if retail_match:
+            try:
+                return float(retail_match.group(1))
+            except ValueError:
+                pass
+
         price_el = soup.find(attrs={"itemprop": "price"})
         if price_el:
             raw = price_el.get("content") or price_el.get_text(strip=True)
