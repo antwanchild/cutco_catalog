@@ -6,13 +6,9 @@
   <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">← Cancel</a>
 </div>
 
-<p class="muted">
-  Scraped <strong>{{ scraped_total }}</strong> items
-  and <strong>{{ scraped_sets_total }}</strong> sets from Cutco.com.
-  {% if blocked_categories %}
-    Blocked categories: {{ blocked_categories | join(', ') }}.
-  {% endif %}
-</p>
+{% if blocked_categories %}
+<p class="muted">Blocked categories: {{ blocked_categories | join(', ') }}.</p>
+{% endif %}
 
 {% if not new_items and not new_sets and not existing_sets_data %}
   <div class="sync-preview-body">
