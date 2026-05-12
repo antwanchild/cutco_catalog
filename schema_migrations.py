@@ -225,6 +225,11 @@ def _schema_item_attachment_migrations() -> None:
     ItemAttachment.__table__.create(db.engine, checkfirst=True)
 
 
+def _schema_item_variant_source_migrations() -> None:
+    """Add variant source tracking."""
+    _add_column("item_variants", "source", "ALTER TABLE item_variants ADD COLUMN source VARCHAR(40)")
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
@@ -235,6 +240,7 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(7, "item_availability", _schema_item_availability_migrations),
     SchemaMigration(8, "activity_event_audit_fields", _schema_activity_event_audit_migrations),
     SchemaMigration(9, "item_attachments", _schema_item_attachment_migrations),
+    SchemaMigration(10, "item_variant_source", _schema_item_variant_source_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

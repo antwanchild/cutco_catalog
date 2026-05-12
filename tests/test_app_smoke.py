@@ -1085,7 +1085,7 @@ class UtilitySmokeTests(SmokeBaseTest):
             "2135-2",
         )
 
-    def test_extract_product_variant_colors_ignores_selection_labels_without_swatch_group(self):
+    def test_extract_product_variant_colors_uses_page_color_without_swatch_group(self):
         response = mock.Mock()
         response.status_code = 200
         response.text = """
@@ -1100,7 +1100,7 @@ class UtilitySmokeTests(SmokeBaseTest):
             _extract_product_variant_colors.cache_clear()
             self.assertEqual(
                 _extract_product_variant_colors("https://www.cutco.com/p/1738C-test-1"),
-                (),
+                ("Classic",),
             )
 
     def test_extract_product_variant_colors_ignores_attribute_sources_without_swatch_group(self):
@@ -1296,7 +1296,7 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Gray",),
             )
 
-    def test_extract_product_variant_colors_returns_empty_when_no_swatch_group_exists(self):
+    def test_extract_product_variant_colors_uses_page_color_when_no_swatch_group_exists(self):
         response = mock.Mock()
         response.status_code = 200
         response.text = """
@@ -1316,7 +1316,7 @@ class UtilitySmokeTests(SmokeBaseTest):
             _extract_product_variant_colors.cache_clear()
             self.assertEqual(
                 _extract_product_variant_colors("https://www.cutco.com/p/278-test"),
-                (),
+                ("Classic",),
             )
 
     def test_extract_product_variant_colors_prefers_selected_color_on_size_pages(self):

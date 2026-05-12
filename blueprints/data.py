@@ -1054,7 +1054,7 @@ def variant_sync_confirm():
                 if color_value.lower() in existing_real:
                     retained_variants += 1
                     continue
-                db.session.add(ItemVariant(item_id=item.id, color=color_value))
+                db.session.add(ItemVariant(item_id=item.id, color=color_value, source="variant_sync"))
                 create_colors.append(color_value)
                 created_variants += 1
             retained_variants += len(item_data.get("retained_colors", []))
@@ -1584,7 +1584,7 @@ def completion_import_confirm():
 
             notes = request.form.get(f"row_note_{row_index}", "").strip() or None
             color = request.form.get(f"row_color_{row_index}", "").strip() or UNKNOWN_COLOR
-            target_color = UNKNOWN_COLOR if (item.category or "") in COOKWARE_CATEGORIES else color
+            target_color = color if color and color != UNKNOWN_COLOR else UNKNOWN_COLOR
 
             person = existing_persons.get(person_name.lower())
             if not person:
@@ -1597,7 +1597,7 @@ def completion_import_confirm():
             variant = next((existing_variant for existing_variant in item.variants
                             if existing_variant.color.lower() == target_color.lower()), None)
             if not variant:
-                variant = ItemVariant(item_id=item.id, color=target_color)
+                variant = ItemVariant(item_id=item.id, color=target_color, source="collection_import")
                 db.session.add(variant)
                 db.session.flush()
 
@@ -1808,12 +1808,11 @@ def import_confirm():
                 if non_catalog:
                     item.in_catalog = False
 
-            is_cookware = (item.category or "") in COOKWARE_CATEGORIES
-            target_color = UNKNOWN_COLOR if is_cookware else (color if (color and color != UNKNOWN_COLOR) else UNKNOWN_COLOR)
+            target_color = color if color and color != UNKNOWN_COLOR else UNKNOWN_COLOR
             variant = next((existing_variant for existing_variant in item.variants
                             if existing_variant.color.lower() == target_color.lower()), None)
             if not variant:
-                variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_variant_unicorn)
+                variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_variant_unicorn, source="catalog_sync")
                 db.session.add(variant)
                 db.session.flush()
             elif is_variant_unicorn and not variant.is_unicorn:
@@ -1925,11 +1924,11 @@ def import_confirm():
                 existing_persons[person_name.lower()] = person
                 added_persons += 1
 
-            target_color = UNKNOWN_COLOR if (item.category or "") in COOKWARE_CATEGORIES else color
+            target_color = color if color and color != UNKNOWN_COLOR else UNKNOWN_COLOR
             variant = next((existing_variant for existing_variant in item.variants
                             if existing_variant.color.lower() == target_color.lower()), None)
             if not variant:
-                variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_variant_unicorn)
+                variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_variant_unicorn, source="collection_import")
                 db.session.add(variant)
                 db.session.flush()
             elif is_variant_unicorn and not variant.is_unicorn:

@@ -8,7 +8,7 @@ from flask import has_request_context, request, session
 from sqlalchemy import event, inspect as sa_inspect
 from sqlalchemy.orm import Session as SASession
 
-from constants import COOKWARE_CATEGORIES, UNKNOWN_COLOR
+from constants import UNKNOWN_COLOR
 from extensions import db
 
 
@@ -113,6 +113,7 @@ class ItemVariant(db.Model):
     item_id    = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
     color      = db.Column(db.String(80), nullable=False, default=UNKNOWN_COLOR)
     is_unicorn = db.Column(db.Boolean,    nullable=False, default=False)
+    source     = db.Column(db.String(40), nullable=True, default="manual")
     notes      = db.Column(db.Text, nullable=True)
 
     ownerships = db.relationship("Ownership", backref="variant",
@@ -275,7 +276,7 @@ class KnifeTaskLog(db.Model):
 def ensure_unknown_variant(item: Item) -> None:
     """Guarantee every item has an 'Unknown / Unspecified' color variant."""
     if not any(variant.color == UNKNOWN_COLOR for variant in item.variants):
-        db.session.add(ItemVariant(item_id=item.id, color=UNKNOWN_COLOR))
+        db.session.add(ItemVariant(item_id=item.id, color=UNKNOWN_COLOR, source="fallback_unknown"))
         db.session.flush()
 
 
@@ -287,17 +288,6 @@ def reconcile_unknown_variant(item: Item) -> None:
     """
     real_variants = [variant for variant in item.variants if variant.color != UNKNOWN_COLOR]
     unknown_variants = [variant for variant in item.variants if variant.color == UNKNOWN_COLOR]
-
-    # Cookware is treated as single-variant: keep Unknown only.
-    if (item.category or "") in COOKWARE_CATEGORIES:
-        if not unknown_variants:
-            ensure_unknown_variant(item)
-            unknown_variants = [variant for variant in item.variants if variant.color == UNKNOWN_COLOR]
-        for real_variant in real_variants:
-            if not real_variant.ownerships:
-                db.session.delete(real_variant)
-        db.session.flush()
-        return
 
     if not real_variants:
         if not unknown_variants:

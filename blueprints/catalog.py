@@ -653,7 +653,7 @@ def catalog_add():
         colors = [raw_color.strip() for raw_color in request.form.get("colors", "").split(",") if raw_color.strip()]
         for color in colors:
             if color != UNKNOWN_COLOR and (item.category or "") not in COOKWARE_CATEGORIES:
-                db.session.add(ItemVariant(item_id=item.id, color=color))
+                db.session.add(ItemVariant(item_id=item.id, color=color, source="manual"))
         db.session.flush()
         reconcile_unknown_variant(item)
         if db_commit(db.session):
@@ -838,6 +838,7 @@ def variant_add(item_id):
         flash(f'"{color}" already exists for this item.', "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
     db.session.add(ItemVariant(item_id=item_id, color=color,
+                               source="manual",
                                notes=request.form.get("notes", "").strip() or None))
     db.session.flush()
     reconcile_unknown_variant(item)

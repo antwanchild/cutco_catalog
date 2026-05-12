@@ -834,7 +834,8 @@ def _extract_selected_page_color(soup: BeautifulSoup) -> str | None:
     match = _PAGE_COLOR_RE.search(page_text)
     if not match:
         return None
-    return _normalize_variant_label(match.group(1))
+    label = re.split(r"\b(?:Select|Image)\b", match.group(1), maxsplit=1)[0].strip()
+    return _normalize_variant_label(label)
 
 
 def _page_has_size_selector(soup: BeautifulSoup) -> bool:
@@ -890,6 +891,8 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
         if selected_color and _page_has_size_selector(soup):
             if selected_color in swatch_candidates:
                 swatch_candidates = (selected_color,)
+        if not swatch_candidates and selected_color:
+            swatch_candidates = (selected_color,)
         for candidate in swatch_candidates:
             key = candidate.lower()
             if key in seen:
