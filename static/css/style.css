@@ -276,6 +276,38 @@ a:hover { text-decoration: underline; }
 .sync-preview-body {
   min-height: 55vh;
 }
+.sync-empty-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1rem;
+}
+.sync-empty-card {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  background: linear-gradient(180deg, rgba(255,255,255,.02), transparent), var(--bg2);
+  box-shadow: var(--shadow);
+  min-height: 108px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.sync-empty-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: .72rem;
+  font-weight: 700;
+}
+.sync-empty-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.sync-empty-message {
+  margin: 0 0 1.25rem;
+}
 .collection-empty-state {
   margin: 2rem 0 1.5rem;
   padding: 1.35rem 1.5rem;
@@ -1921,3 +1953,9 @@ textarea { resize: vertical; }
   border-color: #4a5267;
 }
 .mono-sm { font-family: var(--mono); font-size: .82rem; }
+
+@media (max-width: 900px) {
+  .sync-empty-summary {
+    grid-template-columns: 1fr;
+  }
+}

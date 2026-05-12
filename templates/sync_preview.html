@@ -212,7 +212,21 @@
   </div>
   {% elif existing_sets_data %}
   <h2 class="mt-section">Set Quantity Updates <span class="muted">(0)</span></h2>
-  <p class="flash flash-success">✓ No existing set membership changes detected.</p>
+  <div class="sync-empty-summary" aria-label="Sync summary">
+    <div class="sync-empty-card">
+      <div class="sync-empty-label">Scraped Items</div>
+      <div class="sync-empty-value">{{ scraped_total }}</div>
+    </div>
+    <div class="sync-empty-card">
+      <div class="sync-empty-label">Scraped Sets</div>
+      <div class="sync-empty-value">{{ scraped_sets_total }}</div>
+    </div>
+    <div class="sync-empty-card">
+      <div class="sync-empty-label">Membership Changes</div>
+      <div class="sync-empty-value">0</div>
+    </div>
+  </div>
+  <p class="flash flash-success sync-empty-message">✓ No existing set membership changes detected.</p>
   {% endif %}
 
   <div class="form-actions" style="margin-top:1.25rem">
