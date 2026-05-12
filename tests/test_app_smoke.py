@@ -3262,9 +3262,12 @@ class CatalogSmokeTests(SmokeBaseTest):
             db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=12))
             db.session.commit()
 
+            catalog_items = Item.query.filter(Item.sku.isnot(None)).all()
             preview = _build_set_membership_preview(
                 db.session.get(Set, item_set.id),
                 [{"sku": "1952", "name": "1952 Stainless Salad Fork (12)", "quantity": 12}],
+                {item.sku.upper(): item for item in catalog_items},
+                _build_member_name_lookup(catalog_items),
             )
 
         self.assertFalse(preview["has_changes"])
@@ -3283,9 +3286,12 @@ class CatalogSmokeTests(SmokeBaseTest):
             db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=4))
             db.session.commit()
 
+            catalog_items = Item.query.filter(Item.sku.isnot(None)).all()
             preview = _build_set_membership_preview(
                 db.session.get(Set, item_set.id),
                 [{"sku": "1759", "name": "1759 Table Knife (four)", "quantity": 4}],
+                {item.sku.upper(): item for item in catalog_items},
+                _build_member_name_lookup(catalog_items),
             )
 
         self.assertFalse(preview["has_changes"])
