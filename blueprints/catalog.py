@@ -30,7 +30,14 @@ from models import (
     record_activity,
     reconcile_unknown_variant,
 )
-from scraping import _member_hover_title, scrape_catalog, scrape_item_specs, scrape_item_uses, scrape_sets
+from scraping import (
+    _member_hover_title,
+    scrape_catalog,
+    scrape_item_specs,
+    scrape_item_uses,
+    scrape_item_variant_colors,
+    scrape_sets,
+)
 
 catalog_bp = Blueprint("catalog", __name__)
 logger = logging.getLogger(__name__)
@@ -1475,18 +1482,32 @@ def catalog_sync():
     # Fetch specs (edge, msrp, lengths, weight) for new items in parallel
     if new_items:
         from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
-        _specs_map: dict[str, dict] = {}
+        _details_map: dict[str, dict] = {}
         with ThreadPoolExecutor(max_workers=8) as pool:
-            _future_map = {pool.submit(scrape_item_specs, item_data["url"]): item_data["sku"] for item_data in new_items}
+            _future_map = {
+                pool.submit(scrape_item_specs, item_data["url"]): ("specs", item_data["sku"])
+                for item_data in new_items
+            }
+            _future_map.update({
+                pool.submit(scrape_item_variant_colors, item_data["url"]): ("variant_colors", item_data["sku"])
+                for item_data in new_items
+            })
             for future in _as_completed(_future_map):
-                _specs_map[_future_map[future]] = future.result()
+                kind, sku = _future_map[future]
+                _details_map.setdefault(sku, {})[kind] = future.result()
         for item in new_items:
-            specs = _specs_map.get(item["sku"], {})
+            details = _details_map.get(item["sku"], {})
+            specs = details.get("specs", {})
+            raw_variant_colors = details.get("variant_colors", ())
             item["edge_type"]      = specs.get("edge_type", "Unknown")
             item["msrp"]           = specs.get("msrp")
             item["blade_length"]   = specs.get("blade_length")
             item["overall_length"] = specs.get("overall_length")
             item["weight"]         = specs.get("weight")
+            item["variant_colors"] = [
+                color for color in raw_variant_colors
+                if color and color != UNKNOWN_COLOR
+            ]
 
     existing_sets = {item_set.name.lower() for item_set in Set.query.all()}
     new_sets      = sorted(
@@ -1581,7 +1602,8 @@ def catalog_sync_confirm():
     item_data = {}
     for key, val in request.form.items():
         for prefix in ("name_", "category_", "url_", "edge_type_",
-                       "msrp_", "blade_length_", "overall_length_", "weight_"):
+                       "msrp_", "blade_length_", "overall_length_", "weight_",
+                       "variant_colors_"):
             if key.startswith(prefix):
                 sku = key[len(prefix):]
                 item_data.setdefault(sku, {})[prefix.rstrip("_")] = val
@@ -1604,6 +1626,29 @@ def catalog_sync_confirm():
                     overall_length=data.get("overall_length") or None,
                     weight=data.get("weight") or None)
         db.session.add(item)
+        db.session.flush()
+        raw_variant_colors = data.get("variant_colors")
+        variant_colors: list[str] = []
+        if raw_variant_colors:
+            try:
+                parsed_colors = json.loads(raw_variant_colors)
+            except json.JSONDecodeError:
+                parsed_colors = []
+            if isinstance(parsed_colors, list):
+                variant_colors = [
+                    str(color).strip()
+                    for color in parsed_colors
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+        seen_colors: set[str] = set()
+        for color in variant_colors:
+            color_key = color.lower()
+            if color_key in seen_colors:
+                continue
+            seen_colors.add(color_key)
+            if any(existing_variant.color.lower() == color_key for existing_variant in item.variants):
+                continue
+            db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
         db.session.flush()
         reconcile_unknown_variant(item)
         added_items += 1

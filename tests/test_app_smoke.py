@@ -3210,7 +3210,8 @@ class CatalogSmokeTests(SmokeBaseTest):
                      "overall_length": "8 in",
                      "weight": "1 lb",
                  },
-             ):
+             ), \
+             mock.patch("blueprints.catalog.scrape_item_variant_colors", return_value=()):
             response = self.client.get("/catalog/sync")
 
         self.assertEqual(response.status_code, 200)
@@ -3611,6 +3612,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "blade_length_SX-NEW-1": "4 in",
                 "overall_length_SX-NEW-1": "8 in",
                 "weight_SX-NEW-1": "1 lb",
+                "variant_colors_SX-NEW-1": json.dumps(["Classic Blue"]),
                 "selected_sets": ["Sync New Set"],
                 "set_count": "1",
                 "set_name_0": "Sync New Set",
@@ -3640,6 +3642,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             new_item = db.session.execute(db.select(Item).filter_by(sku="SX-NEW-1")).scalar_one()
             self.assertIsNone(new_item.msrp)
+            self.assertEqual([variant.color for variant in new_item.variants], ["Classic Blue"])
+            self.assertEqual([variant.source for variant in new_item.variants], ["catalog_sync"])
             new_set = db.session.execute(db.select(Set).filter_by(name="Sync New Set")).scalar_one()
             self.assertEqual(len(new_set.members), 2)
             new_member_quantities = {db.session.get(Item, membership.item_id).sku: membership.quantity for membership in new_set.members}

@@ -87,6 +87,7 @@
         <input type="hidden" name="blade_length_{{ item.sku }}"   value="{{ item.blade_length or '' }}">
         <input type="hidden" name="overall_length_{{ item.sku }}" value="{{ item.overall_length or '' }}">
         <input type="hidden" name="weight_{{ item.sku }}"         value="{{ item.weight or '' }}">
+        <input type="hidden" name="variant_colors_{{ item.sku }}" value='{{ item.variant_colors | tojson }}'>
       </tr>
       {% endfor %}
     </tbody>
