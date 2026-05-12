@@ -1612,6 +1612,7 @@ def catalog_sync_confirm():
                 item_data.setdefault(sku, {})[prefix.rstrip("_")] = val
 
     added_items = 0
+    detected_variant_color_total = 0
     for sku in selected:
         if Item.query.filter_by(sku=sku).first():
             continue
@@ -1643,6 +1644,7 @@ def catalog_sync_confirm():
                     for color in parsed_colors
                     if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
                 ]
+        detected_variant_color_total += len(variant_colors)
         seen_colors: set[str] = set()
         for color in variant_colors:
             color_key = color.lower()
@@ -1680,6 +1682,7 @@ def catalog_sync_confirm():
                     for color in parsed_colors
                     if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
                 ]
+        detected_variant_color_total += len(variant_colors)
         seen_colors: set[str] = set()
         for color in variant_colors:
             color_key = color.lower()
@@ -1851,4 +1854,9 @@ def catalog_sync_confirm():
     if placeholder_items:
         parts.append(f"{placeholder_items} placeholder item{'s' if placeholder_items != 1 else ''}")
     flash("Sync complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
+    if detected_variant_color_total:
+        flash(
+            f"Detected {detected_variant_color_total} variant color{'s' if detected_variant_color_total != 1 else ''} in the catalog scrape.",
+            "info",
+        )
     return redirect(url_for("catalog.catalog"))
