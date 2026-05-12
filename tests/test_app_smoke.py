@@ -3507,6 +3507,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(confirm_response.status_code, 200)
         self.assertIn(b"Variant Sync Result", confirm_response.data)
         self.assertIn(b"Variants created", confirm_response.data)
+        self.assertIn(b"Variant colors detected", confirm_response.data)
 
     def test_variant_sync_replaces_unknown_only_variant_with_real_color(self):
         self._login_as_admin()
