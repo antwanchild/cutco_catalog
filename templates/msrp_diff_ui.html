@@ -26,7 +26,7 @@
 </div>
 
 {# ── Run form ─────────────────────────────────────────────────────────────── #}
-<div class="form-card compact mb-section" style="max-width:560px">
+<div class="form-card compact mb-section msrp-diff-run-card">
   <form method="post" action="{{ url_for('admin.msrp_diff_run') }}" id="run-form">
     <div class="inline-form" style="flex-wrap:wrap;gap:.75rem">
       <label class="checkbox-label">
@@ -54,7 +54,7 @@
 </div>
 
 {# ── Progress log (shown while running) ──────────────────────────────────── #}
-<div id="progress-panel" style="{% if job.status != 'running' and not job.progress %}display:none{% endif %}">
+<div id="progress-panel" class="msrp-diff-progress-panel" style="{% if job.status != 'running' and not job.progress %}display:none{% endif %}">
   <h2 class="stats-section-title">Progress</h2>
   <div class="msrp-log" id="progress-log">
     {% for line in job.progress %}
@@ -120,7 +120,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for row in section_rows %}
+        {% for row in section_rows | sort(attribute='sku') %}
         <tr>
           <td class="mono">{{ row.sku }}</td>
           <td>{{ row.name }}</td>
@@ -150,7 +150,7 @@
     <table class="data-table">
       <thead><tr><th>SKU</th><th>Name</th><th>DB Price</th><th>Live Price</th></tr></thead>
       <tbody>
-        {% for row in r.unchanged %}
+        {% for row in r.unchanged | sort(attribute='sku') %}
         <tr>
           <td class="mono">{{ row.sku }}</td>
           <td>{{ row.name }}</td>
