@@ -41,7 +41,7 @@ from scraping import (
     _should_queue_slug,
     _extract_product_variant_colors,
 )
-from blueprints.catalog import _build_set_membership_preview, _load_member_snapshot
+from blueprints.catalog import _build_member_name_lookup, _build_set_membership_preview, _load_member_snapshot
 from time_utils import container_timezone, format_container_time
 
 
@@ -3242,6 +3242,8 @@ class CatalogSmokeTests(SmokeBaseTest):
             preview = _build_set_membership_preview(
                 db.session.get(Set, item_set.id),
                 [{"sku": "2026D", "name": "Gift Box", "quantity": 1}],
+                {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()},
+                _build_member_name_lookup(Item.query.filter(Item.sku.isnot(None)).all()),
             )
 
         self.assertFalse(preview["has_changes"])
@@ -3339,10 +3341,38 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
 
         added_notes = {row["sku"]: row.get("resolution_note") for row in preview["change_rows"] if row["action"] == "added"}
-        self.assertIn("1737", added_notes)
-        self.assertIn("will link to existing catalog item", added_notes["1737"].lower())
         self.assertIn("990C", added_notes)
         self.assertIn("placeholder", added_notes["990C"].lower())
+        self.assertNotIn("1737", added_notes)
+
+    def test_set_membership_preview_detects_different_items_with_same_name(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        current_item_id, _ = self._add_catalog_item(name="Shear Utility", sku="1705D")
+        self._add_catalog_item(name="Shear Utility", sku="2117D")
+
+        with self.app.app_context():
+            item_set = Set(name="Shear Set", sku="SHEAR-1")
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(ItemSetMember(item_id=current_item_id, set_id=item_set.id, quantity=1))
+            db.session.commit()
+
+            preview = _build_set_membership_preview(
+                db.session.get(Set, item_set.id),
+                [{"sku": "2117D", "name": "Shear Utility", "quantity": 1}],
+                {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()},
+                {},
+            )
+
+        self.assertTrue(preview["has_changes"])
+        self.assertEqual(preview["added"], 1)
+        self.assertEqual(preview["removed"], 1)
+        self.assertEqual(
+            sorted(row["sku"] for row in preview["change_rows"] if row["action"] in {"added", "removed"}),
+            ["1705D", "2117D"],
+        )
 
     def test_variant_sync_page_renders_and_creates_missing_variants(self):
         self._login_as_admin()

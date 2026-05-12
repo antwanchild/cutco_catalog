@@ -412,23 +412,29 @@ def _build_set_membership_preview(
     catalog_name_lookup = catalog_name_lookup or {}
     set_sku = _normalize_member_sku(item_set.sku)
     current_rows = OrderedDict()
+    current_compare_rows = OrderedDict()
     for membership in item_set.members:
         item = membership.item
         sku = _normalize_member_sku(item.sku if item else None)
         name = _member_preview_name(item.name if item else None, membership.quantity)
         key = _member_preview_key(sku, name)
+        compare_key = f"item:{item.id}" if item is not None else key
         if not key:
             continue
         current_rows[key] = {
+            "item_id": item.id if item is not None else None,
             "sku": sku,
             "name": name,
             "quantity": max(1, int(membership.quantity or 1)),
         }
+        current_compare_rows[compare_key] = current_rows[key]
 
     incoming_rows = _aggregate_member_preview_rows(member_entries)
+    incoming_compare_rows = OrderedDict()
     current_rows_list = sorted(current_rows.values(), key=_member_preview_sort_key)
     incoming_rows_list = sorted(incoming_rows.values(), key=_member_preview_sort_key)
     incoming_row_notes: dict[str, str] = {}
+    incoming_row_notes_by_compare: dict[str, str] = {}
     for key, incoming in incoming_rows.items():
         resolved_item = _resolve_member_item(
             incoming,
@@ -436,12 +442,16 @@ def _build_set_membership_preview(
             catalog_name_lookup,
             set_sku=set_sku,
         )
+        compare_key = f"item:{resolved_item.id}" if resolved_item is not None else key
+        incoming["item_id"] = resolved_item.id if resolved_item is not None else None
+        incoming_compare_rows[compare_key] = incoming
         if resolved_item is not None:
             incoming_row_notes[key] = "Will link to existing catalog item."
         elif incoming.get("sku"):
             incoming_row_notes[key] = "Will create a placeholder if that option is enabled."
         else:
             incoming_row_notes[key] = "Will be skipped."
+        incoming_row_notes_by_compare[compare_key] = incoming_row_notes[key]
     for row in incoming_rows_list:
         row_key = _member_preview_key(row.get("sku"), row.get("name"))
         if row_key:
@@ -452,8 +462,8 @@ def _build_set_membership_preview(
     removed = 0
     quantity_changed = 0
 
-    for key, incoming in incoming_rows.items():
-        current = current_rows.get(key)
+    for key, incoming in incoming_compare_rows.items():
+        current = current_compare_rows.get(key)
         if current is None:
             added += 1
             change_rows.append({
@@ -462,7 +472,7 @@ def _build_set_membership_preview(
                 "name": incoming.get("name") or "—",
                 "current_quantity": None,
                 "incoming_quantity": incoming.get("quantity"),
-                "resolution_note": incoming_row_notes.get(key),
+                "resolution_note": incoming_row_notes_by_compare.get(key),
             })
             continue
         current_qty = int(current.get("quantity") or 1)
@@ -478,8 +488,8 @@ def _build_set_membership_preview(
                 "resolution_note": "Will update the quantity on the linked item.",
             })
 
-    for key, current in current_rows.items():
-        if key in incoming_rows:
+    for key, current in current_compare_rows.items():
+        if key in incoming_compare_rows:
             continue
         removed += 1
         change_rows.append({
