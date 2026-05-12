@@ -1054,12 +1054,14 @@ def variant_sync_confirm():
                 if color_value.lower() in existing_real:
                     retained_variants += 1
                     continue
-                db.session.add(ItemVariant(item_id=item.id, color=color_value, source="variant_sync"))
+                db.session.add(ItemVariant(item=item, color=color_value, source="variant_sync"))
                 create_colors.append(color_value)
                 created_variants += 1
-            retained_variants += len(item_data.get("retained_colors", []))
-            if create_colors or item_data.get("retained_colors"):
-                touched_items += 1
+        retained_variants += len(item_data.get("retained_colors", []))
+        if create_colors or item_data.get("retained_colors"):
+            touched_items += 1
+            db.session.flush()
+            reconcile_unknown_variant(item)
 
         record_activity(
             "sync",

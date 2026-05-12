@@ -3508,6 +3508,48 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Variant Sync Result", confirm_response.data)
         self.assertIn(b"Variants created", confirm_response.data)
 
+    def test_variant_sync_replaces_unknown_only_variant_with_real_color(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _unknown_variant_id = self._add_catalog_item(name="Handle Mitt", sku="HM-2")
+
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=("Blue",),
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "HM-2",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(preview_response.status_code, 200)
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            self.assertEqual([variant.color for variant in item.variants], ["Blue"])
+            self.assertEqual([variant.source for variant in item.variants], ["variant_sync"])
+
     def test_variant_sync_skips_cutting_boards(self):
         self._login_as_admin()
         self._set_csrf_token()
