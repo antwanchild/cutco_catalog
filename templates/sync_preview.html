@@ -20,6 +20,9 @@
   <input type="hidden" name="set_count" value="{{ new_sets | length }}">
   {# Existing sets — hidden, quantities updated silently on confirm #}
   <input type="hidden" name="existing_set_count" value="{{ existing_sets_data | length }}">
+  {% for item in scraped_items %}
+  <input type="hidden" name="variant_colors_{{ item.sku }}" value='{{ item.variant_colors | tojson }}'>
+  {% endfor %}
   {% for item_set in existing_sets_data %}
   <input type="hidden" name="existing_set_name_{{ loop.index0 }}" value="{{ item_set.name }}">
   <input type="hidden" name="existing_set_member_entries_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
@@ -87,7 +90,6 @@
         <input type="hidden" name="blade_length_{{ item.sku }}"   value="{{ item.blade_length or '' }}">
         <input type="hidden" name="overall_length_{{ item.sku }}" value="{{ item.overall_length or '' }}">
         <input type="hidden" name="weight_{{ item.sku }}"         value="{{ item.weight or '' }}">
-        <input type="hidden" name="variant_colors_{{ item.sku }}" value='{{ item.variant_colors | tojson }}'>
       </tr>
       {% endfor %}
     </tbody>

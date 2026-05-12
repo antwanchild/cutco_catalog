@@ -1479,8 +1479,8 @@ def catalog_sync():
         logger.error("Sets scrape failed: %s", exc)
         scraped_sets = []
 
-    # Fetch specs (edge, msrp, lengths, weight) for new items in parallel
-    if new_items:
+    # Fetch specs (edge, msrp, lengths, weight) and variant colors in parallel.
+    if scraped:
         from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
         _details_map: dict[str, dict] = {}
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -1495,19 +1495,21 @@ def catalog_sync():
             for future in _as_completed(_future_map):
                 kind, sku = _future_map[future]
                 _details_map.setdefault(sku, {})[kind] = future.result()
+        for item in scraped:
+            details = _details_map.get(item["sku"], {})
+            raw_variant_colors = details.get("variant_colors", ())
+            item["variant_colors"] = [
+                color for color in raw_variant_colors
+                if color and color != UNKNOWN_COLOR
+            ]
         for item in new_items:
             details = _details_map.get(item["sku"], {})
             specs = details.get("specs", {})
-            raw_variant_colors = details.get("variant_colors", ())
             item["edge_type"]      = specs.get("edge_type", "Unknown")
             item["msrp"]           = specs.get("msrp")
             item["blade_length"]   = specs.get("blade_length")
             item["overall_length"] = specs.get("overall_length")
             item["weight"]         = specs.get("weight")
-            item["variant_colors"] = [
-                color for color in raw_variant_colors
-                if color and color != UNKNOWN_COLOR
-            ]
 
     existing_sets = {item_set.name.lower() for item_set in Set.query.all()}
     new_sets      = sorted(
@@ -1581,6 +1583,7 @@ def catalog_sync():
 
     return render_template("sync_preview.html",
                            grouped=grouped,
+                           scraped_items=scraped,
                            new_items=new_items,
                            scraped_total=len(scraped),
                            new_sets=new_sets,
@@ -1654,6 +1657,42 @@ def catalog_sync_confirm():
         added_items += 1
 
     db.session.flush()
+
+    reconciled_item_variants = 0
+    for sku, data in item_data.items():
+        if sku in selected:
+            continue
+        item = Item.query.filter_by(sku=sku).first()
+        if not item:
+            continue
+        if any(existing_variant.color != UNKNOWN_COLOR for existing_variant in item.variants):
+            continue
+        raw_variant_colors = data.get("variant_colors")
+        variant_colors: list[str] = []
+        if raw_variant_colors:
+            try:
+                parsed_colors = json.loads(raw_variant_colors)
+            except json.JSONDecodeError:
+                parsed_colors = []
+            if isinstance(parsed_colors, list):
+                variant_colors = [
+                    str(color).strip()
+                    for color in parsed_colors
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+        seen_colors: set[str] = set()
+        for color in variant_colors:
+            color_key = color.lower()
+            if color_key in seen_colors:
+                continue
+            seen_colors.add(color_key)
+            if any(existing_variant.color.lower() == color_key for existing_variant in item.variants):
+                continue
+            db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
+            reconciled_item_variants += 1
+        if seen_colors:
+            db.session.flush()
+            reconcile_unknown_variant(item)
 
     selected_sets = set(request.form.getlist("selected_sets"))
     added_sets    = 0
@@ -1791,12 +1830,13 @@ def catalog_sync_confirm():
                            set_name)
 
     db_commit(db.session)
-    logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates, %d placeholders",
-                added_items, added_sets, linked_items, qty_updates, created_missing_items + created_existing_missing_items)
+    logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates, %d placeholders, %d variants",
+                added_items, added_sets, linked_items, qty_updates,
+                created_missing_items + created_existing_missing_items, reconciled_item_variants)
     record_activity(
         "sync",
         "Catalog sync complete",
-        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates, {created_missing_items + created_existing_missing_items} placeholder items.",
+        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates, {created_missing_items + created_existing_missing_items} placeholder items, {reconciled_item_variants} variant updates.",
     )
     db.session.commit()
 
