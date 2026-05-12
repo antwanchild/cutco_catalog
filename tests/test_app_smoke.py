@@ -150,6 +150,14 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["Strict-Transport-Security"], "max-age=31536000; includeSubDomains")
 
+    def test_msrp_diff_defaults_to_write_mode(self):
+        self._login_as_admin()
+
+        response = self.client.get("/admin/msrp-diff")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'name="update_db" checked', response.data)
+
     def test_health_endpoint_reports_ok(self):
         response = self.client.get("/health")
 

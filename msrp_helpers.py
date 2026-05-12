@@ -123,7 +123,7 @@ def _read_msrp_job() -> dict:
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {"status": "idle", "progress": [], "results": None,
                 "error": None, "started_at": None, "finished_at": None,
-                "update_db": False}
+                "update_db": True}
 
 
 def _write_msrp_job(data: dict) -> None:
@@ -278,11 +278,15 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
 
             if update_db:
                 db_by_sku = {item.sku: item for item in db_items}
-                updated = sum(
-                    1 for sku, info in by_sku.items()
-                    if info["price"] is not None and sku in db_by_sku
-                    and not setattr(db_by_sku[sku], "msrp", info["price"])  # side-effect
-                )
+                updated = 0
+                for sku, info in by_sku.items():
+                    price = info["price"]
+                    item = db_by_sku.get(sku)
+                    if price is None or item is None:
+                        continue
+                    if item.msrp != price:
+                        item.msrp = price
+                        updated += 1
                 db.session.commit()
                 log(f"Updated {updated} MSRP prices in database")
 
