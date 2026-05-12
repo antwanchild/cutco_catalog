@@ -1702,42 +1702,30 @@ def catalog_sync_confirm():
         if member_entries_raw:
             item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
 
-        member_qtys = {
-            _normalize_member_sku(member.get("sku")): max(1, int(member.get("quantity") or 1))
-            for member in member_entries
-            if _normalize_member_sku(member.get("sku"))
-        }
+        set_sku = _normalize_member_sku(item_set.sku)
+        existing_member_ids = {member.item_id for member in item_set.members}
         incoming_member_ids: set[int] = set()
-        for member in item_set.members:
-            item = db.session.get(Item, member.item_id)
-            if item and item.sku:
-                new_qty = member_qtys.get(item.sku.upper(), 1)
-                if member.quantity != new_qty:
-                    member.quantity = new_qty
+        resolved_members, created_now = _aggregate_resolved_members(
+            member_entries,
+            sku_to_item,
+            name_to_item,
+            set_sku=set_sku,
+            create_missing=create_missing_set_members,
+            set_name=set_name if create_missing_set_members else None,
+        )
+        created_existing_missing_items += created_now
+        for item_id, resolved in resolved_members.items():
+            item = resolved["item"]
+            qty = max(1, int(resolved.get("quantity") or 1))
+            if item_id not in existing_member_ids:
+                db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
+                existing_member_ids.add(item_id)
+            else:
+                membership = next((member for member in item_set.members if member.item_id == item_id), None)
+                if membership and membership.quantity != qty:
+                    membership.quantity = qty
                     qty_updates += 1
-        if create_missing_set_members and member_entries:
-            existing_member_ids = {member.item_id for member in item_set.members}
-            resolved_members, created_now = _aggregate_resolved_members(
-                member_entries,
-                sku_to_item,
-                name_to_item,
-                set_sku=set_sku,
-                create_missing=True,
-                set_name=set_name,
-            )
-            created_existing_missing_items += created_now
-            for item_id, resolved in resolved_members.items():
-                item = resolved["item"]
-                qty = max(1, int(resolved.get("quantity") or 1))
-                if item_id not in existing_member_ids:
-                    db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
-                    existing_member_ids.add(item_id)
-                else:
-                    membership = next((member for member in item_set.members if member.item_id == item_id), None)
-                    if membership and membership.quantity != qty:
-                        membership.quantity = qty
-                        qty_updates += 1
-                incoming_member_ids.add(item_id)
+            incoming_member_ids.add(item_id)
         if incoming_member_ids:
             for membership in list(item_set.members):
                 if membership.item_id not in incoming_member_ids:

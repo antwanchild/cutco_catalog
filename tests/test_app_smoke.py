@@ -3598,6 +3598,42 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(existing_set_detail_response.status_code, 200)
         self.assertIn(b"Sync Existing Missing Knife", existing_set_detail_response.data)
 
+    def test_catalog_sync_confirm_reconciles_existing_set_members(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        keep_item_id, _ = self._add_catalog_item(name="Keep Knife", sku="K-1")
+        drop_item_id, _ = self._add_catalog_item(name="Drop Knife", sku="D-1")
+        new_item_id, _ = self._add_catalog_item(name="New Knife", sku="N-1")
+        existing_set_id = self._add_set(name="Sync Existing Set", sku="SX-SET-1", item_ids=(keep_item_id, drop_item_id))
+
+        response = self.client.post(
+            "/catalog/sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "selected_skus": [],
+                "selected_sets": ["Sync Existing Set"],
+                "existing_set_count": "1",
+                "existing_set_name_0": "Sync Existing Set",
+                "existing_set_member_entries_0": json.dumps(
+                    [
+                        {"sku": "K-1", "name": "Keep Knife", "quantity": 2},
+                        {"sku": "N-1", "name": "New Knife", "quantity": 1},
+                    ]
+                ),
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            existing_set = db.session.get(Set, existing_set_id)
+            member_qtys = {db.session.get(Item, member.item_id).sku: member.quantity for member in existing_set.members}
+            self.assertEqual(member_qtys, {"K-1": 2, "N-1": 1})
+            self.assertNotIn("D-1", member_qtys)
+            self.assertIsNotNone(existing_set.member_data)
+            self.assertIn("N-1", existing_set.member_data)
+
     def test_catalog_sync_confirm_preserves_existing_set_members_when_snapshot_is_empty(self):
         self._login_as_admin()
         self._set_csrf_token()
