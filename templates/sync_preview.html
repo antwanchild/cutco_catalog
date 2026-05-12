@@ -164,7 +164,9 @@
           {% if item_set.membership_preview.current_rows %}
             <div class="muted small" style="margin-bottom:.35rem">Current ({{ item_set.membership_preview.current_count }})</div>
             {% for member in item_set.membership_preview.current_rows %}
-              <span class="mono small">{{ member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>{%- if not loop.last %}, {% endif -%}
+              <div style="margin-top:.25rem">
+                <span class="mono small">{{ member.display_sku or member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>
+              </div>
             {% endfor %}
           {% else %}
             <span class="muted small">No current members.</span>
@@ -174,7 +176,15 @@
           {% if item_set.membership_preview.incoming_rows %}
             <div class="muted small" style="margin-bottom:.35rem">Incoming ({{ item_set.membership_preview.incoming_count }})</div>
             {% for member in item_set.membership_preview.incoming_rows %}
-              <span class="mono small">{{ member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>{%- if not loop.last %}, {% endif -%}
+              <div style="margin-top:.25rem">
+                <span class="mono small">{{ member.display_sku or member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>
+                {% if member.source_sku and member.source_sku != member.display_sku %}
+                  <div class="muted small">Scraped as {{ member.source_sku }}</div>
+                {% endif %}
+                {% if member.resolution_note %}
+                  <div class="muted small">{{ member.resolution_note }}</div>
+                {% endif %}
+              </div>
             {% endfor %}
             {% if item_set.not_in_catalog_skus %}
               <div class="muted small" style="margin-top:.35rem">Not in catalog: {% for sku in item_set.not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</div>
@@ -196,6 +206,9 @@
                   {{ change.current_quantity if change.current_quantity is not none else '—' }} -> {{ change.incoming_quantity if change.incoming_quantity is not none else '—' }}
                 </span>
               </div>
+              {% if change.source_sku and change.source_sku != change.sku %}
+                <div class="muted small" style="margin:0 0 .45rem 1.7rem">Scraped as {{ change.source_sku }}</div>
+              {% endif %}
               {% if change.resolution_note %}
                 <div class="muted small" style="margin:0 0 .45rem 1.7rem">{{ change.resolution_note }}</div>
               {% endif %}

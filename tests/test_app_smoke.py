@@ -3380,6 +3380,31 @@ class CatalogSmokeTests(SmokeBaseTest):
             ["1705D", "2117D"],
         )
 
+    def test_set_membership_preview_shows_resolved_incoming_sku(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _ = self._add_catalog_item(name="Shear Utility", sku="1705D")
+
+        with self.app.app_context():
+            item_set = Set(name="Shear Set", sku="SHEAR-1")
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1))
+            db.session.commit()
+
+            catalog_items = Item.query.filter(Item.sku.isnot(None)).all()
+            preview = _build_set_membership_preview(
+                db.session.get(Set, item_set.id),
+                [{"sku": "2117D", "name": "Shear Utility", "quantity": 1}],
+                {item.sku.upper(): item for item in catalog_items},
+                _build_member_name_lookup(catalog_items),
+            )
+
+        self.assertFalse(preview["has_changes"])
+        self.assertEqual(preview["incoming_rows"][0]["display_sku"], "1705D")
+        self.assertEqual(preview["incoming_rows"][0]["source_sku"], "2117D")
+
     def test_variant_sync_page_renders_and_creates_missing_variants(self):
         self._login_as_admin()
         self._set_csrf_token()

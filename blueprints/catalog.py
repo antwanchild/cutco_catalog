@@ -424,6 +424,7 @@ def _build_set_membership_preview(
         current_rows[key] = {
             "item_id": item.id if item is not None else None,
             "sku": sku,
+            "display_sku": sku,
             "name": name,
             "quantity": max(1, int(membership.quantity or 1)),
         }
@@ -444,6 +445,8 @@ def _build_set_membership_preview(
         )
         compare_key = f"item:{resolved_item.id}" if resolved_item is not None else key
         incoming["item_id"] = resolved_item.id if resolved_item is not None else None
+        incoming["source_sku"] = incoming.get("sku")
+        incoming["display_sku"] = _normalize_member_sku(getattr(resolved_item, "sku", None)) or incoming.get("sku")
         incoming_compare_rows[compare_key] = incoming
         if resolved_item is not None:
             incoming_row_notes[key] = "Will link to existing catalog item."
@@ -468,11 +471,12 @@ def _build_set_membership_preview(
             added += 1
             change_rows.append({
                 "action": "added",
-                "sku": incoming.get("sku") or "—",
+                "sku": incoming.get("display_sku") or incoming.get("sku") or "—",
                 "name": incoming.get("name") or "—",
                 "current_quantity": None,
                 "incoming_quantity": incoming.get("quantity"),
                 "resolution_note": incoming_row_notes_by_compare.get(key),
+                "source_sku": incoming.get("source_sku"),
             })
             continue
         current_qty = int(current.get("quantity") or 1)
@@ -481,11 +485,12 @@ def _build_set_membership_preview(
             quantity_changed += 1
             change_rows.append({
                 "action": "quantity",
-                "sku": incoming.get("sku") or current.get("sku") or "—",
+                "sku": incoming.get("display_sku") or incoming.get("sku") or current.get("sku") or "—",
                 "name": incoming.get("name") or current.get("name") or "—",
                 "current_quantity": current_qty,
                 "incoming_quantity": incoming_qty,
                 "resolution_note": "Will update the quantity on the linked item.",
+                "source_sku": incoming.get("source_sku"),
             })
 
     for key, current in current_compare_rows.items():
@@ -494,7 +499,7 @@ def _build_set_membership_preview(
         removed += 1
         change_rows.append({
             "action": "removed",
-            "sku": current.get("sku") or "—",
+            "sku": current.get("display_sku") or current.get("sku") or "—",
             "name": current.get("name") or "—",
             "current_quantity": current.get("quantity"),
             "incoming_quantity": None,
