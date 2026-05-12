@@ -3228,6 +3228,51 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)
 
+    def test_catalog_sync_preview_hides_placeholder_option_when_nothing_is_missing(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        self._add_catalog_item(name="Existing Sync Knife", sku="EX-1")
+        self._add_catalog_item(name="Existing Sync Set Knife", sku="EXS-KNIFE-1")
+        scraped_items = [
+            {
+                "name": "Existing Sync Knife",
+                "sku": "EX-1",
+                "category": "Kitchen Knives",
+                "url": "https://example.com/existing-sync",
+            },
+        ]
+        scraped_sets = [
+            {
+                "name": "Existing Sync Set",
+                "sku": "EXS-1",
+                "url": "https://example.com/existing-set",
+                "member_skus": ["EXS-KNIFE-1"],
+                "member_quantities": {"EXS-KNIFE-1": 1},
+                "member_entries": [
+                    {"sku": "EXS-KNIFE-1", "name": "Existing Sync Set Knife", "quantity": 1},
+                ],
+            }
+        ]
+
+        with mock.patch("blueprints.catalog.scrape_catalog", return_value=(scraped_items, [])), \
+             mock.patch("blueprints.catalog.scrape_sets", return_value=scraped_sets), \
+             mock.patch(
+                 "blueprints.catalog.scrape_item_specs",
+                 return_value={
+                     "edge_type": "Straight",
+                     "msrp": 49.99,
+                     "blade_length": "4 in",
+                     "overall_length": "8 in",
+                     "weight": "1 lb",
+                 },
+             ):
+            response = self.client.get("/catalog/sync")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b"Create placeholder items for missing set members", response.data)
+        self.assertNotIn(b'name="create_missing_set_members" value="on" checked', response.data)
+
     def test_set_membership_preview_ignores_sku_alias_changes_when_names_match(self):
         self._login_as_admin()
         self._set_csrf_token()

@@ -25,7 +25,7 @@
   <input type="hidden" name="existing_set_member_entries_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
   {% endfor %}
 
-  {% if new_sets or existing_sets_data %}
+  {% if has_missing_set_members %}
   <label class="checkbox-label" style="display:block;margin:0 0 1rem">
     <input type="checkbox" name="create_missing_set_members" value="on" checked>
     Create placeholder items for missing set members

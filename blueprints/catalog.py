@@ -1552,6 +1552,10 @@ def catalog_sync():
         for item_set in existing_sets_data
         if item_set.get("membership_preview", {}).get("has_changes")
     ]
+    has_missing_set_members = any(
+        item_set.get("not_in_catalog_skus")
+        for item_set in (*new_sets, *existing_sets_data)
+    )
 
     return render_template("sync_preview.html",
                            grouped=grouped,
@@ -1561,6 +1565,7 @@ def catalog_sync():
                            existing_sets_data=existing_sets_data,
                            changed_existing_sets_data=changed_existing_sets_data,
                            scraped_sets_total=len(scraped_sets),
+                           has_missing_set_members=has_missing_set_members,
                            blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES))
 
 
