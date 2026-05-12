@@ -273,6 +273,9 @@ a:hover { text-decoration: underline; }
 .page-actions .btn {
   min-height: 2.35rem;
 }
+.sync-preview-body {
+  min-height: 55vh;
+}
 .collection-empty-state {
   margin: 2rem 0 1.5rem;
   padding: 1.35rem 1.5rem;
