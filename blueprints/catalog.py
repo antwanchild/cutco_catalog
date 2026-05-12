@@ -216,16 +216,20 @@ def _build_member_status_rows(
         if item is not None:
             status = "present"
             status_label = "In catalog"
+            resolution_note = "Will link to existing catalog item."
         elif sku and sku in found_skus:
             status = "found"
             status_label = "Found in scrape"
+            resolution_note = "Will create a placeholder if that option is enabled."
         elif sku:
             status = "missing"
             status_label = "Missing from catalog"
             missing_skus.append(sku)
+            resolution_note = "Will be skipped unless placeholder creation is enabled."
         else:
             status = "no_sku"
             status_label = "No item number"
+            resolution_note = "Will be skipped."
         rows.append({
             "index": index,
             "sku": sku,
@@ -236,6 +240,7 @@ def _build_member_status_rows(
             "quantity": quantity,
             "status": status,
             "status_label": status_label,
+            "resolution_note": resolution_note,
             "matched_item": item,
         })
     rows.sort(key=_member_preview_sort_key)
@@ -396,8 +401,16 @@ def _aggregate_member_preview_rows(member_entries: list[dict]) -> OrderedDict[st
     return rows
 
 
-def _build_set_membership_preview(item_set: Set, member_entries: list[dict]) -> dict:
+def _build_set_membership_preview(
+    item_set: Set,
+    member_entries: list[dict],
+    catalog_sku_lookup: dict[str, Item] | None = None,
+    catalog_name_lookup: dict[str, object] | None = None,
+) -> dict:
     """Build a before/after snapshot for an existing set."""
+    catalog_sku_lookup = catalog_sku_lookup or {}
+    catalog_name_lookup = catalog_name_lookup or {}
+    set_sku = _normalize_member_sku(item_set.sku)
     current_rows = OrderedDict()
     for membership in item_set.members:
         item = membership.item
@@ -415,6 +428,25 @@ def _build_set_membership_preview(item_set: Set, member_entries: list[dict]) -> 
     incoming_rows = _aggregate_member_preview_rows(member_entries)
     current_rows_list = sorted(current_rows.values(), key=_member_preview_sort_key)
     incoming_rows_list = sorted(incoming_rows.values(), key=_member_preview_sort_key)
+    incoming_row_notes: dict[str, str] = {}
+    for key, incoming in incoming_rows.items():
+        resolved_item = _resolve_member_item(
+            incoming,
+            catalog_sku_lookup,
+            catalog_name_lookup,
+            set_sku=set_sku,
+        )
+        if resolved_item is not None:
+            incoming_row_notes[key] = "Will link to existing catalog item."
+        elif incoming.get("sku"):
+            incoming_row_notes[key] = "Will create a placeholder if that option is enabled."
+        else:
+            incoming_row_notes[key] = "Will be skipped."
+    for row in incoming_rows_list:
+        row_key = _member_preview_key(row.get("sku"), row.get("name"))
+        if row_key:
+            row["resolution_note"] = incoming_row_notes.get(row_key)
+
     change_rows: list[dict[str, object]] = []
     added = 0
     removed = 0
@@ -430,6 +462,7 @@ def _build_set_membership_preview(item_set: Set, member_entries: list[dict]) -> 
                 "name": incoming.get("name") or "—",
                 "current_quantity": None,
                 "incoming_quantity": incoming.get("quantity"),
+                "resolution_note": incoming_row_notes.get(key),
             })
             continue
         current_qty = int(current.get("quantity") or 1)
@@ -442,6 +475,7 @@ def _build_set_membership_preview(item_set: Set, member_entries: list[dict]) -> 
                 "name": incoming.get("name") or current.get("name") or "—",
                 "current_quantity": current_qty,
                 "incoming_quantity": incoming_qty,
+                "resolution_note": "Will update the quantity on the linked item.",
             })
 
     for key, current in current_rows.items():
@@ -454,6 +488,7 @@ def _build_set_membership_preview(item_set: Set, member_entries: list[dict]) -> 
             "name": current.get("name") or "—",
             "current_quantity": current.get("quantity"),
             "incoming_quantity": None,
+            "resolution_note": "Will be removed from the set.",
         })
 
     summary_parts = []
@@ -1482,6 +1517,8 @@ def catalog_sync():
             item_set["membership_preview"] = _build_set_membership_preview(
                 current_set,
                 member_entries,
+                catalog_sku_lookup,
+                preview_name_lookup,
             ) if current_set else {
                 "has_changes": False,
                 "summary": "Unable to load current set state.",

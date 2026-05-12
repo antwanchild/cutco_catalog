@@ -3315,6 +3315,35 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual([member["sku"] for member in preview["current_rows"]], ["84", "1737"])
         self.assertEqual([member["sku"] for member in preview["incoming_rows"]], ["84", "1737"])
 
+    def test_set_membership_preview_includes_resolution_notes(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _variant_id = self._add_catalog_item(name="1737 Cleaver", sku="1737")
+
+        with self.app.app_context():
+            item_set = Set(name="Resolution Set", sku="RES-1")
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1))
+            db.session.commit()
+
+            preview = _build_set_membership_preview(
+                db.session.get(Set, item_set.id),
+                [
+                    {"sku": "1737", "name": "1737 Cleaver Only", "quantity": 1},
+                    {"sku": "990C", "name": "990C", "quantity": 1},
+                ],
+                {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()},
+                {},
+            )
+
+        added_notes = {row["sku"]: row.get("resolution_note") for row in preview["change_rows"] if row["action"] == "added"}
+        self.assertIn("1737", added_notes)
+        self.assertIn("will link to existing catalog item", added_notes["1737"].lower())
+        self.assertIn("990C", added_notes)
+        self.assertIn("placeholder", added_notes["990C"].lower())
+
     def test_variant_sync_page_renders_and_creates_missing_variants(self):
         self._login_as_admin()
         self._set_csrf_token()
