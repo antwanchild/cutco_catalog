@@ -932,6 +932,13 @@ textarea { resize: vertical; }
 }
 .stat-number { font-size: 2rem; font-weight: 700; color: var(--accent); line-height: 1.1; }
 .stat-label  { font-size: .75rem; color: var(--muted); margin-top: .2rem; }
+.variant-sync-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.variant-sync-summary-grid .stat-card {
+  min-width: 0;
+}
 .nowrap { white-space: nowrap; }
 .dash-row {
   display: grid;
@@ -1659,6 +1666,18 @@ textarea { resize: vertical; }
 
   /* Sync preview — category input takes full width */
   .sync-category-header { flex-wrap: wrap; }
+}
+
+@media (max-width: 1200px) {
+  .variant-sync-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .variant-sync-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Set Completion ──────────────────────────────────────────────────────── */
