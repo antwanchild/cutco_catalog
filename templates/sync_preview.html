@@ -167,9 +167,7 @@
           {% if item_set.membership_preview.current_rows %}
             <div class="muted small" style="margin-bottom:.35rem">Current ({{ item_set.membership_preview.current_count }})</div>
             {% for member in item_set.membership_preview.current_rows %}
-              <div style="margin-top:.25rem">
-                <span class="mono small">{{ member.display_sku or member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>
-              </div>
+              <span class="mono small">{{ member.display_sku or member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>{%- if not loop.last %}, {% endif -%}
             {% endfor %}
           {% else %}
             <span class="muted small">No current members.</span>
@@ -179,9 +177,7 @@
           {% if item_set.membership_preview.incoming_rows %}
             <div class="muted small" style="margin-bottom:.35rem">Incoming ({{ item_set.membership_preview.incoming_count }})</div>
             {% for member in item_set.membership_preview.incoming_rows %}
-              <div style="margin-top:.25rem">
-                <span class="mono small">{{ member.display_sku or member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>
-              </div>
+              <span class="mono small">{{ member.display_sku or member.sku or '—' }}{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% endif %}</span>{%- if not loop.last %}, {% endif -%}
             {% endfor %}
             {% if item_set.not_in_catalog_skus %}
               <div class="muted small" style="margin-top:.35rem">Not in catalog: {% for sku in item_set.not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</div>
