@@ -737,6 +737,7 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
 def _build_purple_campaign_variant_preview() -> dict:
     """Scrape the purple campaign page and map promo variants to catalog items."""
     promo_entries = list(scrape_purple_campaign_variants())
+    suppressed_promo_names = {"gift set", "package"}
     if not promo_entries:
         return {
             "items": [],
@@ -764,10 +765,32 @@ def _build_purple_campaign_variant_preview() -> dict:
     for entry in promo_entries:
         items_scanned += 1
         promo_name = entry.get("name") or "Purple Promo Item"
+        promo_name_key = _normalize_variant_lookup_name(promo_name)
         sku_hint = normalize_sku_value(entry.get("sku_hint"))
+        if promo_name_key in suppressed_promo_names:
+            preview_items.append({
+                "item_id": None,
+                "item_name": promo_name,
+                "sku": sku_hint or "—",
+                "category": "Purple Promo",
+                "status": "skipped",
+                "skip_reason": "Suppressed because this is a campaign bundle item, not a standalone catalog product.",
+                "variant_rows": [],
+                "create_colors": [],
+                "retained_colors": [],
+                "existing_count": 0,
+                "create_count": 0,
+                "retained_count": 0,
+                "has_unknown_variant": False,
+                "no_clear_variants": True,
+                "has_purple_variant": True,
+                "promo_code": entry.get("promo_code"),
+                "source_label": "Purple Products",
+            })
+            continue
         item = sku_lookup.get(sku_hint) if sku_hint else None
         if not item:
-            item = name_lookup.get(_normalize_variant_lookup_name(promo_name))
+            item = name_lookup.get(promo_name_key)
         if not item:
             preview_items.append({
                 "item_id": None,

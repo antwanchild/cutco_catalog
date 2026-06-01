@@ -48,7 +48,9 @@
       <summary>
         {{ item.item_name }} <span class="muted mono">#{{ item.sku }}</span>
         <span class="badge badge-info badge-mini">promo</span>
-        {% if item.no_clear_variants %}
+        {% if item.status == 'skipped' %}
+          <span class="badge badge-warning badge-mini">suppressed</span>
+        {% elif item.no_clear_variants %}
           <span class="badge badge-warning badge-mini">unmatched</span>
         {% else %}
           <span class="badge badge-info badge-mini">{{ item.scraped_variant_count }} variant{{ 's' if item.scraped_variant_count != 1 }}</span>

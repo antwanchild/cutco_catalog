@@ -3609,6 +3609,18 @@ class CatalogSmokeTests(SmokeBaseTest):
                     "sku_hint": "77",
                     "color": "Purple",
                 },
+                {
+                    "name": "Gift Set",
+                    "promo_code": "1836LD",
+                    "sku_hint": "1836",
+                    "color": "Purple",
+                },
+                {
+                    "name": "Package",
+                    "promo_code": "3840LD",
+                    "sku_hint": "3840",
+                    "color": "Purple",
+                },
             ),
         ):
             preview_response = self.client.post(
@@ -3624,6 +3636,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"Purple Promo Variants", preview_response.data)
         self.assertIn(b"Mark purple promo variants as unicorns", preview_response.data)
+        self.assertIn(b"Suppressed because this is a campaign bundle item", preview_response.data)
+        self.assertIn(b"suppressed", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
