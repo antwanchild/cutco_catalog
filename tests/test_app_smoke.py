@@ -3684,7 +3684,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         santoku_item_id, _ = self._add_catalog_item(name='7" Santoku', sku="1766")
+        santoku_sheath_item_id, _ = self._add_catalog_item(name='7" Santoku Sheath', sku="1766-2", category="Sheaths")
         trimmer_item_id, _ = self._add_catalog_item(name="Santoku-Style Trimmer", sku="3721")
+        trimmer_sheath_item_id, _ = self._add_catalog_item(name="Santoku-Style Trimmer Sheath", sku="3721-2", category="Sheaths")
 
         with mock.patch(
             "blueprints.data.scrape_item_variant_colors",
@@ -3717,7 +3719,8 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"Purple Sheath", preview_response.data)
+        self.assertIn(b'7&#34; Santoku Sheath', preview_response.data)
+        self.assertIn(b"Santoku-Style Trimmer Sheath", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
@@ -3735,13 +3738,17 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(confirm_response.status_code, 200)
         with self.app.app_context():
             santoku_item = db.session.get(Item, santoku_item_id)
+            santoku_sheath_item = db.session.get(Item, santoku_sheath_item_id)
             trimmer_item = db.session.get(Item, trimmer_item_id)
-            self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple", "Purple Sheath"])
-            self.assertEqual([variant.source for variant in santoku_item.variants], ["variant_sync", "variant_sync"])
-            self.assertEqual([variant.notes for variant in santoku_item.variants], [None, "Promo code: 1766LSH"])
-            self.assertEqual([variant.color for variant in trimmer_item.variants], ["Purple", "Purple Sheath"])
-            self.assertEqual([variant.source for variant in trimmer_item.variants], ["variant_sync", "variant_sync"])
-            self.assertEqual([variant.notes for variant in trimmer_item.variants], [None, "Promo code: 3721LSH"])
+            trimmer_sheath_item = db.session.get(Item, trimmer_sheath_item_id)
+            self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple"])
+            self.assertEqual([variant.source for variant in santoku_item.variants], ["variant_sync"])
+            self.assertEqual([variant.color for variant in santoku_sheath_item.variants], ["Purple"])
+            self.assertEqual([variant.source for variant in santoku_sheath_item.variants], ["variant_sync"])
+            self.assertEqual([variant.color for variant in trimmer_item.variants], ["Purple"])
+            self.assertEqual([variant.source for variant in trimmer_item.variants], ["variant_sync"])
+            self.assertEqual([variant.color for variant in trimmer_sheath_item.variants], ["Purple"])
+            self.assertEqual([variant.source for variant in trimmer_sheath_item.variants], ["variant_sync"])
 
     def test_variant_sync_can_confirm_purple_section_only(self):
         self._login_as_admin()
@@ -3749,6 +3756,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         normal_item_id, _ = self._add_catalog_item(name="Normal Variant Knife", sku="NV-1")
         promo_item_id, _ = self._add_catalog_item(name="Super Shears", sku="77")
+        promo_sheath_item_id, _ = self._add_catalog_item(name="Super Shears Sheath", sku="77-2", category="Sheaths")
 
         with mock.patch(
             "blueprints.data.scrape_item_variant_colors",
@@ -3801,9 +3809,10 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             normal_item = db.session.get(Item, normal_item_id)
             promo_item = db.session.get(Item, promo_item_id)
+            promo_sheath_item = db.session.get(Item, promo_sheath_item_id)
             self.assertEqual([variant.color for variant in normal_item.variants], [UNKNOWN_COLOR])
-            self.assertEqual([variant.color for variant in promo_item.variants], ["Purple", "Purple Sheath"])
-            self.assertEqual([variant.notes for variant in promo_item.variants], [None, "Promo code: 77LSH"])
+            self.assertEqual([variant.color for variant in promo_item.variants], ["Purple"])
+            self.assertEqual([variant.color for variant in promo_sheath_item.variants], ["Purple"])
 
     def test_variant_sync_skips_cutting_boards(self):
         self._login_as_admin()

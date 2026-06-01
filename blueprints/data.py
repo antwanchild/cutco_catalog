@@ -763,11 +763,60 @@ def _build_purple_campaign_variant_preview() -> dict:
     variants_retained = 0
     grouped_items: dict[int, dict] = {}
 
+    def add_preview_target(item: Item, entry: dict[str, str]) -> None:
+        """Add a single purple promo target item to the grouped preview."""
+        nonlocal variants_to_create, variants_retained
+        group = grouped_items.setdefault(
+            item.id,
+            {
+                "item_id": item.id,
+                "item_name": item.name,
+                "sku": item.sku or entry.get("sku_hint") or "—",
+                "category": item.category or "—",
+                "status": "ready",
+                "skip_reason": None,
+                "variant_rows": [],
+                "create_colors": [],
+                "retained_colors": [],
+                "existing_count": 0,
+                "create_count": 0,
+                "retained_count": 0,
+                "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
+                "no_clear_variants": False,
+                "has_purple_variant": True,
+                "scraped_variant_count": 0,
+                "swatch_count": 0,
+                "promo_codes": [],
+                "source_label": "Purple Products",
+            },
+        )
+        group["promo_codes"].append(entry.get("promo_code"))
+        existing_colors = {variant.color.lower() for variant in item.variants}
+        color_name = "Purple"
+        color_key = color_name.lower()
+        if color_key not in {row["color"].lower() for row in group["variant_rows"]}:
+            status = "existing" if color_key in existing_colors else "create"
+            group["variant_rows"].append({
+                "color": color_name,
+                "status": status,
+                "promo_code": entry.get("promo_code"),
+            })
+            group["scraped_variant_count"] += 1
+            group["swatch_count"] += 1
+            if status == "existing":
+                variants_retained += 1
+                group["retained_colors"].append(color_name)
+            else:
+                variants_to_create += 1
+                group["create_colors"].append(color_name)
+        group["create_count"] = len(group["create_colors"])
+        group["retained_count"] = len(group["retained_colors"])
+        group["existing_count"] = len(group["retained_colors"])
+
     for entry in promo_entries:
         items_scanned += 1
         promo_name = entry.get("name") or "Purple Promo Item"
         promo_name_key = _normalize_variant_lookup_name(promo_name)
-        includes_sheath = "sheath" in promo_name_key
         sku_hint = normalize_sku_value(entry.get("sku_hint"))
         if promo_name_key in suppressed_promo_names:
             preview_items.append({
@@ -786,15 +835,36 @@ def _build_purple_campaign_variant_preview() -> dict:
                 "has_unknown_variant": False,
                 "no_clear_variants": True,
                 "has_purple_variant": True,
-                "includes_sheath": includes_sheath,
                 "promo_code": entry.get("promo_code"),
                 "source_label": "Purple Products",
             })
             continue
-        item = sku_lookup.get(sku_hint) if sku_hint else None
-        if not item:
-            item = name_lookup.get(promo_name_key)
-        if not item:
+
+        base_name = re.sub(r"^purple\s+", "", promo_name, flags=re.I).strip()
+        base_name_key = _normalize_variant_lookup_name(base_name)
+        knife_item = sku_lookup.get(sku_hint) if sku_hint else None
+        if not knife_item:
+            knife_item = name_lookup.get(base_name_key) or name_lookup.get(promo_name_key)
+
+        resolved_items: list[Item] = []
+        if knife_item:
+            resolved_items.append(knife_item)
+
+        if "sheath" in promo_name_key:
+            sheath_base = re.sub(r"\s+with\s+sheath\s*$", "", base_name, flags=re.I).strip()
+            sheath_candidates = (
+                f"{sheath_base} Sheath",
+                f"{sheath_base} Knife Sheath",
+            )
+            sheath_item = None
+            for candidate in sheath_candidates:
+                sheath_item = name_lookup.get(_normalize_variant_lookup_name(candidate))
+                if sheath_item:
+                    break
+            if sheath_item and (not knife_item or sheath_item.id != knife_item.id):
+                resolved_items.append(sheath_item)
+
+        if not resolved_items:
             preview_items.append({
                 "item_id": None,
                 "item_name": promo_name,
@@ -811,82 +881,16 @@ def _build_purple_campaign_variant_preview() -> dict:
                 "has_unknown_variant": False,
                 "no_clear_variants": True,
                 "has_purple_variant": True,
-                "includes_sheath": includes_sheath,
                 "promo_code": entry.get("promo_code"),
                 "source_label": "Purple Products",
             })
             continue
 
-        group = grouped_items.setdefault(
-            item.id,
-            {
-                "item_id": item.id,
-                "item_name": item.name,
-                "sku": item.sku or sku_hint or "—",
-                "category": item.category or "—",
-                "status": "ready",
-                "skip_reason": None,
-                "variant_rows": [],
-                "create_colors": [],
-                "retained_colors": [],
-                "existing_count": 0,
-                "create_count": 0,
-                "retained_count": 0,
-                "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
-                "no_clear_variants": False,
-                "has_purple_variant": True,
-                "includes_sheath": False,
-                "scraped_variant_count": 0,
-                "swatch_count": 0,
-                "promo_codes": [],
-                "source_label": "Purple Products",
-            },
-        )
-        group["includes_sheath"] = group["includes_sheath"] or includes_sheath
-        group["promo_codes"].append(entry.get("promo_code"))
-        existing_colors = {variant.color.lower() for variant in item.variants}
-        for color_name in ("Purple",):
-            color_key = color_name.lower()
-            if color_key in {row["color"].lower() for row in group["variant_rows"]}:
-                continue
-            status = "existing" if color_key in existing_colors else "create"
-            group["variant_rows"].append({
-                "color": color_name,
-                "status": status,
-                "promo_code": entry.get("promo_code"),
-            })
-            group["scraped_variant_count"] += 1
-            group["swatch_count"] += 1
-            if status == "existing":
-                variants_retained += 1
-                group["retained_colors"].append(color_name)
-            else:
-                variants_to_create += 1
-                group["create_colors"].append(color_name)
-        if includes_sheath:
-            sheath_color = "Purple Sheath"
-            sheath_key = sheath_color.lower()
-            if sheath_key not in {row["color"].lower() for row in group["variant_rows"]}:
-                status = "existing" if sheath_key in existing_colors else "create"
-                group["variant_rows"].append({
-                    "color": sheath_color,
-                    "status": status,
-                    "promo_code": entry.get("promo_code"),
-                })
-                group["scraped_variant_count"] += 1
-                group["swatch_count"] += 1
-                if status == "existing":
-                    variants_retained += 1
-                    group["retained_colors"].append(sheath_color)
-                else:
-                    variants_to_create += 1
-                    group["create_colors"].append(sheath_color)
+        for item in resolved_items:
+            add_preview_target(item, entry)
 
     for group in grouped_items.values():
         variants_found += 1
-        group["create_count"] = len(group["create_colors"])
-        group["retained_count"] = len(group["retained_colors"])
-        group["existing_count"] = len(group["retained_colors"])
         group["promo_code"] = ", ".join([code for code in group.pop("promo_codes", []) if code]) or "—"
         preview_items.append(group)
 
@@ -1266,10 +1270,6 @@ def variant_sync_confirm():
 
             existing_real = {variant.color.lower() for variant in item.variants if variant.color != UNKNOWN_COLOR}
             create_colors = []
-            row_lookup = {
-                (row.get("color") or "").strip().lower(): row
-                for row in item_data.get("variant_rows", [])
-            }
             for color in item_data.get("create_colors", []):
                 color_value = (color or "").strip()
                 if not color_value:
@@ -1280,10 +1280,6 @@ def variant_sync_confirm():
                 variant = ItemVariant(item=item, color=color_value, source="variant_sync")
                 if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower().startswith("purple"):
                     variant.is_unicorn = True
-                row_data = row_lookup.get(color_value.lower(), {})
-                promo_code = (row_data.get("promo_code") or "").strip()
-                if promo_code and color_value.lower() == "purple sheath":
-                    variant.notes = _merge_note_text(variant.notes, f"Promo code: {promo_code}")
                 db.session.add(variant)
                 create_colors.append(color_value)
                 created_variants += 1
