@@ -838,6 +838,18 @@ def _extract_selected_page_color(soup: BeautifulSoup) -> str | None:
     return _normalize_variant_label(label)
 
 
+def _collect_campaign_variant_candidates(soup: BeautifulSoup) -> tuple[str, ...]:
+    """Extract promo-page variant labels when a campaign page exposes them."""
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    purple_inputs = soup.select('input[data-type*="Purple Products"]')
+    if purple_inputs:
+        _collect_variant_candidate(candidates, seen, "Purple")
+
+    return tuple(candidates)
+
+
 def _page_has_size_selector(soup: BeautifulSoup) -> bool:
     """Return True if the page exposes a size swatch group."""
     for fieldset in soup.select("fieldset.swatch-group"):
@@ -886,6 +898,13 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
 
         candidates: list[str] = []
         seen: set[str] = set()
+        campaign_candidates = _collect_campaign_variant_candidates(soup)
+        for candidate in campaign_candidates:
+            key = candidate.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(candidate)
         swatch_candidates = _collect_variant_candidates_from_swatches(soup)
         selected_color = _extract_selected_page_color(soup)
         if selected_color and _page_has_size_selector(soup):

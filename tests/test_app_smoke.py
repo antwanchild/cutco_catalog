@@ -1337,6 +1337,28 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic",),
             )
 
+    def test_extract_product_variant_colors_detects_purple_campaign_pages(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <h1>Cutco Cares 2026 - Alzheimer's Association</h1>
+              <p>Purple Products:</p>
+              <input type="radio" name="purple_products" value="Super Shears"
+                     data-type="Purple Products" data-code="77L">
+              <input type="radio" name="purple_products" value="Cutting Board"
+                     data-type="Purple Products" data-code="125L">
+              <input type="radio" name="purple_products" value="Santoku-Style Trimmer"
+                     data-type="Purple Products" data-code="3721LSH">
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/cutco-cares-alzheimers/"),
+                ("Purple",),
+            )
+
     def test_extract_product_variant_colors_prefers_selected_color_on_size_pages(self):
         response = mock.Mock()
         response.status_code = 200
