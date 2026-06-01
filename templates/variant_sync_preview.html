@@ -29,7 +29,10 @@
   <div class="form-card variant-sync-category-block">
     <div class="section-heading-actions" style="margin-bottom:.5rem">
       <h2>Purple Promo Variants</h2>
-      <span class="muted small">{{ preview.promo_items | length }} item{{ 's' if preview.promo_items | length != 1 }}</span>
+      <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+        <span class="muted small">{{ preview.promo_items | length }} item{{ 's' if preview.promo_items | length != 1 }}</span>
+        <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="promo">Confirm Purple Promo Only</button>
+      </div>
     </div>
     <p class="muted">Detected from the Cutco Cares campaign page.</p>
 
@@ -112,7 +115,10 @@
   <div class="form-card variant-sync-category-block">
     <div class="section-heading-actions" style="margin-bottom:.5rem">
       <h2>{{ category_block.category }}</h2>
-      <span class="muted small">{{ category_block['items'] | length }} item{{ 's' if category_block['items'] | length != 1 }}</span>
+      <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+        <span class="muted small">{{ category_block['items'] | length }} item{{ 's' if category_block['items'] | length != 1 }}</span>
+        <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="category:{{ category_block.category }}">Confirm This Section Only</button>
+      </div>
     </div>
 
     {% for item in category_block['items'] %}
@@ -180,7 +186,7 @@
   </div>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Confirm Variant Sync</button>
+    <button type="submit" class="btn btn-primary" name="confirm_target" value="all">Confirm Variant Sync</button>
     <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-secondary">Back</a>
   </div>
 </form>

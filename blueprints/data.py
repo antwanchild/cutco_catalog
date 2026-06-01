@@ -1218,10 +1218,20 @@ def variant_sync_confirm():
     skipped_items = 0
     touched_items = 0
     mark_purple_as_unicorn = request.form.get("mark_purple_variants_unicorn") == "on"
+    confirm_target = (request.form.get("confirm_target") or "all").strip()
     skipped_details: list[dict] = []
 
     try:
         promo_summary = preview.get("promo_summary", {})
+        def should_process(item_data: dict, *, section: str) -> bool:
+            if confirm_target == "all":
+                return True
+            if confirm_target == "promo":
+                return section == "promo"
+            if confirm_target.startswith("category:"):
+                return section == "category" and confirm_target == f"category:{item_data.get('category', '')}"
+            return True
+
         def apply_item_preview(item_data: dict, *, allow_purple_unicorn: bool = False) -> None:
             nonlocal created_variants, retained_variants, skipped_items, touched_items
             item_id = item_data.get("item_id")
@@ -1273,9 +1283,11 @@ def variant_sync_confirm():
                 reconcile_unknown_variant(item)
 
         for item_data in preview.get("items", []):
-            apply_item_preview(item_data)
+            if should_process(item_data, section="category"):
+                apply_item_preview(item_data)
         for item_data in preview.get("promo_items", []):
-            apply_item_preview(item_data, allow_purple_unicorn=True)
+            if should_process(item_data, section="promo"):
+                apply_item_preview(item_data, allow_purple_unicorn=True)
 
         combined_summary = dict(preview.get("summary", {}))
         for key in (
