@@ -3660,6 +3660,68 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual([variant.source for variant in item.variants], ["variant_sync"])
             self.assertEqual([variant.is_unicorn for variant in item.variants], [True])
 
+    def test_variant_sync_preserves_sheath_note_for_purple_promo_variants(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        cheese_item_id, _ = self._add_catalog_item(name="Traditional Cheese Knife", sku="6764")
+        santoku_item_id, _ = self._add_catalog_item(name='5" Petite Santoku', sku="2166")
+
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=(),
+        ), mock.patch(
+            "blueprints.data.scrape_purple_campaign_variants",
+            return_value=(
+                {
+                    "name": "Traditional Cheese Knife with Sheath",
+                    "promo_code": "6764L",
+                    "sku_hint": "6764",
+                    "color": "Purple",
+                },
+                {
+                    "name": '5" Petite Santoku with Sheath',
+                    "promo_code": "2166L",
+                    "sku_hint": "2166",
+                    "color": "Purple",
+                },
+            ),
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "all",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"with sheath", preview_response.data)
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        with self.app.app_context():
+            cheese_item = db.session.get(Item, cheese_item_id)
+            santoku_item = db.session.get(Item, santoku_item_id)
+            self.assertEqual([variant.color for variant in cheese_item.variants], ["Purple"])
+            self.assertEqual([variant.notes for variant in cheese_item.variants], ["Includes sheath"])
+            self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple"])
+            self.assertEqual([variant.notes for variant in santoku_item.variants], ["Includes sheath"])
+
     def test_variant_sync_skips_cutting_boards(self):
         self._login_as_admin()
         self._set_csrf_token()

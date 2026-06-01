@@ -766,6 +766,7 @@ def _build_purple_campaign_variant_preview() -> dict:
         items_scanned += 1
         promo_name = entry.get("name") or "Purple Promo Item"
         promo_name_key = _normalize_variant_lookup_name(promo_name)
+        includes_sheath = "sheath" in promo_name_key
         sku_hint = normalize_sku_value(entry.get("sku_hint"))
         if promo_name_key in suppressed_promo_names:
             preview_items.append({
@@ -784,6 +785,7 @@ def _build_purple_campaign_variant_preview() -> dict:
                 "has_unknown_variant": False,
                 "no_clear_variants": True,
                 "has_purple_variant": True,
+                "includes_sheath": includes_sheath,
                 "promo_code": entry.get("promo_code"),
                 "source_label": "Purple Products",
             })
@@ -808,6 +810,7 @@ def _build_purple_campaign_variant_preview() -> dict:
                 "has_unknown_variant": False,
                 "no_clear_variants": True,
                 "has_purple_variant": True,
+                "includes_sheath": includes_sheath,
                 "promo_code": entry.get("promo_code"),
                 "source_label": "Purple Products",
             })
@@ -843,6 +846,7 @@ def _build_purple_campaign_variant_preview() -> dict:
             "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
             "no_clear_variants": False,
             "has_purple_variant": True,
+            "includes_sheath": includes_sheath,
             "scraped_variant_count": 1,
             "swatch_count": 1,
             "promo_code": entry.get("promo_code"),
@@ -1223,15 +1227,25 @@ def variant_sync_confirm():
                     retained_variants += 1
                     continue
                 variant = ItemVariant(item=item, color=color_value, source="variant_sync")
+                if allow_purple_unicorn and color_value.lower() == "purple" and item_data.get("includes_sheath"):
+                    variant.notes = "Includes sheath"
                 if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower() == "purple":
                     variant.is_unicorn = True
                 db.session.add(variant)
                 create_colors.append(color_value)
                 created_variants += 1
-            if allow_purple_unicorn and mark_purple_as_unicorn:
+            if allow_purple_unicorn:
                 for variant in item.variants:
                     if variant.color.lower() == "purple":
-                        variant.is_unicorn = True
+                        if item_data.get("includes_sheath"):
+                            notes = (variant.notes or "").strip()
+                            sheath_note = "Includes sheath"
+                            if not notes:
+                                variant.notes = sheath_note
+                            elif sheath_note.lower() not in notes.lower():
+                                variant.notes = f"{notes}; {sheath_note}"
+                        if mark_purple_as_unicorn:
+                            variant.is_unicorn = True
             retained_variants += len(item_data.get("retained_colors", []))
             if create_colors or item_data.get("retained_colors"):
                 touched_items += 1
