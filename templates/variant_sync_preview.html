@@ -25,14 +25,78 @@
   <input type="hidden" name="preview_json" value="{{ preview_json | e }}">
   <input type="hidden" name="scope_label" value="{{ preview.scope_label }}">
 
-  {% if preview.summary.has_purple_variants %}
-  <label class="checkbox-label" style="display:block;margin:0 0 1rem">
-    <input type="checkbox" name="mark_purple_variants_unicorn" value="on">
-    Mark purple promo variants as unicorns
-  </label>
-  <p class="muted small" style="margin:-.5rem 0 1rem;">
-    Only applies to purple campaign variants detected in this sync preview.
-  </p>
+  {% if preview.promo_items %}
+  <div class="form-card variant-sync-category-block">
+    <div class="section-heading-actions" style="margin-bottom:.5rem">
+      <h2>Purple Promo Variants</h2>
+      <span class="muted small">{{ preview.promo_items | length }} item{{ 's' if preview.promo_items | length != 1 }}</span>
+    </div>
+    <p class="muted">Detected from the Cutco Cares campaign page.</p>
+
+    {% if preview.promo_summary.has_purple_variants %}
+    <label class="checkbox-label" style="display:block;margin:0 0 1rem">
+      <input type="checkbox" name="mark_purple_variants_unicorn" value="on">
+      Mark purple promo variants as unicorns
+    </label>
+    <p class="muted small" style="margin:-.5rem 0 1rem;">
+      Only applies to purple campaign variants detected from the promo source.
+    </p>
+    {% endif %}
+
+    {% for item in preview.promo_items %}
+    <details class="diff-section" open>
+      <summary>
+        {{ item.item_name }} <span class="muted mono">#{{ item.sku }}</span>
+        <span class="badge badge-info badge-mini">promo</span>
+        {% if item.no_clear_variants %}
+          <span class="badge badge-warning badge-mini">unmatched</span>
+        {% else %}
+          <span class="badge badge-info badge-mini">{{ item.scraped_variant_count }} variant{{ 's' if item.scraped_variant_count != 1 }}</span>
+          {% if item.create_count %}<span class="badge badge-new badge-mini">{{ item.create_count }} create</span>{% endif %}
+          {% if item.retained_count %}<span class="badge badge-warning badge-mini">{{ item.retained_count }} retained</span>{% endif %}
+        {% endif %}
+      </summary>
+
+      {% if item.skip_reason %}
+        <p class="muted">{{ item.skip_reason }}</p>
+      {% endif %}
+
+      {% if item.variant_rows %}
+      <table class="data-table compact variant-sync-table">
+        <thead>
+          <tr>
+            <th>Color</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in item.variant_rows %}
+          <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% endif %}">
+            <td>
+              {{ row.color }}
+              {% if row.status == 'fallback only' %}
+                <span class="badge badge-alias badge-mini">fallback only</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.status == 'existing' %}
+                <span class="badge badge-info">existing</span>
+              {% elif row.status == 'create' %}
+                <span class="badge badge-new">create</span>
+              {% elif row.status == 'fallback only' %}
+                <span class="badge badge-alias">fallback only</span>
+              {% else %}
+                <span class="badge badge-warning">not seen in sync</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </details>
+    {% endfor %}
+  </div>
   {% endif %}
 
   {% for category_block in preview.grouped_items %}

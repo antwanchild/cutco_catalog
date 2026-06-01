@@ -936,6 +936,44 @@ scrape_item_variant_colors.cache_clear = _extract_product_variant_colors.cache_c
 scrape_item_variant_colors.cache_info = _extract_product_variant_colors.cache_info  # type: ignore[attr-defined]
 
 
+@lru_cache(maxsize=64)
+def scrape_purple_campaign_variants() -> tuple[dict[str, str], ...]:
+    """Fetch the Cutco Cares purple campaign page and return promo variant hints."""
+    campaign_url = "https://www.cutco.com/p/cutco-cares-alzheimers/"
+    try:
+        resp = requests.get(campaign_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
+            logger.debug("Purple campaign fetch: HTTP %d for %s", resp.status_code, campaign_url)
+            return ()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        candidates: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for promo_input in soup.select('input[data-type*="Purple Products"]'):
+            promo_name = _normalize_variant_label(promo_input.get("value") or "")
+            promo_code = (promo_input.get("data-code") or "").strip().upper()
+            if not promo_name or not promo_code:
+                continue
+            key = (promo_name.lower(), promo_code)
+            if key in seen:
+                continue
+            seen.add(key)
+            match = re.match(r"^(\d+)", promo_code)
+            sku_hint = match.group(1) if match else promo_code
+            candidates.append(
+                {
+                    "name": promo_name,
+                    "promo_code": promo_code,
+                    "sku_hint": sku_hint,
+                    "color": "Purple",
+                }
+            )
+        logger.debug("Purple campaign fetch: %s → %d candidates", campaign_url, len(candidates))
+        return tuple(candidates)
+    except Exception as exc:
+        logger.warning("Purple campaign scrape failed for %s: %s", campaign_url, exc)
+        return ()
+
+
 # Keep old name as alias so existing callers still work
 def scrape_edge_type(url: str) -> str:
     """Return the scraped edge type for a product page."""

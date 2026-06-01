@@ -3595,24 +3595,34 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _unknown_variant_id = self._add_catalog_item(name="Purple Promo Knife", sku="PP-1")
+        item_id, _unknown_variant_id = self._add_catalog_item(name="Super Shears", sku="77")
 
         with mock.patch(
             "blueprints.data.scrape_item_variant_colors",
-            return_value=("Purple",),
+            return_value=(),
+        ), mock.patch(
+            "blueprints.data.scrape_purple_campaign_variants",
+            return_value=(
+                {
+                    "name": "Super Shears",
+                    "promo_code": "77L",
+                    "sku_hint": "77",
+                    "color": "Purple",
+                },
+            ),
         ):
             preview_response = self.client.post(
                 "/variant-sync",
                 data={
                     "csrf_token": "test-csrf-token",
-                    "scope": "selected",
-                    "selected_skus": "PP-1",
+                    "scope": "all",
                 },
                 content_type="multipart/form-data",
                 follow_redirects=False,
             )
 
         self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Purple Promo Variants", preview_response.data)
         self.assertIn(b"Mark purple promo variants as unicorns", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')

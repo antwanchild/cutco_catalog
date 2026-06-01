@@ -34,6 +34,7 @@ from models import (
     reconcile_unknown_variant,
 )
 from scraping import scrape_item_variant_colors
+from scraping import scrape_purple_campaign_variants
 from time_utils import format_container_time
 
 data_bp = Blueprint("data", __name__)
@@ -103,6 +104,27 @@ def _build_item_sku_lookup(items: list[Item]) -> dict[str, Item]:
         for alias_sku in parse_alternate_skus(item.alternate_skus):
             if alias_sku and alias_sku not in lookup:
                 lookup[alias_sku] = item
+    return lookup
+
+
+def _normalize_variant_lookup_name(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
+def _build_item_name_lookup(items: list[Item]) -> dict[str, Item]:
+    lookup: dict[str, Item] = {}
+    ambiguous: set[str] = set()
+    for item in items:
+        key = _normalize_variant_lookup_name(item.name)
+        if not key:
+            continue
+        if key in ambiguous:
+            continue
+        if key in lookup:
+            lookup.pop(key, None)
+            ambiguous.add(key)
+            continue
+        lookup[key] = item
     return lookup
 
 
@@ -712,6 +734,113 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
     }
 
 
+def _build_purple_campaign_variant_preview() -> dict:
+    """Scrape the purple campaign page and map promo variants to catalog items."""
+    promo_entries = list(scrape_purple_campaign_variants())
+    if not promo_entries:
+        return {
+            "items": [],
+            "summary": {
+                "items_scanned": 0,
+                "variants_found": 0,
+                "variants_to_create": 0,
+                "variants_retained": 0,
+                "items_with_no_clear_variants": 0,
+                "purple_variant_count": 0,
+                "has_purple_variants": False,
+            },
+        }
+
+    catalog_items = Item.query.options(selectinload(Item.variants)).filter(Item.sku.isnot(None)).all()
+    sku_lookup = _build_item_sku_lookup(catalog_items)
+    name_lookup = _build_item_name_lookup(catalog_items)
+
+    preview_items: list[dict] = []
+    items_scanned = 0
+    variants_found = 0
+    variants_to_create = 0
+    variants_retained = 0
+
+    for entry in promo_entries:
+        items_scanned += 1
+        promo_name = entry.get("name") or "Purple Promo Item"
+        sku_hint = normalize_sku_value(entry.get("sku_hint"))
+        item = sku_lookup.get(sku_hint) if sku_hint else None
+        if not item:
+            item = name_lookup.get(_normalize_variant_lookup_name(promo_name))
+        if not item:
+            preview_items.append({
+                "item_id": None,
+                "item_name": promo_name,
+                "sku": sku_hint or "—",
+                "category": "Purple Promo",
+                "status": "skipped",
+                "skip_reason": f"No matching catalog item was found for purple promo code {entry.get('promo_code', '—')}.",
+                "variant_rows": [],
+                "create_colors": [],
+                "retained_colors": [],
+                "existing_count": 0,
+                "create_count": 0,
+                "retained_count": 0,
+                "has_unknown_variant": False,
+                "no_clear_variants": True,
+                "has_purple_variant": True,
+                "promo_code": entry.get("promo_code"),
+                "source_label": "Purple Products",
+            })
+            continue
+
+        variants_found += 1
+        existing_purple = next((variant for variant in item.variants if variant.color.lower() == "purple"), None)
+        create_colors: list[str] = []
+        retained_colors: list[str] = []
+        variant_rows = [{"color": "Purple", "status": "existing" if existing_purple else "create"}]
+        existing_count = 1 if existing_purple else 0
+        create_count = 0 if existing_purple else 1
+        if existing_purple:
+            variants_retained += 1
+            retained_colors.append("Purple")
+        else:
+            variants_to_create += 1
+            create_colors.append("Purple")
+
+        preview_items.append({
+            "item_id": item.id,
+            "item_name": item.name,
+            "sku": item.sku or sku_hint or "—",
+            "category": item.category or "—",
+            "status": "ready",
+            "skip_reason": None,
+            "variant_rows": variant_rows,
+            "create_colors": create_colors,
+            "retained_colors": retained_colors,
+            "existing_count": existing_count,
+            "create_count": create_count,
+            "retained_count": len(retained_colors),
+            "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
+            "no_clear_variants": False,
+            "has_purple_variant": True,
+            "scraped_variant_count": 1,
+            "swatch_count": 1,
+            "promo_code": entry.get("promo_code"),
+            "source_label": "Purple Products",
+        })
+
+    preview_items.sort(key=lambda item: ((item["sku"] or "").lower(), (item["item_name"] or "").lower()))
+    return {
+        "items": preview_items,
+        "summary": {
+            "items_scanned": items_scanned,
+            "variants_found": variants_found,
+            "variants_to_create": variants_to_create,
+            "variants_retained": variants_retained,
+            "items_with_no_clear_variants": 0,
+            "purple_variant_count": variants_found,
+            "has_purple_variants": bool(variants_found),
+        },
+    }
+
+
 def _resolve_completion_gap_people(selected_person_id: str, people: list[Person]) -> tuple[list[Person], str | int, str | None]:
     """Resolve a completion gaps collector selection."""
     if selected_person_id == "all":
@@ -966,6 +1095,7 @@ def variant_sync_page():
 
     # Variant color pages can change over time, so always start with a fresh scrape.
     scrape_item_variant_colors.cache_clear()
+    scrape_purple_campaign_variants.cache_clear()
     items, selection_error = _resolve_variant_sync_items(scope, category, selected_skus)
     if selection_error:
         flash(selection_error, "error")
@@ -989,6 +1119,9 @@ def variant_sync_page():
         )
 
     preview = _build_variant_sync_preview(items)
+    promo_preview = _build_purple_campaign_variant_preview()
+    preview["promo_items"] = promo_preview.get("items", [])
+    preview["promo_summary"] = promo_preview.get("summary", {})
     preview["scope"] = scope
     preview["scope_label"] = {
         "all": "Entire catalog",
@@ -1032,10 +1165,12 @@ def variant_sync_confirm():
     skipped_details: list[dict] = []
 
     try:
-        for item_data in preview.get("items", []):
+        promo_summary = preview.get("promo_summary", {})
+        def apply_item_preview(item_data: dict, *, allow_purple_unicorn: bool = False) -> None:
+            nonlocal created_variants, retained_variants, skipped_items, touched_items
             item_id = item_data.get("item_id")
             if not item_id:
-                continue
+                return
             item = db.session.get(Item, item_id)
             if not item:
                 skipped_items += 1
@@ -1044,7 +1179,7 @@ def variant_sync_confirm():
                     "sku": item_data.get("sku", "—"),
                     "reason": "Item was not found during confirmation.",
                 })
-                continue
+                return
 
             if item_data.get("status") == "skipped":
                 skipped_items += 1
@@ -1053,7 +1188,7 @@ def variant_sync_confirm():
                     "sku": item.sku or "—",
                     "reason": item_data.get("skip_reason") or "No clear variants were detected.",
                 })
-                continue
+                return
 
             existing_real = {variant.color.lower() for variant in item.variants if variant.color != UNKNOWN_COLOR}
             create_colors = []
@@ -1065,12 +1200,12 @@ def variant_sync_confirm():
                     retained_variants += 1
                     continue
                 variant = ItemVariant(item=item, color=color_value, source="variant_sync")
-                if mark_purple_as_unicorn and item_data.get("has_purple_variant") and color_value.lower() == "purple":
+                if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower() == "purple":
                     variant.is_unicorn = True
                 db.session.add(variant)
                 create_colors.append(color_value)
                 created_variants += 1
-            if mark_purple_as_unicorn and item_data.get("has_purple_variant"):
+            if allow_purple_unicorn and mark_purple_as_unicorn:
                 for variant in item.variants:
                     if variant.color.lower() == "purple":
                         variant.is_unicorn = True
@@ -1080,11 +1215,28 @@ def variant_sync_confirm():
                 db.session.flush()
                 reconcile_unknown_variant(item)
 
+        for item_data in preview.get("items", []):
+            apply_item_preview(item_data)
+        for item_data in preview.get("promo_items", []):
+            apply_item_preview(item_data, allow_purple_unicorn=True)
+
+        combined_summary = dict(preview.get("summary", {}))
+        for key in (
+            "items_scanned",
+            "variants_found",
+            "variants_to_create",
+            "variants_retained",
+            "items_with_no_clear_variants",
+            "purple_variant_count",
+        ):
+            combined_summary[key] = combined_summary.get(key, 0) + promo_summary.get(key, 0)
+        combined_summary["has_purple_variants"] = combined_summary.get("purple_variant_count", 0) > 0
+
         record_activity(
             "sync",
             "Variant sync complete",
             (
-                f"Items scanned {preview.get('summary', {}).get('items_scanned', 0)}, "
+                f"Items scanned {combined_summary.get('items_scanned', 0)}, "
                 f"variants created {created_variants}, retained {retained_variants}, "
                 f"skipped {skipped_items}."
             ),
@@ -1092,7 +1244,7 @@ def variant_sync_confirm():
         if db_commit(db.session):
             return render_template(
                 "variant_sync_result.html",
-                summary=preview.get("summary", {}),
+                summary=combined_summary,
                 created_variants=created_variants,
                 retained_variants=retained_variants,
                 skipped_items=skipped_items,
