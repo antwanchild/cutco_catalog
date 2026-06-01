@@ -761,6 +761,7 @@ def _build_purple_campaign_variant_preview() -> dict:
     variants_found = 0
     variants_to_create = 0
     variants_retained = 0
+    grouped_items: dict[int, dict] = {}
 
     for entry in promo_entries:
         items_scanned += 1
@@ -816,48 +817,70 @@ def _build_purple_campaign_variant_preview() -> dict:
             })
             continue
 
-        variants_found += 1
+        group = grouped_items.setdefault(
+            item.id,
+            {
+                "item_id": item.id,
+                "item_name": item.name,
+                "sku": item.sku or sku_hint or "—",
+                "category": item.category or "—",
+                "status": "ready",
+                "skip_reason": None,
+                "variant_rows": [],
+                "create_colors": [],
+                "retained_colors": [],
+                "existing_count": 0,
+                "create_count": 0,
+                "retained_count": 0,
+                "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
+                "no_clear_variants": False,
+                "has_purple_variant": True,
+                "includes_sheath": False,
+                "scraped_variant_count": 0,
+                "swatch_count": 0,
+                "promo_codes": [],
+                "source_label": "Purple Products",
+            },
+        )
+        group["includes_sheath"] = group["includes_sheath"] or includes_sheath
+        group["promo_codes"].append(entry.get("promo_code"))
         existing_colors = {variant.color.lower() for variant in item.variants}
-        create_colors: list[str] = []
-        retained_colors: list[str] = []
-        variant_rows: list[dict[str, str]] = []
-        promo_colors = ["Purple"]
-        for color_name in promo_colors:
+        for color_name in ("Purple",):
             color_key = color_name.lower()
+            if color_key in {row["color"].lower() for row in group["variant_rows"]}:
+                continue
             status = "existing" if color_key in existing_colors else "create"
-            variant_rows.append({"color": color_name, "status": status})
+            group["variant_rows"].append({"color": color_name, "status": status})
+            group["scraped_variant_count"] += 1
+            group["swatch_count"] += 1
             if status == "existing":
                 variants_retained += 1
-                retained_colors.append(color_name)
+                group["retained_colors"].append(color_name)
             else:
                 variants_to_create += 1
-                create_colors.append(color_name)
+                group["create_colors"].append(color_name)
         if includes_sheath:
-            variant_rows.append({"color": "Sheath included", "status": "included"})
+            sheath_color = "Purple Sheath"
+            sheath_key = sheath_color.lower()
+            if sheath_key not in {row["color"].lower() for row in group["variant_rows"]}:
+                status = "existing" if sheath_key in existing_colors else "create"
+                group["variant_rows"].append({"color": sheath_color, "status": status})
+                group["scraped_variant_count"] += 1
+                group["swatch_count"] += 1
+                if status == "existing":
+                    variants_retained += 1
+                    group["retained_colors"].append(sheath_color)
+                else:
+                    variants_to_create += 1
+                    group["create_colors"].append(sheath_color)
 
-        preview_items.append({
-            "item_id": item.id,
-            "item_name": promo_name,
-            "sku": item.sku or sku_hint or "—",
-            "catalog_item_name": item.name,
-            "category": item.category or "—",
-            "status": "ready",
-            "skip_reason": None,
-            "variant_rows": variant_rows,
-            "create_colors": create_colors,
-            "retained_colors": retained_colors,
-            "existing_count": len(retained_colors),
-            "create_count": len(create_colors),
-            "retained_count": len(retained_colors),
-            "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
-            "no_clear_variants": False,
-            "has_purple_variant": True,
-            "includes_sheath": includes_sheath,
-            "scraped_variant_count": len(promo_colors),
-            "swatch_count": len(promo_colors),
-            "promo_code": entry.get("promo_code"),
-            "source_label": "Purple Products",
-        })
+    for group in grouped_items.values():
+        variants_found += 1
+        group["create_count"] = len(group["create_colors"])
+        group["retained_count"] = len(group["retained_colors"])
+        group["existing_count"] = len(group["retained_colors"])
+        group["promo_code"] = ", ".join([code for code in group.pop("promo_codes", []) if code]) or "—"
+        preview_items.append(group)
 
     preview_items.sort(key=lambda item: ((item["sku"] or "").lower(), (item["item_name"] or "").lower()))
     return {
@@ -1233,14 +1256,14 @@ def variant_sync_confirm():
                     retained_variants += 1
                     continue
                 variant = ItemVariant(item=item, color=color_value, source="variant_sync")
-                if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower() == "purple":
+                if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower().startswith("purple"):
                     variant.is_unicorn = True
                 db.session.add(variant)
                 create_colors.append(color_value)
                 created_variants += 1
             if allow_purple_unicorn:
                 for variant in item.variants:
-                    if variant.color.lower() == "purple":
+                    if variant.color.lower().startswith("purple"):
                         if mark_purple_as_unicorn:
                             variant.is_unicorn = True
             retained_variants += len(item_data.get("retained_colors", []))

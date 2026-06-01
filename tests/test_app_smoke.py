@@ -3679,7 +3679,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual([variant.source for variant in item.variants], ["variant_sync"])
             self.assertEqual([variant.is_unicorn for variant in item.variants], [True])
 
-    def test_variant_sync_keeps_purple_promo_sheath_as_metadata(self):
+    def test_variant_sync_creates_purple_sheath_variants(self):
         self._login_as_admin()
         self._set_csrf_token()
 
@@ -3717,8 +3717,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"with sheath", preview_response.data)
-        self.assertIn(b"Sheath included", preview_response.data)
+        self.assertIn(b"Purple Sheath", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
@@ -3737,12 +3736,12 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             santoku_item = db.session.get(Item, santoku_item_id)
             trimmer_item = db.session.get(Item, trimmer_item_id)
-            self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple"])
-            self.assertEqual([variant.source for variant in santoku_item.variants], ["variant_sync"])
-            self.assertEqual([variant.notes for variant in santoku_item.variants], [None])
-            self.assertEqual([variant.color for variant in trimmer_item.variants], ["Purple"])
-            self.assertEqual([variant.source for variant in trimmer_item.variants], ["variant_sync"])
-            self.assertEqual([variant.notes for variant in trimmer_item.variants], [None])
+            self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple", "Purple Sheath"])
+            self.assertEqual([variant.source for variant in santoku_item.variants], ["variant_sync", "variant_sync"])
+            self.assertEqual([variant.notes for variant in santoku_item.variants], [None, None])
+            self.assertEqual([variant.color for variant in trimmer_item.variants], ["Purple", "Purple Sheath"])
+            self.assertEqual([variant.source for variant in trimmer_item.variants], ["variant_sync", "variant_sync"])
+            self.assertEqual([variant.notes for variant in trimmer_item.variants], [None, None])
 
     def test_variant_sync_skips_cutting_boards(self):
         self._login_as_admin()
