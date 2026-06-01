@@ -817,18 +817,23 @@ def _build_purple_campaign_variant_preview() -> dict:
             continue
 
         variants_found += 1
-        existing_purple = next((variant for variant in item.variants if variant.color.lower() == "purple"), None)
+        existing_colors = {variant.color.lower() for variant in item.variants}
         create_colors: list[str] = []
         retained_colors: list[str] = []
-        variant_rows = [{"color": "Purple", "status": "existing" if existing_purple else "create"}]
-        existing_count = 1 if existing_purple else 0
-        create_count = 0 if existing_purple else 1
-        if existing_purple:
-            variants_retained += 1
-            retained_colors.append("Purple")
-        else:
-            variants_to_create += 1
-            create_colors.append("Purple")
+        variant_rows: list[dict[str, str]] = []
+        promo_colors = ["Purple"]
+        if includes_sheath:
+            promo_colors.append("Purple Sheath")
+        for color_name in promo_colors:
+            color_key = color_name.lower()
+            status = "existing" if color_key in existing_colors else "create"
+            variant_rows.append({"color": color_name, "status": status})
+            if status == "existing":
+                variants_retained += 1
+                retained_colors.append(color_name)
+            else:
+                variants_to_create += 1
+                create_colors.append(color_name)
 
         preview_items.append({
             "item_id": item.id,
@@ -840,15 +845,15 @@ def _build_purple_campaign_variant_preview() -> dict:
             "variant_rows": variant_rows,
             "create_colors": create_colors,
             "retained_colors": retained_colors,
-            "existing_count": existing_count,
-            "create_count": create_count,
+            "existing_count": len(retained_colors),
+            "create_count": len(create_colors),
             "retained_count": len(retained_colors),
             "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
             "no_clear_variants": False,
             "has_purple_variant": True,
             "includes_sheath": includes_sheath,
-            "scraped_variant_count": 1,
-            "swatch_count": 1,
+            "scraped_variant_count": len(promo_colors),
+            "swatch_count": len(promo_colors),
             "promo_code": entry.get("promo_code"),
             "source_label": "Purple Products",
         })
@@ -1227,23 +1232,14 @@ def variant_sync_confirm():
                     retained_variants += 1
                     continue
                 variant = ItemVariant(item=item, color=color_value, source="variant_sync")
-                if allow_purple_unicorn and color_value.lower() == "purple" and item_data.get("includes_sheath"):
-                    variant.notes = "Includes sheath"
-                if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower() == "purple":
+                if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower().startswith("purple"):
                     variant.is_unicorn = True
                 db.session.add(variant)
                 create_colors.append(color_value)
                 created_variants += 1
             if allow_purple_unicorn:
                 for variant in item.variants:
-                    if variant.color.lower() == "purple":
-                        if item_data.get("includes_sheath"):
-                            notes = (variant.notes or "").strip()
-                            sheath_note = "Includes sheath"
-                            if not notes:
-                                variant.notes = sheath_note
-                            elif sheath_note.lower() not in notes.lower():
-                                variant.notes = f"{notes}; {sheath_note}"
+                    if variant.color.lower().startswith("purple"):
                         if mark_purple_as_unicorn:
                             variant.is_unicorn = True
             retained_variants += len(item_data.get("retained_colors", []))
