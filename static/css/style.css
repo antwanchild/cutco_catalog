@@ -805,6 +805,17 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .variant-sync-fallback-row .badge-alias {
   margin-left: .35rem;
 }
+.variant-sync-included-row td {
+  color: var(--muted);
+  background: rgba(79, 142, 247, .045);
+}
+.variant-sync-included-row td:first-child {
+  border-left: 3px solid rgba(79, 142, 247, .28);
+  padding-left: .75rem;
+}
+.variant-sync-included-row .badge-info {
+  background: rgba(79, 142, 247, .16);
+}
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
