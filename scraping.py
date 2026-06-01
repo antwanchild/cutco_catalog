@@ -967,6 +967,26 @@ def scrape_purple_campaign_variants() -> tuple[dict[str, str], ...]:
                     "color": "Purple",
                 }
             )
+
+        # The promo campaign also includes two sheathed purple knife offers that
+        # are easy to miss if the campaign page only exposes the generic purple
+        # entry. Keep them explicit so the promo sync can surface them too.
+        for fallback_name, fallback_code, fallback_sku_hint in (
+            ("Purple Traditional Cheese Knife with Sheath", "6764L", "6764"),
+            ('Purple 5" Petite Santoku with Sheath', "2166L", "2166"),
+        ):
+            key = (fallback_name.lower(), fallback_code)
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(
+                {
+                    "name": fallback_name,
+                    "promo_code": fallback_code,
+                    "sku_hint": fallback_sku_hint,
+                    "color": "Purple",
+                }
+            )
         logger.debug("Purple campaign fetch: %s → %d candidates", campaign_url, len(candidates))
         return tuple(candidates)
     except Exception as exc:

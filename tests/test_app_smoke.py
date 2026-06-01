@@ -41,6 +41,7 @@ from scraping import (
     _resolve_visible_member_sku,
     _should_queue_slug,
     _extract_product_variant_colors,
+    scrape_purple_campaign_variants,
 )
 from blueprints.catalog import _build_member_name_lookup, _build_set_membership_preview, _load_member_snapshot
 from time_utils import container_timezone, format_container_time
@@ -1358,6 +1359,21 @@ class UtilitySmokeTests(SmokeBaseTest):
                 _extract_product_variant_colors("https://www.cutco.com/p/cutco-cares-alzheimers/"),
                 ("Purple",),
             )
+
+    def test_scrape_purple_campaign_variants_includes_sheathed_promo_items(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <input type="radio" name="purple_products" value="Purple Super Shears"
+                     data-type="Purple Products" data-code="77L">
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_purple_campaign_variants.cache_clear()
+            entries = scrape_purple_campaign_variants()
+        self.assertIn("Purple Traditional Cheese Knife with Sheath", {entry["name"] for entry in entries})
+        self.assertIn('Purple 5" Petite Santoku with Sheath', {entry["name"] for entry in entries})
 
     def test_extract_product_variant_colors_prefers_selected_color_on_size_pages(self):
         response = mock.Mock()
