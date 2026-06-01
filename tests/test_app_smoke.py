@@ -3591,6 +3591,51 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual([variant.color for variant in item.variants], ["Blue"])
             self.assertEqual([variant.source for variant in item.variants], ["variant_sync"])
 
+    def test_variant_sync_can_mark_purple_campaign_variants_as_unicorns(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _unknown_variant_id = self._add_catalog_item(name="Purple Promo Knife", sku="PP-1")
+
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=("Purple",),
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "PP-1",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Mark purple promo variants as unicorns", preview_response.data)
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+                "mark_purple_variants_unicorn": "on",
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            self.assertEqual([variant.color for variant in item.variants], ["Purple"])
+            self.assertEqual([variant.source for variant in item.variants], ["variant_sync"])
+            self.assertEqual([variant.is_unicorn for variant in item.variants], [True])
+
     def test_variant_sync_skips_cutting_boards(self):
         self._login_as_admin()
         self._set_csrf_token()

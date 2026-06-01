@@ -567,6 +567,7 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
     variants_to_create = 0
     variants_retained = 0
     items_with_no_clear_variants = 0
+    purple_variant_count = 0
 
     fetched_variants: dict[int, tuple[str, ...]] = {}
     with ThreadPoolExecutor(max_workers=6) as pool:
@@ -596,6 +597,7 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
                 "retained_count": 0,
                 "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
                 "no_clear_variants": True,
+                "has_purple_variant": False,
             })
             items_with_no_clear_variants += 1
             continue
@@ -618,12 +620,16 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
                 "retained_count": 0,
                 "has_unknown_variant": any(variant.color == UNKNOWN_COLOR for variant in item.variants),
                 "no_clear_variants": True,
+                "has_purple_variant": False,
             })
             items_with_no_clear_variants += 1
             continue
 
         scraped_colors = list(fetched_variants.get(item.id, ()))
         scraped_variant_total += len(scraped_colors)
+        has_purple_variant = any(color.lower() == "purple" for color in scraped_colors)
+        if has_purple_variant:
+            purple_variant_count += 1
         existing_real_variants = [variant for variant in item.variants if variant.color != UNKNOWN_COLOR]
         existing_lookup = {variant.color.lower(): variant for variant in existing_real_variants}
         scraped_lookup = {color.lower() for color in scraped_colors}
@@ -672,6 +678,7 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
             "retained_count": retained_count,
             "has_unknown_variant": has_unknown_variant,
             "no_clear_variants": no_clear_variants,
+            "has_purple_variant": has_purple_variant,
             "scraped_variant_count": len(scraped_colors),
             "swatch_count": len(scraped_colors),
         })
@@ -699,6 +706,8 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
             "variants_to_create": variants_to_create,
             "variants_retained": variants_retained,
             "items_with_no_clear_variants": items_with_no_clear_variants,
+            "purple_variant_count": purple_variant_count,
+            "has_purple_variants": purple_variant_count > 0,
         },
     }
 
@@ -1019,6 +1028,7 @@ def variant_sync_confirm():
     retained_variants = 0
     skipped_items = 0
     touched_items = 0
+    mark_purple_as_unicorn = request.form.get("mark_purple_variants_unicorn") == "on"
     skipped_details: list[dict] = []
 
     try:
@@ -1054,9 +1064,16 @@ def variant_sync_confirm():
                 if color_value.lower() in existing_real:
                     retained_variants += 1
                     continue
-                db.session.add(ItemVariant(item=item, color=color_value, source="variant_sync"))
+                variant = ItemVariant(item=item, color=color_value, source="variant_sync")
+                if mark_purple_as_unicorn and item_data.get("has_purple_variant") and color_value.lower() == "purple":
+                    variant.is_unicorn = True
+                db.session.add(variant)
                 create_colors.append(color_value)
                 created_variants += 1
+            if mark_purple_as_unicorn and item_data.get("has_purple_variant"):
+                for variant in item.variants:
+                    if variant.color.lower() == "purple":
+                        variant.is_unicorn = True
             retained_variants += len(item_data.get("retained_colors", []))
             if create_colors or item_data.get("retained_colors"):
                 touched_items += 1

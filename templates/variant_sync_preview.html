@@ -25,6 +25,16 @@
   <input type="hidden" name="preview_json" value="{{ preview_json | e }}">
   <input type="hidden" name="scope_label" value="{{ preview.scope_label }}">
 
+  {% if preview.summary.has_purple_variants %}
+  <label class="checkbox-label" style="display:block;margin:0 0 1rem">
+    <input type="checkbox" name="mark_purple_variants_unicorn" value="on">
+    Mark purple promo variants as unicorns
+  </label>
+  <p class="muted small" style="margin:-.5rem 0 1rem;">
+    Only applies to purple campaign variants detected in this sync preview.
+  </p>
+  {% endif %}
+
   {% for category_block in preview.grouped_items %}
   <div class="form-card variant-sync-category-block">
     <div class="section-heading-actions" style="margin-bottom:.5rem">
