@@ -972,8 +972,8 @@ def scrape_purple_campaign_variants() -> tuple[dict[str, str], ...]:
         # are easy to miss if the campaign page only exposes the generic purple
         # entry. Keep them explicit so the promo sync can surface them too.
         for fallback_name, fallback_code, fallback_sku_hint in (
-            ("Purple Traditional Cheese Knife with Sheath", "6764L", "6764"),
-            ('Purple 5" Petite Santoku with Sheath', "2166L", "2166"),
+            ('Purple 7" Santoku with Sheath', "1766LSH", "1766"),
+            ("Purple Santoku-Style Trimmer with Sheath", "3721LSH", "3721"),
         ):
             key = (fallback_name.lower(), fallback_code)
             if key in seen:

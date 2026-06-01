@@ -1372,8 +1372,11 @@ class UtilitySmokeTests(SmokeBaseTest):
         with mock.patch("scraping.requests.get", return_value=response):
             scrape_purple_campaign_variants.cache_clear()
             entries = scrape_purple_campaign_variants()
-        self.assertIn("Purple Traditional Cheese Knife with Sheath", {entry["name"] for entry in entries})
-        self.assertIn('Purple 5" Petite Santoku with Sheath', {entry["name"] for entry in entries})
+        entry_names = {entry["name"] for entry in entries}
+        self.assertIn('Purple 7" Santoku with Sheath', entry_names)
+        self.assertIn("Purple Santoku-Style Trimmer with Sheath", entry_names)
+        self.assertNotIn("Purple Traditional Cheese Knife with Sheath", entry_names)
+        self.assertNotIn('Purple 5" Petite Santoku with Sheath', entry_names)
 
     def test_extract_product_variant_colors_prefers_selected_color_on_size_pages(self):
         response = mock.Mock()
@@ -3680,28 +3683,28 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        cheese_item_id, _ = self._add_catalog_item(name="Traditional Cheese Knife", sku="6764")
-        santoku_item_id, _ = self._add_catalog_item(name='5" Petite Santoku', sku="2166")
+        santoku_item_id, _ = self._add_catalog_item(name='7" Santoku', sku="1766")
+        trimmer_item_id, _ = self._add_catalog_item(name="Santoku-Style Trimmer", sku="3721")
 
         with mock.patch(
             "blueprints.data.scrape_item_variant_colors",
             return_value=(),
         ), mock.patch(
             "blueprints.data.scrape_purple_campaign_variants",
-            return_value=(
-                {
-                    "name": "Traditional Cheese Knife with Sheath",
-                    "promo_code": "6764L",
-                    "sku_hint": "6764",
-                    "color": "Purple",
-                },
-                {
-                    "name": '5" Petite Santoku with Sheath',
-                    "promo_code": "2166L",
-                    "sku_hint": "2166",
-                    "color": "Purple",
-                },
-            ),
+                return_value=(
+                    {
+                        "name": '7" Santoku with Sheath',
+                        "promo_code": "1766LSH",
+                        "sku_hint": "1766",
+                        "color": "Purple",
+                    },
+                    {
+                        "name": "Santoku-Style Trimmer with Sheath",
+                        "promo_code": "3721LSH",
+                        "sku_hint": "3721",
+                        "color": "Purple",
+                    },
+                ),
         ):
             preview_response = self.client.post(
                 "/variant-sync",
@@ -3732,14 +3735,14 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(confirm_response.status_code, 200)
         with self.app.app_context():
-            cheese_item = db.session.get(Item, cheese_item_id)
             santoku_item = db.session.get(Item, santoku_item_id)
-            self.assertEqual([variant.color for variant in cheese_item.variants], ["Purple"])
-            self.assertEqual([variant.source for variant in cheese_item.variants], ["variant_sync"])
-            self.assertEqual([variant.notes for variant in cheese_item.variants], [None])
+            trimmer_item = db.session.get(Item, trimmer_item_id)
             self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple"])
             self.assertEqual([variant.source for variant in santoku_item.variants], ["variant_sync"])
             self.assertEqual([variant.notes for variant in santoku_item.variants], [None])
+            self.assertEqual([variant.color for variant in trimmer_item.variants], ["Purple"])
+            self.assertEqual([variant.source for variant in trimmer_item.variants], ["variant_sync"])
+            self.assertEqual([variant.notes for variant in trimmer_item.variants], [None])
 
     def test_variant_sync_skips_cutting_boards(self):
         self._login_as_admin()
