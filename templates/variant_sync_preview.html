@@ -76,11 +76,13 @@
         </thead>
         <tbody>
           {% for row in item.variant_rows %}
-          <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% endif %}">
+          <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% elif row.status == 'included' %}variant-sync-included-row{% endif %}">
             <td>
               {{ row.color }}
               {% if row.status == 'fallback only' %}
                 <span class="badge badge-alias badge-mini">fallback only</span>
+              {% elif row.status == 'included' %}
+                <span class="badge badge-info badge-mini">included</span>
               {% endif %}
             </td>
             <td>
@@ -90,6 +92,8 @@
                 <span class="badge badge-new">create</span>
               {% elif row.status == 'fallback only' %}
                 <span class="badge badge-alias">fallback only</span>
+              {% elif row.status == 'included' %}
+                <span class="badge badge-info">included</span>
               {% else %}
                 <span class="badge badge-warning">not seen in sync</span>
               {% endif %}
@@ -138,11 +142,13 @@
         </thead>
         <tbody>
           {% for row in item.variant_rows %}
-          <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% endif %}">
+          <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% elif row.status == 'included' %}variant-sync-included-row{% endif %}">
             <td>
               {{ row.color }}
               {% if row.status == 'fallback only' %}
                 <span class="badge badge-alias badge-mini">fallback only</span>
+              {% elif row.status == 'included' %}
+                <span class="badge badge-info badge-mini">included</span>
               {% endif %}
             </td>
             <td>
@@ -152,6 +158,8 @@
                 <span class="badge badge-new">create</span>
               {% elif row.status == 'fallback only' %}
                 <span class="badge badge-alias">fallback only</span>
+              {% elif row.status == 'included' %}
+                <span class="badge badge-info">included</span>
               {% else %}
                 <span class="badge badge-warning">not seen in sync</span>
               {% endif %}

@@ -3715,6 +3715,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"with sheath", preview_response.data)
+        self.assertIn(b"Sheath included", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)

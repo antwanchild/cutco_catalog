@@ -832,11 +832,14 @@ def _build_purple_campaign_variant_preview() -> dict:
             else:
                 variants_to_create += 1
                 create_colors.append(color_name)
+        if includes_sheath:
+            variant_rows.append({"color": "Sheath included", "status": "included"})
 
         preview_items.append({
             "item_id": item.id,
-            "item_name": item.name,
+            "item_name": promo_name,
             "sku": item.sku or sku_hint or "—",
+            "catalog_item_name": item.name,
             "category": item.category or "—",
             "status": "ready",
             "skip_reason": None,
