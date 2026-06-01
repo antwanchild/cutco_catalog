@@ -3738,10 +3738,10 @@ class CatalogSmokeTests(SmokeBaseTest):
             trimmer_item = db.session.get(Item, trimmer_item_id)
             self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple", "Purple Sheath"])
             self.assertEqual([variant.source for variant in santoku_item.variants], ["variant_sync", "variant_sync"])
-            self.assertEqual([variant.notes for variant in santoku_item.variants], [None, None])
+            self.assertEqual([variant.notes for variant in santoku_item.variants], [None, "Promo code: 1766LSH"])
             self.assertEqual([variant.color for variant in trimmer_item.variants], ["Purple", "Purple Sheath"])
             self.assertEqual([variant.source for variant in trimmer_item.variants], ["variant_sync", "variant_sync"])
-            self.assertEqual([variant.notes for variant in trimmer_item.variants], [None, None])
+            self.assertEqual([variant.notes for variant in trimmer_item.variants], [None, "Promo code: 3721LSH"])
 
     def test_variant_sync_can_confirm_purple_section_only(self):
         self._login_as_admin()
@@ -3803,6 +3803,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             promo_item = db.session.get(Item, promo_item_id)
             self.assertEqual([variant.color for variant in normal_item.variants], [UNKNOWN_COLOR])
             self.assertEqual([variant.color for variant in promo_item.variants], ["Purple", "Purple Sheath"])
+            self.assertEqual([variant.notes for variant in promo_item.variants], [None, "Promo code: 77LSH"])
 
     def test_variant_sync_skips_cutting_boards(self):
         self._login_as_admin()

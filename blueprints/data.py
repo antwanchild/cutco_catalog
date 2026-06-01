@@ -850,7 +850,11 @@ def _build_purple_campaign_variant_preview() -> dict:
             if color_key in {row["color"].lower() for row in group["variant_rows"]}:
                 continue
             status = "existing" if color_key in existing_colors else "create"
-            group["variant_rows"].append({"color": color_name, "status": status})
+            group["variant_rows"].append({
+                "color": color_name,
+                "status": status,
+                "promo_code": entry.get("promo_code"),
+            })
             group["scraped_variant_count"] += 1
             group["swatch_count"] += 1
             if status == "existing":
@@ -864,7 +868,11 @@ def _build_purple_campaign_variant_preview() -> dict:
             sheath_key = sheath_color.lower()
             if sheath_key not in {row["color"].lower() for row in group["variant_rows"]}:
                 status = "existing" if sheath_key in existing_colors else "create"
-                group["variant_rows"].append({"color": sheath_color, "status": status})
+                group["variant_rows"].append({
+                    "color": sheath_color,
+                    "status": status,
+                    "promo_code": entry.get("promo_code"),
+                })
                 group["scraped_variant_count"] += 1
                 group["swatch_count"] += 1
                 if status == "existing":
@@ -1258,6 +1266,10 @@ def variant_sync_confirm():
 
             existing_real = {variant.color.lower() for variant in item.variants if variant.color != UNKNOWN_COLOR}
             create_colors = []
+            row_lookup = {
+                (row.get("color") or "").strip().lower(): row
+                for row in item_data.get("variant_rows", [])
+            }
             for color in item_data.get("create_colors", []):
                 color_value = (color or "").strip()
                 if not color_value:
@@ -1268,6 +1280,10 @@ def variant_sync_confirm():
                 variant = ItemVariant(item=item, color=color_value, source="variant_sync")
                 if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower().startswith("purple"):
                     variant.is_unicorn = True
+                row_data = row_lookup.get(color_value.lower(), {})
+                promo_code = (row_data.get("promo_code") or "").strip()
+                if promo_code and color_value.lower() == "purple sheath":
+                    variant.notes = _merge_note_text(variant.notes, f"Promo code: {promo_code}")
                 db.session.add(variant)
                 create_colors.append(color_value)
                 created_variants += 1
