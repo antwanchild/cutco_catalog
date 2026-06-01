@@ -822,8 +822,6 @@ def _build_purple_campaign_variant_preview() -> dict:
         retained_colors: list[str] = []
         variant_rows: list[dict[str, str]] = []
         promo_colors = ["Purple"]
-        if includes_sheath:
-            promo_colors.append("Purple Sheath")
         for color_name in promo_colors:
             color_key = color_name.lower()
             status = "existing" if color_key in existing_colors else "create"
@@ -1232,14 +1230,14 @@ def variant_sync_confirm():
                     retained_variants += 1
                     continue
                 variant = ItemVariant(item=item, color=color_value, source="variant_sync")
-                if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower().startswith("purple"):
+                if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower() == "purple":
                     variant.is_unicorn = True
                 db.session.add(variant)
                 create_colors.append(color_value)
                 created_variants += 1
             if allow_purple_unicorn:
                 for variant in item.variants:
-                    if variant.color.lower().startswith("purple"):
+                    if variant.color.lower() == "purple":
                         if mark_purple_as_unicorn:
                             variant.is_unicorn = True
             retained_variants += len(item_data.get("retained_colors", []))

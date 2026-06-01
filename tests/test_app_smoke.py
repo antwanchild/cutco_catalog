@@ -3660,7 +3660,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual([variant.source for variant in item.variants], ["variant_sync"])
             self.assertEqual([variant.is_unicorn for variant in item.variants], [True])
 
-    def test_variant_sync_creates_separate_sheath_variant_for_purple_promo_variants(self):
+    def test_variant_sync_keeps_purple_promo_sheath_as_metadata(self):
         self._login_as_admin()
         self._set_csrf_token()
 
@@ -3717,12 +3717,12 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             cheese_item = db.session.get(Item, cheese_item_id)
             santoku_item = db.session.get(Item, santoku_item_id)
-            self.assertEqual([variant.color for variant in cheese_item.variants], ["Purple", "Purple Sheath"])
-            self.assertEqual([variant.source for variant in cheese_item.variants], ["variant_sync", "variant_sync"])
-            self.assertEqual([variant.notes for variant in cheese_item.variants], [None, None])
-            self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple", "Purple Sheath"])
-            self.assertEqual([variant.source for variant in santoku_item.variants], ["variant_sync", "variant_sync"])
-            self.assertEqual([variant.notes for variant in santoku_item.variants], [None, None])
+            self.assertEqual([variant.color for variant in cheese_item.variants], ["Purple"])
+            self.assertEqual([variant.source for variant in cheese_item.variants], ["variant_sync"])
+            self.assertEqual([variant.notes for variant in cheese_item.variants], [None])
+            self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple"])
+            self.assertEqual([variant.source for variant in santoku_item.variants], ["variant_sync"])
+            self.assertEqual([variant.notes for variant in santoku_item.variants], [None])
 
     def test_variant_sync_skips_cutting_boards(self):
         self._login_as_admin()
