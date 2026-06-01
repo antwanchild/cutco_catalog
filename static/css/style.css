@@ -805,19 +805,19 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .variant-sync-fallback-row .badge-alias {
   margin-left: .35rem;
 }
-.variant-sync-included-row td {
+.variant-sync-sheath-row td {
   color: var(--text);
   background: linear-gradient(90deg, rgba(79, 142, 247, .18), rgba(79, 142, 247, .06));
 }
-.variant-sync-included-row td:first-child {
+.variant-sync-sheath-row td:first-child {
   border-left: 4px solid rgba(79, 142, 247, .72);
   padding-left: .7rem;
 }
-.variant-sync-included-row .badge-info {
+.variant-sync-sheath-row .badge-info {
   background: rgba(79, 142, 247, .28);
   color: #eff5ff;
 }
-.variant-sync-included-row td:first-child {
+.variant-sync-sheath-row td:first-child {
   font-weight: 600;
 }
 .form-row {
