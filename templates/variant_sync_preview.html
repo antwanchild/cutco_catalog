@@ -57,9 +57,6 @@
           <span class="badge badge-warning badge-mini">unmatched</span>
         {% else %}
           <span class="badge badge-info badge-mini">{{ item.scraped_variant_count }} variant{{ 's' if item.scraped_variant_count != 1 }}</span>
-          {% if item.includes_sheath %}
-            <span class="badge badge-alias badge-mini">with sheath</span>
-          {% endif %}
           {% if item.create_count %}<span class="badge badge-new badge-mini">{{ item.create_count }} create</span>{% endif %}
           {% if item.retained_count %}<span class="badge badge-warning badge-mini">{{ item.retained_count }} retained</span>{% endif %}
         {% endif %}
