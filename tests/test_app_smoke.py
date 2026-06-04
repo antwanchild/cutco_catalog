@@ -34,6 +34,7 @@ from scraping import (
     _build_set_member_entries,
     _dedupe_product_links,
     _extract_sku_from_href,
+    _find_cutco_item_link,
     _product_link_name,
     _member_hover_title,
     _infer_visible_member_sku,
@@ -370,6 +371,40 @@ class PublicSmokeTests(SmokeBaseTest):
                 scrape_item_specs("https://www.cutco.com/p/super-shears/677CD")["msrp"],
                 149.0,
             )
+
+    def test_msrp_scraper_ignores_sheath_bundle_price_noise(self):
+        html = """
+            <html>
+              <body>
+                <h1>Super Shears</h1>
+                <div class="price">$149</div>
+                <div>Super Shears with Sheath</div>
+                <div class="price">$198</div>
+              </body>
+            </html>
+        """
+
+        with mock.patch("scraping.requests.get") as mocked_get:
+            mocked_get.return_value = mock.Mock(
+                status_code=200,
+                url="https://www.cutco.com/p/super-shears/77CD",
+                text=html,
+            )
+
+            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/super-shears/77CD", "Super Shears"), 149.0)
+
+    def test_find_cutco_item_link_prefers_exact_item_over_sheath_bundle(self):
+        html = """
+            <html>
+              <body>
+                <a href="/p/super-shears-with-sheath"><h2>Super Shears with Sheath</h2></a>
+                <a href="/p/super-shears"><h2>Super Shears</h2></a>
+              </body>
+            </html>
+        """
+
+        self.assertEqual(_find_cutco_item_link(html, "Super Shears"), "https://www.cutco.com/p/super-shears")
+        self.assertEqual(_find_cutco_item_link(html, "Super Shears with Sheath"), "https://www.cutco.com/p/super-shears-with-sheath")
 
     def test_health_endpoint_reports_ok(self):
         response = self.client.get("/health")

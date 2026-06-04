@@ -56,6 +56,8 @@ def _find_cutco_item_link(raw_html: str, item_name: str | None) -> str | None:
         return None
 
     soup = BeautifulSoup(raw_html, "html.parser")
+    wants_sheath = "sheath" in normalized_item or "gift box" in normalized_item
+    best_match: tuple[int, str] | None = None
     for anchor in soup.select("a[href*='/p/']"):
         href = (anchor.get("href") or "").strip()
         if not href:
@@ -69,10 +71,29 @@ def _find_cutco_item_link(raw_html: str, item_name: str | None) -> str | None:
         image = anchor.find("img", alt=True)
         if image:
             texts.append(image.get("alt", ""))
-        for text in texts:
-            if normalized_item in _normalize_text_for_match(text):
-                return urljoin("https://www.cutco.com", href)
-    return None
+        candidate_text = " ".join(texts)
+        normalized_text = _normalize_text_for_match(candidate_text)
+        if not normalized_text:
+            continue
+        score = 0
+        if normalized_text == normalized_item:
+            score += 100
+        elif normalized_text.startswith(normalized_item):
+            score += 80
+        elif normalized_item in normalized_text:
+            score += 60
+        if normalized_item.split()[:2] and " ".join(normalized_item.split()[:2]) in normalized_text:
+            score += 10
+        if re.search(r"\b(with\s+sheath|knife\s+and\s+sheath|knife\s+sheath|sheath\s+set|gift\s+box|bundle)\b",
+                     normalized_text):
+            score -= 50 if not wants_sheath else 0
+        if re.search(r"\b(set|kit)\b", normalized_text) and not wants_sheath:
+            score -= 10
+        if score <= 0:
+            continue
+        if best_match is None or score > best_match[0]:
+            best_match = (score, urljoin("https://www.cutco.com", href))
+    return best_match[1] if best_match else None
 
 
 def _fetch_cutco_page(url: str, *, item_name: str | None = None) -> tuple[str | None, str | None]:
@@ -133,6 +154,7 @@ def _extract_primary_visible_price(
     start_index = 0
     normalized_candidate = _normalize_text_for_match(candidate_text or "")
     normalized_heading = _normalize_text_for_match(heading_text or "")
+    wants_sheath = "sheath" in normalized_candidate or "gift box" in normalized_candidate
     if normalized_candidate:
         for index, line in enumerate(lines):
             if normalized_candidate in _normalize_text_for_match(line):
@@ -165,12 +187,19 @@ def _extract_primary_visible_price(
             break
 
     for line in truncated_lines:
+        normalized_line = _normalize_text_for_match(line)
+        if normalized_candidate and not wants_sheath:
+            if re.search(r"\b(with\s+sheath|knife\s+and\s+sheath|knife\s+sheath|sheath\s+set|gift\s+box|bundle)\b",
+                         normalized_line):
+                continue
         for dollar_match in re.finditer(r"\$\s*([\d,]+(?:\.\d{2})?)", line):
             try:
                 price = float(dollar_match.group(1).replace(",", ""))
             except ValueError:
                 continue
             if price > 0:
+                if normalized_candidate:
+                    return price
                 return price
     return None
 
