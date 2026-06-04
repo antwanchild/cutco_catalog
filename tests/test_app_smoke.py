@@ -3501,6 +3501,9 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
             item_set.members.append(ItemSetMember(item_id=item_id, quantity=1))
             item_set.members.append(ItemSetMember(item_id=incomplete_item_id, quantity=1))
+            red_variant = db.session.get(ItemVariant, variant_id)
+            if red_variant is not None:
+                red_variant.color = "Red"
             clear_set = Set(
                 name="Clear Set",
                 sku="CS-1",
@@ -3526,6 +3529,8 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"SG-1", sets_page.data)
         self.assertEqual(set_detail_page.status_code, 200)
         self.assertIn(b"Set Group", set_detail_page.data)
+        self.assertIn(b"Top Colors", set_detail_page.data)
+        self.assertIn(b"/variants?color=Red", set_detail_page.data)
         self.assertEqual(set_edit_page.status_code, 200)
         self.assertIn(b"Set Members", set_edit_page.data)
         self.assertIn("← Sets".encode(), set_detail_page.data)

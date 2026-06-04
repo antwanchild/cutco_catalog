@@ -1256,11 +1256,11 @@ def sets_list():
     owned_q = Ownership.query.filter_by(status="Owned")
     if person_id:
         owned_q = owned_q.filter_by(person_id=person_id)
-    owned_item_ids = {
-        ownership.variant.item_id
-        for ownership in owned_q.all()
+    owned_ownerships = [
+        ownership for ownership in owned_q.all()
         if ownership.variant is not None and ownership.variant.item is not None
-    }
+    ]
+    owned_item_ids = {ownership.variant.item_id for ownership in owned_ownerships}
 
     catalog_sku_lookup = {
         _normalize_member_sku(item.sku): item
@@ -1643,11 +1643,11 @@ def set_detail(set_id=None, sid=None):
     owned_q = Ownership.query.filter_by(status="Owned")
     if person_id:
         owned_q = owned_q.filter_by(person_id=person_id)
-    owned_item_ids = {
-        ownership.variant.item_id
-        for ownership in owned_q.all()
+    owned_ownerships = [
+        ownership for ownership in owned_q.all()
         if ownership.variant is not None and ownership.variant.item is not None
-    }
+    ]
+    owned_item_ids = {ownership.variant.item_id for ownership in owned_ownerships}
 
     wishlisted_item_ids: set[int] = set()
     if person_id:
@@ -1666,6 +1666,17 @@ def set_detail(set_id=None, sid=None):
         _load_member_snapshot(item_set.member_data),
         catalog_sku_lookup,
     )
+
+    color_counts: dict[str, int] = {}
+    for ownership in owned_ownerships:
+        color = ownership.variant.color or UNKNOWN_COLOR
+        if color == UNKNOWN_COLOR:
+            continue
+        color_counts[color] = color_counts.get(color, 0) + 1
+    top_colors = [
+        {"color": color, "count": count}
+        for color, count in sorted(color_counts.items(), key=lambda kv: kv[1], reverse=True)[:8]
+    ]
 
     def _sort_items(items: list[Item]) -> list[Item]:
         if sort_field == "msrp":
@@ -1714,6 +1725,7 @@ def set_detail(set_id=None, sid=None):
                            qty_map=qty_map,
                            member_snapshot_rows=member_snapshot_rows,
                            not_in_catalog_skus=not_in_catalog_skus,
+                           top_colors=top_colors,
                            next_target=next_target,
                            can_restore_memberships=bool(item_set.member_data),
                            COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
