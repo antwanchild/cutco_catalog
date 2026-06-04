@@ -796,6 +796,11 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Share Gift List", gift_share_response.data)
         self.assertEqual(collection_share_response.status_code, 200)
         self.assertIn(b"Share Collection Card", collection_share_response.data)
+        collection_response = self.client.get(f"/people/{person_id}/collection")
+        self.assertEqual(collection_response.status_code, 200)
+        self.assertIn(b"Top Colors", collection_response.data)
+        self.assertIn(b"/variants?color=Red", collection_response.data)
+        self.assertIn(b"/variants?color=Purple", collection_response.data)
 
     def test_item_attachments_upload_render_and_delete(self):
         self._login_as_admin()

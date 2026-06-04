@@ -128,10 +128,22 @@ def person_collection(person_id):
         if missing:
             variant_gaps.append((item, missing))
 
+    color_counts: dict[str, int] = {}
+    for ownership in ownerships:
+        color = ownership.variant.color or UNKNOWN_COLOR
+        if color == UNKNOWN_COLOR:
+            continue
+        color_counts[color] = color_counts.get(color, 0) + 1
+    top_colors = [
+        {"color": color, "count": count}
+        for color, count in sorted(color_counts.items(), key=lambda kv: kv[1], reverse=True)[:8]
+    ]
+
     return render_template("collection.html", person=person,
                            ownerships=ownerships,
                            item_gaps=item_gaps,
                            variant_gaps=variant_gaps,
+                           top_colors=top_colors,
                            status_options=STATUS_OPTIONS,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
