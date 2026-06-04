@@ -812,6 +812,11 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .msrp-diff-progress-panel {
   max-width: 960px;
 }
+.msrp-diff-actions {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
 .variant-sync-intro-card,
 .variant-sync-summary-card {
   margin-bottom: 1rem;
