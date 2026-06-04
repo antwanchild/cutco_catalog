@@ -16,15 +16,12 @@ Environment:
 
 import argparse
 import csv
-import json
 import os
-import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 import requests
-from bs4 import BeautifulSoup
 
 # ── Bootstrap Flask app context ───────────────────────────────────────────────
 # Build an app instance so the script gets the same DB/session setup as the web app.
@@ -33,7 +30,7 @@ from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models import Item  # noqa: E402
 from constants import SCRAPE_HEADERS, REQUEST_TIMEOUT  # noqa: E402
-from scraping import scrape_catalog  # noqa: E402
+from scraping import scrape_catalog, _extract_cutco_price  # noqa: E402
 from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
 
 app = create_app()
@@ -41,68 +38,12 @@ app = create_app()
 # ── Price scraping ─────────────────────────────────────────────────────────────
 
 def _scrape_price_from_page(url: str) -> float | None:
-    """Fetch a Cutco product page and return its price.
-
-    Tries, in order:
-      1. JSON-LD  offers.price
-      2. <meta property="og:price:amount">
-      3. [itemprop="price"] content attribute
-      4. First $NNN.NN pattern in visible text
-    """
+    """Fetch a Cutco product page and return its price."""
     try:
         resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         if resp.status_code != 200:
             return None
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        # Strategy 1: JSON-LD offers.price
-        for ld_tag in soup.find_all("script", type="application/ld+json"):
-            try:
-                data = json.loads(ld_tag.string or "")
-                entries = data if isinstance(data, list) else [data]
-                for entry in entries:
-                    if not isinstance(entry, dict) or entry.get("@type") != "Product":
-                        continue
-                    offers = entry.get("offers", {})
-                    if isinstance(offers, list):
-                        offers = offers[0] if offers else {}
-                    price_val = offers.get("price") if isinstance(offers, dict) else None
-                    if price_val is not None:
-                        return float(price_val)
-            except (json.JSONDecodeError, ValueError, AttributeError):
-                pass
-
-        # Strategy 2: Open Graph meta tag
-        og_tag = soup.find("meta", property="og:price:amount")
-        if og_tag and og_tag.get("content", "").strip():
-            try:
-                return float(og_tag["content"].replace(",", ""))
-            except ValueError:
-                pass
-
-        # Strategy 3: itemprop="price"
-        price_el = soup.find(attrs={"itemprop": "price"})
-        if price_el:
-            raw = price_el.get("content") or price_el.get_text(strip=True)
-            price_match = re.search(r"[\d,]+\.?\d*", raw.replace(",", ""))
-            if price_match:
-                try:
-                    return float(price_match.group().replace(",", ""))
-                except ValueError:
-                    pass
-
-        # Strategy 4: first $NNN.NN in visible text
-        for noise in soup.find_all(["script", "style"]):
-            noise.decompose()
-        page_text = soup.get_text(" ", strip=True)
-        dollar_match = re.search(r"\$\s*([\d,]+\.\d{2})", page_text)
-        if dollar_match:
-            try:
-                return float(dollar_match.group(1).replace(",", ""))
-            except ValueError:
-                pass
-
-        return None
+        return _extract_cutco_price(resp.text, page_url=url)
     except Exception:
         return None
 

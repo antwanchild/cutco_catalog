@@ -18,6 +18,77 @@ from constants import (
 logger = logging.getLogger(__name__)
 
 
+def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float | None:
+    """Return the most reliable product price found on a Cutco page.
+
+    Cutco pages often expose multiple price sources. The page-local JS values
+    tend to match the rendered product price better than JSON-LD, which can
+    point at alternate offers or variants on pages like shears and cutting
+    boards.
+    """
+    soup = BeautifulSoup(raw_html, "html.parser")
+    page_sku = _extract_sku_from_href(page_url, preserve_lettered_code=True) if page_url else None
+
+    # Prefer the price values embedded in the page's own product JS.
+    for key in ("actualPrice", "fullRetail"):
+        price_match = re.search(rf'"{key}"\s*:\s*([\d.]+)', raw_html)
+        if price_match:
+            try:
+                return float(price_match.group(1))
+            except ValueError:
+                pass
+
+    # JSON-LD can contain multiple Product entries; if we know the SKU, try to
+    # select the matching one instead of blindly taking the first offer.
+    for ld_tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(ld_tag.string or "")
+            entries = data if isinstance(data, list) else [data]
+            for entry in entries:
+                if not isinstance(entry, dict) or entry.get("@type") != "Product":
+                    continue
+                if page_sku:
+                    entry_sku = str(entry.get("sku") or entry.get("productID") or "").strip().upper()
+                    if entry_sku and page_sku not in entry_sku and entry_sku not in page_sku:
+                        continue
+                offers = entry.get("offers", {})
+                if isinstance(offers, list):
+                    offers = offers[0] if offers else {}
+                price_val = offers.get("price") if isinstance(offers, dict) else None
+                if price_val is not None:
+                    return float(price_val)
+        except (json.JSONDecodeError, ValueError, AttributeError):
+            pass
+
+    og_tag = soup.find("meta", property="og:price:amount")
+    if og_tag and og_tag.get("content", "").strip():
+        try:
+            return float(og_tag["content"].replace(",", ""))
+        except ValueError:
+            pass
+
+    price_el = soup.find(attrs={"itemprop": "price"})
+    if price_el:
+        raw = price_el.get("content") or price_el.get_text(strip=True)
+        price_match = re.search(r"[\d,]+\.?\d*", raw)
+        if price_match:
+            try:
+                return float(price_match.group().replace(",", ""))
+            except ValueError:
+                pass
+
+    for noise in soup.find_all(["script", "style"]):
+        noise.decompose()
+    dollar_match = re.search(r"\$\s*([\d,]+\.\d{2})", soup.get_text(" ", strip=True))
+    if dollar_match:
+        try:
+            return float(dollar_match.group(1).replace(",", ""))
+        except ValueError:
+            pass
+
+    return None
+
+
 def _extract_sku_from_href(href: str, *, preserve_lettered_code: bool = False) -> str | None:
     """Pull a base SKU from a /p/ product URL."""
     parts = href.rstrip("/").split("/")
@@ -538,8 +609,6 @@ def scrape_item_specs(url: str) -> dict:
         if resp.status_code != 200:
             return result
         raw_html = resp.text
-        soup = BeautifulSoup(raw_html, "html.parser")
-
         # ── Edge type ────────────────────────────────────────────────────────
         item_class_m    = re.search(r'"itemClass"\s*:\s*"([^"]+)"', raw_html)
         item_subclass_m = re.search(r'"itemSubclass"\s*:\s*"([^"]+)"', raw_html)
@@ -575,41 +644,8 @@ def scrape_item_specs(url: str) -> dict:
             if field and result[field] is None:
                 result[field] = val
 
-        # ── MSRP (JSON-LD → og:price → itemprop) ────────────────────────────
-        for ld_tag in soup.find_all("script", type="application/ld+json"):
-            try:
-                import json as _json
-                data = _json.loads(ld_tag.string or "")
-                entries = data if isinstance(data, list) else [data]
-                for entry in entries:
-                    if not isinstance(entry, dict) or entry.get("@type") != "Product":
-                        continue
-                    offers = entry.get("offers", {})
-                    if isinstance(offers, list):
-                        offers = offers[0] if offers else {}
-                    price_val = offers.get("price") if isinstance(offers, dict) else None
-                    if price_val is not None:
-                        result["msrp"] = float(price_val)
-                        break
-            except (ValueError, AttributeError):
-                pass
-            if result["msrp"] is not None:
-                break
-        if result["msrp"] is None:
-            # Cutco embeds fullRetail in webItemsMap JS
-            retail_m = re.search(r'"fullRetail"\s*:\s*([\d.]+)', raw_html)
-            if retail_m:
-                try:
-                    result["msrp"] = float(retail_m.group(1))
-                except ValueError:
-                    pass
-        if result["msrp"] is None:
-            og_tag = soup.find("meta", property="og:price:amount")
-            if og_tag and og_tag.get("content", "").strip():
-                try:
-                    result["msrp"] = float(og_tag["content"].replace(",", ""))
-                except ValueError:
-                    pass
+        # ── MSRP ─────────────────────────────────────────────────────────────
+        result["msrp"] = _extract_cutco_price(raw_html, page_url=clean_url)
 
         logger.debug("Specs: %s → %s", clean_url, result)
     except Exception as exc:

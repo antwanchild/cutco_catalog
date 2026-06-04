@@ -3,13 +3,11 @@
 import json
 import logging
 import os
-import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 
 import requests
-from bs4 import BeautifulSoup
 
 from constants import (
     DATA_DIR, DISCORD_WEBHOOK_URL, REQUEST_TIMEOUT, SCRAPE_HEADERS,
@@ -17,7 +15,7 @@ from constants import (
 from extensions import db
 from helpers import _notify_discord, check_wishlist_targets
 from models import Item, record_activity
-from scraping import scrape_catalog
+from scraping import scrape_catalog, _extract_cutco_price
 
 logger = logging.getLogger(__name__)
 
@@ -141,57 +139,7 @@ def _scrape_price_from_page(url: str) -> float | None:
         resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         if resp.status_code != 200:
             return None
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        for ld_tag in soup.find_all("script", type="application/ld+json"):
-            try:
-                data = json.loads(ld_tag.string or "")
-                entries = data if isinstance(data, list) else [data]
-                for entry in entries:
-                    if not isinstance(entry, dict) or entry.get("@type") != "Product":
-                        continue
-                    offers = entry.get("offers", {})
-                    if isinstance(offers, list):
-                        offers = offers[0] if offers else {}
-                    price_val = offers.get("price") if isinstance(offers, dict) else None
-                    if price_val is not None:
-                        return float(price_val)
-            except (json.JSONDecodeError, ValueError, AttributeError):
-                pass
-
-        og_tag = soup.find("meta", property="og:price:amount")
-        if og_tag and og_tag.get("content", "").strip():
-            try:
-                return float(og_tag["content"].replace(",", ""))
-            except ValueError:
-                pass
-
-        retail_match = re.search(r'"(?:fullRetail|actualPrice)"\s*:\s*([\d.]+)', resp.text)
-        if retail_match:
-            try:
-                return float(retail_match.group(1))
-            except ValueError:
-                pass
-
-        price_el = soup.find(attrs={"itemprop": "price"})
-        if price_el:
-            raw = price_el.get("content") or price_el.get_text(strip=True)
-            price_match = re.search(r"[\d,]+\.?\d*", raw)
-            if price_match:
-                try:
-                    return float(price_match.group().replace(",", ""))
-                except ValueError:
-                    pass
-
-        for noise in soup.find_all(["script", "style"]):
-            noise.decompose()
-        dollar_match = re.search(r"\$\s*([\d,]+\.\d{2})", soup.get_text(" ", strip=True))
-        if dollar_match:
-            try:
-                return float(dollar_match.group(1).replace(",", ""))
-            except ValueError:
-                pass
-        return None
+        return _extract_cutco_price(resp.text, page_url=url)
     except Exception:
         return None
 

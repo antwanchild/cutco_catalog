@@ -42,6 +42,7 @@ from scraping import (
     _should_queue_slug,
     _extract_product_variant_colors,
     scrape_purple_campaign_variants,
+    scrape_item_specs,
 )
 from blueprints.catalog import _build_member_name_lookup, _build_set_membership_preview, _load_member_snapshot
 from time_utils import container_timezone, format_container_time
@@ -168,6 +169,37 @@ class PublicSmokeTests(SmokeBaseTest):
             mocked_get.return_value.text = html
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/1766C"), 184.0)
+
+    def test_msrp_scraper_prefers_page_js_price_over_json_ld_offer(self):
+        html = """
+            <html>
+              <head>
+                <script type="application/ld+json">
+                  {"@type":"Product","sku":"677CD","offers":{"price":159.00}}
+                </script>
+              </head>
+              <body>
+                <script>
+                  window.__CUTCO__ = {"fullRetail":149.00,"actualPrice":149.00};
+                </script>
+              </body>
+            </html>
+        """
+
+        with mock.patch("msrp_helpers.requests.get") as mocked_get:
+            mocked_get.return_value.status_code = 200
+            mocked_get.return_value.text = html
+
+            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/super-shears/677CD"), 149.0)
+
+        with mock.patch("scraping.requests.get") as mocked_get:
+            mocked_get.return_value.status_code = 200
+            mocked_get.return_value.text = html
+
+            self.assertEqual(
+                scrape_item_specs("https://www.cutco.com/p/super-shears/677CD")["msrp"],
+                149.0,
+            )
 
     def test_health_endpoint_reports_ok(self):
         response = self.client.get("/health")
