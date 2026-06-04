@@ -414,6 +414,31 @@ class PublicSmokeTests(SmokeBaseTest):
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/1759C", "Table Knife"), 54.0)
 
+    def test_msrp_scraper_ignores_late_related_item_price_on_exact_page(self):
+        html = """
+            <html>
+              <body>
+                <h1>#1504 Cheese Knife</h1>
+                <div class="price">$98</div>
+                <div>Regular shipping included</div>
+                <section>
+                  <h2>Frequently Bought Together</h2>
+                  <p>Super Shears $149</p>
+                  <p>Bundle Price $481</p>
+                </section>
+              </body>
+            </html>
+        """
+
+        with mock.patch("scraping.requests.get") as mocked_get:
+            mocked_get.return_value = mock.Mock(
+                status_code=200,
+                url="https://www.cutco.com/p/cheese-knife",
+                text=html,
+            )
+
+            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/cheese-knife", "Cheese Knife"), 98.0)
+
     def test_find_cutco_item_link_prefers_exact_item_over_sheath_bundle(self):
         html = """
             <html>

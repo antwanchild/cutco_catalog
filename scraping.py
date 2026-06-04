@@ -168,6 +168,7 @@ def _extract_primary_visible_price(
         return None
 
     start_index = 0
+    end_index = len(lines)
     normalized_candidate = _normalize_text_for_match(candidate_text or "")
     normalized_heading = _normalize_text_for_match(heading_text or "")
     wants_sheath = "sheath" in normalized_candidate or "gift box" in normalized_candidate
@@ -175,11 +176,13 @@ def _extract_primary_visible_price(
         for index, line in enumerate(lines):
             if _line_matches_item_name(line, candidate_text):
                 start_index = index
+                end_index = min(len(lines), index + 15)
                 break
     elif normalized_heading:
         for index, line in enumerate(lines):
             if normalized_heading in _normalize_text_for_match(line):
                 start_index = index + 1
+                end_index = min(len(lines), index + 15)
                 break
 
     cut_markers = (
@@ -196,7 +199,7 @@ def _extract_primary_visible_price(
         "Shipping and handling included",
     )
 
-    truncated_lines = lines[start_index:]
+    truncated_lines = lines[start_index:end_index]
     for stop_index, line in enumerate(truncated_lines):
         if any(marker.lower() in line.lower() for marker in stop_markers):
             truncated_lines = truncated_lines[:stop_index]
