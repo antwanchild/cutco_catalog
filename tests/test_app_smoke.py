@@ -161,6 +161,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Explore", response.data)
         self.assertIn(b"Track", response.data)
         self.assertIn(b"Data", response.data)
+        self.assertIn(b'/catalog?unicorn=1', response.data)
         self.assertIn(b"Admin", response.data)
         self.assertIn(b"Review", response.data)
         self.assertIn(b"Tools", response.data)
