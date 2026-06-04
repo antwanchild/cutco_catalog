@@ -52,6 +52,32 @@ def _fetch_cutco_page(url: str) -> tuple[str | None, str | None]:
         return None, None
 
 
+def _extract_primary_visible_price(page_text: str) -> float | None:
+    """Extract the main visible product price from Cutco page text.
+
+    Cutco product pages often include extra prices later in the page for
+    frequently-bought-together items or related accessories. The primary
+    product price is usually positioned before the regular-shipping copy.
+    """
+    truncated_text = page_text
+    for marker in (
+        "Regular shipping and handling included",
+        "Regular shipping included",
+        "Shipping and handling included",
+    ):
+        marker_pos = truncated_text.find(marker)
+        if marker_pos > 0:
+            truncated_text = truncated_text[:marker_pos]
+            break
+    dollar_match = re.search(r"\$\s*([\d,]+(?:\.\d{2})?)", truncated_text)
+    if not dollar_match:
+        return None
+    try:
+        return float(dollar_match.group(1).replace(",", ""))
+    except ValueError:
+        return None
+
+
 def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float | None:
     """Return the most reliable product price found on a Cutco page.
 
@@ -67,12 +93,9 @@ def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float
     for noise in soup.find_all(["script", "style"]):
         noise.decompose()
     page_text = soup.get_text(" ", strip=True)
-    dollar_match = re.search(r"\$\s*([\d,]+(?:\.\d{2})?)", page_text)
-    if dollar_match:
-        try:
-            return float(dollar_match.group(1).replace(",", ""))
-        except ValueError:
-            pass
+    visible_price = _extract_primary_visible_price(page_text)
+    if visible_price is not None:
+        return visible_price
 
     # Next try the page's own product JS.
     for key in ("actualPrice", "fullRetail"):
