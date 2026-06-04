@@ -159,6 +159,8 @@ def _line_matches_item_identity(line: str, item_name: str | None, sku: str | Non
     """Return True when a visible line looks like the target product."""
     normalized_item = _normalize_cutco_title(item_name or "")
     normalized_line = _normalize_cutco_title(line)
+    if not normalized_line:
+        return False
     if sku:
         normalized_sku = _normalize_text_for_match(sku)
         if normalized_sku and re.search(rf"(?<![a-z0-9]){re.escape(normalized_sku)}(?![a-z0-9])",
@@ -284,7 +286,9 @@ def _extract_cutco_price(
     boards.
     """
     soup = BeautifulSoup(raw_html, "html.parser")
-    page_sku = _extract_sku_from_href(page_url, preserve_lettered_code=True) if page_url else None
+    page_sku = None
+    if page_url and "/p/" in page_url:
+        page_sku = _extract_sku_from_href(page_url, preserve_lettered_code=True)
 
     # Prefer the rendered price the customer sees first.
     heading = soup.find("h1")
