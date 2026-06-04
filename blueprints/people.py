@@ -136,7 +136,7 @@ def person_collection(person_id):
         color_counts[color] = color_counts.get(color, 0) + 1
     top_colors = [
         {"color": color, "count": count}
-        for color, count in sorted(color_counts.items(), key=lambda kv: kv[1], reverse=True)[:8]
+        for color, count in sorted(color_counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))[:8]
     ]
 
     return render_template("collection.html", person=person,

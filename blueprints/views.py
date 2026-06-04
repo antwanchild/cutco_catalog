@@ -305,7 +305,7 @@ def stats():
     edge_data  = sorted(edge_counts.items(), key=lambda kv: kv[1], reverse=True)
     top_colors = [
         {"color": color, "count": count}
-        for color, count in color_data[:8]
+        for color, count in sorted(color_counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))[:8]
     ]
 
     cov_cats   = sorted(cat_catalog.keys())

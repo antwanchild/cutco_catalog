@@ -791,6 +791,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(stats_response.status_code, 200)
         self.assertIn(b"Coverage", stats_response.data)
         self.assertIn(b"Top Colors", stats_response.data)
+        self.assertIn(b'href="/variants"', stats_response.data)
         self.assertIn(b"/variants?color=Red", stats_response.data)
         self.assertIn(b"/variants?color=Purple", stats_response.data)
         self.assertIn(b"Includes public items plus unicorn, rep only, Costco, and non-catalog items that are marked Owned.", stats_response.data)
