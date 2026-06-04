@@ -190,6 +190,30 @@ class PublicSmokeTests(SmokeBaseTest):
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/small-cutting-board"), 35.0)
 
+    def test_msrp_scraper_ignores_related_item_prices_after_purchase_area(self):
+        html = """
+            <html>
+              <body>
+                <h1>#125 Medium Cutting Board</h1>
+                <div class="price">$38</div>
+                <button>Add to Cart</button>
+                <section>
+                  <h2>Frequently Bought Together</h2>
+                  <p>Large Cutting Board $42</p>
+                  <p>Super Shears $149</p>
+                  <p>Bundle Price $481</p>
+                </section>
+              </body>
+            </html>
+        """
+
+        with mock.patch("scraping.requests.get") as mocked_get:
+            mocked_get.return_value.status_code = 200
+            mocked_get.return_value.url = "https://www.cutco.com/p/medium-cutting-board"
+            mocked_get.return_value.text = html
+
+            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/medium-cutting-board"), 38.0)
+
     def test_find_stale_msrp_rows_flags_zero_and_missing_prices(self):
         with self.app.app_context():
             zero_item = Item(name="Zero Knife", sku="Z-1", category="Kitchen Knives", msrp=0.0)

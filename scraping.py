@@ -67,7 +67,7 @@ def _fetch_cutco_page(url: str) -> tuple[str | None, str | None]:
         return None, None
 
 
-def _extract_primary_visible_price(page_text: str) -> float | None:
+def _extract_primary_visible_price(page_text: str, *, heading_text: str | None = None) -> float | None:
     """Extract the main visible product price from Cutco page text.
 
     Cutco product pages often include extra prices later in the page for
@@ -75,6 +75,24 @@ def _extract_primary_visible_price(page_text: str) -> float | None:
     product price is usually positioned before the regular-shipping copy.
     """
     truncated_text = page_text
+    if heading_text:
+        heading_index = truncated_text.find(heading_text)
+        if heading_index >= 0:
+            truncated_text = truncated_text[heading_index + len(heading_text):]
+    cut_markers = (
+        "Add to Cart",
+        "Frequently Bought Together",
+        "Specifications",
+        "Reviews & Questions",
+        "Overview +",
+        "Set Pieces +",
+    )
+    cut_pos = min(
+        [pos for marker in cut_markers if (pos := truncated_text.find(marker)) > 0],
+        default=-1,
+    )
+    if cut_pos > 0:
+        truncated_text = truncated_text[:cut_pos]
     for marker in (
         "Regular shipping and handling included",
         "Regular shipping included",
@@ -117,10 +135,12 @@ def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float
     page_sku = _extract_sku_from_href(page_url, preserve_lettered_code=True) if page_url else None
 
     # Prefer the rendered price the customer sees first.
+    heading = soup.find("h1")
+    heading_text = heading.get_text(" ", strip=True) if heading else None
     for noise in soup.find_all(["script", "style"]):
         noise.decompose()
     page_text = soup.get_text(" ", strip=True)
-    visible_price = _extract_primary_visible_price(page_text)
+    visible_price = _extract_primary_visible_price(page_text, heading_text=heading_text)
     if visible_price is not None:
         return visible_price
 
