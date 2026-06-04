@@ -6,6 +6,39 @@
   <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">← Cancel</a>
 </div>
 
+{% if job and job.status == 'running' %}
+<div class="form-card compact mb-section" style="max-width:720px">
+  <p class="hint" style="margin-top:0">
+    Catalog sync is running in the background. This page will refresh when the preview is ready.
+  </p>
+  <div class="msrp-log" id="progress-log" style="max-height:320px;overflow:auto">
+    {% for line in job.progress %}
+      <div>{{ line }}</div>
+    {% endfor %}
+  </div>
+</div>
+<script>
+(function () {
+  const logEl = document.getElementById('progress-log');
+  function poll() {
+    fetch('{{ url_for("catalog.catalog_sync_status") }}')
+      .then(r => r.json())
+      .then(data => {
+        logEl.innerHTML = (data.progress || []).map(l => `<div>${l}</div>`).join('');
+        logEl.scrollTop = logEl.scrollHeight;
+        if (data.status === 'running') {
+          setTimeout(poll, 2000);
+        } else {
+          window.location.href = '{{ url_for("catalog.catalog_sync") }}';
+        }
+      })
+      .catch(() => setTimeout(poll, 4000));
+  }
+  setTimeout(poll, 2000);
+})();
+</script>
+{% else %}
+
 {% if blocked_categories %}
 <p class="muted">Blocked categories: {{ blocked_categories | join(', ') }}.</p>
 {% endif %}
@@ -306,4 +339,5 @@ document.querySelectorAll('.sort-hdr').forEach(function(hdr) {
   });
 });
 </script>
+{% endif %}
 {% endblock %}

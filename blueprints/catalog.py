@@ -2,14 +2,17 @@
 
 import json
 import logging
+import os
 import re
+import threading
 from collections import OrderedDict
+from datetime import UTC, datetime
 from pathlib import Path
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 
 from constants import (
-    AVAILABILITY_CHOICES, COOKWARE_CATEGORIES, EDGE_TYPES,
+    AVAILABILITY_CHOICES, COOKWARE_CATEGORIES, DATA_DIR, EDGE_TYPES,
     SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR, canonicalize_category,
     canonicalize_availability,
 )
@@ -42,6 +45,245 @@ from scraping import (
 catalog_bp = Blueprint("catalog", __name__)
 logger = logging.getLogger(__name__)
 UNCATEGORIZED_FILTER = "__uncategorized__"
+_CATALOG_SYNC_JOB_FILE = os.path.join(DATA_DIR, "catalog_sync_job.json")
+_catalog_sync_job_lock = threading.Lock()
+
+
+def _read_catalog_sync_job() -> dict:
+    try:
+        with open(_CATALOG_SYNC_JOB_FILE) as fh:
+            return json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {
+            "status": "idle",
+            "progress": [],
+            "results": None,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
+            "preview": None,
+            "heartbeat_at": None,
+        }
+
+
+def _write_catalog_sync_job(data: dict) -> None:
+    with _catalog_sync_job_lock:
+        os.makedirs(os.path.dirname(_CATALOG_SYNC_JOB_FILE) or DATA_DIR, exist_ok=True)
+        tmp = _CATALOG_SYNC_JOB_FILE + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(data, fh)
+        os.replace(tmp, _CATALOG_SYNC_JOB_FILE)
+
+
+def _reset_catalog_sync_job() -> None:
+    _write_catalog_sync_job({
+        "status": "idle",
+        "progress": [],
+        "results": None,
+        "error": None,
+        "started_at": None,
+        "finished_at": None,
+        "preview": None,
+        "heartbeat_at": None,
+    })
+
+
+def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -> dict:
+    existing_skus = {item.sku for item in Item.query.filter(Item.sku.isnot(None)).all()}
+    new_items = [scraped_item for scraped_item in scraped if scraped_item["sku"] not in existing_skus]
+
+    _grouped_unsorted: dict = {}
+    for item in new_items:
+        _grouped_unsorted.setdefault(item["category"], []).append(item)
+
+    def _sku_sort_key(item):
+        sku = item.get("sku") or ""
+        sku_num_match = re.match(r"(\d+)", sku)
+        return (0, int(sku_num_match.group(1)), sku) if sku_num_match else (1, 0, sku)
+
+    grouped = {
+        cat: sorted(items, key=_sku_sort_key)
+        for cat, items in sorted(_grouped_unsorted.items(), key=lambda kv: kv[0].lower())
+    }
+
+    if scraped:
+        from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+
+        _details_map: dict[str, dict] = {}
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            _future_map = {
+                pool.submit(scrape_item_specs, item_data["url"]): ("specs", item_data["sku"])
+                for item_data in new_items
+            }
+            _future_map.update({
+                pool.submit(scrape_item_variant_colors, item_data["url"]): ("variant_colors", item_data["sku"])
+                for item_data in new_items
+            })
+            for future in _as_completed(_future_map):
+                kind, sku = _future_map[future]
+                _details_map.setdefault(sku, {})[kind] = future.result()
+        for item in scraped:
+            details = _details_map.get(item["sku"], {})
+            raw_variant_colors = details.get("variant_colors", ())
+            item["variant_colors"] = [
+                color for color in raw_variant_colors
+                if color and color != UNKNOWN_COLOR
+            ]
+        for item in new_items:
+            details = _details_map.get(item["sku"], {})
+            specs = details.get("specs", {})
+            item["edge_type"]      = specs.get("edge_type", "Unknown")
+            item["msrp"]           = specs.get("msrp")
+            item["blade_length"]   = specs.get("blade_length")
+            item["overall_length"] = specs.get("overall_length")
+            item["weight"]         = specs.get("weight")
+
+    existing_sets = {item_set.name.lower() for item_set in Set.query.all()}
+    new_sets = sorted(
+        (scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() not in existing_sets),
+        key=_sku_sort_key,
+    )
+    existing_sets_data = [scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() in existing_sets]
+
+    from sqlalchemy.orm import selectinload
+
+    existing_set_lookup = {
+        item_set.name.lower(): item_set
+        for item_set in Set.query.options(selectinload(Set.members).selectinload(ItemSetMember.item)).all()
+    }
+
+    catalog_sku_lookup = {
+        _normalize_member_sku(item.sku): item
+        for item in Item.query.filter(Item.sku.isnot(None)).all()
+        if _normalize_member_sku(item.sku)
+    }
+    preview_name_lookup = _build_member_name_lookup([
+        *Item.query.filter(Item.sku.isnot(None)).all(),
+        *new_items,
+    ])
+    scraped_sku_lookup = {
+        _normalize_member_sku(item["sku"])
+        for item in new_items
+        if _normalize_member_sku(item.get("sku"))
+    }
+    for item_set in (*new_sets, *existing_sets_data):
+        member_entries = item_set.get("member_entries") or []
+        member_snapshot_rows, not_in_catalog_skus = _build_member_status_rows(
+            member_entries,
+            catalog_sku_lookup,
+            preview_name_lookup,
+            set_sku=_normalize_member_sku(item_set.get("sku")),
+            found_skus=scraped_sku_lookup,
+        )
+        item_set["member_snapshot_rows"] = member_snapshot_rows
+        item_set["not_in_catalog_skus"] = not_in_catalog_skus
+        item_set["member_data_json"] = json.dumps(member_entries, ensure_ascii=False)
+        if item_set in existing_sets_data:
+            current_set = existing_set_lookup.get(item_set["name"].lower())
+            item_set["membership_preview"] = _build_set_membership_preview(
+                current_set,
+                member_entries,
+                catalog_sku_lookup,
+                preview_name_lookup,
+            ) if current_set else {
+                "has_changes": False,
+                "summary": "Unable to load current set state.",
+                "current_rows": [],
+                "incoming_rows": member_snapshot_rows,
+                "change_rows": [],
+                "added": 0,
+                "removed": 0,
+                "quantity_changed": 0,
+                "current_count": 0,
+                "incoming_count": len(member_snapshot_rows),
+            }
+
+    changed_existing_sets_data = [
+        item_set
+        for item_set in existing_sets_data
+        if item_set.get("membership_preview", {}).get("has_changes")
+    ]
+    has_missing_set_members = any(
+        item_set.get("not_in_catalog_skus")
+        for item_set in (*new_sets, *existing_sets_data)
+    )
+
+    return {
+        "grouped": grouped,
+        "scraped_items": scraped,
+        "new_items": new_items,
+        "scraped_total": len(scraped),
+        "new_sets": new_sets,
+        "existing_sets_data": existing_sets_data,
+        "changed_existing_sets_data": changed_existing_sets_data,
+        "scraped_sets_total": len(scraped_sets),
+        "has_missing_set_members": has_missing_set_members,
+        "blocked_categories": sorted(SYNC_BLOCKED_CATEGORIES),
+    }
+
+
+def _run_catalog_sync_job(app) -> None:
+    with app.app_context():
+        started_at = datetime.now(UTC).isoformat(timespec="seconds")
+        progress: list[str] = []
+
+        def log(message: str) -> None:
+            progress.append(message)
+            _write_catalog_sync_job({
+                "status": "running",
+                "progress": list(progress),
+                "results": None,
+                "error": None,
+                "started_at": started_at,
+                "finished_at": None,
+                "preview": None,
+                "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            })
+
+        try:
+            log("Scraping live catalog…")
+            scraped, set_candidates = scrape_catalog(progress_cb=log)
+            log(f"Found {len(scraped)} items on cutco.com")
+            log("Scraping set pages…")
+            scraped_sets = scrape_sets(extra_candidates=set_candidates)
+            log(f"Found {len(scraped_sets)} sets on cutco.com")
+            preview = _build_catalog_sync_preview(scraped, scraped_sets)
+            finished_at = datetime.now(UTC).isoformat(timespec="seconds")
+            results = {
+                "scraped_total": preview["scraped_total"],
+                "new_items": len(preview["new_items"]),
+                "new_sets": len(preview["new_sets"]),
+                "existing_sets": len(preview["existing_sets_data"]),
+            }
+            _write_catalog_sync_job({
+                "status": "done",
+                "progress": progress,
+                "results": results,
+                "error": None,
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "preview": preview,
+                "heartbeat_at": finished_at,
+            })
+            record_activity(
+                "catalog_sync",
+                "Catalog sync complete",
+                f"Scraped {preview['scraped_total']} items and {preview['scraped_sets_total']} sets.",
+                occurred_at=finished_at,
+            )
+        except Exception as exc:
+            logger.exception("Catalog sync failed")
+            finished_at = datetime.now(UTC).isoformat(timespec="seconds")
+            _write_catalog_sync_job({
+                "status": "error",
+                "progress": progress,
+                "results": None,
+                "error": str(exc),
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "preview": None,
+                "heartbeat_at": finished_at,
+            })
 
 
 def _safe_redirect_target(target: str | None) -> str | None:
@@ -1449,6 +1691,76 @@ def catalog_sync():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))
 
+    start_requested = request.args.get("run") == "1"
+    job = _read_catalog_sync_job()
+
+    if start_requested:
+        if job.get("status") != "running":
+            _reset_catalog_sync_job()
+            _write_catalog_sync_job({
+                "status": "running",
+                "progress": ["Preparing catalog sync…"],
+                "results": None,
+                "error": None,
+                "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                "finished_at": None,
+                "preview": None,
+                "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            })
+            threading.Thread(target=_run_catalog_sync_job, args=(current_app._get_current_object(),), daemon=True).start()
+        job = _read_catalog_sync_job()
+        if job.get("status") == "done" and job.get("preview"):
+            preview = job["preview"]
+            return render_template("sync_preview.html", job=job, **preview)
+        return render_template(
+            "sync_preview.html",
+            job=job,
+            grouped={},
+            scraped_items=[],
+            new_items=[],
+            scraped_total=0,
+            new_sets=[],
+            existing_sets_data=[],
+            changed_existing_sets_data=[],
+            scraped_sets_total=0,
+            has_missing_set_members=False,
+            blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES),
+        )
+
+    if job.get("status") == "done" and job.get("preview"):
+        return render_template("sync_preview.html", job=job, **job["preview"])
+    if job.get("status") == "running":
+        return render_template(
+            "sync_preview.html",
+            job=job,
+            grouped={},
+            scraped_items=[],
+            new_items=[],
+            scraped_total=0,
+            new_sets=[],
+            existing_sets_data=[],
+            changed_existing_sets_data=[],
+            scraped_sets_total=0,
+            has_missing_set_members=False,
+            blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES),
+        )
+    if job.get("status") == "error":
+        flash(f"Catalog sync failed: {job.get('error') or 'Unknown error'}", "error")
+        return render_template(
+            "sync_preview.html",
+            job=job,
+            grouped={},
+            scraped_items=[],
+            new_items=[],
+            scraped_total=0,
+            new_sets=[],
+            existing_sets_data=[],
+            changed_existing_sets_data=[],
+            scraped_sets_total=0,
+            has_missing_set_members=False,
+            blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES),
+        )
+
     try:
         scraped, set_candidates = scrape_catalog()
     except Exception as exc:
@@ -1456,142 +1768,32 @@ def catalog_sync():
         flash("Could not reach cutco.com — try again later.", "error")
         return redirect(url_for("catalog.catalog"))
 
-    existing_skus = {item.sku for item in Item.query.filter(Item.sku.isnot(None)).all()}
-    new_items = [scraped_item for scraped_item in scraped if scraped_item["sku"] not in existing_skus]
-
-    _grouped_unsorted: dict = {}
-    for item in new_items:
-        _grouped_unsorted.setdefault(item["category"], []).append(item)
-
-    def _sku_sort_key(item):
-        sku = item.get("sku") or ""
-        sku_num_match = re.match(r"(\d+)", sku)
-        return (0, int(sku_num_match.group(1)), sku) if sku_num_match else (1, 0, sku)
-
-    grouped = OrderedDict(
-        (cat, sorted(items, key=_sku_sort_key))
-        for cat, items in sorted(_grouped_unsorted.items(), key=lambda kv: kv[0].lower())
-    )
-
     try:
         scraped_sets = scrape_sets(extra_candidates=set_candidates)
     except Exception as exc:
         logger.error("Sets scrape failed: %s", exc)
         scraped_sets = []
 
-    # Fetch specs (edge, msrp, lengths, weight) and variant colors in parallel.
-    if scraped:
-        from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
-        _details_map: dict[str, dict] = {}
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            _future_map = {
-                pool.submit(scrape_item_specs, item_data["url"]): ("specs", item_data["sku"])
-                for item_data in new_items
-            }
-            _future_map.update({
-                pool.submit(scrape_item_variant_colors, item_data["url"]): ("variant_colors", item_data["sku"])
-                for item_data in new_items
-            })
-            for future in _as_completed(_future_map):
-                kind, sku = _future_map[future]
-                _details_map.setdefault(sku, {})[kind] = future.result()
-        for item in scraped:
-            details = _details_map.get(item["sku"], {})
-            raw_variant_colors = details.get("variant_colors", ())
-            item["variant_colors"] = [
-                color for color in raw_variant_colors
-                if color and color != UNKNOWN_COLOR
-            ]
-        for item in new_items:
-            details = _details_map.get(item["sku"], {})
-            specs = details.get("specs", {})
-            item["edge_type"]      = specs.get("edge_type", "Unknown")
-            item["msrp"]           = specs.get("msrp")
-            item["blade_length"]   = specs.get("blade_length")
-            item["overall_length"] = specs.get("overall_length")
-            item["weight"]         = specs.get("weight")
-
-    existing_sets = {item_set.name.lower() for item_set in Set.query.all()}
-    new_sets      = sorted(
-        (scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() not in existing_sets),
-        key=_sku_sort_key,
-    )
-    # Pass existing sets too so confirm can update member quantities
-    existing_sets_data = [scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() in existing_sets]
-
-    from sqlalchemy.orm import selectinload
-    existing_set_lookup = {
-        item_set.name.lower(): item_set
-        for item_set in Set.query.options(selectinload(Set.members).selectinload(ItemSetMember.item)).all()
+    preview = _build_catalog_sync_preview(scraped, scraped_sets)
+    job = {
+        "status": "done",
+        "progress": [],
+        "results": None,
+        "error": None,
+        "started_at": None,
+        "finished_at": None,
+        "preview": preview,
+        "heartbeat_at": None,
     }
+    return render_template("sync_preview.html", job=job, **preview)
 
-    catalog_sku_lookup = {
-        _normalize_member_sku(item.sku): item
-        for item in Item.query.filter(Item.sku.isnot(None)).all()
-        if _normalize_member_sku(item.sku)
-    }
-    preview_name_lookup = _build_member_name_lookup([
-        *Item.query.filter(Item.sku.isnot(None)).all(),
-        *new_items,
-    ])
-    scraped_sku_lookup = {
-        _normalize_member_sku(item["sku"])
-        for item in new_items
-        if _normalize_member_sku(item.get("sku"))
-    }
-    for item_set in (*new_sets, *existing_sets_data):
-        member_entries = item_set.get("member_entries") or []
-        member_snapshot_rows, not_in_catalog_skus = _build_member_status_rows(
-            member_entries,
-            catalog_sku_lookup,
-            preview_name_lookup,
-            set_sku=_normalize_member_sku(item_set.get("sku")),
-            found_skus=scraped_sku_lookup,
-        )
-        item_set["member_snapshot_rows"] = member_snapshot_rows
-        item_set["not_in_catalog_skus"] = not_in_catalog_skus
-        item_set["member_data_json"] = json.dumps(member_entries, ensure_ascii=False)
-        if item_set in existing_sets_data:
-            current_set = existing_set_lookup.get(item_set["name"].lower())
-            item_set["membership_preview"] = _build_set_membership_preview(
-                current_set,
-                member_entries,
-                catalog_sku_lookup,
-                preview_name_lookup,
-            ) if current_set else {
-                "has_changes": False,
-                "summary": "Unable to load current set state.",
-                "current_rows": [],
-                "incoming_rows": member_snapshot_rows,
-                "change_rows": [],
-                "added": 0,
-                "removed": 0,
-                "quantity_changed": 0,
-                "current_count": 0,
-                "incoming_count": len(member_snapshot_rows),
-            }
 
-    changed_existing_sets_data = [
-        item_set
-        for item_set in existing_sets_data
-        if item_set.get("membership_preview", {}).get("has_changes")
-    ]
-    has_missing_set_members = any(
-        item_set.get("not_in_catalog_skus")
-        for item_set in (*new_sets, *existing_sets_data)
-    )
-
-    return render_template("sync_preview.html",
-                           grouped=grouped,
-                           scraped_items=scraped,
-                           new_items=new_items,
-                           scraped_total=len(scraped),
-                           new_sets=new_sets,
-                           existing_sets_data=existing_sets_data,
-                           changed_existing_sets_data=changed_existing_sets_data,
-                           scraped_sets_total=len(scraped_sets),
-                           has_missing_set_members=has_missing_set_members,
-                           blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES))
+@catalog_bp.route("/catalog/sync/status")
+def catalog_sync_status():
+    """Return the current catalog sync job state."""
+    if not is_admin():
+        abort(403)
+    return jsonify(_read_catalog_sync_job())
 
 
 @catalog_bp.route("/catalog/sync/confirm", methods=["POST"])
