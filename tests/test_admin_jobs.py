@@ -125,6 +125,20 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertTrue(write_mock.call_args.args[0]["update_db"])
         thread_instance.start.assert_called_once()
 
+    def test_msrp_diff_reset_clears_job_state(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with mock.patch("blueprints.admin._reset_msrp_job") as reset_mock:
+            response = self.client.post(
+                "/admin/msrp-diff/reset",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        reset_mock.assert_called_once()
+
     def test_stale_msrp_job_is_recovered_on_read(self):
         stale_started_at = (datetime.now(UTC) - timedelta(hours=2)).isoformat(timespec="seconds")
         job_data = {

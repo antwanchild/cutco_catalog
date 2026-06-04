@@ -153,6 +153,20 @@ def _write_msrp_job(data: dict) -> None:
         os.replace(tmp, _MSRP_JOB_FILE)
 
 
+def _reset_msrp_job() -> None:
+    """Clear the persisted MSRP job state back to idle."""
+    _write_msrp_job({
+        "status": "idle",
+        "progress": [],
+        "results": None,
+        "error": None,
+        "started_at": None,
+        "finished_at": None,
+        "update_db": True,
+        "heartbeat_at": None,
+    })
+
+
 def _scrape_price_from_page(url: str, item_name: str | None = None) -> float | None:
     """Return the price from a Cutco product page, or None if not found."""
     try:

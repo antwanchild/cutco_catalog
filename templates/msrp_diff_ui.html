@@ -33,24 +33,32 @@
         <input type="checkbox" name="update_db"{% if job.update_db %} checked{% endif %}>
         Write prices to DB after scrape
       </label>
-      <button type="submit" class="btn btn-primary"
-              id="run-btn"{% if job.status == 'running' %} disabled{% endif %}>
-        {% if job.status == 'running' %}Running…{% else %}Run Diff{% endif %}
-      </button>
       {% if job.started_at %}
       <span class="muted small">Last run: {{ format_container_time(job.started_at) }}
         {% if job.finished_at %}→ {{ format_container_time(job.finished_at) }}{% endif %}
       </span>
       {% endif %}
     </div>
-    <p class="hint" style="margin-top:.5rem">
-      Scrapes live prices from cutco.com and compares them to the values stored in your database.
-      The scrape takes 1–3 minutes.
-      {% if not job.update_db and job.status != 'running' %}
-        <strong>Write prices to DB</strong> is off — results are read-only.
-      {% endif %}
-    </p>
+    <div class="inline-form" style="flex-wrap:wrap;gap:.75rem;margin-top:.75rem">
+      <button type="submit" class="btn btn-primary"
+              id="run-btn"{% if job.status == 'running' %} disabled{% endif %}>
+        {% if job.status == 'running' %}Running…{% else %}Run Diff{% endif %}
+      </button>
+    </div>
   </form>
+  <form method="post" action="{{ url_for('admin.msrp_diff_reset') }}" class="inline-form" style="flex-wrap:wrap;gap:.75rem;margin-top:.75rem">
+    <button type="submit" class="btn btn-secondary"
+            {% if job.status != 'running' and job.status != 'error' and not job.progress %}disabled{% endif %}>
+      Clear Job State
+    </button>
+  </form>
+  <p class="hint" style="margin-top:.5rem">
+    Scrapes live prices from cutco.com and compares them to the values stored in your database.
+    The scrape takes 1–3 minutes.
+    {% if not job.update_db and job.status != 'running' %}
+      <strong>Write prices to DB</strong> is off — results are read-only.
+    {% endif %}
+  </p>
 </div>
 
 {# ── Progress log (shown while running) ──────────────────────────────────── #}

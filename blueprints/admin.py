@@ -20,7 +20,7 @@ from schema_migrations import get_schema_history, get_schema_state, SCHEMA_VERSI
 from startup import BOOTSTRAP_VERSION, get_bootstrap_history, get_bootstrap_state
 from time_utils import format_container_time
 from msrp_helpers import (
-    _read_msrp_job, _run_msrp_diff_job, _write_msrp_job,
+    _read_msrp_job, _reset_msrp_job, _run_msrp_diff_job, _write_msrp_job,
     _read_specs_job, _run_specs_backfill_job, _write_specs_job,
 )
 
@@ -155,6 +155,17 @@ def msrp_diff_status():
     if not is_admin():
         return jsonify(error="Unauthorized"), 403
     return jsonify(_read_msrp_job())
+
+
+@admin_bp.route("/admin/msrp-diff/reset", methods=["POST"])
+def msrp_diff_reset():
+    """Clear the persisted MSRP diff job state."""
+    if not is_admin():
+        flash("Admin access required.", "error")
+        return redirect(url_for("index"))
+    _reset_msrp_job()
+    flash("MSRP diff job state cleared.", "success")
+    return redirect(url_for("admin.msrp_diff_page"))
 
 
 @admin_bp.route("/admin/specs-backfill")
