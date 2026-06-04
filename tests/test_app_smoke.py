@@ -143,12 +143,38 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Recent Activity", response.data)
         self.assertIn(b"Quick Actions", response.data)
+        self.assertIn(b"Popular Colors", response.data)
         self.assertIn(b"Recently Changed", response.data)
         self.assertIn(b"Release &amp; Diagnostics", response.data)
         self.assertIn(b"\xc2\xa9", response.data)
         self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
         self.assertNotIn("Strict-Transport-Security", response.headers)
         self.assertEqual(self.client.get("/robots.txt").status_code, 200)
+
+    def test_dashboard_popular_colors_links_to_variants_browse(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        _red_item_id, red_variant_id = self._add_catalog_item(name="Dashboard Red Knife", sku="DR-1")
+        _purple_item_id, purple_variant_id = self._add_catalog_item(name="Dashboard Purple Knife", sku="DP-1")
+
+        with self.app.app_context():
+            red_variant = db.session.get(ItemVariant, red_variant_id)
+            purple_variant = db.session.get(ItemVariant, purple_variant_id)
+            self.assertIsNotNone(red_variant)
+            self.assertIsNotNone(purple_variant)
+            red_variant.color = "Red"
+            purple_variant.color = "Purple"
+            db.session.commit()
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Popular Colors", response.data)
+        self.assertIn(b"Red", response.data)
+        self.assertIn(b"Purple", response.data)
+        self.assertIn(b"/variants?color=Red", response.data)
+        self.assertIn(b"/variants?color=Purple", response.data)
 
     def test_public_pages_include_hsts_when_cookie_secure_enabled(self):
         self.app.config["SESSION_COOKIE_SECURE"] = True

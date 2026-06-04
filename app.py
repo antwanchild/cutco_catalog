@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
 
 from flask import Flask, Response, jsonify, render_template, request, url_for
+from sqlalchemy import func
 
 from constants import (
     ADMIN_SESSION_SECONDS,
@@ -274,6 +275,17 @@ def _register_routes(app: Flask) -> None:
         )
         people = Person.query.order_by(Person.name).all()
         recent = Ownership.query.order_by(Ownership.id.desc()).limit(10).all()
+        top_colors = [
+            {"color": color, "count": count}
+            for color, count in (
+                db.session.query(ItemVariant.color, func.count(ItemVariant.id))
+                .filter(ItemVariant.color != UNKNOWN_COLOR)
+                .group_by(ItemVariant.color)
+                .order_by(func.count(ItemVariant.id).desc(), ItemVariant.color.asc())
+                .limit(8)
+                .all()
+            )
+        ]
         return render_template(
             "index.html",
             stats=stats,
@@ -282,6 +294,7 @@ def _register_routes(app: Flask) -> None:
             recent_activity=_recent_activity(),
             recent_changes=_recent_changes(),
             release_snapshot=_release_snapshot(),
+            top_colors=top_colors,
         )
 
     @app.route("/search")
