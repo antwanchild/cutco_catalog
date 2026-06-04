@@ -497,7 +497,7 @@ def _build_member_status_rows(
             "status": status,
             "status_label": status_label,
             "resolution_note": resolution_note,
-            "matched_item_id": item.id if item is not None else None,
+            "matched_item_id": _get_item_field(item, "id") if item is not None else None,
             "matched_item_name": _get_item_field(item, "name") if item is not None else None,
         })
     rows.sort(key=_member_preview_sort_key)
