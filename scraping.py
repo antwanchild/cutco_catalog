@@ -59,7 +59,12 @@ def _find_cutco_item_link(raw_html: str, item_name: str | None) -> str | None:
         href = (anchor.get("href") or "").strip()
         if not href:
             continue
-        texts = [anchor.get_text(" ", strip=True), anchor.get("aria-label", ""), anchor.get("title", "")]
+        texts = [
+            anchor.get_text(" ", strip=True),
+            anchor.get("aria-label", ""),
+            anchor.get("title", ""),
+            href,
+        ]
         image = anchor.find("img", alt=True)
         if image:
             texts.append(image.get("alt", ""))
@@ -204,7 +209,7 @@ def _extract_cutco_price(
     if visible_price is not None:
         return visible_price
 
-    # Next try the page's own product JS.
+    # Fallback to the page's own product JS if the visible price is absent.
     for key in ("actualPrice", "fullRetail"):
         price_match = re.search(rf'"{key}"\s*:\s*([\d.]+)', raw_html)
         if price_match:
