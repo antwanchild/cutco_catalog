@@ -25,9 +25,9 @@
               class="form-inline">
           <button class="btn btn-xs btn-secondary"
                   data-confirm-title="Reset variant"
-                  data-confirm-message="This will change the only variant back to Unknown."
+                  data-confirm-message="This will keep the variant record and ownerships, then reset its color to Unknown."
                   data-confirm-count="1 variant"
-                  data-confirm-preview="Item: {{ item.name | e }} | Current color: {{ variant.color | e }}"
+                  data-confirm-preview="Item: {{ item.name | e }} | Current color: {{ variant.color | e }} | Ownerships: {{ variant.ownerships | length }}"
                   data-confirm-button="Reset to Unknown">Reset</button>
         </form>
         {% elif item.variants | length > 1 %}
