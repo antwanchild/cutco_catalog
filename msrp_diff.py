@@ -18,7 +18,6 @@ import argparse
 import csv
 import os
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 import requests
@@ -29,21 +28,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models import Item  # noqa: E402
-from scraping import _extract_cutco_price, _fetch_cutco_page, scrape_catalog  # noqa: E402
+from msrp_helpers import _fetch_live_prices_by_sku  # noqa: E402
+from scraping import scrape_catalog  # noqa: E402
 from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
-
-# ── Price scraping ─────────────────────────────────────────────────────────────
-
-def _scrape_price_from_page(url: str, item_name: str | None = None) -> float | None:
-    """Fetch a Cutco product page and return its price."""
-    try:
-        resolved_url, raw_html = _fetch_cutco_page(url, item_name=item_name)
-        if not raw_html:
-            return None
-        return _extract_cutco_price(raw_html, page_url=resolved_url or url, item_name=item_name)
-    except Exception:
-        return None
-
 
 def scrape_live_prices(workers: int = 8) -> dict[str, dict]:
     """Return a dict of sku → {name, url, price} for all live Cutco products.
@@ -63,21 +50,9 @@ def scrape_live_prices(workers: int = 8) -> dict[str, dict]:
             by_sku[sku] = {"name": item["name"], "url": item["url"], "price": None}
 
     print(f"Fetching prices for {len(by_sku)} unique SKUs…", flush=True)
-    fetched = 0
-
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        future_map = {
-            pool.submit(_scrape_price_from_page, info["url"], info["name"]): sku
-            for sku, info in by_sku.items()
-            if info.get("url")
-        }
-        for future in as_completed(future_map):
-            sku = future_map[future]
-            price = future.result()
-            by_sku[sku]["price"] = price
-            fetched += 1
-            if fetched % 20 == 0:
-                print(f"  …{fetched}/{len(future_map)}", flush=True)
+    fetched, timed_out = _fetch_live_prices_by_sku(by_sku, workers=workers, log_fn=lambda msg: print(msg, flush=True))
+    if timed_out:
+        print(f"  Continuing with {timed_out} missing live price(s).", flush=True)
 
     priced = sum(1 for info in by_sku.values() if info["price"] is not None)
     print(f"  Prices found: {priced}/{len(by_sku)}", flush=True)

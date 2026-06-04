@@ -163,6 +163,49 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIn("stale", recovered["error"].lower())
         self.assertIsNotNone(recovered["finished_at"])
 
+    def test_msrp_price_fetch_timeout_finishes_without_blocking(self):
+        by_sku = {
+            "A-1": {"name": "Alpha", "url": "https://example.com/a", "price": None},
+            "B-1": {"name": "Beta", "url": "https://example.com/b", "price": None},
+        }
+        first_future = mock.Mock()
+        first_future.result.return_value = 11.0
+        second_future = mock.Mock()
+
+        class FakeExecutor:
+            def __init__(self, *args, **kwargs):
+                self.shutdown_args = None
+                self.submit_calls = []
+
+            def submit(self, fn, url, name):
+                self.submit_calls.append((fn, url, name))
+                return first_future if len(self.submit_calls) == 1 else second_future
+
+            def shutdown(self, wait=True, cancel_futures=False):
+                self.shutdown_args = {"wait": wait, "cancel_futures": cancel_futures}
+
+        def fake_as_completed(future_map, timeout=None):
+            yield first_future
+            raise TimeoutError()
+
+        fake_executor = FakeExecutor()
+
+        with mock.patch("msrp_helpers.ThreadPoolExecutor", return_value=fake_executor), \
+             mock.patch("msrp_helpers.as_completed", new=fake_as_completed):
+            fetched, timed_out = msrp_helpers._fetch_live_prices_by_sku(
+                by_sku,
+                workers=2,
+                log_fn=lambda _msg: None,
+            )
+
+        self.assertEqual(fetched, 1)
+        self.assertEqual(timed_out, 1)
+        self.assertEqual(by_sku["A-1"]["price"], 11.0)
+        self.assertIsNone(by_sku["B-1"]["price"])
+        first_future.result.assert_called_once()
+        second_future.cancel.assert_called_once()
+        self.assertEqual(fake_executor.shutdown_args, {"wait": False, "cancel_futures": True})
+
     def test_admin_diagnostics_shows_job_summaries(self):
         self._login_as_admin()
 

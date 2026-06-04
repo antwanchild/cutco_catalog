@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 _MSRP_JOB_FILE   = os.path.join(DATA_DIR, "msrp_job.json")
 _msrp_write_lock  = threading.Lock()
 _MSRP_JOB_STALE_AFTER = timedelta(minutes=30)
+_MSRP_PRICE_FETCH_TIMEOUT = timedelta(minutes=3)
 
 _SPECS_JOB_FILE  = os.path.join(DATA_DIR, "specs_job.json")
 _specs_write_lock = threading.Lock()
@@ -178,6 +179,61 @@ def _scrape_price_from_page(url: str, item_name: str | None = None) -> float | N
         return None
 
 
+def _fetch_live_prices_by_sku(
+    by_sku: dict[str, dict],
+    *,
+    workers: int = 8,
+    log_fn=None,
+) -> tuple[int, int]:
+    """Fetch live prices for the provided SKU map.
+
+    Returns:
+        (fetched_count, timed_out_count)
+
+    """
+    fetched = 0
+    timed_out = 0
+    completed: set = set()
+    executor = ThreadPoolExecutor(max_workers=workers)
+    try:
+        future_map = {
+            executor.submit(_scrape_price_from_page, info["url"], info["name"]): sku
+            for sku, info in by_sku.items()
+            if info.get("url")
+        }
+        try:
+            for future in as_completed(future_map, timeout=_MSRP_PRICE_FETCH_TIMEOUT.total_seconds()):
+                sku = future_map[future]
+                completed.add(future)
+                try:
+                    by_sku[sku]["price"] = future.result()
+                except Exception as exc:
+                    by_sku[sku]["price"] = None
+                    if log_fn:
+                        log_fn(f"  ! {sku} price fetch failed: {exc}")
+                fetched += 1
+                if fetched % 20 == 0 and log_fn:
+                    log_fn(f"  …{fetched}/{len(future_map)} prices fetched")
+        except TimeoutError:
+            pass
+
+        pending = [future for future in future_map if future not in completed]
+        timed_out = len(pending)
+        for future in pending:
+            sku = future_map[future]
+            by_sku[sku]["price"] = None
+            future.cancel()
+        if timed_out and log_fn:
+            log_fn(
+                f"Timed out waiting for {timed_out} price fetch(es); "
+                "continuing without them."
+            )
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    return fetched, timed_out
+
+
 def _build_msrp_diff(db_items: list, live: dict) -> dict:
     """Diff DB MSRP prices against live scraped prices."""
     db_by_sku = {item.sku: item for item in db_items if item.sku}
@@ -242,18 +298,9 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
                                    "url": live_item["url"], "price": None}
 
             log(f"Fetching prices for {len(by_sku)} unique SKUs…")
-            fetched = 0
-            with ThreadPoolExecutor(max_workers=8) as pool:
-                future_map = {
-                    pool.submit(_scrape_price_from_page, info["url"], info["name"]): sku
-                    for sku, info in by_sku.items() if info.get("url")
-                }
-                for future in as_completed(future_map):
-                    sku = future_map[future]
-                    by_sku[sku]["price"] = future.result()
-                    fetched += 1
-                    if fetched % 20 == 0:
-                        log(f"  …{fetched}/{len(future_map)} prices fetched")
+            fetched, timed_out = _fetch_live_prices_by_sku(by_sku, workers=8, log_fn=log)
+            if timed_out:
+                log(f"Continuing with {timed_out} missing live price(s).")
 
             priced = sum(1 for info in by_sku.values() if info["price"] is not None)
             log(f"Prices found: {priced}/{len(by_sku)}")
