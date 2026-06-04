@@ -37,6 +37,13 @@
   setTimeout(poll, 2000);
 })();
 </script>
+{% elif job and job.status == 'idle' %}
+<div class="form-card compact mb-section" style="max-width:720px">
+  <p class="hint" style="margin-top:0">
+    Catalog sync hasn't been started yet. Click <strong>Run Sync</strong> to begin a background scrape.
+  </p>
+  <a class="btn btn-primary" href="{{ url_for('catalog.catalog_sync', run=1) }}">Run Sync</a>
+</div>
 {% else %}
 
 {% if blocked_categories %}

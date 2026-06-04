@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 from app import create_app
+import blueprints.catalog as catalog_blueprint
 from constants import UNKNOWN_COLOR
 from extensions import db
 from helpers import _collection_token, _gift_token, _notify_discord, _verify_collection_token, _verify_gift_token, check_wishlist_targets
@@ -3567,7 +3568,8 @@ class CatalogSmokeTests(SmokeBaseTest):
             }
         ]
 
-        with mock.patch("blueprints.catalog.scrape_catalog", return_value=(scraped_items, [])), \
+        with mock.patch("blueprints.catalog._CATALOG_SYNC_JOB_FILE", f"{self.temp_dir.name}/catalog_sync_job.json"), \
+             mock.patch("blueprints.catalog.scrape_catalog", return_value=(scraped_items, [])), \
              mock.patch("blueprints.catalog.scrape_sets", return_value=scraped_sets), \
              mock.patch(
                  "blueprints.catalog.scrape_item_specs",
@@ -3575,12 +3577,13 @@ class CatalogSmokeTests(SmokeBaseTest):
                      "edge_type": "Straight",
                      "msrp": 49.99,
                      "blade_length": "4 in",
-                     "overall_length": "8 in",
-                     "weight": "1 lb",
-                 },
-             ), \
-             mock.patch("blueprints.catalog.scrape_item_variant_colors", return_value=()):
-            response = self.client.get("/catalog/sync")
+                    "overall_length": "8 in",
+                    "weight": "1 lb",
+                },
+            ), \
+             mock.patch("blueprints.catalog.scrape_item_variant_colors", return_value=()), \
+             mock.patch("blueprints.catalog._start_catalog_sync_background_job", side_effect=catalog_blueprint._run_catalog_sync_job):
+            response = self.client.get("/catalog/sync?run=1")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Catalog Sync Preview", response.data)
@@ -3596,6 +3599,18 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Scrapes Cutco.com to discover new items and sets.", response.data)
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)
+
+    def test_catalog_sync_idle_page_does_not_scrape_inline(self):
+        self._login_as_admin()
+
+        with mock.patch("blueprints.catalog.scrape_catalog") as scrape_catalog_mock, \
+             mock.patch("blueprints.catalog.scrape_sets") as scrape_sets_mock:
+            response = self.client.get("/catalog/sync")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Catalog sync hasn't been started yet", response.data)
+        scrape_catalog_mock.assert_not_called()
+        scrape_sets_mock.assert_not_called()
 
     def test_catalog_sync_preview_hides_placeholder_option_when_nothing_is_missing(self):
         self._login_as_admin()

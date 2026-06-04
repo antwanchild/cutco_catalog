@@ -286,6 +286,13 @@ def _run_catalog_sync_job(app) -> None:
             })
 
 
+def _start_catalog_sync_background_job(app) -> threading.Thread:
+    """Launch the catalog sync job in a background thread."""
+    thread = threading.Thread(target=_run_catalog_sync_job, args=(app,), daemon=True)
+    thread.start()
+    return thread
+
+
 def _safe_redirect_target(target: str | None) -> str | None:
     if not target:
         return None
@@ -490,7 +497,8 @@ def _build_member_status_rows(
             "status": status,
             "status_label": status_label,
             "resolution_note": resolution_note,
-            "matched_item": item,
+            "matched_item_id": item.id if item is not None else None,
+            "matched_item_name": _get_item_field(item, "name") if item is not None else None,
         })
     rows.sort(key=_member_preview_sort_key)
     return rows, missing_skus
@@ -1707,7 +1715,7 @@ def catalog_sync():
                 "preview": None,
                 "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
             })
-            threading.Thread(target=_run_catalog_sync_job, args=(current_app._get_current_object(),), daemon=True).start()
+            _start_catalog_sync_background_job(current_app._get_current_object())
         job = _read_catalog_sync_job()
         if job.get("status") == "done" and job.get("preview"):
             preview = job["preview"]
@@ -1761,31 +1769,20 @@ def catalog_sync():
             blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES),
         )
 
-    try:
-        scraped, set_candidates = scrape_catalog()
-    except Exception as exc:
-        logger.error("Catalog scrape failed: %s", exc)
-        flash("Could not reach cutco.com — try again later.", "error")
-        return redirect(url_for("catalog.catalog"))
-
-    try:
-        scraped_sets = scrape_sets(extra_candidates=set_candidates)
-    except Exception as exc:
-        logger.error("Sets scrape failed: %s", exc)
-        scraped_sets = []
-
-    preview = _build_catalog_sync_preview(scraped, scraped_sets)
-    job = {
-        "status": "done",
-        "progress": [],
-        "results": None,
-        "error": None,
-        "started_at": None,
-        "finished_at": None,
-        "preview": preview,
-        "heartbeat_at": None,
-    }
-    return render_template("sync_preview.html", job=job, **preview)
+    return render_template(
+        "sync_preview.html",
+        job=job,
+        grouped={},
+        scraped_items=[],
+        new_items=[],
+        scraped_total=0,
+        new_sets=[],
+        existing_sets_data=[],
+        changed_existing_sets_data=[],
+        scraped_sets_total=0,
+        has_missing_set_members=False,
+        blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES),
+    )
 
 
 @catalog_bp.route("/catalog/sync/status")
