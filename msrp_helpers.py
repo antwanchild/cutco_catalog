@@ -287,7 +287,7 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
     try:
         with app.app_context():
             log("Scraping live catalog…")
-            live_items, _ = scrape_catalog()
+            live_items, _ = scrape_catalog(progress_cb=log)
             log(f"Found {len(live_items)} items on cutco.com")
 
             by_sku: dict[str, dict] = {}

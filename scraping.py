@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import time
+from collections.abc import Callable
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin
@@ -1210,8 +1211,12 @@ def scrape_edge_type(url: str) -> str:
     return scrape_item_specs(url)["edge_type"]
 
 
-def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
+def scrape_catalog(progress_cb: Callable[[str], None] | None = None) -> tuple[list[dict], list[tuple[str, str]]]:
     """Scrape all item categories and return items plus set candidates."""
+    def _progress(msg: str) -> None:
+        if progress_cb is not None:
+            progress_cb(msg)
+
     results        = []
     set_candidates: list[tuple[str, str]] = []
     seen_skus      = set()
@@ -1224,6 +1229,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
     for cat_name, cat_url in categories:
         if cat_name in SYNC_BLOCKED_CATEGORIES:
             continue
+        _progress(f"Scraping category: {cat_name}…")
         try:
             resp = requests.get(cat_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
@@ -1279,11 +1285,14 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                                     category=_resolve_category(sku, cat_name, name),
                                     url=prod_url))
             time.sleep(0.4)
+            _progress(f"Finished category: {cat_name} ({len(results)} items so far)")
         except Exception as exc:
             logger.warning("Scrape failed for %s: %s", cat_url, exc)
+            _progress(f"Category failed: {cat_name}")
 
     if slug_queue:
         logger.info("Fetching %d pure-slug product pages (parallel)", len(slug_queue))
+        _progress(f"Fetching {len(slug_queue)} pure-slug product pages…")
         added_from_slugs = 0
         with ThreadPoolExecutor(max_workers=6) as pool:
             future_map = {
@@ -1312,6 +1321,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                                     url=prod_url))
                 added_from_slugs += 1
         logger.info("Slug queue: %d pages fetched, %d items added", len(slug_queue), added_from_slugs)
+        _progress(f"Finished slug pages: {added_from_slugs} items added")
 
     return results, set_candidates
 

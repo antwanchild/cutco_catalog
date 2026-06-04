@@ -39,7 +39,7 @@ def scrape_live_prices(workers: int = 8) -> dict[str, dict]:
     parallel from each product page.
     """
     print("Scraping live catalog…", flush=True)
-    live_items, _ = scrape_catalog()
+    live_items, _ = scrape_catalog(progress_cb=lambda msg: print(msg, flush=True))
     print(f"  Found {len(live_items)} items on cutco.com", flush=True)
 
     # Build SKU → item map first (dedup by SKU)
