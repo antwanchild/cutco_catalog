@@ -177,8 +177,8 @@ class AdminJobSmokeTests(unittest.TestCase):
                 self.shutdown_args = None
                 self.submit_calls = []
 
-            def submit(self, fn, url, name):
-                self.submit_calls.append((fn, url, name))
+            def submit(self, fn, url, name, sku=None):
+                self.submit_calls.append((fn, url, name, sku))
                 return first_future if len(self.submit_calls) == 1 else second_future
 
             def shutdown(self, wait=True, cancel_futures=False):
