@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Variants – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🎨 Variants {{ help_btn("variants") }}</h1>
+  <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">← Catalog</a>
+</div>
+
+<p class="hint">
+  Browse every color variant in one place. Filter by color, search by item or note, or jump into the item-specific variant page.
+</p>
+
+<form class="filter-bar" method="get">
+  <input name="q" value="{{ q }}" placeholder="Search item, SKU, color, or note…" class="input-search">
+  <input name="color" value="{{ color }}" placeholder="Color filter…" class="input-search">
+  <label class="checkbox-label">
+    <input type="checkbox" name="unknown" value="1"{% if include_unknown %} checked{% endif %}>
+    Include Unknown
+  </label>
+  <button type="submit" class="btn btn-sm">Filter</button>
+  <a href="{{ url_for('catalog.variants_browse') }}" class="btn btn-sm btn-ghost">Clear</a>
+</form>
+
+<div class="stat-grid mb-section">
+  <div class="stat-card">
+    <div class="stat-number">{{ variants | length }}</div>
+    <div class="stat-label">Matching Variants</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ item_count }}</div>
+    <div class="stat-label">Items</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ color_counts | length }}</div>
+    <div class="stat-label">Colors</div>
+  </div>
+</div>
+
+{% if color_counts %}
+<div class="form-card compact mb-section">
+  <h3>Popular Colors</h3>
+  <div class="chip-row">
+    {% for row in color_counts %}
+      <a class="chip{% if color and color|lower == row.color|lower %} chip-active{% endif %}"
+         href="{% if include_unknown %}{{ url_for('catalog.variants_browse', q=q, color=row.color, unknown=1) }}{% else %}{{ url_for('catalog.variants_browse', q=q, color=row.color) }}{% endif %}">
+        {{ row.color }} <span class="muted">({{ row.count }})</span>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Color</th>
+        <th>Item</th>
+        <th>SKU</th>
+        <th>Category</th>
+        <th>Notes</th>
+        <th>Ownerships</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for variant in variants %}
+      <tr>
+        <td>
+          <span class="badge{% if variant.color == UNKNOWN_COLOR %} badge-off-catalog{% endif %}">{{ variant.color }}</span>
+        </td>
+        <td>
+          <a href="{{ url_for('catalog.variants', item_id=variant.item.id) }}">{{ variant.item.name }}</a>
+        </td>
+        <td class="mono">{{ variant.item.sku or '—' }}</td>
+        <td>{{ variant.item.category or '—' }}</td>
+        <td>{{ variant.notes or '—' }}</td>
+        <td>{{ variant.ownerships | length }}</td>
+        <td class="actions">
+          <a href="{{ url_for('catalog.variants', item_id=variant.item.id) }}" class="btn btn-xs btn-secondary">Open item</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="empty">No variants match your filters.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

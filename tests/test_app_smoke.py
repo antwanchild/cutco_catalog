@@ -504,6 +504,42 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Uncategorized", uncategorized_response.data)
         self.assertNotIn(b"Search Knife", uncategorized_response.data)
 
+    def test_variants_browse_page_filters_by_color(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        _red_item_id, red_variant_id = self._add_catalog_item(name="Red Knife", sku="R-1")
+        _purple_item_id, purple_variant_id = self._add_catalog_item(name="Purple Knife", sku="P-1")
+        _unknown_item_id, unknown_variant_id = self._add_catalog_item(name="Unknown Knife", sku="U-1")
+
+        with self.app.app_context():
+            red_variant = db.session.get(ItemVariant, red_variant_id)
+            purple_variant = db.session.get(ItemVariant, purple_variant_id)
+            unknown_variant = db.session.get(ItemVariant, unknown_variant_id)
+            self.assertIsNotNone(red_variant)
+            self.assertIsNotNone(purple_variant)
+            self.assertIsNotNone(unknown_variant)
+            red_variant.color = "Red"
+            purple_variant.color = "Purple"
+            db.session.commit()
+
+        self.client.get("/variants")
+        browse_response = self.client.get("/variants")
+        self.assertEqual(browse_response.status_code, 200)
+        self.assertIn(b"Variants", browse_response.data)
+        self.assertIn(b"Red Knife", browse_response.data)
+        self.assertIn(b"Purple Knife", browse_response.data)
+
+        purple_response = self.client.get("/variants?color=Purple")
+        self.assertEqual(purple_response.status_code, 200)
+        self.assertIn(b"Purple Knife", purple_response.data)
+        self.assertNotIn(b"Red Knife", purple_response.data)
+
+        unknown_response = self.client.get("/variants?unknown=1")
+        self.assertEqual(unknown_response.status_code, 200)
+        self.assertIn(b"Unknown Knife", unknown_response.data)
+        self.assertIn(b"Include Unknown", unknown_response.data)
+
     def test_admin_login_sets_session_flag(self):
         response = self.client.post(
             "/admin/login",

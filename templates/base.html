@@ -26,7 +26,7 @@
   <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">🌙</button>
   <button class="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
   <div class="nav-links">
-    <a href="{{ url_for('catalog.catalog') }}" {% if request.endpoint and request.endpoint.startswith('catalog.') %}class="active"{% endif %}>Catalog</a>
+    <a href="{{ url_for('catalog.catalog') }}" {% if request.endpoint == 'catalog.catalog' or (request.endpoint and request.endpoint.startswith('catalog.catalog_')) %}class="active"{% endif %}>Catalog</a>
     <a href="{{ url_for('catalog.catalog', unicorn='1') }}"
        {% if request.endpoint == 'catalog.catalog' and request.args.get('unicorn') == '1' %}class="active"{% endif %}>🦄 Unicorns</a>
     <a href="{{ url_for('catalog.sets_list') }}" {% if request.endpoint and 'set' in request.endpoint %}class="active"{% endif %}>Sets</a>
@@ -36,7 +36,7 @@
 
     <details class="nav-group">
       <summary class="nav-group-toggle
-        {% if request.endpoint in ['views.matrix', 'people.wishlist', 'logs.sharpening', 'logs.cookware', 'logs.tasks', 'data.import_page', 'data.export_page', 'data.export_csv', 'data.import_template', 'data.completion_gaps_page', 'data.variant_sync_page', 'data.variant_sync_confirm'] or (request.endpoint and ('cookware' in request.endpoint or 'task' in request.endpoint or 'wishlist' in request.endpoint or 'sharpening' in request.endpoint or 'import' in request.endpoint or 'export' in request.endpoint or 'completion_gaps' in request.endpoint or 'variant_sync' in request.endpoint)) %}active{% endif %}">
+        {% if request.endpoint in ['views.matrix', 'people.wishlist', 'logs.sharpening', 'logs.cookware', 'logs.tasks', 'data.import_page', 'data.export_page', 'data.export_csv', 'data.import_template', 'data.completion_gaps_page', 'data.variant_sync_page', 'data.variant_sync_confirm', 'catalog.variants_browse'] or (request.endpoint and ('cookware' in request.endpoint or 'task' in request.endpoint or 'wishlist' in request.endpoint or 'sharpening' in request.endpoint or 'import' in request.endpoint or 'export' in request.endpoint or 'completion_gaps' in request.endpoint or 'variant_sync' in request.endpoint)) %}active{% endif %}">
         More
       </summary>
       <div class="nav-group-menu">
@@ -48,6 +48,7 @@
         <a href="{{ url_for('data.import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
         <a href="{{ url_for('data.completion_import_page') }}" {% if request.endpoint and 'completion_import' in request.endpoint %}class="active"{% endif %}>Completion Import</a>
         <a href="{{ url_for('data.variant_sync_page') }}" {% if request.endpoint and 'variant_sync' in request.endpoint %}class="active"{% endif %}>Variant Sync</a>
+        <a href="{{ url_for('catalog.variants_browse') }}" {% if request.endpoint == 'catalog.variants_browse' %}class="active"{% endif %}>All Variants</a>
         <a href="{{ url_for('data.completion_gaps_page') }}" {% if request.endpoint and 'completion_gaps' in request.endpoint %}class="active"{% endif %}>Completion Gaps</a>
         <a href="{{ url_for('data.export_page') }}" {% if request.endpoint and 'export' in request.endpoint %}class="active"{% endif %}>Export CSV</a>
       </div>

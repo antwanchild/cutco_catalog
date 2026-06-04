@@ -754,6 +754,17 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 }
 .chip[hidden] { display: none !important; }
 .chip:hover { color: var(--text); text-decoration: none; }
+.chip-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(79, 142, 247, .12);
+}
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  align-items: flex-start;
+}
 .set-chips { display: flex; flex-wrap: wrap; gap: .25rem; align-items: flex-start; }
 .chip-more {
   cursor: pointer;

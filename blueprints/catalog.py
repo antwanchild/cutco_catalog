@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
+from sqlalchemy import func, or_
+from sqlalchemy.orm import selectinload
 
 from constants import (
     AVAILABILITY_CHOICES, COOKWARE_CATEGORIES, DATA_DIR, EDGE_TYPES,
@@ -1066,6 +1068,64 @@ def catalog_delete(item_id):
 
 
 # ── Variants ──────────────────────────────────────────────────────────────────
+
+@catalog_bp.route("/variants")
+def variants_browse():
+    """Browse variants across the catalog with optional color filtering."""
+    q = request.args.get("q", "").strip()
+    color = request.args.get("color", "").strip()
+    include_unknown = request.args.get("unknown") == "1"
+
+    query = ItemVariant.query.join(Item).options(selectinload(ItemVariant.item))
+    if not include_unknown:
+        query = query.filter(ItemVariant.color != UNKNOWN_COLOR)
+    if color:
+        query = query.filter(func.lower(ItemVariant.color) == color.lower())
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(
+            Item.name.ilike(like),
+            Item.sku.ilike(like),
+            Item.category.ilike(like),
+            ItemVariant.color.ilike(like),
+            ItemVariant.notes.ilike(like),
+        ))
+
+    variants = query.order_by(ItemVariant.color.asc(), Item.name.asc(), Item.sku.asc()).all()
+    color_counts = db.session.query(ItemVariant.color, func.count(ItemVariant.id)).join(Item)
+    if not include_unknown:
+        color_counts = color_counts.filter(ItemVariant.color != UNKNOWN_COLOR)
+    if color:
+        color_counts = color_counts.filter(func.lower(ItemVariant.color) == color.lower())
+    if q:
+        like = f"%{q}%"
+        color_counts = color_counts.filter(or_(
+            Item.name.ilike(like),
+            Item.sku.ilike(like),
+            Item.category.ilike(like),
+            ItemVariant.color.ilike(like),
+            ItemVariant.notes.ilike(like),
+        ))
+    color_counts = [
+        {"color": color_name, "count": count}
+        for color_name, count in (
+            color_counts.group_by(ItemVariant.color)
+            .order_by(func.count(ItemVariant.id).desc(), ItemVariant.color.asc())
+            .all()
+        )
+    ]
+    item_count = len({variant.item_id for variant in variants})
+    return render_template(
+        "variants_browse.html",
+        variants=variants,
+        color_counts=color_counts,
+        item_count=item_count,
+        q=q,
+        color=color,
+        include_unknown=include_unknown,
+        UNKNOWN_COLOR=UNKNOWN_COLOR,
+    )
+
 
 @catalog_bp.route("/catalog/<int:item_id>/variants")
 def variants(item_id):
