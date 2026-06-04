@@ -29,7 +29,18 @@ def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float
     soup = BeautifulSoup(raw_html, "html.parser")
     page_sku = _extract_sku_from_href(page_url, preserve_lettered_code=True) if page_url else None
 
-    # Prefer the price values embedded in the page's own product JS.
+    # Prefer the rendered price the customer sees first.
+    for noise in soup.find_all(["script", "style"]):
+        noise.decompose()
+    page_text = soup.get_text(" ", strip=True)
+    dollar_match = re.search(r"\$\s*([\d,]+(?:\.\d{2})?)", page_text)
+    if dollar_match:
+        try:
+            return float(dollar_match.group(1).replace(",", ""))
+        except ValueError:
+            pass
+
+    # Next try the page's own product JS.
     for key in ("actualPrice", "fullRetail"):
         price_match = re.search(rf'"{key}"\s*:\s*([\d.]+)', raw_html)
         if price_match:
@@ -76,15 +87,6 @@ def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float
                 return float(price_match.group().replace(",", ""))
             except ValueError:
                 pass
-
-    for noise in soup.find_all(["script", "style"]):
-        noise.decompose()
-    dollar_match = re.search(r"\$\s*([\d,]+\.\d{2})", soup.get_text(" ", strip=True))
-    if dollar_match:
-        try:
-            return float(dollar_match.group(1).replace(",", ""))
-        except ValueError:
-            pass
 
     return None
 

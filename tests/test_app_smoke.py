@@ -170,6 +170,26 @@ class PublicSmokeTests(SmokeBaseTest):
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/1766C"), 184.0)
 
+    def test_msrp_scraper_prefers_visible_page_price_over_embedded_script_price(self):
+        html = """
+            <html>
+              <head><title>Medium Cutting Board</title></head>
+              <body>
+                <h1>#125 Medium Cutting Board</h1>
+                <div class="price">$35</div>
+                <script>
+                  window.__CUTCO__ = {"fullRetail":198.00,"actualPrice":198.00};
+                </script>
+              </body>
+            </html>
+        """
+
+        with mock.patch("msrp_helpers.requests.get") as mocked_get:
+            mocked_get.return_value.status_code = 200
+            mocked_get.return_value.text = html
+
+            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/cutting-boards/125"), 35.0)
+
     def test_msrp_scraper_prefers_page_js_price_over_json_ld_offer(self):
         html = """
             <html>
