@@ -84,13 +84,25 @@ def _extract_primary_visible_price(page_text: str) -> float | None:
         if marker_pos > 0:
             truncated_text = truncated_text[:marker_pos]
             break
-    dollar_match = re.search(r"\$\s*([\d,]+(?:\.\d{2})?)", truncated_text)
-    if not dollar_match:
+    for dollar_match in re.finditer(r"\$\s*([\d,]+(?:\.\d{2})?)", truncated_text):
+        try:
+            price = float(dollar_match.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if price > 0:
+            return price
+    return None
+
+
+def _coerce_positive_price(raw_price: str | float | int | None) -> float | None:
+    """Convert a scraped value to a positive price, rejecting placeholders."""
+    if raw_price is None:
         return None
     try:
-        return float(dollar_match.group(1).replace(",", ""))
-    except ValueError:
+        price = float(raw_price)
+    except (TypeError, ValueError):
         return None
+    return price if price > 0 else None
 
 
 def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float | None:
@@ -116,10 +128,9 @@ def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float
     for key in ("actualPrice", "fullRetail"):
         price_match = re.search(rf'"{key}"\s*:\s*([\d.]+)', raw_html)
         if price_match:
-            try:
-                return float(price_match.group(1))
-            except ValueError:
-                pass
+            price = _coerce_positive_price(price_match.group(1))
+            if price is not None:
+                return price
 
     # JSON-LD can contain multiple Product entries; if we know the SKU, try to
     # select the matching one instead of blindly taking the first offer.
@@ -138,27 +149,26 @@ def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float
                 if isinstance(offers, list):
                     offers = offers[0] if offers else {}
                 price_val = offers.get("price") if isinstance(offers, dict) else None
-                if price_val is not None:
-                    return float(price_val)
+                price = _coerce_positive_price(price_val)
+                if price is not None:
+                    return price
         except (json.JSONDecodeError, ValueError, AttributeError):
             pass
 
     og_tag = soup.find("meta", property="og:price:amount")
     if og_tag and og_tag.get("content", "").strip():
-        try:
-            return float(og_tag["content"].replace(",", ""))
-        except ValueError:
-            pass
+        price = _coerce_positive_price(og_tag["content"].replace(",", ""))
+        if price is not None:
+            return price
 
     price_el = soup.find(attrs={"itemprop": "price"})
     if price_el:
         raw = price_el.get("content") or price_el.get_text(strip=True)
         price_match = re.search(r"[\d,]+\.?\d*", raw)
         if price_match:
-            try:
-                return float(price_match.group().replace(",", ""))
-            except ValueError:
-                pass
+            price = _coerce_positive_price(price_match.group().replace(",", ""))
+            if price is not None:
+                return price
 
     return None
 
