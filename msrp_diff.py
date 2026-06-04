@@ -32,8 +32,6 @@ from models import Item  # noqa: E402
 from scraping import _extract_cutco_price, _fetch_cutco_page, scrape_catalog  # noqa: E402
 from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
 
-app = create_app()
-
 # ── Price scraping ─────────────────────────────────────────────────────────────
 
 def _scrape_price_from_page(url: str) -> float | None:
@@ -163,6 +161,20 @@ def build_diff(db_items: list[Item], live: dict[str, dict]) -> dict:
     return result
 
 
+def find_stale_msrp_rows(db_items: list[Item]) -> list[dict]:
+    """Return DB rows with a stale or placeholder MSRP."""
+    stale_rows: list[dict] = []
+    for item in db_items:
+        if item.msrp is None or item.msrp <= 0:
+            stale_rows.append({
+                "sku": item.sku,
+                "name": item.name,
+                "db_price": item.msrp,
+                "cutco_url": item.cutco_url,
+            })
+    return sorted(stale_rows, key=lambda row: row["sku"] or "")
+
+
 # ── Output helpers ─────────────────────────────────────────────────────────────
 
 def _fmt_price(val: float | None) -> str:
@@ -216,6 +228,28 @@ def print_report(diff: dict) -> None:
                 f"  {delta_str:>8}"
             )
         print()
+
+
+def print_stale_msrp_audit(stale_rows: list[dict]) -> None:
+    """Print a compact report of rows that need MSRP refresh."""
+    today = date.today().isoformat()
+    print()
+    print(f"Stale MSRP Audit — {today}")
+    print("=" * 60)
+    print(f"  Rows needing refresh : {len(stale_rows)}")
+    print()
+    if not stale_rows:
+        print("✅ No stale MSRP rows found.")
+        return
+
+    print(f"  {'SKU':<8}  {'Name':<40}  {'DB':>10}  {'URL'}")
+    print(f"  {'-'*8}  {'-'*40}  {'-'*10}  {'-'*30}")
+    for row in sorted(stale_rows, key=lambda report_row: report_row["sku"] or ""):
+        print(
+            f"  {str(row['sku'])[:8]:<8}  {row['name'][:40]:<40}  "
+            f"{_fmt_price(row['db_price']):>10}  "
+            f"{(row.get('cutco_url') or '')[:30]}"
+        )
 
 
 def write_csv(diff: dict, path: str) -> None:
@@ -316,6 +350,14 @@ def main() -> None:
         "--discord", action="store_true",
         help="Post a summary to DISCORD_WEBHOOK_URL.",
     )
+    parser.add_argument(
+        "--audit-stale", action="store_true",
+        help="List catalog rows whose stored MSRP is missing or zero.",
+    )
+    parser.add_argument(
+        "--repair-stale", action="store_true",
+        help="Refresh only rows whose stored MSRP is missing or zero.",
+    )
     args = parser.parse_args()
 
     if args.discord:
@@ -324,43 +366,57 @@ def main() -> None:
             print("ERROR: DISCORD_WEBHOOK_URL is not set.", file=sys.stderr)
             sys.exit(1)
 
+    app = create_app()
     with app.app_context():
         db_items = Item.query.filter(Item.sku.isnot(None)).all()
         print(f"Loaded {len(db_items)} items from database.")
+
+        stale_rows = find_stale_msrp_rows(db_items)
+        if args.audit_stale:
+            print_stale_msrp_audit(stale_rows)
+            if not args.repair_stale:
+                return
 
         live = scrape_live_prices()
         diff = build_diff(db_items, live)
 
         print_report(diff)
 
-        if args.update:
+        if args.update or args.repair_stale:
             updated = 0
             db_by_sku = {item.sku: item for item in db_items if item.sku}
+            stale_skus = {row["sku"] for row in stale_rows if row.get("sku")}
             for sku, info in live.items():
-                if info["price"] is not None and sku in db_by_sku:
+                if info["price"] is None or sku not in db_by_sku:
+                    continue
+                if args.repair_stale and sku not in stale_skus:
+                    continue
+                if db_by_sku[sku].msrp != info["price"]:
                     db_by_sku[sku].msrp = info["price"]
                     updated += 1
             db.session.commit()
-            print(f"Updated {updated} MSRP prices in database.")
+            mode = "stale MSRP rows" if args.repair_stale and not args.update else "MSRP prices"
+            print(f"Updated {updated} {mode} in database.")
 
             # After price update, check wishlist targets and notify
-            hits = check_wishlist_targets()
-            if hits:
-                print(f"\nWishlist targets met: {len(hits)}")
-                for hit in hits:
-                    print(f"  🎯 {hit['person']} — {hit['item']} (#{hit['sku']}): "
-                          f"${hit['msrp']:.2f} ≤ target ${hit['target']:.2f}")
-                if args.discord:
-                    lines = ["**🎯 Cutco Wishlist — Price Targets Met**"]
+            if args.update or args.repair_stale:
+                hits = check_wishlist_targets()
+                if hits:
+                    print(f"\nWishlist targets met: {len(hits)}")
                     for hit in hits:
-                        lines.append(
-                            f"• **{hit['person']}** — {hit['item']} (#{hit['sku']}): "
-                            f"MSRP ${hit['msrp']:.2f} ≤ target ${hit['target']:.2f} "
-                            f"(saves ${hit['savings']:.2f})"
-                        )
-                    _notify_discord("\n".join(lines))
-            else:
-                print("No wishlist targets met at updated prices.")
+                        print(f"  🎯 {hit['person']} — {hit['item']} (#{hit['sku']}): "
+                              f"${hit['msrp']:.2f} ≤ target ${hit['target']:.2f}")
+                    if args.discord:
+                        lines = ["**🎯 Cutco Wishlist — Price Targets Met**"]
+                        for hit in hits:
+                            lines.append(
+                                f"• **{hit['person']}** — {hit['item']} (#{hit['sku']}): "
+                                f"MSRP ${hit['msrp']:.2f} ≤ target ${hit['target']:.2f} "
+                                f"(saves ${hit['savings']:.2f})"
+                            )
+                        _notify_discord("\n".join(lines))
+                else:
+                    print("No wishlist targets met at updated prices.")
 
         if args.csv:
             write_csv(diff, args.csv)

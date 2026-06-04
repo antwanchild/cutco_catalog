@@ -14,6 +14,7 @@ from app import create_app
 from constants import UNKNOWN_COLOR
 from extensions import db
 from helpers import _collection_token, _gift_token, _notify_discord, _verify_collection_token, _verify_gift_token, check_wishlist_targets
+from msrp_diff import find_stale_msrp_rows
 from msrp_helpers import _scrape_price_from_page
 from models import (
     CookwareSession,
@@ -188,6 +189,18 @@ class PublicSmokeTests(SmokeBaseTest):
             mocked_get.return_value.text = html
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/small-cutting-board"), 35.0)
+
+    def test_find_stale_msrp_rows_flags_zero_and_missing_prices(self):
+        with self.app.app_context():
+            zero_item = Item(name="Zero Knife", sku="Z-1", category="Kitchen Knives", msrp=0.0)
+            missing_item = Item(name="Missing Knife", sku="M-1", category="Kitchen Knives", msrp=None)
+            priced_item = Item(name="Priced Knife", sku="P-1", category="Kitchen Knives", msrp=18.0)
+            db.session.add_all([zero_item, missing_item, priced_item])
+            db.session.commit()
+
+            rows = find_stale_msrp_rows(Item.query.all())
+
+        self.assertEqual([row["sku"] for row in rows], ["M-1", "Z-1"])
 
     def test_msrp_scraper_maps_cutting_board_family_urls_to_specific_products(self):
         cases = [
