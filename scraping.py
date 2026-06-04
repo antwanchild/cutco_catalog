@@ -135,6 +135,22 @@ def _normalize_text_for_match(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
 
 
+def _normalize_cutco_title(value: str) -> str:
+    normalized = _normalize_text_for_match(value)
+    normalized = re.sub(r"^cutco\s+", "", normalized)
+    normalized = re.sub(r"^#?\s*\d{2,4}(?:[a-z]{0,3})?(?:\s+)?", "", normalized)
+    return normalized.strip()
+
+
+def _line_matches_item_name(line: str, item_name: str | None) -> bool:
+    """Return True when a visible line looks like the exact item title."""
+    normalized_item = _normalize_cutco_title(item_name or "")
+    if not normalized_item:
+        return False
+    normalized_line = _normalize_cutco_title(line)
+    return normalized_line == normalized_item
+
+
 def _extract_primary_visible_price(
     page_text: str,
     *,
@@ -157,7 +173,7 @@ def _extract_primary_visible_price(
     wants_sheath = "sheath" in normalized_candidate or "gift box" in normalized_candidate
     if normalized_candidate:
         for index, line in enumerate(lines):
-            if normalized_candidate in _normalize_text_for_match(line):
+            if _line_matches_item_name(line, candidate_text):
                 start_index = index
                 break
     elif normalized_heading:

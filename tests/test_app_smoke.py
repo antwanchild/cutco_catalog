@@ -393,6 +393,27 @@ class PublicSmokeTests(SmokeBaseTest):
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/super-shears/77CD", "Super Shears"), 149.0)
 
+    def test_msrp_scraper_prefers_exact_item_title_over_variant_substring(self):
+        html = """
+            <html>
+              <body>
+                <h1>#1759C Table Knife</h1>
+                <div class="price">$54</div>
+                <div>Also available as Stainless Table Knife</div>
+                <div class="price">$78</div>
+              </body>
+            </html>
+        """
+
+        with mock.patch("scraping.requests.get") as mocked_get:
+            mocked_get.return_value = mock.Mock(
+                status_code=200,
+                url="https://www.cutco.com/p/1759C",
+                text=html,
+            )
+
+            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/1759C", "Table Knife"), 54.0)
+
     def test_find_cutco_item_link_prefers_exact_item_over_sheath_bundle(self):
         html = """
             <html>
