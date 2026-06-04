@@ -34,13 +34,13 @@ from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
 
 # ── Price scraping ─────────────────────────────────────────────────────────────
 
-def _scrape_price_from_page(url: str) -> float | None:
+def _scrape_price_from_page(url: str, item_name: str | None = None) -> float | None:
     """Fetch a Cutco product page and return its price."""
     try:
         resolved_url, raw_html = _fetch_cutco_page(url)
         if not raw_html:
             return None
-        return _extract_cutco_price(raw_html, page_url=resolved_url or url)
+        return _extract_cutco_price(raw_html, page_url=resolved_url or url, item_name=item_name)
     except Exception:
         return None
 
@@ -67,7 +67,7 @@ def scrape_live_prices(workers: int = 8) -> dict[str, dict]:
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         future_map = {
-            pool.submit(_scrape_price_from_page, info["url"]): sku
+            pool.submit(_scrape_price_from_page, info["url"], info["name"]): sku
             for sku, info in by_sku.items()
             if info.get("url")
         }

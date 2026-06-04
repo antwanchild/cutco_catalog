@@ -67,18 +67,40 @@ def _fetch_cutco_page(url: str) -> tuple[str | None, str | None]:
         return None, None
 
 
-def _extract_primary_visible_price(page_text: str, *, heading_text: str | None = None) -> float | None:
+def _normalize_text_for_match(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
+def _extract_primary_visible_price(
+    page_text: str,
+    *,
+    heading_text: str | None = None,
+    candidate_text: str | None = None,
+) -> float | None:
     """Extract the main visible product price from Cutco page text.
 
     Cutco product pages often include extra prices later in the page for
     frequently-bought-together items or related accessories. The primary
     product price is usually positioned before the regular-shipping copy.
     """
-    truncated_text = page_text
-    if heading_text:
-        heading_index = truncated_text.find(heading_text)
-        if heading_index >= 0:
-            truncated_text = truncated_text[heading_index + len(heading_text):]
+    lines = [line.strip() for line in page_text.splitlines() if line.strip()]
+    if not lines:
+        return None
+
+    start_index = 0
+    normalized_candidate = _normalize_text_for_match(candidate_text or "")
+    normalized_heading = _normalize_text_for_match(heading_text or "")
+    if normalized_candidate:
+        for index, line in enumerate(lines):
+            if normalized_candidate in _normalize_text_for_match(line):
+                start_index = index
+                break
+    elif normalized_heading:
+        for index, line in enumerate(lines):
+            if normalized_heading in _normalize_text_for_match(line):
+                start_index = index + 1
+                break
+
     cut_markers = (
         "Add to Cart",
         "Frequently Bought Together",
@@ -87,28 +109,26 @@ def _extract_primary_visible_price(page_text: str, *, heading_text: str | None =
         "Overview +",
         "Set Pieces +",
     )
-    cut_pos = min(
-        [pos for marker in cut_markers if (pos := truncated_text.find(marker)) > 0],
-        default=-1,
-    )
-    if cut_pos > 0:
-        truncated_text = truncated_text[:cut_pos]
-    for marker in (
+    stop_markers = cut_markers + (
         "Regular shipping and handling included",
         "Regular shipping included",
         "Shipping and handling included",
-    ):
-        marker_pos = truncated_text.find(marker)
-        if marker_pos > 0:
-            truncated_text = truncated_text[:marker_pos]
+    )
+
+    truncated_lines = lines[start_index:]
+    for stop_index, line in enumerate(truncated_lines):
+        if any(marker.lower() in line.lower() for marker in stop_markers):
+            truncated_lines = truncated_lines[:stop_index]
             break
-    for dollar_match in re.finditer(r"\$\s*([\d,]+(?:\.\d{2})?)", truncated_text):
-        try:
-            price = float(dollar_match.group(1).replace(",", ""))
-        except ValueError:
-            continue
-        if price > 0:
-            return price
+
+    for line in truncated_lines:
+        for dollar_match in re.finditer(r"\$\s*([\d,]+(?:\.\d{2})?)", line):
+            try:
+                price = float(dollar_match.group(1).replace(",", ""))
+            except ValueError:
+                continue
+            if price > 0:
+                return price
     return None
 
 
@@ -123,7 +143,12 @@ def _coerce_positive_price(raw_price: str | float | int | None) -> float | None:
     return price if price > 0 else None
 
 
-def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float | None:
+def _extract_cutco_price(
+    raw_html: str,
+    *,
+    page_url: str | None = None,
+    item_name: str | None = None,
+) -> float | None:
     """Return the most reliable product price found on a Cutco page.
 
     Cutco pages often expose multiple price sources. The page-local JS values
@@ -139,8 +164,12 @@ def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float
     heading_text = heading.get_text(" ", strip=True) if heading else None
     for noise in soup.find_all(["script", "style"]):
         noise.decompose()
-    page_text = soup.get_text(" ", strip=True)
-    visible_price = _extract_primary_visible_price(page_text, heading_text=heading_text)
+    page_text = soup.get_text("\n", strip=True)
+    visible_price = _extract_primary_visible_price(
+        page_text,
+        heading_text=heading_text,
+        candidate_text=item_name,
+    )
     if visible_price is not None:
         return visible_price
 
