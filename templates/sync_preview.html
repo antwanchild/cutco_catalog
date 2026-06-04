@@ -170,11 +170,6 @@
               <span class="mono">{{ member.sku or '—' }}{% set qty = member.quantity or 1 %}{% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}</span>{% if not loop.last %}, {% endif %}
             {% endfor %}
           </div>
-          {% for member in item_set.member_snapshot_rows %}
-            {% if member.status != 'present' and member.resolution_note %}
-              <div class="muted small" style="margin-top:.25rem">{{ member.status_label }}. {{ member.resolution_note }}</div>
-            {% endif %}
-          {% endfor %}
           {% if item_set.not_in_catalog_skus %}
             <div class="muted small">Not in catalog: {% for sku in item_set.not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</div>
           {% endif %}

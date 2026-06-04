@@ -3609,6 +3609,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn("NS-1", members_row.get_text(" ", strip=True))
         self.assertIn("NS-2", members_row.get_text(" ", strip=True))
         self.assertIn(",", members_row.get_text(" ", strip=True))
+        self.assertNotIn("Found in scrape", members_row.get_text(" ", strip=True))
+        self.assertNotIn("Will create a placeholder", members_row.get_text(" ", strip=True))
+        self.assertNotIn("Will be skipped", members_row.get_text(" ", strip=True))
 
     def test_catalog_sync_idle_page_does_not_scrape_inline(self):
         self._login_as_admin()
