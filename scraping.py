@@ -1351,9 +1351,6 @@ def scrape_catalog(progress_cb: Callable[[str], None] | None = None) -> tuple[li
                 if cat_name == "Sheaths" or (name and "sheath" in name.lower() and "with sheath" not in name.lower()):
                     sku = None
 
-                if sku and name:
-                    prod_url = _resolve_cutco_item_page_url(prod_url, item_name=name)
-
                 if not sku:
                     if "&view=product" not in prod_url:
                         prod_url = prod_url + "&view=product"
@@ -1398,7 +1395,6 @@ def scrape_catalog(progress_cb: Callable[[str], None] | None = None) -> tuple[li
                 name = cat_page_name or page_name
                 if not sku or sku in seen_skus or not name:
                     continue
-                prod_url = _resolve_cutco_item_page_url(prod_url, item_name=name)
                 if _is_set_product(name):
                     if prod_url not in seen_set_urls:
                         seen_set_urls.add(prod_url)
