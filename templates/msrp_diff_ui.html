@@ -48,6 +48,11 @@
   </form>
   <form method="post" action="{{ url_for('admin.msrp_diff_reset') }}" class="inline-form" style="flex-wrap:wrap;gap:.75rem;margin-top:.75rem">
     <button type="submit" class="btn btn-secondary"
+            data-confirm-title="Clear MSRP job state"
+            data-confirm-message="This will reset the saved MSRP diff job back to idle."
+            data-confirm-count="1 job state"
+            data-confirm-preview="Any current progress log and results will be cleared."
+            data-confirm-button="Clear job state"
             {% if job.status != 'running' and job.status != 'error' and not job.progress %}disabled{% endif %}>
       Clear Job State
     </button>
