@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models import Item  # noqa: E402
-from msrp_helpers import _fetch_live_prices_by_sku  # noqa: E402
+from msrp_helpers import _build_msrp_price_targets, _fetch_live_prices_by_sku  # noqa: E402
 from scraping import scrape_catalog  # noqa: E402
 from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
 
@@ -42,12 +42,7 @@ def scrape_live_prices(workers: int = 8) -> dict[str, dict]:
     live_items, _ = scrape_catalog(progress_cb=lambda msg: print(msg, flush=True))
     print(f"  Found {len(live_items)} items on cutco.com", flush=True)
 
-    # Build SKU → item map first (dedup by SKU)
-    by_sku: dict[str, dict] = {}
-    for item in live_items:
-        sku = item.get("sku")
-        if sku and sku not in by_sku:
-            by_sku[sku] = {"name": item["name"], "url": item["url"], "price": None}
+    by_sku = _build_msrp_price_targets(live_items)
 
     print(f"Fetching prices for {len(by_sku)} unique SKUs…", flush=True)
     fetched, timed_out = _fetch_live_prices_by_sku(by_sku, workers=workers, log_fn=lambda msg: print(msg, flush=True))

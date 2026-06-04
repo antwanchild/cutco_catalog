@@ -206,6 +206,22 @@ class AdminJobSmokeTests(unittest.TestCase):
         second_future.cancel.assert_called_once()
         self.assertEqual(fake_executor.shutdown_args, {"wait": False, "cancel_futures": True})
 
+    def test_msrp_price_targets_prefer_db_urls_for_known_skus(self):
+        live_items = [
+            {"sku": "125", "name": "Medium Cutting Board", "url": "https://www.cutco.com/shop/cutting-boards", "price": None},
+            {"sku": "999", "name": "New Thing", "url": "https://www.cutco.com/p/new-thing", "price": None},
+        ]
+
+        with self.app.app_context():
+            with mock.patch.object(msrp_helpers.Item, "query") as query_mock:
+                query_mock.filter.return_value.all.return_value = [
+                    mock.Mock(sku="125", cutco_url="https://www.cutco.com/p/medium-cutting-board"),
+                ]
+                targets = msrp_helpers._build_msrp_price_targets(live_items)
+
+        self.assertEqual(targets["125"]["url"], "https://www.cutco.com/p/medium-cutting-board")
+        self.assertEqual(targets["999"]["url"], "https://www.cutco.com/p/new-thing")
+
     def test_admin_diagnostics_shows_job_summaries(self):
         self._login_as_admin()
 

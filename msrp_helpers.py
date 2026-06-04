@@ -19,6 +19,7 @@ _MSRP_JOB_FILE   = os.path.join(DATA_DIR, "msrp_job.json")
 _msrp_write_lock  = threading.Lock()
 _MSRP_JOB_STALE_AFTER = timedelta(minutes=30)
 _MSRP_PRICE_FETCH_TIMEOUT = timedelta(minutes=3)
+_MSRP_PRICE_FETCH_WORKERS = int(os.environ.get("MSRP_PRICE_FETCH_WORKERS", "12"))
 
 _SPECS_JOB_FILE  = os.path.join(DATA_DIR, "specs_job.json")
 _specs_write_lock = threading.Lock()
@@ -179,10 +180,29 @@ def _scrape_price_from_page(url: str, item_name: str | None = None) -> float | N
         return None
 
 
+def _build_msrp_price_targets(live_items: list[dict]) -> dict[str, dict]:
+    """Build a SKU map that prefers stored DB URLs for known items."""
+    db_url_by_sku = {
+        item.sku: item.cutco_url
+        for item in Item.query.filter(Item.sku.isnot(None), Item.cutco_url.isnot(None)).all()
+        if item.sku and item.cutco_url
+    }
+    by_sku: dict[str, dict] = {}
+    for live_item in live_items:
+        sku = live_item.get("sku")
+        if sku and sku not in by_sku:
+            by_sku[sku] = {
+                "name": live_item["name"],
+                "url": db_url_by_sku.get(sku) or live_item["url"],
+                "price": None,
+            }
+    return by_sku
+
+
 def _fetch_live_prices_by_sku(
     by_sku: dict[str, dict],
     *,
-    workers: int = 8,
+    workers: int = _MSRP_PRICE_FETCH_WORKERS,
     log_fn=None,
 ) -> tuple[int, int]:
     """Fetch live prices for the provided SKU map.
@@ -290,15 +310,10 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
             live_items, _ = scrape_catalog(progress_cb=log)
             log(f"Found {len(live_items)} items on cutco.com")
 
-            by_sku: dict[str, dict] = {}
-            for live_item in live_items:
-                sku = live_item.get("sku")
-                if sku and sku not in by_sku:
-                    by_sku[sku] = {"name": live_item["name"],
-                                   "url": live_item["url"], "price": None}
+            by_sku = _build_msrp_price_targets(live_items)
 
             log(f"Fetching prices for {len(by_sku)} unique SKUs…")
-            fetched, timed_out = _fetch_live_prices_by_sku(by_sku, workers=8, log_fn=log)
+            fetched, timed_out = _fetch_live_prices_by_sku(by_sku, log_fn=log)
             if timed_out:
                 log(f"Continuing with {timed_out} missing live price(s).")
 
