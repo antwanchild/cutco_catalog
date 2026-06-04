@@ -3518,6 +3518,33 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             self.assertIsNone(db.session.get(Set, item_set.id))
 
+        single_item_id, single_variant_id = self._add_catalog_item(name="Single Variant Knife", sku="4444")
+        with self.app.app_context():
+            variant = db.session.get(ItemVariant, single_variant_id)
+            self.assertIsNotNone(variant)
+            variant.color = "Purple"
+            variant.notes = "Bogus import"
+            variant.source = "manual"
+            db.session.commit()
+
+        single_variant_page = self.client.get(f"/catalog/{single_item_id}/variants")
+        self.assertEqual(single_variant_page.status_code, 200)
+        self.assertIn(b"Reset to Unknown", single_variant_page.data)
+        self.assertNotIn(b"Delete variant", single_variant_page.data)
+
+        reset_variant_response = self.client.post(
+            f"/variants/{single_variant_id}/reset-unknown",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(reset_variant_response.status_code, 302)
+        with self.app.app_context():
+            variant = db.session.get(ItemVariant, single_variant_id)
+            self.assertIsNotNone(variant)
+            self.assertEqual(variant.color, UNKNOWN_COLOR)
+            self.assertIsNone(variant.notes)
+            self.assertEqual(variant.source, "fallback_unknown")
+
     def test_catalog_sync_preview_renders_with_mocked_scrapes(self):
         self._login_as_admin()
         self._set_csrf_token()

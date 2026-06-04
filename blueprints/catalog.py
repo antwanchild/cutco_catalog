@@ -1131,6 +1131,34 @@ def variant_edit(vid):
     return redirect(url_for("catalog.variants", item_id=item_id))
 
 
+@catalog_bp.route("/variants/<int:vid>/reset-unknown", methods=["POST"])
+@admin_required
+def variant_reset_unknown(vid):
+    """Reset a single bad variant back to the Unknown fallback."""
+    variant = db.session.get(ItemVariant, vid)
+    if not variant:
+        abort(404)
+    item = variant.item
+    item_id = variant.item_id
+    if len(item.variants) != 1:
+        flash("Reset to Unknown is only available when this is the only variant.", "warning")
+        return redirect(url_for("catalog.variants", item_id=item_id))
+    if variant.color == UNKNOWN_COLOR:
+        flash("This variant is already Unknown.", "info")
+        return redirect(url_for("catalog.variants", item_id=item_id))
+
+    variant.color = UNKNOWN_COLOR
+    variant.notes = None
+    variant.is_unicorn = False
+    variant.source = "fallback_unknown"
+    db.session.flush()
+    reconcile_unknown_variant(item)
+    if db_commit(db.session):
+        logger.info("Variant reset to Unknown: item %d", item_id)
+        flash("Variant reset to Unknown.", "success")
+    return redirect(url_for("catalog.variants", item_id=item_id))
+
+
 @catalog_bp.route("/variants/<int:vid>/delete", methods=["POST"])
 @admin_required
 def variant_delete(vid):

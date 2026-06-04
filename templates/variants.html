@@ -20,7 +20,17 @@
       <td class="actions">
         {% if not is_cookware %}
         <button class="btn btn-xs" onclick="toggleEdit({{ variant.id }})">Edit</button>
-        {% if item.variants | length > 1 %}
+        {% if item.variants | length == 1 and variant.color != UNKNOWN_COLOR %}
+        <form method="post" action="{{ url_for('catalog.variant_reset_unknown', vid=variant.id) }}"
+              class="form-inline">
+          <button class="btn btn-xs btn-secondary"
+                  data-confirm-title="Reset variant"
+                  data-confirm-message="This will change the only variant back to Unknown."
+                  data-confirm-count="1 variant"
+                  data-confirm-preview="Item: {{ item.name | e }} | Current color: {{ variant.color | e }}"
+                  data-confirm-button="Reset to Unknown">Reset</button>
+        </form>
+        {% elif item.variants | length > 1 %}
         <form method="post" action="{{ url_for('catalog.variant_delete', vid=variant.id) }}"
               class="form-inline">
           <button class="btn btn-xs btn-danger"
