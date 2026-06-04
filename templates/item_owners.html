@@ -53,6 +53,22 @@
 {% if item.notes %}<p class="item-notes mb-section">{{ item.notes }}</p>{% endif %}
 
 {# ── Two-column layout ────────────────────────────────────────────────────── #}
+{% if top_colors %}
+<section class="dashboard-card" style="margin-bottom:1.25rem">
+  <div class="section-heading-actions" style="margin-bottom:.6rem">
+    <h2>Top Colors</h2>
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('catalog.variants_browse', unknown=1) }}">Browse variants</a>
+  </div>
+  <div class="chip-row">
+    {% for row in top_colors %}
+      <a class="chip" href="{{ url_for('catalog.variants_browse', color=row.color, unknown=1) }}">
+        {{ row.color }} <span class="muted">({{ row.count }})</span>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 <div class="detail-grid">
 
   {# ── Left column ────────────────────────────────────────────────────────── #}

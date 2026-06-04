@@ -776,6 +776,8 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(item_response.status_code, 200)
         self.assertIn(b"View Knife", item_response.data)
         self.assertIn(b'SKU:</strong> <span class="mono">VW-1</span>', item_response.data)
+        self.assertIn(b"Top Colors", item_response.data)
+        self.assertIn(b"/variants?color=Blue", item_response.data)
         self.assertIn(b"Aliases:", item_response.data)
         self.assertIn(b"2 alt SKUs", item_response.data)
         self.assertIn(b'data-clamp-rows="2"', item_response.data)

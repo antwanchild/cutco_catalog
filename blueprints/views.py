@@ -110,12 +110,24 @@ def item_owners(item_id):
         task_counts[entry.task.name] = task_counts.get(entry.task.name, 0) + 1
     top_tasks = sorted(task_counts.items(), key=lambda kv: kv[1], reverse=True)
 
+    color_counts: dict[str, int] = {}
+    for entry in entries:
+        color = entry.variant.color or UNKNOWN_COLOR
+        if color == UNKNOWN_COLOR:
+            continue
+        color_counts[color] = color_counts.get(color, 0) + 1
+    top_colors = [
+        {"color": color, "count": count}
+        for color, count in sorted(color_counts.items(), key=lambda kv: kv[1], reverse=True)[:8]
+    ]
+
     attachments = item.attachments
 
     return render_template("item_owners.html", item=item,
                            entries=entries, people_without=people_without,
                            sharpening=sharpening, task_log=task_log,
                            top_tasks=top_tasks,
+                           top_colors=top_colors,
                            attachments=attachments,
                            COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
