@@ -11,7 +11,7 @@ from constants import DATA_DIR, DISCORD_WEBHOOK_URL
 from extensions import db
 from helpers import _notify_discord, check_wishlist_targets
 from models import Item, record_activity
-from scraping import _extract_cutco_price, _fetch_cutco_page, scrape_catalog
+from scraping import _extract_cutco_price, _fetch_cutco_page
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +199,24 @@ def _build_msrp_price_targets(live_items: list[dict]) -> dict[str, dict]:
     return by_sku
 
 
+def _build_msrp_price_targets_from_db(db_items: list[Item]) -> dict[str, dict]:
+    """Build a SKU map from stored catalog rows.
+
+    This is the fast path for MSRP scans: we already know the exact DB item
+    URLs, so we can skip a fresh catalog crawl and fetch prices directly.
+    """
+    by_sku: dict[str, dict] = {}
+    for item in db_items:
+        if not item.sku or not item.cutco_url or item.sku in by_sku:
+            continue
+        by_sku[item.sku] = {
+            "name": item.name,
+            "url": item.cutco_url,
+            "price": None,
+        }
+    return by_sku
+
+
 def _fetch_live_prices_by_sku(
     by_sku: dict[str, dict],
     *,
@@ -306,11 +324,9 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
 
     try:
         with app.app_context():
-            log("Scraping live catalog…")
-            live_items, _ = scrape_catalog(progress_cb=log)
-            log(f"Found {len(live_items)} items on cutco.com")
-
-            by_sku = _build_msrp_price_targets(live_items)
+            db_items = Item.query.filter(Item.sku.isnot(None)).all()
+            log(f"Loaded {len(db_items)} DB items — using stored Cutco URLs…")
+            by_sku = _build_msrp_price_targets_from_db(db_items)
 
             log(f"Fetching prices for {len(by_sku)} unique SKUs…")
             fetched, timed_out = _fetch_live_prices_by_sku(by_sku, log_fn=log)
@@ -320,8 +336,7 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
             priced = sum(1 for info in by_sku.values() if info["price"] is not None)
             log(f"Prices found: {priced}/{len(by_sku)}")
 
-            db_items = Item.query.filter(Item.sku.isnot(None)).all()
-            log(f"Loaded {len(db_items)} DB items — building diff…")
+            log("Building diff from stored DB rows…")
             diff = _build_msrp_diff(db_items, by_sku)
 
             changes = len(diff["increased"]) + len(diff["decreased"])
