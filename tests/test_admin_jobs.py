@@ -225,14 +225,14 @@ class AdminJobSmokeTests(unittest.TestCase):
     def test_msrp_price_targets_from_db_uses_stored_item_urls(self):
         with self.app.app_context():
             item_a = Item(name="Knife A", sku="A-1", cutco_url="https://www.cutco.com/p/knife-a")
-            item_b = Item(name="Knife B", sku="B-1", cutco_url="https://www.cutco.com/p/knife-b")
+            item_b = Item(name="Knife B", sku="125", cutco_url="https://www.cutco.com/p/cutting-boards/125")
             db.session.add_all([item_a, item_b])
             db.session.commit()
 
             targets = msrp_helpers._build_msrp_price_targets_from_db(Item.query.all())
 
         self.assertEqual(targets["A-1"]["url"], "https://www.cutco.com/p/knife-a")
-        self.assertEqual(targets["B-1"]["url"], "https://www.cutco.com/p/knife-b")
+        self.assertEqual(targets["125"]["url"], "https://www.cutco.com/p/medium-cutting-board")
 
     def test_admin_diagnostics_shows_job_summaries(self):
         self._login_as_admin()

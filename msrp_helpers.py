@@ -3,15 +3,18 @@
 import json
 import logging
 import os
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 
-from constants import DATA_DIR, DISCORD_WEBHOOK_URL
+import requests
+from bs4 import BeautifulSoup
+
+from constants import DATA_DIR, DISCORD_WEBHOOK_URL, REQUEST_TIMEOUT, SCRAPE_HEADERS
 from extensions import db
 from helpers import _notify_discord, check_wishlist_targets
 from models import Item, record_activity
-from scraping import _extract_cutco_price, _fetch_cutco_page
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +23,12 @@ _msrp_write_lock  = threading.Lock()
 _MSRP_JOB_STALE_AFTER = timedelta(minutes=30)
 _MSRP_PRICE_FETCH_TIMEOUT = timedelta(minutes=3)
 _MSRP_PRICE_FETCH_WORKERS = int(os.environ.get("MSRP_PRICE_FETCH_WORKERS", "12"))
+
+_CUTTING_BOARD_URLS = {
+    "124": "https://www.cutco.com/p/small-cutting-board",
+    "125": "https://www.cutco.com/p/medium-cutting-board",
+    "126": "https://www.cutco.com/p/large-cutting-board",
+}
 
 _SPECS_JOB_FILE  = os.path.join(DATA_DIR, "specs_job.json")
 _specs_write_lock = threading.Lock()
@@ -169,13 +178,109 @@ def _reset_msrp_job() -> None:
     })
 
 
+def _normalize_price_text(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
+def _is_exact_product_url(url: str | None) -> bool:
+    return bool(url and "/p/" in url)
+
+
+def _normalize_msrp_url(url: str, sku: str | None = None) -> str:
+    if sku and sku in _CUTTING_BOARD_URLS and "cutting-boards" in url:
+        return _CUTTING_BOARD_URLS[sku]
+    return url
+
+
+def _line_matches_target(line: str, item_name: str | None, sku: str | None = None) -> bool:
+    normalized_line = _normalize_price_text(line)
+    if not normalized_line:
+        return False
+    if sku:
+        normalized_sku = _normalize_price_text(sku)
+        if normalized_sku and re.search(rf"(?<![a-z0-9]){re.escape(normalized_sku)}(?![a-z0-9])", normalized_line):
+            return True
+    normalized_item = _normalize_price_text(item_name)
+    if not normalized_item:
+        return False
+    return normalized_line == normalized_item or normalized_item in normalized_line or normalized_line in normalized_item
+
+
 def _scrape_price_from_page(url: str, item_name: str | None = None, sku: str | None = None) -> float | None:
-    """Return the price from a Cutco product page, or None if not found."""
+    """Return the visible MSRP from a single Cutco product page.
+
+    This path is intentionally strict: it only trusts exact product pages and a
+    tiny explicit cutting-board URL mapping. If the page is ambiguous, it fails
+    closed and returns None instead of guessing.
+    """
     try:
-        resolved_url, raw_html = _fetch_cutco_page(url, item_name=item_name, sku=sku)
-        if not raw_html:
+        request_url = _normalize_msrp_url(url, sku)
+        resp = requests.get(request_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
             return None
-        return _extract_cutco_price(raw_html, page_url=resolved_url or url, item_name=item_name, sku=sku)
+        page_url = resp.url or request_url
+        if not _is_exact_product_url(page_url):
+            return None
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for noise in soup.find_all(["script", "style"]):
+            noise.decompose()
+
+        heading = soup.find("h1")
+        heading_text = heading.get_text(" ", strip=True) if heading else None
+        lines = [line.strip() for line in soup.get_text("\n", strip=True).splitlines() if line.strip()]
+
+        candidates = [item_name, heading_text]
+        start_index = 0
+        if lines:
+            for candidate in candidates:
+                if not candidate:
+                    continue
+                for index, line in enumerate(lines):
+                    if _line_matches_target(line, candidate, sku=sku):
+                        start_index = index
+                        break
+                else:
+                    continue
+                break
+
+        stop_markers = (
+            "Add to Cart",
+            "Frequently Bought Together",
+            "You May Also Like",
+            "Specifications",
+            "Reviews & Questions",
+            "Regular shipping and handling included",
+            "Regular shipping included",
+            "Shipping and handling included",
+        )
+
+        if lines:
+            truncated_lines = lines[start_index:]
+            for stop_index, line in enumerate(truncated_lines):
+                if any(marker.lower() in line.lower() for marker in stop_markers):
+                    truncated_lines = truncated_lines[:stop_index]
+                    break
+
+            for line in truncated_lines:
+                for dollar_match in re.finditer(r"\$\s*([\d,]+(?:\.\d{2})?)", line):
+                    try:
+                        price = float(dollar_match.group(1).replace(",", ""))
+                    except ValueError:
+                        continue
+                    if price > 0:
+                        return price
+
+        for key in ("actualPrice", "fullRetail"):
+            price_match = re.search(rf'"{key}"\s*:\s*([\d.]+)', resp.text)
+            if price_match:
+                try:
+                    price = float(price_match.group(1))
+                except ValueError:
+                    continue
+                if price > 0:
+                    return price
+        return None
     except Exception:
         return None
 
@@ -202,8 +307,8 @@ def _build_msrp_price_targets(live_items: list[dict]) -> dict[str, dict]:
 def _build_msrp_price_targets_from_db(db_items: list[Item]) -> dict[str, dict]:
     """Build a SKU map from stored catalog rows.
 
-    This is the fast path for MSRP scans: we already know the exact DB item
-    URLs, so we can skip a fresh catalog crawl and fetch prices directly.
+    This is the fast path for MSRP scans: we already know the stored DB item
+    URLs, so we can fetch prices directly without rediscovering the catalog.
     """
     by_sku: dict[str, dict] = {}
     for item in db_items:
@@ -211,7 +316,7 @@ def _build_msrp_price_targets_from_db(db_items: list[Item]) -> dict[str, dict]:
             continue
         by_sku[item.sku] = {
             "name": item.name,
-            "url": item.cutco_url,
+            "url": _normalize_msrp_url(item.cutco_url, item.sku),
             "price": None,
         }
     return by_sku

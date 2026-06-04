@@ -28,11 +28,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models import Item  # noqa: E402
-from msrp_helpers import (  # noqa: E402
-    _build_msrp_price_targets,
-    _build_msrp_price_targets_from_db,
-    _fetch_live_prices_by_sku,
-)
+from msrp_helpers import _build_msrp_price_targets_from_db, _fetch_live_prices_by_sku  # noqa: E402
 from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
 
 def scrape_live_prices(
@@ -41,25 +37,20 @@ def scrape_live_prices(
     db_items: list[Item] | None = None,
     include_catalog: bool = False,
 ) -> dict[str, dict]:
-    """Return a dict of sku → {name, url, price} for all live Cutco products.
+    """Return a dict of sku → {name, url, price} for stored Cutco products.
 
-    By default this uses the DB's stored URLs so the scan stays fast.
-    Pass include_catalog=True to rediscover the live catalog first.
+    MSRP diff now uses the database as the source of truth for URLs. The old
+    catalog rediscovery mode is disabled here because it was introducing bad
+    page guesses and drift.
     """
     if include_catalog:
-        from scraping import scrape_catalog  # noqa: E402
-
-        print("Scraping live catalog…", flush=True)
-        live_items, _ = scrape_catalog(progress_cb=lambda msg: print(msg, flush=True))
-        print(f"  Found {len(live_items)} items on cutco.com", flush=True)
-        by_sku = _build_msrp_price_targets(live_items)
-    else:
-        if db_items is None:
-            app = create_app()
-            with app.app_context():
-                db_items = Item.query.filter(Item.sku.isnot(None)).all()
-        print(f"Using {len(db_items or [])} stored DB item URLs…", flush=True)
-        by_sku = _build_msrp_price_targets_from_db(db_items or [])
+        print("Catalog rediscovery is disabled for MSRP diff; using stored DB URLs.", flush=True)
+    if db_items is None:
+        app = create_app()
+        with app.app_context():
+            db_items = Item.query.filter(Item.sku.isnot(None)).all()
+    print(f"Using {len(db_items or [])} stored DB item URLs…", flush=True)
+    by_sku = _build_msrp_price_targets_from_db(db_items or [])
 
     print(f"Fetching prices for {len(by_sku)} unique SKUs…", flush=True)
     fetched, timed_out = _fetch_live_prices_by_sku(by_sku, workers=workers, log_fn=lambda msg: print(msg, flush=True))
@@ -347,7 +338,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--catalog", action="store_true",
-        help="Rediscover the live Cutco catalog before fetching prices (slower).",
+        help="Deprecated; MSRP diff now always uses stored DB URLs.",
     )
     args = parser.parse_args()
 

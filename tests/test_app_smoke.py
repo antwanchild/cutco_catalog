@@ -232,12 +232,12 @@ class PublicSmokeTests(SmokeBaseTest):
 
     def test_msrp_scraper_maps_cutting_board_family_urls_to_specific_products(self):
         cases = [
-            ("https://www.cutco.com/p/cutting-boards/124", "https://www.cutco.com/p/small-cutting-board", 35.0),
-            ("https://www.cutco.com/p/cutting-boards/125", "https://www.cutco.com/p/medium-cutting-board", 28.0),
-            ("https://www.cutco.com/p/cutting-boards/126", "https://www.cutco.com/p/large-cutting-board", 42.0),
+            ("124", "https://www.cutco.com/p/cutting-boards/124", "https://www.cutco.com/p/small-cutting-board", 35.0),
+            ("125", "https://www.cutco.com/p/cutting-boards/125", "https://www.cutco.com/p/medium-cutting-board", 28.0),
+            ("126", "https://www.cutco.com/p/cutting-boards/126", "https://www.cutco.com/p/large-cutting-board", 42.0),
         ]
 
-        for family_url, product_url, expected_price in cases:
+        for sku, family_url, product_url, expected_price in cases:
             with self.subTest(family_url=family_url):
                 html = f"""
                     <html>
@@ -253,11 +253,11 @@ class PublicSmokeTests(SmokeBaseTest):
 
                 response = mock.Mock(status_code=200, url=product_url, text=html)
                 with mock.patch("scraping.requests.get", return_value=response) as mocked_get:
-                    self.assertEqual(_scrape_price_from_page(family_url), expected_price)
+                    self.assertEqual(_scrape_price_from_page(family_url, sku=sku), expected_price)
                     mocked_get.assert_called_once()
                     self.assertEqual(mocked_get.call_args.args[0], product_url)
 
-    def test_msrp_scraper_uses_item_name_to_choose_price_on_family_pages(self):
+    def test_msrp_scraper_rejects_family_pages_without_exact_product_url(self):
         html = """
             <html>
               <body>
@@ -278,12 +278,9 @@ class PublicSmokeTests(SmokeBaseTest):
 
         response = mock.Mock(status_code=200, url="https://www.cutco.com/shop/flatware", text=html)
         with mock.patch("scraping.requests.get", return_value=response):
-            self.assertEqual(
-                _scrape_price_from_page("https://www.cutco.com/shop/flatware", "Stainless Dinner Fork"),
-                39.0,
-            )
+            self.assertIsNone(_scrape_price_from_page("https://www.cutco.com/shop/flatware", "Stainless Dinner Fork"))
 
-    def test_msrp_scraper_hops_from_family_page_to_matching_item_page(self):
+    def test_msrp_scraper_rejects_family_page_item_hop_guessing(self):
         family_html = """
             <html>
               <body>
@@ -292,27 +289,14 @@ class PublicSmokeTests(SmokeBaseTest):
               </body>
             </html>
         """
-        item_html = """
-            <html>
-              <body>
-                <h1>#1950 Stainless Dinner Fork</h1>
-                <div class="price">$39</div>
-              </body>
-            </html>
-        """
 
         with mock.patch("scraping.requests.get") as mocked_get:
-            mocked_get.side_effect = [
-                mock.Mock(status_code=200, url="https://www.cutco.com/shop/flatware", text=family_html),
-                mock.Mock(status_code=200, url="https://www.cutco.com/p/stainless-dinner-fork", text=item_html),
-            ]
+            mocked_get.return_value = mock.Mock(status_code=200, url="https://www.cutco.com/shop/flatware", text=family_html)
 
-            self.assertEqual(
+            self.assertIsNone(
                 _scrape_price_from_page("https://www.cutco.com/shop/flatware", "Stainless Dinner Fork"),
-                39.0,
             )
             self.assertEqual(mocked_get.call_args_list[0].args[0], "https://www.cutco.com/shop/flatware")
-            self.assertEqual(mocked_get.call_args_list[1].args[0], "https://www.cutco.com/p/stainless-dinner-fork")
 
     def test_resolve_cutco_item_page_url_hops_to_matching_item_page(self):
         family_html = """
