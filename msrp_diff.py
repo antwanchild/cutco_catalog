@@ -29,8 +29,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models import Item  # noqa: E402
-from constants import SCRAPE_HEADERS, REQUEST_TIMEOUT  # noqa: E402
-from scraping import scrape_catalog, _extract_cutco_price  # noqa: E402
+from scraping import _extract_cutco_price, _fetch_cutco_page, scrape_catalog  # noqa: E402
 from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
 
 app = create_app()
@@ -40,10 +39,10 @@ app = create_app()
 def _scrape_price_from_page(url: str) -> float | None:
     """Fetch a Cutco product page and return its price."""
     try:
-        resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
-        if resp.status_code != 200:
+        resolved_url, raw_html = _fetch_cutco_page(url)
+        if not raw_html:
             return None
-        return _extract_cutco_price(resp.text, page_url=url)
+        return _extract_cutco_price(raw_html, page_url=resolved_url or url)
     except Exception:
         return None
 

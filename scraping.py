@@ -18,6 +18,40 @@ from constants import (
 logger = logging.getLogger(__name__)
 
 
+def _extract_cutco_canonical_url(raw_html: str, *, fallback_url: str | None = None) -> str | None:
+    """Return a canonical Cutco product URL from page metadata when present."""
+    soup = BeautifulSoup(raw_html, "html.parser")
+    for tag in (
+        soup.find("link", rel="canonical"),
+        soup.find("meta", property="og:url"),
+    ):
+        if not tag:
+            continue
+        candidate = (tag.get("href") or tag.get("content") or "").strip()
+        if candidate and "/p/" in candidate:
+            return candidate
+    return fallback_url
+
+
+def _fetch_cutco_page(url: str) -> tuple[str | None, str | None]:
+    """Fetch a Cutco page and follow canonical URLs when exposed."""
+    try:
+        resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if resp.status_code != 200:
+            return None, None
+        canonical_url = _extract_cutco_canonical_url(resp.text, fallback_url=resp.url)
+        if canonical_url and canonical_url != resp.url:
+            try:
+                canonical_resp = requests.get(canonical_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+                if canonical_resp.status_code == 200:
+                    return canonical_resp.url, canonical_resp.text
+            except Exception:
+                pass
+        return resp.url, resp.text
+    except Exception:
+        return None, None
+
+
 def _extract_cutco_price(raw_html: str, *, page_url: str | None = None) -> float | None:
     """Return the most reliable product price found on a Cutco page.
 
@@ -544,11 +578,11 @@ def scrape_item_uses(url: str) -> list[str]:
     """Fetch a product page and return uses from the 'Uses+' accordion section."""
     clean_url = url.split("&view=")[0].split("?view=")[0]
     try:
-        resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
-        if resp.status_code != 200:
-            logger.debug("Uses fetch: HTTP %d for %s", resp.status_code, clean_url)
+        resolved_url, raw_html = _fetch_cutco_page(clean_url)
+        if not raw_html:
+            logger.debug("Uses fetch failed for %s", clean_url)
             return []
-        soup = BeautifulSoup(resp.text, "html.parser")
+        soup = BeautifulSoup(raw_html, "html.parser")
 
         # Find the heading that starts with "Uses" (e.g. "Uses+")
         uses_heading = None
@@ -571,7 +605,7 @@ def scrape_item_uses(url: str) -> list[str]:
             return []
 
         uses = [li.get_text(strip=True) for li in uses_ul.find_all("li") if li.get_text(strip=True)]
-        logger.debug("Uses fetch: %s → %d uses", clean_url, len(uses))
+        logger.debug("Uses fetch: %s → %d uses", resolved_url or clean_url, len(uses))
         return uses
     except Exception as exc:
         logger.warning("Uses scrape failed for %s: %s", url, exc)
@@ -607,10 +641,9 @@ def scrape_item_specs(url: str) -> dict:
         "weight":         None,
     }
     try:
-        resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
-        if resp.status_code != 200:
+        resolved_url, raw_html = _fetch_cutco_page(clean_url)
+        if not raw_html:
             return result
-        raw_html = resp.text
         # ── Edge type ────────────────────────────────────────────────────────
         item_class_m    = re.search(r'"itemClass"\s*:\s*"([^"]+)"', raw_html)
         item_subclass_m = re.search(r'"itemSubclass"\s*:\s*"([^"]+)"', raw_html)
@@ -647,9 +680,9 @@ def scrape_item_specs(url: str) -> dict:
                 result[field] = val
 
         # ── MSRP ─────────────────────────────────────────────────────────────
-        result["msrp"] = _extract_cutco_price(raw_html, page_url=clean_url)
+        result["msrp"] = _extract_cutco_price(raw_html, page_url=resolved_url or clean_url)
 
-        logger.debug("Specs: %s → %s", clean_url, result)
+        logger.debug("Specs: %s → %s", resolved_url or clean_url, result)
     except Exception as exc:
         logger.warning("Spec scrape failed for %s: %s", url, exc)
     return result

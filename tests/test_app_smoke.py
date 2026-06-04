@@ -164,8 +164,9 @@ class PublicSmokeTests(SmokeBaseTest):
     def test_msrp_scraper_reads_full_retail_fallback(self):
         html = '<html><body><script>{"fullRetail":184.0,"actualPrice":184.0}</script></body></html>'
 
-        with mock.patch("msrp_helpers.requests.get") as mocked_get:
+        with mock.patch("scraping.requests.get") as mocked_get:
             mocked_get.return_value.status_code = 200
+            mocked_get.return_value.url = "https://www.cutco.com/p/1766C"
             mocked_get.return_value.text = html
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/1766C"), 184.0)
@@ -184,9 +185,39 @@ class PublicSmokeTests(SmokeBaseTest):
             </html>
         """
 
-        with mock.patch("msrp_helpers.requests.get") as mocked_get:
-            mocked_get.return_value.status_code = 200
-            mocked_get.return_value.text = html
+        family_response = mock.Mock(status_code=200, url="https://www.cutco.com/p/cutting-boards/125", text=html)
+
+        with mock.patch("scraping.requests.get", return_value=family_response):
+            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/cutting-boards/125"), 35.0)
+
+    def test_msrp_scraper_follows_canonical_cutco_url(self):
+        parent_html = """
+            <html>
+              <head>
+                <link rel="canonical" href="https://www.cutco.com/p/medium-cutting-board">
+              </head>
+              <body>
+                <h1>#125 Medium Cutting Board</h1>
+                <script>
+                  window.__CUTCO__ = {"fullRetail":198.00,"actualPrice":198.00};
+                </script>
+              </body>
+            </html>
+        """
+        child_html = """
+            <html>
+              <body>
+                <h1>#125 Medium Cutting Board</h1>
+                <div class="price">$35</div>
+              </body>
+            </html>
+        """
+
+        with mock.patch("scraping.requests.get") as mocked_get:
+            mocked_get.side_effect = [
+                mock.Mock(status_code=200, url="https://www.cutco.com/p/cutting-boards/125", text=parent_html),
+                mock.Mock(status_code=200, url="https://www.cutco.com/p/medium-cutting-board", text=child_html),
+            ]
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/cutting-boards/125"), 35.0)
 
@@ -206,15 +237,15 @@ class PublicSmokeTests(SmokeBaseTest):
             </html>
         """
 
-        with mock.patch("msrp_helpers.requests.get") as mocked_get:
-            mocked_get.return_value.status_code = 200
-            mocked_get.return_value.text = html
+        with mock.patch("scraping.requests.get") as mocked_get:
+            mocked_get.side_effect = [
+                mock.Mock(status_code=200, url="https://www.cutco.com/p/super-shears/677CD", text=html),
+            ]
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/super-shears/677CD"), 149.0)
 
         with mock.patch("scraping.requests.get") as mocked_get:
-            mocked_get.return_value.status_code = 200
-            mocked_get.return_value.text = html
+            mocked_get.return_value = mock.Mock(status_code=200, url="https://www.cutco.com/p/super-shears/677CD", text=html)
 
             self.assertEqual(
                 scrape_item_specs("https://www.cutco.com/p/super-shears/677CD")["msrp"],

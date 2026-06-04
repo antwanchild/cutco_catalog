@@ -7,15 +7,11 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 
-import requests
-
-from constants import (
-    DATA_DIR, DISCORD_WEBHOOK_URL, REQUEST_TIMEOUT, SCRAPE_HEADERS,
-)
+from constants import DATA_DIR, DISCORD_WEBHOOK_URL
 from extensions import db
 from helpers import _notify_discord, check_wishlist_targets
 from models import Item, record_activity
-from scraping import scrape_catalog, _extract_cutco_price
+from scraping import _extract_cutco_price, _fetch_cutco_page, scrape_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -136,10 +132,10 @@ def _write_msrp_job(data: dict) -> None:
 def _scrape_price_from_page(url: str) -> float | None:
     """Return the price from a Cutco product page, or None if not found."""
     try:
-        resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
-        if resp.status_code != 200:
+        resolved_url, raw_html = _fetch_cutco_page(url)
+        if not raw_html:
             return None
-        return _extract_cutco_price(resp.text, page_url=url)
+        return _extract_cutco_price(raw_html, page_url=resolved_url or url)
     except Exception:
         return None
 
