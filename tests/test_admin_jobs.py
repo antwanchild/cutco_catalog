@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from datetime import timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from unittest import mock
 
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
@@ -10,6 +10,7 @@ from app import create_app
 import constants
 from constants import KNIFE_TASK_PRESETS
 from extensions import db
+import msrp_helpers
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Set
 from schema_migrations import SCHEMA_VERSION, SchemaState, apply_schema_migrations
 from startup import BOOTSTRAP_VERSION, BootstrapState, initialize_database
@@ -123,6 +124,30 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertEqual(write_mock.call_args.args[0]["status"], "running")
         self.assertTrue(write_mock.call_args.args[0]["update_db"])
         thread_instance.start.assert_called_once()
+
+    def test_stale_msrp_job_is_recovered_on_read(self):
+        stale_started_at = (datetime.now(UTC) - timedelta(hours=2)).isoformat(timespec="seconds")
+        job_data = {
+            "status": "running",
+            "progress": ["Starting MSRP diff…"],
+            "results": None,
+            "error": None,
+            "started_at": stale_started_at,
+            "finished_at": None,
+            "update_db": True,
+            "heartbeat_at": stale_started_at,
+        }
+        job_file = f"{self.temp_dir.name}/msrp_job.json"
+        with open(job_file, "w", encoding="utf-8") as fh:
+            import json
+            json.dump(job_data, fh)
+
+        with mock.patch.object(msrp_helpers, "_MSRP_JOB_FILE", job_file):
+            recovered = msrp_helpers._read_msrp_job()
+
+        self.assertEqual(recovered["status"], "error")
+        self.assertIn("stale", recovered["error"].lower())
+        self.assertIsNotNone(recovered["finished_at"])
 
     def test_admin_diagnostics_shows_job_summaries(self):
         self._login_as_admin()

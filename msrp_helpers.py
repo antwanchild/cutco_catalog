@@ -5,7 +5,7 @@ import logging
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from constants import DATA_DIR, DISCORD_WEBHOOK_URL
 from extensions import db
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 _MSRP_JOB_FILE   = os.path.join(DATA_DIR, "msrp_job.json")
 _msrp_write_lock  = threading.Lock()
+_MSRP_JOB_STALE_AFTER = timedelta(minutes=30)
 
 _SPECS_JOB_FILE  = os.path.join(DATA_DIR, "specs_job.json")
 _specs_write_lock = threading.Lock()
@@ -113,16 +114,39 @@ def _run_specs_backfill_job(app) -> None:
 def _read_msrp_job() -> dict:
     try:
         with open(_MSRP_JOB_FILE) as fh:
-            return json.load(fh)
+            job = json.load(fh)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {"status": "idle", "progress": [], "results": None,
                 "error": None, "started_at": None, "finished_at": None,
-                "update_db": True}
+                "update_db": True, "heartbeat_at": None}
+    if job.get("status") != "running":
+        return job
+    timestamp_text = job.get("heartbeat_at") or job.get("started_at")
+    stale = not timestamp_text
+    if not stale:
+        try:
+            timestamp = datetime.fromisoformat(str(timestamp_text))
+        except ValueError:
+            stale = True
+        else:
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=UTC)
+            stale = datetime.now(UTC) - timestamp > _MSRP_JOB_STALE_AFTER
+    if not stale:
+        return job
+
+    recovered = dict(job)
+    recovered["status"] = "error"
+    recovered["error"] = "Previous MSRP diff job became stale. Please rerun the diff."
+    recovered["finished_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+    recovered["heartbeat_at"] = recovered["finished_at"]
+    _write_msrp_job(recovered)
+    return recovered
 
 
 def _write_msrp_job(data: dict) -> None:
     with _msrp_write_lock:
-        os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(os.path.dirname(_MSRP_JOB_FILE) or DATA_DIR, exist_ok=True)
         tmp = _MSRP_JOB_FILE + ".tmp"
         with open(tmp, "w") as fh:
             json.dump(data, fh)
@@ -187,6 +211,7 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
     def log(msg: str) -> None:
         job = _read_msrp_job()
         job["progress"].append(msg)
+        job["heartbeat_at"] = datetime.now(UTC).isoformat(timespec="seconds")
         _write_msrp_job(job)
 
     try:
@@ -255,7 +280,8 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
 
             job = _read_msrp_job()
             job.update({"status": "done", "results": diff,
-                        "finished_at": datetime.now(UTC).isoformat(timespec="seconds")})
+                        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                        "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds")})
             _write_msrp_job(job)
             record_activity(
                 "msrp_diff",
@@ -269,7 +295,8 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
         logger.error("MSRP diff job failed: %s", exc)
         job = _read_msrp_job()
         job.update({"status": "error", "error": str(exc),
-                    "finished_at": datetime.now(UTC).isoformat(timespec="seconds")})
+                    "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                    "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds")})
         _write_msrp_job(job)
         record_activity(
             "msrp_diff",
