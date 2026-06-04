@@ -151,6 +151,23 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertNotIn("Strict-Transport-Security", response.headers)
         self.assertEqual(self.client.get("/robots.txt").status_code, 200)
 
+    def test_nav_menus_are_sectioned_for_admin(self):
+        self._login_as_admin()
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"More", response.data)
+        self.assertIn(b"Explore", response.data)
+        self.assertIn(b"Track", response.data)
+        self.assertIn(b"Data", response.data)
+        self.assertIn(b"Admin", response.data)
+        self.assertIn(b"Review", response.data)
+        self.assertIn(b"Tools", response.data)
+        self.assertIn(b"Session", response.data)
+        self.assertIn(b"All Variants", response.data)
+        self.assertIn(b"MSRP Diff", response.data)
+
     def test_dashboard_popular_colors_links_to_variants_browse(self):
         self._login_as_admin()
         self._set_csrf_token()

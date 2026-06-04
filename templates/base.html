@@ -40,17 +40,26 @@
         More
       </summary>
       <div class="nav-group-menu">
-        <a href="{{ url_for('views.matrix') }}" {% if request.endpoint == 'views.matrix' %}class="active"{% endif %}>Matrix</a>
-        <a href="{{ url_for('people.wishlist') }}" {% if request.endpoint and 'wishlist' in request.endpoint %}class="active"{% endif %}>Wishlist</a>
-        <a href="{{ url_for('logs.sharpening') }}" {% if request.endpoint and 'sharpening' in request.endpoint %}class="active"{% endif %}>Sharpening</a>
-        <a href="{{ url_for('logs.cookware') }}" {% if request.endpoint and 'cookware' in request.endpoint %}class="active"{% endif %}>Cookware</a>
-        <a href="{{ url_for('logs.tasks') }}" {% if request.endpoint and 'task' in request.endpoint %}class="active"{% endif %}>Tasks</a>
-        <a href="{{ url_for('data.import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
-        <a href="{{ url_for('data.completion_import_page') }}" {% if request.endpoint and 'completion_import' in request.endpoint %}class="active"{% endif %}>Completion Import</a>
-        <a href="{{ url_for('data.variant_sync_page') }}" {% if request.endpoint and 'variant_sync' in request.endpoint %}class="active"{% endif %}>Variant Sync</a>
-        <a href="{{ url_for('catalog.variants_browse') }}" {% if request.endpoint == 'catalog.variants_browse' %}class="active"{% endif %}>All Variants</a>
-        <a href="{{ url_for('data.completion_gaps_page') }}" {% if request.endpoint and 'completion_gaps' in request.endpoint %}class="active"{% endif %}>Completion Gaps</a>
-        <a href="{{ url_for('data.export_page') }}" {% if request.endpoint and 'export' in request.endpoint %}class="active"{% endif %}>Export CSV</a>
+        <div class="nav-group-section">
+          <div class="nav-group-heading">Explore</div>
+          <a href="{{ url_for('views.matrix') }}" {% if request.endpoint == 'views.matrix' %}class="active"{% endif %}>Matrix</a>
+          <a href="{{ url_for('people.wishlist') }}" {% if request.endpoint and 'wishlist' in request.endpoint %}class="active"{% endif %}>Wishlist</a>
+          <a href="{{ url_for('catalog.variants_browse') }}" {% if request.endpoint == 'catalog.variants_browse' %}class="active"{% endif %}>All Variants</a>
+        </div>
+        <div class="nav-group-section">
+          <div class="nav-group-heading">Track</div>
+          <a href="{{ url_for('logs.sharpening') }}" {% if request.endpoint and 'sharpening' in request.endpoint %}class="active"{% endif %}>Sharpening</a>
+          <a href="{{ url_for('logs.cookware') }}" {% if request.endpoint and 'cookware' in request.endpoint %}class="active"{% endif %}>Cookware</a>
+          <a href="{{ url_for('logs.tasks') }}" {% if request.endpoint and 'task' in request.endpoint %}class="active"{% endif %}>Tasks</a>
+        </div>
+        <div class="nav-group-section nav-group-section-last">
+          <div class="nav-group-heading">Data</div>
+          <a href="{{ url_for('data.import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
+          <a href="{{ url_for('data.completion_import_page') }}" {% if request.endpoint and 'completion_import' in request.endpoint %}class="active"{% endif %}>Completion Import</a>
+          <a href="{{ url_for('data.variant_sync_page') }}" {% if request.endpoint and 'variant_sync' in request.endpoint %}class="active"{% endif %}>Variant Sync</a>
+          <a href="{{ url_for('data.completion_gaps_page') }}" {% if request.endpoint and 'completion_gaps' in request.endpoint %}class="active"{% endif %}>Completion Gaps</a>
+          <a href="{{ url_for('data.export_page') }}" {% if request.endpoint and 'export' in request.endpoint %}class="active"{% endif %}>Export CSV</a>
+        </div>
       </div>
     </details>
 
@@ -60,11 +69,20 @@
           Admin <span class="badge-admin">On</span>
         </summary>
         <div class="nav-group-menu">
-          <a href="{{ url_for('admin.audit_page') }}" {% if request.endpoint == 'admin.audit_page' %}class="active"{% endif %}>Audit Trail</a>
-          <a href="{{ url_for('admin.diagnostics_page') }}" {% if request.endpoint == 'admin.diagnostics_page' %}class="active"{% endif %}>Diagnostics</a>
-          <a href="{{ url_for('admin.msrp_diff_page') }}" {% if request.endpoint == 'admin.msrp_diff_page' %}class="active"{% endif %}>MSRP Diff</a>
-          <a href="{{ url_for('admin.specs_backfill_page') }}" {% if request.endpoint == 'admin.specs_backfill_page' %}class="active"{% endif %}>Specs Backfill</a>
-          <a href="{{ url_for('admin.admin_logout') }}">Logout</a>
+          <div class="nav-group-section">
+            <div class="nav-group-heading">Review</div>
+            <a href="{{ url_for('admin.audit_page') }}" {% if request.endpoint == 'admin.audit_page' %}class="active"{% endif %}>Audit Trail</a>
+            <a href="{{ url_for('admin.diagnostics_page') }}" {% if request.endpoint == 'admin.diagnostics_page' %}class="active"{% endif %}>Diagnostics</a>
+          </div>
+          <div class="nav-group-section">
+            <div class="nav-group-heading">Tools</div>
+            <a href="{{ url_for('admin.msrp_diff_page') }}" {% if request.endpoint == 'admin.msrp_diff_page' %}class="active"{% endif %}>MSRP Diff</a>
+            <a href="{{ url_for('admin.specs_backfill_page') }}" {% if request.endpoint == 'admin.specs_backfill_page' %}class="active"{% endif %}>Specs Backfill</a>
+          </div>
+          <div class="nav-group-section nav-group-section-last">
+            <div class="nav-group-heading">Session</div>
+            <a href="{{ url_for('admin.admin_logout') }}">Logout</a>
+          </div>
         </div>
       </details>
     {% else %}
