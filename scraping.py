@@ -17,6 +17,12 @@ from constants import (
 
 logger = logging.getLogger(__name__)
 
+_CUTTING_BOARD_URLS = {
+    "124": "https://www.cutco.com/p/small-cutting-board",
+    "125": "https://www.cutco.com/p/medium-cutting-board",
+    "126": "https://www.cutco.com/p/large-cutting-board",
+}
+
 
 def _extract_cutco_canonical_url(raw_html: str, *, fallback_url: str | None = None) -> str | None:
     """Return a canonical Cutco product URL from page metadata when present."""
@@ -33,10 +39,19 @@ def _extract_cutco_canonical_url(raw_html: str, *, fallback_url: str | None = No
     return fallback_url
 
 
+def _resolve_cutco_product_url(url: str) -> str:
+    """Return a size-specific Cutco product URL when a family page is ambiguous."""
+    sku_hint = _extract_sku_from_href(url, preserve_lettered_code=True)
+    if sku_hint in _CUTTING_BOARD_URLS and "cutting-boards" in url:
+        return _CUTTING_BOARD_URLS[sku_hint]
+    return url
+
+
 def _fetch_cutco_page(url: str) -> tuple[str | None, str | None]:
     """Fetch a Cutco page and follow canonical URLs when exposed."""
     try:
-        resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        resolved_request_url = _resolve_cutco_product_url(url)
+        resp = requests.get(resolved_request_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         if resp.status_code != 200:
             return None, None
         canonical_url = _extract_cutco_canonical_url(resp.text, fallback_url=resp.url)
@@ -1133,6 +1148,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                 preserve_lettered_code = cat_name in COOKWARE_CATEGORIES or cat_name == "Sheaths"
                 sku = _extract_sku_from_href(base_href, preserve_lettered_code=preserve_lettered_code)
                 prod_url = href if href.startswith("http") else f"https://www.cutco.com{href}"
+                prod_url = _resolve_cutco_product_url(prod_url)
 
                 name = name_hint
 

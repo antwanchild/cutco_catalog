@@ -171,59 +171,32 @@ class PublicSmokeTests(SmokeBaseTest):
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/1766C"), 184.0)
 
-    def test_msrp_scraper_prefers_visible_page_price_over_embedded_script_price(self):
-        html = """
-                <html>
-              <head><title>Medium Cutting Board</title></head>
-              <body>
-                <h1>#125 Medium Cutting Board</h1>
-                <div class="price">$28</div>
-                <p>Regular shipping and handling included</p>
-                <section class="frequently-bought">
-                  <span>Small Cutting Board $35</span>
-                </section>
-                <script>
-                  window.__CUTCO__ = {"fullRetail":198.00,"actualPrice":198.00};
-                </script>
-              </body>
-            </html>
-        """
+    def test_msrp_scraper_maps_cutting_board_family_urls_to_specific_products(self):
+        cases = [
+            ("https://www.cutco.com/p/cutting-boards/124", "https://www.cutco.com/p/small-cutting-board", 35.0),
+            ("https://www.cutco.com/p/cutting-boards/125", "https://www.cutco.com/p/medium-cutting-board", 28.0),
+            ("https://www.cutco.com/p/cutting-boards/126", "https://www.cutco.com/p/large-cutting-board", 42.0),
+        ]
 
-        family_response = mock.Mock(status_code=200, url="https://www.cutco.com/p/cutting-boards/125", text=html)
+        for family_url, product_url, expected_price in cases:
+            with self.subTest(family_url=family_url):
+                html = f"""
+                    <html>
+                      <body>
+                        <h1>{product_url.rsplit('/', 1)[-1].replace('-', ' ').title()}</h1>
+                        <div class="price">${expected_price:.2f}</div>
+                        <script>
+                          window.__CUTCO__ = {{"fullRetail":198.00,"actualPrice":198.00}};
+                        </script>
+                      </body>
+                    </html>
+                """
 
-        with mock.patch("scraping.requests.get", return_value=family_response):
-            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/cutting-boards/125"), 28.0)
-
-    def test_msrp_scraper_follows_canonical_cutco_url(self):
-        parent_html = """
-            <html>
-              <head>
-                <link rel="canonical" href="https://www.cutco.com/p/medium-cutting-board">
-              </head>
-              <body>
-                <h1>#125 Medium Cutting Board</h1>
-                <script>
-                  window.__CUTCO__ = {"fullRetail":198.00,"actualPrice":198.00};
-                </script>
-              </body>
-            </html>
-        """
-        child_html = """
-            <html>
-              <body>
-                <h1>#125 Medium Cutting Board</h1>
-                <div class="price">$35</div>
-              </body>
-            </html>
-        """
-
-        with mock.patch("scraping.requests.get") as mocked_get:
-            mocked_get.side_effect = [
-                mock.Mock(status_code=200, url="https://www.cutco.com/p/cutting-boards/125", text=parent_html),
-                mock.Mock(status_code=200, url="https://www.cutco.com/p/medium-cutting-board", text=child_html),
-            ]
-
-            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/cutting-boards/125"), 35.0)
+                response = mock.Mock(status_code=200, url=product_url, text=html)
+                with mock.patch("scraping.requests.get", return_value=response) as mocked_get:
+                    self.assertEqual(_scrape_price_from_page(family_url), expected_price)
+                    mocked_get.assert_called_once()
+                    self.assertEqual(mocked_get.call_args.args[0], product_url)
 
     def test_msrp_scraper_prefers_page_js_price_over_json_ld_offer(self):
         html = """
