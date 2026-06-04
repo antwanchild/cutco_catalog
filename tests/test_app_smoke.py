@@ -40,6 +40,7 @@ from scraping import (
     _normalize_set_member_sku,
     _collect_visible_set_piece_rows,
     _resolve_visible_member_sku,
+    _resolve_cutco_item_page_url,
     _should_queue_slug,
     _extract_product_variant_colors,
     scrape_purple_campaign_variants,
@@ -309,6 +310,35 @@ class PublicSmokeTests(SmokeBaseTest):
             )
             self.assertEqual(mocked_get.call_args_list[0].args[0], "https://www.cutco.com/shop/flatware")
             self.assertEqual(mocked_get.call_args_list[1].args[0], "https://www.cutco.com/p/stainless-dinner-fork")
+
+    def test_resolve_cutco_item_page_url_hops_to_matching_item_page(self):
+        family_html = """
+            <html>
+              <body>
+                <a href="/p/stainless-place-setting"><h2>Cutco 5-Pc. Stainless Place Setting with Stainless Table Knife</h2></a>
+                <a href="/p/stainless-dinner-fork"><h2>Cutco Stainless Dinner Fork</h2></a>
+              </body>
+            </html>
+        """
+        item_html = """
+            <html>
+              <body>
+                <h1>#1950 Stainless Dinner Fork</h1>
+                <div class="price">$39</div>
+              </body>
+            </html>
+        """
+
+        with mock.patch("scraping.requests.get") as mocked_get:
+            mocked_get.side_effect = [
+                mock.Mock(status_code=200, url="https://www.cutco.com/shop/flatware", text=family_html),
+                mock.Mock(status_code=200, url="https://www.cutco.com/p/stainless-dinner-fork", text=item_html),
+            ]
+
+            self.assertEqual(
+                _resolve_cutco_item_page_url("https://www.cutco.com/shop/flatware", item_name="Stainless Dinner Fork"),
+                "https://www.cutco.com/p/stainless-dinner-fork",
+            )
 
     def test_msrp_scraper_prefers_page_js_price_over_json_ld_offer(self):
         html = """

@@ -103,6 +103,12 @@ def _fetch_cutco_page(url: str, *, item_name: str | None = None) -> tuple[str | 
         return None, None
 
 
+def _resolve_cutco_item_page_url(url: str, *, item_name: str | None = None) -> str:
+    """Return the best Cutco page URL for a specific item when possible."""
+    resolved_url, _ = _fetch_cutco_page(url, item_name=item_name)
+    return resolved_url or url
+
+
 def _normalize_text_for_match(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
 
@@ -1250,6 +1256,9 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                 if cat_name == "Sheaths" or (name and "sheath" in name.lower() and "with sheath" not in name.lower()):
                     sku = None
 
+                if sku and name:
+                    prod_url = _resolve_cutco_item_page_url(prod_url, item_name=name)
+
                 if not sku:
                     if "&view=product" not in prod_url:
                         prod_url = prod_url + "&view=product"
@@ -1291,6 +1300,7 @@ def scrape_catalog() -> tuple[list[dict], list[tuple[str, str]]]:
                 name = cat_page_name or page_name
                 if not sku or sku in seen_skus or not name:
                     continue
+                prod_url = _resolve_cutco_item_page_url(prod_url, item_name=name)
                 if _is_set_product(name):
                     if prod_url not in seen_set_urls:
                         seen_set_urls.add(prod_url)
