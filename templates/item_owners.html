@@ -57,7 +57,9 @@
 <section class="dashboard-card" style="margin-bottom:1.25rem">
   <div class="section-heading-actions" style="margin-bottom:.6rem">
     <h2>Top Colors</h2>
-    <a class="btn btn-secondary btn-sm" href="{{ url_for('catalog.variants_browse') }}">Show all</a>
+    {% if top_colors | length > 2 %}
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('catalog.variants_browse') }}">Show all</a>
+    {% endif %}
   </div>
   <div class="chip-row">
     {% for row in top_colors %}
