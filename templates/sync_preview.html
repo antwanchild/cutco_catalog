@@ -164,14 +164,16 @@
         <td>{{ item_set.name }}</td>
         <td class="mono">{{ item_set.sku or '—' }}</td>
         <td>
-          <span class="muted small">{{ item_set.member_snapshot_rows | length }} item(s):</span>
+          <div class="muted small" style="margin-bottom:.35rem">{{ item_set.member_snapshot_rows | length }} item(s):</div>
+          <div class="small">
+            {% for member in item_set.member_snapshot_rows %}
+              <span class="mono">{{ member.sku or '—' }}{% set qty = member.quantity or 1 %}{% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}</span>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </div>
           {% for member in item_set.member_snapshot_rows %}
-            <div style="margin-top:.25rem">
-              <span class="mono small">{{ member.sku or '—' }}{% set qty = member.quantity or 1 %}{% if qty > 1 %}<span class="badge badge-info">×{{ qty }}</span>{% endif %}</span>
-              {% if member.status != 'present' and member.resolution_note %}
-                <div class="muted small">{{ member.status_label }}. {{ member.resolution_note }}</div>
-              {% endif %}
-            </div>
+            {% if member.status != 'present' and member.resolution_note %}
+              <div class="muted small" style="margin-top:.25rem">{{ member.status_label }}. {{ member.resolution_note }}</div>
+            {% endif %}
           {% endfor %}
           {% if item_set.not_in_catalog_skus %}
             <div class="muted small">Not in catalog: {% for sku in item_set.not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</div>

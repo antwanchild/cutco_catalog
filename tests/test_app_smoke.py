@@ -3600,6 +3600,16 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)
 
+        soup = BeautifulSoup(response.data, "html.parser")
+        members_cell = soup.find(string=lambda text: text and "New Sync Set" in text)
+        self.assertIsNotNone(members_cell)
+        members_row = members_cell.find_parent("tr")
+        self.assertIsNotNone(members_row)
+        self.assertIn("EX-1", members_row.get_text(" ", strip=True))
+        self.assertIn("NS-1", members_row.get_text(" ", strip=True))
+        self.assertIn("NS-2", members_row.get_text(" ", strip=True))
+        self.assertIn(",", members_row.get_text(" ", strip=True))
+
     def test_catalog_sync_idle_page_does_not_scrape_inline(self):
         self._login_as_admin()
 
