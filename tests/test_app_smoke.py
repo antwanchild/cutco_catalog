@@ -712,9 +712,23 @@ class PublicSmokeTests(SmokeBaseTest):
             sku="VW-1",
             alternate_skus="VW-ALT1, VW-ALT2",
         )
+        red_item_id, red_variant_id = self._add_catalog_item(name="Stats Red Knife", sku="SR-1")
+        purple_item_id, purple_variant_id = self._add_catalog_item(name="Stats Purple Knife", sku="SP-1")
         _matrix_sort_item_id, _ = self._add_catalog_item(name="A Matrix Knife", sku="AA-1")
         person_id = self._add_person(name="Viewer", notes="")
         set_id = self._add_set(name="View Set", sku="VS-1", item_ids=(item_id,))
+
+        with self.app.app_context():
+            view_variant = db.session.get(ItemVariant, variant_id)
+            red_variant = db.session.get(ItemVariant, red_variant_id)
+            purple_variant = db.session.get(ItemVariant, purple_variant_id)
+            self.assertIsNotNone(view_variant)
+            self.assertIsNotNone(red_variant)
+            self.assertIsNotNone(purple_variant)
+            view_variant.color = "Blue"
+            red_variant.color = "Red"
+            purple_variant.color = "Purple"
+            db.session.commit()
 
         self.client.post(
             "/ownership/add",
@@ -722,6 +736,30 @@ class PublicSmokeTests(SmokeBaseTest):
                 "csrf_token": "test-csrf-token",
                 "person_id": str(person_id),
                 "variant_id": str(variant_id),
+                "status": "Owned",
+                "target_price": "",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(red_variant_id),
+                "status": "Owned",
+                "target_price": "",
+                "notes": "",
+            },
+            follow_redirects=False,
+        )
+        self.client.post(
+            "/ownership/add",
+            data={
+                "csrf_token": "test-csrf-token",
+                "person_id": str(person_id),
+                "variant_id": str(purple_variant_id),
                 "status": "Owned",
                 "target_price": "",
                 "notes": "",
@@ -750,6 +788,9 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertGreater(matrix_response.data.index(b"#AA-1"), matrix_response.data.index(b"#VW-1"))
         self.assertEqual(stats_response.status_code, 200)
         self.assertIn(b"Coverage", stats_response.data)
+        self.assertIn(b"Top Colors", stats_response.data)
+        self.assertIn(b"/variants?color=Red", stats_response.data)
+        self.assertIn(b"/variants?color=Purple", stats_response.data)
         self.assertIn(b"Includes public items plus unicorn, rep only, Costco, and non-catalog items that are marked Owned.", stats_response.data)
         self.assertEqual(gift_share_response.status_code, 200)
         self.assertIn(b"Share Gift List", gift_share_response.data)

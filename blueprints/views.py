@@ -291,6 +291,10 @@ def stats():
     val_data   = sorted(cat_values.items(),  key=lambda kv: kv[1], reverse=True)
     color_data = sorted(color_counts.items(), key=lambda kv: kv[1], reverse=True)[:15]
     edge_data  = sorted(edge_counts.items(), key=lambda kv: kv[1], reverse=True)
+    top_colors = [
+        {"color": color, "count": count}
+        for color, count in color_data[:8]
+    ]
 
     cov_cats   = sorted(cat_catalog.keys())
     cov_owned  = [cat_counts.get(cat, 0)   for cat in cov_cats]
@@ -304,6 +308,7 @@ def stats():
         cat_data=cat_data,
         val_data=val_data,
         color_data=color_data,
+        top_colors=top_colors,
         edge_data=edge_data,
         collector_rows=collector_rows,
         cov_cats=cov_cats,
