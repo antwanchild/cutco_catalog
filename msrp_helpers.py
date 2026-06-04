@@ -169,13 +169,13 @@ def _reset_msrp_job() -> None:
     })
 
 
-def _scrape_price_from_page(url: str, item_name: str | None = None) -> float | None:
+def _scrape_price_from_page(url: str, item_name: str | None = None, sku: str | None = None) -> float | None:
     """Return the price from a Cutco product page, or None if not found."""
     try:
-        resolved_url, raw_html = _fetch_cutco_page(url, item_name=item_name)
+        resolved_url, raw_html = _fetch_cutco_page(url, item_name=item_name, sku=sku)
         if not raw_html:
             return None
-        return _extract_cutco_price(raw_html, page_url=resolved_url or url, item_name=item_name)
+        return _extract_cutco_price(raw_html, page_url=resolved_url or url, item_name=item_name, sku=sku)
     except Exception:
         return None
 
@@ -235,7 +235,7 @@ def _fetch_live_prices_by_sku(
     executor = ThreadPoolExecutor(max_workers=workers)
     try:
         future_map = {
-            executor.submit(_scrape_price_from_page, info["url"], info["name"]): sku
+            executor.submit(_scrape_price_from_page, info["url"], info["name"], sku): sku
             for sku, info in by_sku.items()
             if info.get("url")
         }

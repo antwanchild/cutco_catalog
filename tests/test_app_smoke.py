@@ -33,6 +33,7 @@ from models import (
 from scraping import (
     _build_set_member_entries,
     _dedupe_product_links,
+    _extract_cutco_price,
     _extract_sku_from_href,
     _find_cutco_item_link,
     _product_link_name,
@@ -438,6 +439,31 @@ class PublicSmokeTests(SmokeBaseTest):
             )
 
             self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/cheese-knife", "Cheese Knife"), 98.0)
+
+    def test_msrp_scraper_anchors_on_sku_when_title_has_extra_descriptor(self):
+        html = """
+            <html>
+              <body>
+                <h1>#1501 Vegetable & Potato Peeler</h1>
+                <div class="price">$55</div>
+                <div>Regular shipping included</div>
+                <section>
+                  <h2>Frequently Bought Together</h2>
+                  <p>Kitchen Tool Holder $149</p>
+                </section>
+              </body>
+            </html>
+        """
+
+        self.assertEqual(
+            _extract_cutco_price(
+                html,
+                page_url="https://www.cutco.com/p/vegetable-peeler",
+                item_name="Vegetable Peeler",
+                sku="1501",
+            ),
+            55.0,
+        )
 
     def test_find_cutco_item_link_prefers_exact_item_over_sheath_bundle(self):
         html = """

@@ -49,11 +49,13 @@ def _resolve_cutco_product_url(url: str) -> str:
     return url
 
 
-def _find_cutco_item_link(raw_html: str, item_name: str | None) -> str | None:
-    """Return a matching product link from a family page when the item name is known."""
+def _find_cutco_item_link(raw_html: str, item_name: str | None, sku: str | None = None) -> str | None:
+    """Return a matching product link from a family page when the item identity is known."""
     normalized_item = _normalize_text_for_match(item_name or "")
+    normalized_sku = _normalize_text_for_match(sku or "")
     if not normalized_item:
-        return None
+        if not normalized_sku:
+            return None
 
     soup = BeautifulSoup(raw_html, "html.parser")
     wants_sheath = "sheath" in normalized_item or "gift box" in normalized_item
@@ -76,14 +78,20 @@ def _find_cutco_item_link(raw_html: str, item_name: str | None) -> str | None:
         if not normalized_text:
             continue
         score = 0
-        if normalized_text == normalized_item:
-            score += 100
-        elif normalized_text.startswith(normalized_item):
-            score += 80
-        elif normalized_item in normalized_text:
-            score += 60
-        if normalized_item.split()[:2] and " ".join(normalized_item.split()[:2]) in normalized_text:
-            score += 10
+        if normalized_item:
+            if normalized_text == normalized_item:
+                score += 100
+            elif normalized_text.startswith(normalized_item):
+                score += 80
+            elif normalized_item in normalized_text:
+                score += 60
+            if normalized_item.split()[:2] and " ".join(normalized_item.split()[:2]) in normalized_text:
+                score += 10
+        if normalized_sku:
+            if normalized_sku in normalized_text:
+                score += 90
+            if normalized_sku in _normalize_text_for_match(href):
+                score += 80
         if re.search(r"\b(with\s+sheath|knife\s+and\s+sheath|knife\s+sheath|sheath\s+set|gift\s+box|bundle)\b",
                      normalized_text):
             score -= 50 if not wants_sheath else 0
@@ -96,15 +104,20 @@ def _find_cutco_item_link(raw_html: str, item_name: str | None) -> str | None:
     return best_match[1] if best_match else None
 
 
-def _fetch_cutco_page(url: str, *, item_name: str | None = None) -> tuple[str | None, str | None]:
+def _fetch_cutco_page(
+    url: str,
+    *,
+    item_name: str | None = None,
+    sku: str | None = None,
+) -> tuple[str | None, str | None]:
     """Fetch a Cutco page and follow canonical or item-specific URLs when exposed."""
     try:
         resolved_request_url = _resolve_cutco_product_url(url)
         resp = requests.get(resolved_request_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         if resp.status_code != 200:
             return None, None
-        if item_name:
-            item_url = _find_cutco_item_link(resp.text, item_name)
+        if item_name or sku:
+            item_url = _find_cutco_item_link(resp.text, item_name, sku)
             if item_url and item_url != resp.url:
                 try:
                     item_resp = requests.get(item_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
@@ -142,13 +155,27 @@ def _normalize_cutco_title(value: str) -> str:
     return normalized.strip()
 
 
-def _line_matches_item_name(line: str, item_name: str | None) -> bool:
-    """Return True when a visible line looks like the exact item title."""
+def _line_matches_item_identity(line: str, item_name: str | None, sku: str | None = None) -> bool:
+    """Return True when a visible line looks like the target product."""
     normalized_item = _normalize_cutco_title(item_name or "")
+    normalized_line = _normalize_cutco_title(line)
+    if sku:
+        normalized_sku = _normalize_text_for_match(sku)
+        if normalized_sku and re.search(rf"(?<![a-z0-9]){re.escape(normalized_sku)}(?![a-z0-9])",
+                                        _normalize_text_for_match(line)):
+            if not normalized_item or normalized_item in normalized_line or normalized_line in normalized_item:
+                return True
+            # Some Cutco pages expose a slightly different product title; the SKU
+            # is still a reliable anchor for the main product block.
+            if normalized_line:
+                return True
     if not normalized_item:
         return False
-    normalized_line = _normalize_cutco_title(line)
-    return normalized_line == normalized_item
+    if normalized_line == normalized_item:
+        return True
+    if normalized_line.startswith(normalized_item) or normalized_item.startswith(normalized_line):
+        return True
+    return normalized_item in normalized_line or normalized_line in normalized_item
 
 
 def _extract_primary_visible_price(
@@ -156,6 +183,7 @@ def _extract_primary_visible_price(
     *,
     heading_text: str | None = None,
     candidate_text: str | None = None,
+    sku: str | None = None,
 ) -> float | None:
     """Extract the main visible product price from Cutco page text.
 
@@ -168,21 +196,28 @@ def _extract_primary_visible_price(
         return None
 
     start_index = 0
-    end_index = len(lines)
     normalized_candidate = _normalize_text_for_match(candidate_text or "")
     normalized_heading = _normalize_text_for_match(heading_text or "")
     wants_sheath = "sheath" in normalized_candidate or "gift box" in normalized_candidate
     if normalized_candidate:
         for index, line in enumerate(lines):
-            if _line_matches_item_name(line, candidate_text):
+            if _line_matches_item_identity(line, candidate_text, sku=sku):
                 start_index = index
-                end_index = min(len(lines), index + 15)
                 break
+        else:
+            if sku:
+                normalized_sku = _normalize_text_for_match(sku)
+                for index, line in enumerate(lines):
+                    if normalized_sku and re.search(
+                        rf"(?<![a-z0-9]){re.escape(normalized_sku)}(?![a-z0-9])",
+                        _normalize_text_for_match(line),
+                    ):
+                        start_index = index
+                        break
     elif normalized_heading:
         for index, line in enumerate(lines):
             if normalized_heading in _normalize_text_for_match(line):
                 start_index = index + 1
-                end_index = min(len(lines), index + 15)
                 break
 
     cut_markers = (
@@ -199,7 +234,7 @@ def _extract_primary_visible_price(
         "Shipping and handling included",
     )
 
-    truncated_lines = lines[start_index:end_index]
+    truncated_lines = lines[start_index:]
     for stop_index, line in enumerate(truncated_lines):
         if any(marker.lower() in line.lower() for marker in stop_markers):
             truncated_lines = truncated_lines[:stop_index]
@@ -239,6 +274,7 @@ def _extract_cutco_price(
     *,
     page_url: str | None = None,
     item_name: str | None = None,
+    sku: str | None = None,
 ) -> float | None:
     """Return the most reliable product price found on a Cutco page.
 
@@ -260,6 +296,7 @@ def _extract_cutco_price(
         page_text,
         heading_text=heading_text,
         candidate_text=item_name,
+        sku=sku or page_sku,
     )
     if visible_price is not None:
         return visible_price
