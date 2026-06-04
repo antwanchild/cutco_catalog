@@ -279,6 +279,37 @@ class PublicSmokeTests(SmokeBaseTest):
                 39.0,
             )
 
+    def test_msrp_scraper_hops_from_family_page_to_matching_item_page(self):
+        family_html = """
+            <html>
+              <body>
+                <a href="/p/stainless-place-setting"><h2>Cutco 5-Pc. Stainless Place Setting with Stainless Table Knife</h2></a>
+                <a href="/p/stainless-dinner-fork"><h2>Cutco Stainless Dinner Fork</h2></a>
+              </body>
+            </html>
+        """
+        item_html = """
+            <html>
+              <body>
+                <h1>#1950 Stainless Dinner Fork</h1>
+                <div class="price">$39</div>
+              </body>
+            </html>
+        """
+
+        with mock.patch("scraping.requests.get") as mocked_get:
+            mocked_get.side_effect = [
+                mock.Mock(status_code=200, url="https://www.cutco.com/shop/flatware", text=family_html),
+                mock.Mock(status_code=200, url="https://www.cutco.com/p/stainless-dinner-fork", text=item_html),
+            ]
+
+            self.assertEqual(
+                _scrape_price_from_page("https://www.cutco.com/shop/flatware", "Stainless Dinner Fork"),
+                39.0,
+            )
+            self.assertEqual(mocked_get.call_args_list[0].args[0], "https://www.cutco.com/shop/flatware")
+            self.assertEqual(mocked_get.call_args_list[1].args[0], "https://www.cutco.com/p/stainless-dinner-fork")
+
     def test_msrp_scraper_prefers_page_js_price_over_json_ld_offer(self):
         html = """
             <html>

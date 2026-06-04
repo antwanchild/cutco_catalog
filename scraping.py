@@ -6,6 +6,7 @@ import re
 import time
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -47,13 +48,43 @@ def _resolve_cutco_product_url(url: str) -> str:
     return url
 
 
-def _fetch_cutco_page(url: str) -> tuple[str | None, str | None]:
-    """Fetch a Cutco page and follow canonical URLs when exposed."""
+def _find_cutco_item_link(raw_html: str, item_name: str | None) -> str | None:
+    """Return a matching product link from a family page when the item name is known."""
+    normalized_item = _normalize_text_for_match(item_name or "")
+    if not normalized_item:
+        return None
+
+    soup = BeautifulSoup(raw_html, "html.parser")
+    for anchor in soup.select("a[href*='/p/']"):
+        href = (anchor.get("href") or "").strip()
+        if not href:
+            continue
+        texts = [anchor.get_text(" ", strip=True), anchor.get("aria-label", ""), anchor.get("title", "")]
+        image = anchor.find("img", alt=True)
+        if image:
+            texts.append(image.get("alt", ""))
+        for text in texts:
+            if normalized_item in _normalize_text_for_match(text):
+                return urljoin("https://www.cutco.com", href)
+    return None
+
+
+def _fetch_cutco_page(url: str, *, item_name: str | None = None) -> tuple[str | None, str | None]:
+    """Fetch a Cutco page and follow canonical or item-specific URLs when exposed."""
     try:
         resolved_request_url = _resolve_cutco_product_url(url)
         resp = requests.get(resolved_request_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
         if resp.status_code != 200:
             return None, None
+        if item_name:
+            item_url = _find_cutco_item_link(resp.text, item_name)
+            if item_url and item_url != resp.url:
+                try:
+                    item_resp = requests.get(item_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+                    if item_resp.status_code == 200:
+                        return item_resp.url, item_resp.text
+                except Exception:
+                    pass
         canonical_url = _extract_cutco_canonical_url(resp.text, fallback_url=resp.url)
         if canonical_url and canonical_url != resp.url:
             try:

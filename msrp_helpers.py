@@ -132,7 +132,7 @@ def _write_msrp_job(data: dict) -> None:
 def _scrape_price_from_page(url: str, item_name: str | None = None) -> float | None:
     """Return the price from a Cutco product page, or None if not found."""
     try:
-        resolved_url, raw_html = _fetch_cutco_page(url)
+        resolved_url, raw_html = _fetch_cutco_page(url, item_name=item_name)
         if not raw_html:
             return None
         return _extract_cutco_price(raw_html, page_url=resolved_url or url, item_name=item_name)
