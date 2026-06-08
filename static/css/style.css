@@ -550,6 +550,16 @@ a:hover { text-decoration: underline; }
   display: inline-block;
   margin: 0 auto;
 }
+.data-table th:has(> input[type="checkbox"]),
+.data-table td:has(> input[type="checkbox"]) {
+  text-align: center;
+  vertical-align: middle;
+}
+.data-table th:has(> input[type="checkbox"]) > input[type="checkbox"],
+.data-table td:has(> input[type="checkbox"]) > input[type="checkbox"] {
+  display: block;
+  margin: 0 auto;
+}
 .import-ownership-table th:nth-child(1), .import-ownership-table td:nth-child(1) { width: 4%; }
 .import-ownership-table th:nth-child(2), .import-ownership-table td:nth-child(2) { width: 6%; }
 .import-ownership-table th:nth-child(3), .import-ownership-table td:nth-child(3) { width: 16%; }
