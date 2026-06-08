@@ -3137,7 +3137,7 @@ class ImportSmokeTests(SmokeBaseTest):
     def test_import_preview_flags_set_sku_collisions(self):
         self._login_as_admin()
         self._set_csrf_token()
-        self._add_set(name="Cookware Set", sku="990C")
+        self._add_set(name="Cookware Set", sku="SET-COLLISION-990")
 
         preview_response = self.client.post(
             "/import",
@@ -3147,7 +3147,7 @@ class ImportSmokeTests(SmokeBaseTest):
                 "csvfile": (
                     BytesIO(
                         b"name,sku,owned,color,edge,category\n"
-                        b"Cookware Piece,990C,yes,Classic Brown,Straight,Cookware\n"
+                        b"Collision Test Piece,SET-COLLISION-990,yes,Classic Brown,Straight,Cookware\n"
                     ),
                     "set_collision.csv",
                 ),

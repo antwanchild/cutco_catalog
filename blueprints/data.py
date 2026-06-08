@@ -1637,7 +1637,7 @@ def import_page():
                 bucket = set_sku_collisions
             else:
                 bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku else new_items_list
-                bucket.append({
+            bucket.append({
                 "name": name, "sku": sku, "color": target_color,
                 "display_color": _preview_import_color(target_color, is_cookware),
                 "edge_type": edge_type,
