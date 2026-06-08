@@ -60,13 +60,13 @@
     <table class="data-table import-item-table">
       <thead>
         <tr>
-          <th>Accept</th><th>Row</th><th>Color</th><th>Edge</th><th>Category</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
+          <th>Keep</th><th>Row</th><th>Color</th><th>Edge</th><th>Category</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
         </tr>
       </thead>
       <tbody>
         {% for item in group.rows %}
         <tr>
-          <td><input type="checkbox" name="item_accept_{{ item.form_index }}" {% if checked_by_default %}checked{% endif %}></td>
+          <td class="import-accept-cell"><input type="checkbox" class="import-accept-checkbox" name="item_accept_{{ item.form_index }}" {% if checked_by_default %}checked{% endif %}></td>
           <td>
             <input type="hidden" name="item_row_{{ item.form_index }}" value="{{ item.row }}">
             <input type="hidden" name="item_name_{{ item.form_index }}" value="{{ item.name }}">
@@ -156,7 +156,7 @@
     <table class="data-table import-ownership-table">
       <thead>
         <tr>
-          <th>Accept</th><th>Row</th><th>Person</th><th>Color</th><th>Status</th><th>Flags</th>
+          <th>Keep</th><th>Row</th><th>Person</th><th>Color</th><th>Status</th><th>Flags</th>
           <th><span class="stacked-head"><span>Qty</span><span>Purchased</span></span></th>
           <th><span class="stacked-head"><span>Qty</span><span>Given Away</span></span></th>
           <th>Notes</th>
@@ -165,7 +165,7 @@
       <tbody>
         {% for entry in group.rows %}
         <tr>
-          <td><input type="checkbox" name="own_accept_{{ entry.form_index }}" checked></td>
+          <td class="import-accept-cell"><input type="checkbox" class="import-accept-checkbox" name="own_accept_{{ entry.form_index }}" checked></td>
           <td>
             <input type="hidden" name="own_row_{{ entry.form_index }}" value="{{ entry.row }}">
             <input type="hidden" name="own_person_{{ entry.form_index }}" value="{{ entry.person }}">
