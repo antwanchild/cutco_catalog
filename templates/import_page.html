@@ -9,83 +9,85 @@
   </div>
 </div>
 
-<div class="form-card">
-  <h2>Start Here</h2>
-  <p class="muted">Upload a CSV or XLSX, optionally assign every row to one person, and preview the import before anything is saved.</p>
-  <p class="muted small">If you only want to validate the file shape, use <strong>Check Headers</strong>. The mapping guide below is available when you need it.</p>
-</div>
-
-<form method="post" enctype="multipart/form-data" class="form-card">
-  <label>File (.xlsx or .csv) *
-    <input type="file" name="csvfile" accept=".csv,.xlsx" required class="input-full">
-  </label>
-
-  <label>Assign all rows to
-    <span class="hint">If set, every row uses this person instead of the Owned column value.</span>
-    <select name="person_override" class="input-full">
-      <option value="">— use Owned column —</option>
-      {% for person in people %}
-        <option value="{{ person.name }}">{{ person.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-
-  <div class="form-actions">
-    <button type="submit" name="mode" value="preview" class="btn btn-primary">Preview Import</button>
-    <button type="submit" name="mode" value="check" class="btn btn-secondary">Check Headers</button>
+<div class="import-page-stack">
+  <div class="form-card">
+    <h2>Start Here</h2>
+    <p class="muted">Upload a CSV or XLSX, optionally assign every row to one person, and preview the import before anything is saved.</p>
+    <p class="muted small">If you only want to validate the file shape, use <strong>Check Headers</strong>. The mapping guide below is available when you need it.</p>
   </div>
-</form>
 
-<details class="form-card import-mapping">
-  <summary>Import Column Mapping</summary>
-  <p class="muted">Case-insensitive matching. Lowercase is easiest to scan, and these are the headers we recognize.</p>
-  <p class="muted small"><code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
-  <table class="data-table compact">
-    <thead><tr><th>Spreadsheet Column</th><th>Maps To</th></tr></thead>
-    <tbody>
-      <tr><td><code>name</code></td><td>Item name</td></tr>
-      <tr><td><code>sku</code></td><td>SKU</td></tr>
-      <tr><td><code>owned</code></td><td>yes = Owned, no = Wishlist, text = person</td></tr>
-      <tr><td><code>color</code></td><td>Variant color</td></tr>
-      <tr><td><code>availability</code></td><td>Blank = Public; <code>rep</code> = Rep only; <code>costco</code> = Costco; <code>non-catalog</code> = Non-catalog</td></tr>
-      <tr><td><code>non_catalog</code></td><td>Legacy alias for non-catalog</td></tr>
-      <tr><td><code>quantity purchased</code></td><td>Whole number</td></tr>
-      <tr><td><code>quantity given away</code></td><td>Whole number</td></tr>
-      <tr><td><code>category</code></td><td>Category</td></tr>
-      <tr><td><code>edge</code></td><td>Edge type</td></tr>
-      <tr><td><code>is_sku_unicorn</code></td><td>SKU/item unicorn flag</td></tr>
-      <tr><td><code>is_variant_unicorn</code></td><td>Variant/color unicorn flag</td></tr>
-      <tr><td><code>is_edge_unicorn</code></td><td>Edge/blade-type unicorn flag</td></tr>
-      <tr><td><code>price</code></td><td>Merged into notes</td></tr>
-    </tbody>
-  </table>
-</details>
+  <form method="post" enctype="multipart/form-data" class="form-card">
+    <label>File (.xlsx or .csv) *
+      <input type="file" name="csvfile" accept=".csv,.xlsx" required class="input-full">
+    </label>
 
-{% if import_check %}
-<div class="form-card">
-  <h2>Header Check Result ({{ import_check.file_type }})</h2>
-  <p class="muted small">Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
-  {% if import_check.ok %}
-    <p class="flash flash-success">Required headers look good.</p>
-  {% else %}
-    <p class="flash flash-error">Missing required headers: {{ import_check.missing_required | join(", ") }}</p>
-  {% endif %}
-
-  {% if import_check.warnings %}
-    <div class="flash flash-warning">
-      <strong>Warnings</strong>
-      <ul>
-        {% for warning in import_check.warnings %}
-          <li>{{ warning }}</li>
+    <label>Assign all rows to
+      <span class="hint">If set, every row uses this person instead of the Owned column value.</span>
+      <select name="person_override" class="input-full">
+        <option value="">— use Owned column —</option>
+        {% for person in people %}
+          <option value="{{ person.name }}">{{ person.name }}</option>
         {% endfor %}
-      </ul>
-    </div>
-  {% endif %}
+      </select>
+    </label>
 
-  <p><strong>Recognized mapped columns:</strong> {{ import_check.mapped_headers | join(", ") if import_check.mapped_headers else "none" }}</p>
-  {% if import_check.unknown_headers %}
-    <p><strong>Unmapped headers:</strong> {{ import_check.unknown_headers | join(", ") }}</p>
+    <div class="form-actions">
+      <button type="submit" name="mode" value="preview" class="btn btn-primary">Preview Import</button>
+      <button type="submit" name="mode" value="check" class="btn btn-secondary">Check Headers</button>
+    </div>
+  </form>
+
+  <details class="form-card import-mapping">
+    <summary>Import Column Mapping</summary>
+    <p class="muted">Case-insensitive matching. Lowercase is easiest to scan, and these are the headers we recognize.</p>
+    <p class="muted small"><code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
+    <table class="data-table compact">
+      <thead><tr><th>Spreadsheet Column</th><th>Maps To</th></tr></thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>Item name</td></tr>
+        <tr><td><code>sku</code></td><td>SKU</td></tr>
+        <tr><td><code>owned</code></td><td>yes = Owned, no = Wishlist, text = person</td></tr>
+        <tr><td><code>color</code></td><td>Variant color</td></tr>
+        <tr><td><code>availability</code></td><td>Blank = Public; <code>rep</code> = Rep only; <code>costco</code> = Costco; <code>non-catalog</code> = Non-catalog</td></tr>
+        <tr><td><code>non_catalog</code></td><td>Legacy alias for non-catalog</td></tr>
+        <tr><td><code>quantity purchased</code></td><td>Whole number</td></tr>
+        <tr><td><code>quantity given away</code></td><td>Whole number</td></tr>
+        <tr><td><code>category</code></td><td>Category</td></tr>
+        <tr><td><code>edge</code></td><td>Edge type</td></tr>
+        <tr><td><code>is_sku_unicorn</code></td><td>SKU/item unicorn flag</td></tr>
+        <tr><td><code>is_variant_unicorn</code></td><td>Variant/color unicorn flag</td></tr>
+        <tr><td><code>is_edge_unicorn</code></td><td>Edge/blade-type unicorn flag</td></tr>
+        <tr><td><code>price</code></td><td>Merged into notes</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  {% if import_check %}
+  <div class="form-card">
+    <h2>Header Check Result ({{ import_check.file_type }})</h2>
+    <p class="muted small">Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
+    {% if import_check.ok %}
+      <p class="flash flash-success">Required headers look good.</p>
+    {% else %}
+      <p class="flash flash-error">Missing required headers: {{ import_check.missing_required | join(", ") }}</p>
+    {% endif %}
+
+    {% if import_check.warnings %}
+      <div class="flash flash-warning">
+        <strong>Warnings</strong>
+        <ul>
+          {% for warning in import_check.warnings %}
+            <li>{{ warning }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <p><strong>Recognized mapped columns:</strong> {{ import_check.mapped_headers | join(", ") if import_check.mapped_headers else "none" }}</p>
+    {% if import_check.unknown_headers %}
+      <p><strong>Unmapped headers:</strong> {{ import_check.unknown_headers | join(", ") }}</p>
+    {% endif %}
+  </div>
   {% endif %}
 </div>
-{% endif %}
 {% endblock %}
