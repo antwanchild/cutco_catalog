@@ -2468,6 +2468,32 @@ class ImportSmokeTests(SmokeBaseTest):
             self.assertEqual(second_item.name, "Duplicate Knife")
             self.assertNotEqual(first_item.id, second_item.id)
 
+    def test_import_preview_keeps_duplicate_sku_rows_visible(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color\n"
+                        b"Carving Fork,1733,yes,Classic Brown\n"
+                        b"Carving Fork,1733,yes,Classic Brown\n"
+                    ),
+                    "duplicate_sku.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"New Catalog Items (2)", response.data)
+        self.assertIn(b"1733", response.data)
+        self.assertIn(b"Import matching prefers SKU first.", response.data)
+
     def test_import_preview_renders_xlsx_rows(self):
         self._login_as_admin()
         self._set_csrf_token()

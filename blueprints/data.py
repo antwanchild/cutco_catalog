@@ -1477,7 +1477,6 @@ def import_page():
     ownership_entries  = []
     conflicts          = []
     errors             = []
-    seen_skus          = set()
 
     for row_num, row in enumerate(parsed_rows, start=2):
         name       = row.get("name", "").strip()
@@ -1542,8 +1541,6 @@ def import_page():
                 None,
             )
 
-        dedup_key = (sku or name.lower(), color.lower())
-
         if matched_item:
             is_cookware = (matched_item.category or "") in COOKWARE_CATEGORIES
             already_in_catalog.append({"item": matched_item, "row": row,
@@ -1568,8 +1565,7 @@ def import_page():
                 "is_variant_unicorn": is_variant_unicorn,
                 "is_edge_unicorn": is_edge_unicorn,
             })
-        elif dedup_key not in seen_skus:
-            seen_skus.add(dedup_key)
+        else:
             if matches_set_sku:
                 bucket = set_sku_collisions
             else:
