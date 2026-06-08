@@ -2192,7 +2192,7 @@ class ImportSmokeTests(SmokeBaseTest):
             self.assertEqual(ownership.quantity_purchased, 2)
             self.assertEqual(ownership.quantity_given_away, 1)
 
-    def test_import_confirm_updates_existing_ownership_quantities(self):
+    def test_import_confirm_accumulates_existing_ownership_quantities(self):
         self._login_as_admin()
         self._set_csrf_token()
 
@@ -2264,8 +2264,8 @@ class ImportSmokeTests(SmokeBaseTest):
             ).scalars().all()
             self.assertEqual(len(ownerships), 1)
             ownership = ownerships[0]
-            self.assertEqual(ownership.quantity_purchased, 5)
-            self.assertEqual(ownership.quantity_given_away, 2)
+            self.assertEqual(ownership.quantity_purchased, 7)
+            self.assertEqual(ownership.quantity_given_away, 3)
 
     def test_import_confirm_marks_non_catalog_items_off_catalog(self):
         self._login_as_admin()
