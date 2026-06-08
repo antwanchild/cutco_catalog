@@ -4050,6 +4050,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         )
         self.assertEqual(confirm_response.status_code, 200)
         self.assertIn(b"Variant Sync Result", confirm_response.data)
+        self.assertIn(b"Sync Complete", confirm_response.data)
         self.assertIn(b"Variants created", confirm_response.data)
         self.assertIn(b"Variant colors detected", confirm_response.data)
 
