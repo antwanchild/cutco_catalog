@@ -107,6 +107,21 @@ def _build_item_sku_lookup(items: list[Item]) -> dict[str, Item]:
     return lookup
 
 
+def _match_import_item(
+    *,
+    existing_items: dict[str, Item],
+    existing_names: dict[str, Item],
+    sku: str,
+    name: str,
+) -> Item | None:
+    """Match an import row to an existing item, preferring SKU over name."""
+    if sku:
+        return existing_items.get(sku)
+    if name:
+        return existing_names.get(name.lower())
+    return None
+
+
 def _normalize_variant_lookup_name(value: str | None) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
 
@@ -1504,11 +1519,12 @@ def import_page():
         if status not in STATUS_OPTIONS:
             status = "Owned"
 
-        matched_item = None
-        if sku and sku in existing_items:
-            matched_item = existing_items[sku]
-        elif name.lower() in existing_names:
-            matched_item = existing_names[name.lower()]
+        matched_item = _match_import_item(
+            existing_items=existing_items,
+            existing_names=existing_names,
+            sku=sku,
+            name=name,
+        )
 
         matched_set = existing_set_skus.get(sku) if sku else None
         matches_set_sku = bool(sku and matched_set and not matched_item)
@@ -2031,11 +2047,12 @@ def import_confirm():
                 })
                 continue
 
-            item = None
-            if sku and sku in existing_items:
-                item = existing_items[sku]
-            elif name.lower() in existing_names:
-                item = existing_names[name.lower()]
+            item = _match_import_item(
+                existing_items=existing_items,
+                existing_names=existing_names,
+                sku=sku,
+                name=name,
+            )
 
             if not item:
                 item = Item(name=name, sku=sku, category=category,

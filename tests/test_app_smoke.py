@@ -2386,6 +2386,87 @@ class ImportSmokeTests(SmokeBaseTest):
             item = db.session.get(Item, existing_item_id)
             self.assertEqual(item.category, "Kitchen Knives")
 
+    def test_import_keeps_same_name_rows_with_different_skus_separate(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color\n"
+                        b"Duplicate Knife,DN-1,yes,Classic Brown\n"
+                        b"Duplicate Knife,DN-2,yes,Pearl White\n"
+                    ),
+                    "duplicates.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"New Catalog Items (2)", response.data)
+        self.assertIn(b"DN-1", response.data)
+        self.assertIn(b"DN-2", response.data)
+
+        soup = BeautifulSoup(response.data, "html.parser")
+        item_count_input = soup.select_one('input[name="item_count"]')
+        self.assertIsNotNone(item_count_input)
+        self.assertEqual(item_count_input["value"], "2")
+
+        confirm_response = self.client.post(
+            "/import/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "total_rows": "2",
+                "error_count": "0",
+                "conflict_count": "0",
+                "item_count": "2",
+                "own_count": "0",
+                "item_accept_0": "on",
+                "item_row_0": "2",
+                "item_name_0": "Duplicate Knife",
+                "item_sku_0": "DN-1",
+                "item_color_0": "Classic Brown",
+                "item_edge_0": "Unknown",
+                "item_category_0": "Kitchen Knives",
+                "item_availability_0": "public",
+                "item_sku_unicorn_0": "",
+                "item_variant_unicorn_0": "",
+                "item_edge_unicorn_0": "",
+                "item_person_0": "",
+                "item_status_0": "Owned",
+                "item_notes_0": "",
+                "item_accept_1": "on",
+                "item_row_1": "3",
+                "item_name_1": "Duplicate Knife",
+                "item_sku_1": "DN-2",
+                "item_color_1": "Pearl White",
+                "item_edge_1": "Unknown",
+                "item_category_1": "Kitchen Knives",
+                "item_availability_1": "public",
+                "item_sku_unicorn_1": "",
+                "item_variant_unicorn_1": "",
+                "item_edge_unicorn_1": "",
+                "item_person_1": "",
+                "item_status_1": "Owned",
+                "item_notes_1": "",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        self.assertIn(b"Import complete", confirm_response.data)
+        with self.app.app_context():
+            first_item = db.session.execute(db.select(Item).filter_by(sku="DN-1")).scalar_one()
+            second_item = db.session.execute(db.select(Item).filter_by(sku="DN-2")).scalar_one()
+            self.assertEqual(first_item.name, "Duplicate Knife")
+            self.assertEqual(second_item.name, "Duplicate Knife")
+            self.assertNotEqual(first_item.id, second_item.id)
+
     def test_import_preview_renders_xlsx_rows(self):
         self._login_as_admin()
         self._set_csrf_token()
