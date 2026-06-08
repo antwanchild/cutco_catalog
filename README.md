@@ -13,7 +13,7 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 ## ✨ Features
 
 - 📋 **Catalog** — Full product catalog with SKU, category, edge type, and link to Cutco.com
-- 🎨 **Variants** — Track every color/handle variant per item
+- 🎨 **Variants** — Track every color/handle variant per item, with a dedicated browse page for colors like red or purple
 - 🏠 **Ownership** — Record who owns what, with statuses: Owned, Wishlist, Sold, Traded
 - 🗂️ **Sets & Bundles** — Manage curated Cutco sets with member items and quantities (e.g. Galley +6 shows ×6)
 - 🦄 **Unicorn Tracking** — Flag rare, discontinued, or limited-run items and variants
@@ -26,7 +26,7 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 🎯 **Suggested Uses** — Sync Cutco.com's recommended uses per knife into the task system; task dropdown highlights tasks suggested for the selected knife; task detail page shows all knives that can perform a given task
 - 🗂️ **Set Completion** — Track progress through Cutco sets with per-person completion bars and owned/missing panels; one-click wishlist from missing items
 - 🔄 **Catalog Sync** — Scrape Cutco.com to discover new items and sets automatically
-- 🎨 **Variant Sync** — Separate page for color-variant cleanup; previews existing/create/retained colors without touching catalog sync
+- 🎨 **Variant Sync** — Separate page for color-variant cleanup; previews existing/create/retained colors, plus a polished review/result flow, without touching catalog sync
 - 📥 **Import / Export** — Bulk import ownership data via CSV or XLSX; export full collection as CSV
 - 🧩 **Completion Reports** — Standalone completion-gaps reporting and completion-import rollups for rep-style collection lists
 - 📊 **Matrix View** — Cross-tabulate items vs. collectors at a glance
