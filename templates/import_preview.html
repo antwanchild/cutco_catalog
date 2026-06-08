@@ -132,6 +132,105 @@
 {% endfor %}
 {% endmacro %}
 
+{% macro render_grouped_ownership_section(title, rows, groups, intro) %}
+<h2>{{ title }} ({{ rows | length }})</h2>
+<p class="muted">{{ intro }}</p>
+<p class="muted small">Same SKU rows are grouped together here, but each row still confirms separately so variant-specific quantities stay intact.</p>
+<input type="hidden" name="own_count" value="{{ rows | length }}">
+{% for group in groups %}
+<details class="diff-section import-sku-group" open>
+  <summary>
+    <span class="import-sku-group-summary">
+      <span class="import-sku-group-main">
+        <span class="mono">{{ group.sku or '—' }}</span>
+        <strong>{{ group.name }}</strong>
+      </span>
+      <span class="import-sku-group-meta">
+        {% if group.variant_colors %}
+        <span class="import-sku-group-chips">
+          {% for color in group.variant_colors %}
+          <span class="badge">{{ color }}</span>
+          {% endfor %}
+        </span>
+        {% endif %}
+        <span class="muted small">{{ group.row_count }} row(s)</span>
+      </span>
+    </span>
+  </summary>
+  <div class="table-wrap">
+    <table class="data-table import-ownership-table">
+      <thead>
+        <tr>
+          <th>Accept</th><th>Row</th><th>Person</th><th>Item</th><th>SKU</th><th>Color</th><th>Status</th><th>Flags</th>
+          <th><span class="stacked-head"><span>Qty</span><span>Purchased</span></span></th>
+          <th><span class="stacked-head"><span>Qty</span><span>Given Away</span></span></th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in group.rows %}
+        <tr>
+          <td><input type="checkbox" name="own_accept_{{ entry.form_index }}" checked></td>
+          <td>
+            <input type="hidden" name="own_row_{{ entry.form_index }}" value="{{ entry.row }}">
+            <input type="hidden" name="own_person_{{ entry.form_index }}" value="{{ entry.person }}">
+            Row {{ entry.row }}
+          </td>
+          <td>
+            {{ entry.person }}
+            {% if entry.is_new_person %}<span class="badge badge-new">new</span>{% endif %}
+          </td>
+          <td>
+            <input type="hidden" name="own_item_id_{{ entry.form_index }}" value="{{ entry.item_id }}">
+            <input type="hidden" name="own_item_name_{{ entry.form_index }}" value="{{ entry.item_name }}">
+            <input type="hidden" name="own_item_sku_{{ entry.form_index }}" value="{{ entry.sku or '' }}">
+            {{ entry.item_name }}
+          </td>
+          <td><span class="mono">{{ entry.sku or '—' }}</span></td>
+          <td>
+            <input type="hidden" name="own_color_{{ entry.form_index }}" value="{{ entry.color }}">
+            <div class="ownership-color-cell">
+              <span class="ownership-color-label">{{ entry.display_color or entry.color }}</span>
+              {% if entry.is_new_variant %}<span class="badge badge-new">new variant</span>{% endif %}
+            </div>
+          </td>
+          <td>
+            <select name="own_status_{{ entry.form_index }}" class="select-xs">
+              {% for status_option in status_options %}
+                <option value="{{ status_option }}" {% if status_option == entry.status %}selected{% endif %}>{{ status_option }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <input type="hidden" name="own_sku_unicorn_{{ entry.form_index }}" value="{% if entry.is_sku_unicorn %}on{% endif %}">
+            <input type="hidden" name="own_variant_unicorn_{{ entry.form_index }}" value="{% if entry.is_variant_unicorn %}on{% endif %}">
+            <input type="hidden" name="own_edge_unicorn_{{ entry.form_index }}" value="{% if entry.is_edge_unicorn %}on{% endif %}">
+            {% if entry.is_sku_unicorn %}<span class="badge badge-unicorn">SKU 🦄</span>{% endif %}
+            {% if entry.is_variant_unicorn %}<span class="badge badge-unicorn">Variant 🦄</span>{% endif %}
+            {% if entry.is_edge_unicorn %}<span class="badge badge-unicorn">Edge 🦄</span>{% endif %}
+            {% if not entry.is_sku_unicorn and not entry.is_variant_unicorn and not entry.is_edge_unicorn %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td>
+            <input type="hidden" name="own_quantity_purchased_{{ entry.form_index }}" value="{{ entry.quantity_purchased if entry.quantity_purchased is not none else '' }}">
+            <span class="mono">{{ entry.quantity_purchased if entry.quantity_purchased is not none else '—' }}</span>
+          </td>
+          <td>
+            <input type="hidden" name="own_quantity_given_away_{{ entry.form_index }}" value="{{ entry.quantity_given_away if entry.quantity_given_away is not none else '' }}">
+            <span class="mono">{{ entry.quantity_given_away if entry.quantity_given_away is not none else '—' }}</span>
+          </td>
+          <td>
+            <input type="hidden" name="own_notes_{{ entry.form_index }}" value="{{ entry.notes or '' }}">
+            <span class="small muted">{{ entry.notes or '' }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endfor %}
+{% endmacro %}
+
 {% if already_in_catalog %}
 <details class="diff-section">
   <summary>{{ already_in_catalog | length }} row(s) matched existing catalog items and will update ownership only</summary>
@@ -226,81 +325,14 @@
 
   {# ── Ownership Entries ──────────────────────────────────────────────── #}
   {% if ownership_entries %}
-  <h2>Ownership Entries ({{ ownership_entries | length }})</h2>
-  <p class="muted">These items already exist in the catalog. Check entries to log ownership.</p>
   {% set new_variant_count = ownership_entries | selectattr("is_new_variant") | list | length %}
   {% if new_variant_count %}
   <p class="flash flash-info">
     <strong>{{ new_variant_count }}</strong> ownership row(s) will create a new variant for the matched item/SKU.
   </p>
-  <p class="muted small">Variant colors are item-specific, so a new variant here applies only to that item/SKU.</p>
   {% endif %}
-  <input type="hidden" name="own_count" value="{{ ownership_entries | length }}">
-  <table class="data-table import-ownership-table">
-    <thead>
-      <tr>
-        <th>Accept</th><th>Person</th><th>Item</th><th>SKU</th><th>Color</th><th>Status</th><th>Flags</th>
-        <th><span class="stacked-head"><span>Qty</span><span>Purchased</span></span></th>
-        <th><span class="stacked-head"><span>Qty</span><span>Given Away</span></span></th>
-        <th>Notes</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for entry in ownership_entries %}
-      <tr>
-        <td><input type="checkbox" name="own_accept_{{ loop.index0 }}" checked></td>
-        <td>
-          <input type="hidden" name="own_row_{{ loop.index0 }}" value="{{ entry.row }}">
-          <input type="hidden" name="own_person_{{ loop.index0 }}" value="{{ entry.person }}">
-          {{ entry.person }}
-          {% if entry.is_new_person %}<span class="badge badge-new">new</span>{% endif %}
-        </td>
-        <td>
-          <input type="hidden" name="own_item_id_{{ loop.index0 }}" value="{{ entry.item_id }}">
-          <input type="hidden" name="own_item_name_{{ loop.index0 }}" value="{{ entry.item_name }}">
-          <input type="hidden" name="own_item_sku_{{ loop.index0 }}" value="{{ entry.sku or '' }}">
-          {{ entry.item_name }}
-        </td>
-        <td><span class="mono">{{ entry.sku or '—' }}</span></td>
-        <td>
-          <input type="hidden" name="own_color_{{ loop.index0 }}" value="{{ entry.color }}">
-          <div class="ownership-color-cell">
-            <span class="ownership-color-label">{{ entry.display_color or entry.color }}</span>
-            {% if entry.is_new_variant %}<span class="badge badge-new">new variant</span>{% endif %}
-          </div>
-        </td>
-        <td>
-          <select name="own_status_{{ loop.index0 }}" class="select-xs">
-            {% for status_option in status_options %}
-              <option value="{{ status_option }}" {% if status_option == entry.status %}selected{% endif %}>{{ status_option }}</option>
-            {% endfor %}
-          </select>
-        </td>
-        <td>
-          <input type="hidden" name="own_sku_unicorn_{{ loop.index0 }}" value="{% if entry.is_sku_unicorn %}on{% endif %}">
-          <input type="hidden" name="own_variant_unicorn_{{ loop.index0 }}" value="{% if entry.is_variant_unicorn %}on{% endif %}">
-          <input type="hidden" name="own_edge_unicorn_{{ loop.index0 }}" value="{% if entry.is_edge_unicorn %}on{% endif %}">
-          {% if entry.is_sku_unicorn %}<span class="badge badge-unicorn">SKU 🦄</span>{% endif %}
-          {% if entry.is_variant_unicorn %}<span class="badge badge-unicorn">Variant 🦄</span>{% endif %}
-          {% if entry.is_edge_unicorn %}<span class="badge badge-unicorn">Edge 🦄</span>{% endif %}
-          {% if not entry.is_sku_unicorn and not entry.is_variant_unicorn and not entry.is_edge_unicorn %}<span class="muted">—</span>{% endif %}
-        </td>
-        <td>
-          <input type="hidden" name="own_quantity_purchased_{{ loop.index0 }}" value="{{ entry.quantity_purchased if entry.quantity_purchased is not none else '' }}">
-          <span class="mono">{{ entry.quantity_purchased if entry.quantity_purchased is not none else '—' }}</span>
-        </td>
-        <td>
-          <input type="hidden" name="own_quantity_given_away_{{ loop.index0 }}" value="{{ entry.quantity_given_away if entry.quantity_given_away is not none else '' }}">
-          <span class="mono">{{ entry.quantity_given_away if entry.quantity_given_away is not none else '—' }}</span>
-        </td>
-        <td>
-          <input type="hidden" name="own_notes_{{ loop.index0 }}" value="{{ entry.notes or '' }}">
-          <span class="small muted">{{ entry.notes or '' }}</span>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  {{ render_grouped_ownership_section("Ownership Entries", ownership_entries, ownership_groups, "These items already exist in the catalog. Check entries to log ownership.") }}
+  <p class="muted small">Variant colors are item-specific, so a new variant here applies only to that item/SKU.</p>
   {% endif %}
 
   {% if not new_items and not likely_unicorns and not ownership_entries %}

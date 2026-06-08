@@ -1711,6 +1711,7 @@ def import_page():
             base_index=len(new_items_list) + len(likely_unicorns),
         ),
         ownership_entries=ownership_entries,
+        ownership_groups=_group_import_rows(ownership_entries, base_index=0),
         conflicts=conflicts,
         errors=errors,
         total_rows=len(parsed_rows),

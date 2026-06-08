@@ -2617,6 +2617,36 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Row 3", response.data)
         self.assertIn(b"Same SKU rows are grouped together here", response.data)
 
+    def test_import_preview_groups_same_sku_ownership_rows(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        self._add_catalog_item(name="Ownership Group Knife", sku="OG-1")
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color\n"
+                        b"Ownership Group Knife,OG-1,Anthony,Classic Brown\n"
+                        b"Ownership Group Knife,OG-1,Anthony,Pearl White\n"
+                    ),
+                    "ownership_grouped.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Ownership Entries (2)", response.data)
+        self.assertIn(b"import-sku-group", response.data)
+        self.assertIn(b"Classic Brown", response.data)
+        self.assertIn(b"Pearl White", response.data)
+        self.assertIn(b"Row 2", response.data)
+        self.assertIn(b"Row 3", response.data)
+
     def test_import_preview_renders_xlsx_rows(self):
         self._login_as_admin()
         self._set_csrf_token()
