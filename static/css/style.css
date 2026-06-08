@@ -571,6 +571,7 @@ a:hover { text-decoration: underline; }
 .import-ownership-table th:nth-child(9), .import-ownership-table td:nth-child(9) { width: 18%; }
 .import-mapping {
   padding-top: 1rem;
+  margin-bottom: 1rem;
 }
 .import-mapping > summary {
   font-size: 1.05rem;
