@@ -1609,38 +1609,48 @@ textarea { resize: vertical; }
 .muted-summary { color: var(--muted); font-weight: 400; }
 .diff-section .table-wrap { border-radius: 0 0 var(--radius) var(--radius); }
 .import-sku-group {
-  margin-bottom: .85rem;
+  margin-bottom: .8rem;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
 }
 .import-sku-group summary {
-  padding: .8rem 1rem;
+  padding: .72rem .95rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg3) 88%, transparent), transparent);
 }
 .import-sku-group-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: .6rem 1rem;
+  gap: .45rem .85rem;
   align-items: center;
   justify-content: space-between;
   width: 100%;
 }
 .import-sku-group-main {
   display: flex;
-  gap: .55rem;
+  gap: .5rem;
   align-items: baseline;
   flex-wrap: wrap;
 }
+.import-sku-group-main strong {
+  font-size: .95rem;
+}
 .import-sku-group-meta {
   display: flex;
-  gap: .6rem;
+  gap: .55rem;
   align-items: center;
   flex-wrap: wrap;
 }
 .import-sku-group-chips {
   display: inline-flex;
-  gap: .35rem;
+  gap: .3rem;
   flex-wrap: wrap;
 }
 .import-sku-group .table-wrap {
   overflow-x: auto;
+  border-top: 1px solid var(--border);
 }
 
 /* ── Sharpening log ──────────────────────────────────────────────────────── */

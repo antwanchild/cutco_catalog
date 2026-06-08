@@ -3158,6 +3158,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"Set SKU Collisions", preview_response.data)
         self.assertIn(b"Set SKU", preview_response.data)
+        self.assertIn(b"badge badge-warning", preview_response.data)
         self.assertIn(b"unchecked by default", preview_response.data)
         self.assertNotIn(b"New Catalog Items (1)", preview_response.data)
 
