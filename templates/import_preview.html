@@ -25,6 +25,10 @@
 </div>
 {% endif %}
 
+<div class="flash flash-info">
+  Import matching prefers SKU first. Rows with the same name but different SKUs stay separate.
+</div>
+
 {% if already_in_catalog %}
 <details class="diff-section">
   <summary>{{ already_in_catalog | length }} row(s) matched existing catalog items and will update ownership only</summary>

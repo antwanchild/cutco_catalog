@@ -2411,6 +2411,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"New Catalog Items (2)", response.data)
         self.assertIn(b"DN-1", response.data)
         self.assertIn(b"DN-2", response.data)
+        self.assertIn(b"Import matching prefers SKU first.", response.data)
 
         soup = BeautifulSoup(response.data, "html.parser")
         item_count_input = soup.select_one('input[name="item_count"]')
