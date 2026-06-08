@@ -3,7 +3,9 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">Variant Sync Preview {{ help_btn("variant_sync") }}</h1>
-  <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-ghost">← Back</a>
+  <div class="page-actions variant-sync-header-actions">
+    <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-ghost btn-sm">← Back</a>
+  </div>
 </div>
 
 <div class="form-card variant-sync-summary-card variant-sync-preview-hero">

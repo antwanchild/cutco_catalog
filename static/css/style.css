@@ -292,6 +292,13 @@ a:hover { text-decoration: underline; }
 .page-actions .btn {
   min-height: 2.35rem;
 }
+.variant-sync-header-actions {
+  gap: .4rem;
+}
+.variant-sync-header-actions .btn {
+  min-width: 11rem;
+  justify-content: center;
+}
 .sync-preview-body {
   min-height: 55vh;
 }
