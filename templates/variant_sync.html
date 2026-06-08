@@ -18,51 +18,57 @@
 </div>
 
 <form method="post" class="form-card variant-sync-form">
-  <div id="variant-sync-overlay" style="display:none">
+  <div id="variant-sync-overlay" style="display:none" aria-live="polite" aria-busy="true">
     <div class="sync-overlay-inner">
       <div class="sync-spinner"></div>
       <p>Scanning variants... this may take a minute…</p>
     </div>
   </div>
-  <h2>Scan Scope</h2>
-  <div class="variant-scope-group">
-    <label class="checkbox-label">
-      <input type="radio" name="scope" value="all" {% if scope != 'category' and scope != 'selected' %}checked{% endif %}>
-      Entire catalog
-    </label>
-    <label class="checkbox-label">
-      <input type="radio" name="scope" value="category" {% if scope == 'category' %}checked{% endif %}>
-      Category
-    </label>
-    <label class="checkbox-label">
-      <input type="radio" name="scope" value="selected" {% if scope == 'selected' %}checked{% endif %}>
-      Selected SKUs
-    </label>
-  </div>
+  <div class="variant-sync-body">
+    <div class="variant-sync-heading">
+      <h2>Scan Scope</h2>
+      <p class="muted small">Choose the slice to scan, then preview before anything is saved.</p>
+    </div>
 
-  <div class="variant-scope-field" data-scope-field="category">
-    <label>Category
-      <select name="category" class="select-full">
-        <option value="">Choose a category</option>
-        {% for cat in categories %}
-          <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
-        {% endfor %}
-      </select>
-    </label>
-  </div>
+    <div class="variant-scope-group">
+      <label class="checkbox-label">
+        <input type="radio" name="scope" value="all" {% if scope != 'category' and scope != 'selected' %}checked{% endif %}>
+        Entire catalog
+      </label>
+      <label class="checkbox-label">
+        <input type="radio" name="scope" value="category" {% if scope == 'category' %}checked{% endif %}>
+        Category
+      </label>
+      <label class="checkbox-label">
+        <input type="radio" name="scope" value="selected" {% if scope == 'selected' %}checked{% endif %}>
+        Selected SKUs
+      </label>
+    </div>
 
-  <div class="variant-scope-field" data-scope-field="selected">
-    <label>Selected SKUs
-      <span class="hint">Paste one SKU per line, or separate them with commas.</span>
-      <textarea name="selected_skus" rows="6" class="input-full" placeholder="1726&#10;1738C&#10;1759C">{{ selected_skus_text or '' }}</textarea>
-    </label>
-  </div>
+    <div class="variant-scope-field" data-scope-field="category">
+      <label>Category
+        <select name="category" class="select-full">
+          <option value="">Choose a category</option>
+          {% for cat in categories %}
+            <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
 
-  <p class="muted variant-sync-note">Preview will show <strong>existing</strong>, <strong>create</strong>, and <strong>not seen in sync</strong> variant statuses before anything is saved.</p>
+    <div class="variant-scope-field" data-scope-field="selected">
+      <label>Selected SKUs
+        <span class="hint">Paste one SKU per line, or separate them with commas.</span>
+        <textarea name="selected_skus" rows="6" class="input-full" placeholder="1726&#10;1738C&#10;1759C">{{ selected_skus_text or '' }}</textarea>
+      </label>
+    </div>
 
-  <div class="form-actions">
-    <button type="submit" id="variant-sync-preview-btn" class="btn btn-primary">Preview Variants</button>
-    <a href="{{ url_for('catalog.catalog') }}" class="btn btn-secondary">Back</a>
+    <p class="muted variant-sync-note">Preview shows <strong>existing</strong>, <strong>create</strong>, and <strong>not seen in sync</strong> statuses before saving.</p>
+
+    <div class="form-actions variant-sync-actions">
+      <button type="submit" id="variant-sync-preview-btn" class="btn btn-primary">Preview Variants</button>
+      <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">Back</a>
+    </div>
   </div>
 </form>
 {% endblock %}
@@ -94,6 +100,7 @@
       previewBtn.textContent = 'Scanning...';
       previewBtn.classList.add('btn-disabled');
       previewBtn.style.pointerEvents = 'none';
+      form.classList.add('is-scanning');
       overlay.style.display = 'flex';
 
       fetch(form.action || window.location.href, {

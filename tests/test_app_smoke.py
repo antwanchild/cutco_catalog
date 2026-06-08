@@ -4013,6 +4013,8 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual(page_response.status_code, 200)
             self.assertIn(b"Variant Sync", page_response.data)
             self.assertIn(b"Entire catalog", page_response.data)
+            self.assertIn(b"Preview Variants", page_response.data)
+            self.assertIn(b"Back", page_response.data)
 
             preview_response = self.client.post(
                 "/variant-sync",

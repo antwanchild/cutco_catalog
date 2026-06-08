@@ -821,6 +821,56 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .variant-sync-summary-card {
   margin-bottom: 1rem;
 }
+.variant-sync-form {
+  position: relative;
+  overflow: hidden;
+}
+.variant-sync-body {
+  display: grid;
+  gap: 1rem;
+}
+.variant-sync-heading {
+  display: grid;
+  gap: .25rem;
+}
+.variant-sync-form.is-scanning .variant-sync-body {
+  opacity: .35;
+  filter: blur(1px);
+  pointer-events: none;
+}
+.variant-sync-form #variant-sync-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: color-mix(in srgb, var(--bg2) 88%, transparent);
+  backdrop-filter: blur(2px);
+  justify-content: center;
+  align-items: center;
+}
+.variant-sync-form #variant-sync-overlay .sync-overlay-inner {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  box-shadow: var(--shadow);
+  padding: 1.25rem 1.5rem;
+}
+.variant-sync-actions {
+  padding-top: .25rem;
+}
+.variant-scope-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .6rem;
+}
+.variant-scope-group .checkbox-label {
+  padding: .7rem .8rem;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.variant-scope-group .checkbox-label:hover {
+  background: var(--bg3);
+}
 .variant-sync-category-block { margin-top: 1.5rem; }
 .msrp-diff-progress-panel {
   margin-bottom: 1.5rem;
@@ -1739,6 +1789,9 @@ textarea { resize: vertical; }
 
 @media (max-width: 700px) {
   .variant-sync-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .variant-scope-group {
     grid-template-columns: 1fr;
   }
 }
