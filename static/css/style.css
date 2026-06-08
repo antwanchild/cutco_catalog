@@ -554,6 +554,8 @@ a:hover { text-decoration: underline; }
 .data-table td:has(> input[type="checkbox"]) {
   text-align: center;
   vertical-align: middle;
+  width: 2.5rem;
+  min-width: 2.5rem;
 }
 .data-table th:has(> input[type="checkbox"]) > input[type="checkbox"],
 .data-table td:has(> input[type="checkbox"]) > input[type="checkbox"] {
