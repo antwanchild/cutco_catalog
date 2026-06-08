@@ -60,7 +60,7 @@
     <table class="data-table import-item-table">
       <thead>
         <tr>
-          <th>Accept</th><th>Row</th><th>Color</th><th>Edge</th><th>Category</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
+          <th>Accept</th><th>#</th><th>Color</th><th>Edge</th><th>Category</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
         </tr>
       </thead>
       <tbody>
@@ -74,7 +74,7 @@
             <input type="hidden" name="item_availability_{{ item.form_index }}" value="{{ item.availability }}">
             <input type="hidden" name="item_quantity_purchased_{{ item.form_index }}" value="{{ item.quantity_purchased if item.quantity_purchased is not none else '' }}">
             <input type="hidden" name="item_quantity_given_away_{{ item.form_index }}" value="{{ item.quantity_given_away if item.quantity_given_away is not none else '' }}">
-            Row {{ item.row }}
+            {{ item.row }}
           </td>
           <td>
             <input type="hidden" name="item_color_{{ item.form_index }}" value="{{ item.color }}">
@@ -156,7 +156,7 @@
     <table class="data-table import-ownership-table">
       <thead>
         <tr>
-          <th>Accept</th><th>Row</th><th>Person</th><th>Color</th><th>Status</th><th>Flags</th>
+          <th>Accept</th><th>#</th><th>Person</th><th>Color</th><th>Status</th><th>Flags</th>
           <th><span class="stacked-head"><span>Qty</span><span>Purchased</span></span></th>
           <th><span class="stacked-head"><span>Qty</span><span>Given Away</span></span></th>
           <th>Notes</th>
@@ -169,7 +169,7 @@
           <td>
             <input type="hidden" name="own_row_{{ entry.form_index }}" value="{{ entry.row }}">
             <input type="hidden" name="own_person_{{ entry.form_index }}" value="{{ entry.person }}">
-            Row {{ entry.row }}
+            {{ entry.row }}
           </td>
           <td>
             {{ entry.person }}

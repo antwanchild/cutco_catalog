@@ -2613,8 +2613,8 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"import-sku-group", response.data)
         self.assertIn(b"Classic Brown", response.data)
         self.assertIn(b"Pearl White", response.data)
-        self.assertIn(b"Row 2", response.data)
-        self.assertIn(b"Row 3", response.data)
+        self.assertIn(b'name="item_row_0" value="2"', response.data)
+        self.assertIn(b'name="item_row_1" value="3"', response.data)
         self.assertIn(b"Same SKU rows are grouped together here", response.data)
 
     def test_import_preview_groups_same_sku_ownership_rows(self):
