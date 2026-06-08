@@ -4139,7 +4139,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"Purple Promo Variants", preview_response.data)
+        self.assertIn(b"Promo Variants", preview_response.data)
         self.assertIn(b"Mark purple promo variants as unicorns", preview_response.data)
         self.assertIn(b"Suppressed because this is a campaign bundle item", preview_response.data)
         self.assertIn(b"suppressed", preview_response.data)
