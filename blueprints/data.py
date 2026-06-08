@@ -1006,6 +1006,33 @@ def _find_import_variant(item: Item, color: str) -> ItemVariant | None:
     )
 
 
+def _group_import_rows(rows: list[dict], *, base_index: int = 0) -> list[dict]:
+    """Group import preview rows by SKU while preserving row-level data."""
+    grouped: list[dict] = []
+    group_map: dict[str, dict] = {}
+    for idx, row in enumerate(rows):
+        row_copy = dict(row)
+        row_copy["form_index"] = base_index + idx
+        sku_key = normalize_sku_value(row_copy.get("sku")) or f"__row_{row_copy['form_index']}"
+        group = group_map.get(sku_key)
+        if not group:
+            group = {
+                "sku": row_copy.get("sku") or None,
+                "name": row_copy.get("name") or "—",
+                "rows": [],
+                "row_count": 0,
+                "variant_colors": [],
+            }
+            group_map[sku_key] = group
+            grouped.append(group)
+        group["rows"].append(row_copy)
+        group["row_count"] += 1
+        display_color = row_copy.get("display_color") or row_copy.get("color") or "—"
+        if display_color not in group["variant_colors"]:
+            group["variant_colors"].append(display_color)
+    return grouped
+
+
 def _safe_csv_filename(raw_name: str) -> str:
     """Normalize a user-provided filename into a safe CSV filename."""
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (raw_name or "").strip()).strip("._")
@@ -1670,19 +1697,28 @@ def import_page():
                 "is_new_person": person_name.lower() not in existing_persons,
             })
 
-    return render_template("import_preview.html",
-                           already_in_catalog=already_in_catalog,
-                           sku_name_mismatches=sku_name_mismatches,
-                           new_items=new_items_list,
-                           likely_unicorns=likely_unicorns,
-                           set_sku_collisions=set_sku_collisions,
-                           ownership_entries=ownership_entries,
-                           conflicts=conflicts,
-                           errors=errors,
-                           total_rows=len(parsed_rows),
-                           edge_types=EDGE_TYPES,
-                           status_options=STATUS_OPTIONS,
-                           person_override=person_override)
+    return render_template(
+        "import_preview.html",
+        already_in_catalog=already_in_catalog,
+        sku_name_mismatches=sku_name_mismatches,
+        new_items=new_items_list,
+        new_item_groups=_group_import_rows(new_items_list, base_index=0),
+        likely_unicorns=likely_unicorns,
+        likely_unicorn_groups=_group_import_rows(likely_unicorns, base_index=len(new_items_list)),
+        set_sku_collisions=set_sku_collisions,
+        set_sku_collision_groups=_group_import_rows(
+            set_sku_collisions,
+            base_index=len(new_items_list) + len(likely_unicorns),
+        ),
+        ownership_entries=ownership_entries,
+        conflicts=conflicts,
+        errors=errors,
+        total_rows=len(parsed_rows),
+        item_rows_total=len(new_items_list) + len(likely_unicorns) + len(set_sku_collisions),
+        edge_types=EDGE_TYPES,
+        status_options=STATUS_OPTIONS,
+        person_override=person_override,
+    )
 
 
 @data_bp.route("/completion-import", methods=["GET", "POST"])

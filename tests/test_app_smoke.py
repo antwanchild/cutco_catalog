@@ -2584,7 +2584,38 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"New Catalog Items (2)", response.data)
         self.assertIn(b"1733", response.data)
+        self.assertIn(b"import-sku-group", response.data)
         self.assertIn(b"Import matching prefers SKU first.", response.data)
+
+    def test_import_preview_groups_same_sku_rows_and_lists_variants(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color\n"
+                        b"Carving Fork,1733,yes,Classic Brown\n"
+                        b"Carving Fork,1733,yes,Pearl White\n"
+                    ),
+                    "grouped_variants.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"New Catalog Items (2)", response.data)
+        self.assertIn(b"import-sku-group", response.data)
+        self.assertIn(b"Classic Brown", response.data)
+        self.assertIn(b"Pearl White", response.data)
+        self.assertIn(b"Row 2", response.data)
+        self.assertIn(b"Row 3", response.data)
+        self.assertIn(b"Same SKU rows are grouped together here", response.data)
 
     def test_import_preview_renders_xlsx_rows(self):
         self._login_as_admin()

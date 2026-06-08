@@ -1608,6 +1608,40 @@ textarea { resize: vertical; }
 .diff-section[open] summary { border-bottom: 1px solid var(--border); }
 .muted-summary { color: var(--muted); font-weight: 400; }
 .diff-section .table-wrap { border-radius: 0 0 var(--radius) var(--radius); }
+.import-sku-group {
+  margin-bottom: .85rem;
+}
+.import-sku-group summary {
+  padding: .8rem 1rem;
+}
+.import-sku-group-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.import-sku-group-main {
+  display: flex;
+  gap: .55rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.import-sku-group-meta {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.import-sku-group-chips {
+  display: inline-flex;
+  gap: .35rem;
+  flex-wrap: wrap;
+}
+.import-sku-group .table-wrap {
+  overflow-x: auto;
+}
 
 /* ── Sharpening log ──────────────────────────────────────────────────────── */
 .sharpen-add-panel {
