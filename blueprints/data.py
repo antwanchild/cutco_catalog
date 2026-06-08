@@ -94,6 +94,16 @@ def _preview_import_color(color: str, is_cookware: bool = False) -> str:
     return _display_import_color(color)
 
 
+def _resolve_import_variant_color(name: str, category: str, color: str) -> str:
+    """Return the stored variant color to use for import rows."""
+    resolved_color = _normalize_import_color(color)
+    if category in COOKWARE_CATEGORIES:
+        return UNKNOWN_COLOR
+    if resolved_color.lower() == "stainless" and "stainless" in (name or "").lower():
+        return UNKNOWN_COLOR
+    return resolved_color
+
+
 def _build_item_sku_lookup(items: list[Item]) -> dict[str, Item]:
     lookup: dict[str, Item] = {}
     for item in items:
@@ -966,6 +976,36 @@ def _merge_import_ownership(
         ownership.quantity_given_away = quantity_given_away
 
 
+def _add_import_ownership_quantities(
+    ownership: Ownership,
+    *,
+    status: str,
+    notes: str | None = None,
+    quantity_purchased: int | None = None,
+    quantity_given_away: int | None = None,
+) -> None:
+    """Add imported quantities onto an existing ownership row."""
+    ownership.status = status
+    if notes is not None:
+        ownership.notes = notes
+    if quantity_purchased is not None:
+        ownership.quantity_purchased = (ownership.quantity_purchased or 0) + quantity_purchased
+    if quantity_given_away is not None:
+        ownership.quantity_given_away = (ownership.quantity_given_away or 0) + quantity_given_away
+
+
+def _find_import_variant(item: Item, color: str) -> ItemVariant | None:
+    """Return an existing variant for an item/color pair if one exists."""
+    normalized_color = (color or "").strip().lower()
+    if not normalized_color:
+        return None
+    return (
+        ItemVariant.query.filter_by(item_id=item.id)
+        .filter(db.func.lower(ItemVariant.color) == normalized_color)
+        .first()
+    )
+
+
 def _safe_csv_filename(raw_name: str) -> str:
     """Normalize a user-provided filename into a safe CSV filename."""
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (raw_name or "").strip()).strip("._")
@@ -1528,8 +1568,9 @@ def import_page():
         matched_set = existing_set_skus.get(sku) if sku else None
         matches_set_sku = bool(sku and matched_set and not matched_item)
 
-        is_cookware = ((matched_item.category or "") in COOKWARE_CATEGORIES) if matched_item else False
-        target_color = UNKNOWN_COLOR if is_cookware else color
+        item_category_for_color = (matched_item.category if matched_item else category) or ""
+        target_color = _resolve_import_variant_color(name, item_category_for_color, color)
+        is_cookware = item_category_for_color in COOKWARE_CATEGORIES
         existing_variant = None
         if matched_item:
             existing_variant = next(
@@ -1542,10 +1583,9 @@ def import_page():
             )
 
         if matched_item:
-            is_cookware = (matched_item.category or "") in COOKWARE_CATEGORIES
             already_in_catalog.append({"item": matched_item, "row": row,
                                        "row_num": row_num,
-                                       "color": color, "display_color": _preview_import_color(color, is_cookware),
+                                       "color": target_color, "display_color": _preview_import_color(target_color, is_cookware),
                                        "non_catalog": non_catalog,
                                        "availability": availability,
                                        "availability_label": _availability_preview_fields(availability)[0],
@@ -1570,9 +1610,9 @@ def import_page():
                 bucket = set_sku_collisions
             else:
                 bucket = likely_unicorns if is_sku_unicorn or is_variant_unicorn or is_edge_unicorn or not sku else new_items_list
-            bucket.append({
-                "name": name, "sku": sku, "color": color,
-                "display_color": _preview_import_color(color, is_cookware),
+                bucket.append({
+                "name": name, "sku": sku, "color": target_color,
+                "display_color": _preview_import_color(target_color, is_cookware),
                 "edge_type": edge_type,
                 "non_catalog": non_catalog,
                 "availability": availability,
@@ -2073,9 +2113,8 @@ def import_confirm():
                 if non_catalog:
                     item.in_catalog = False
 
-            target_color = color if color and color != UNKNOWN_COLOR else UNKNOWN_COLOR
-            variant = next((existing_variant for existing_variant in item.variants
-                            if existing_variant.color.lower() == target_color.lower()), None)
+            target_color = _resolve_import_variant_color(item.name, item.category or category, color)
+            variant = _find_import_variant(item, target_color)
             if not variant:
                 variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_variant_unicorn, source="catalog_sync")
                 db.session.add(variant)
@@ -2096,9 +2135,10 @@ def import_confirm():
                 if existing_o:
                     if existing_o.status != status:
                         continue
-                    _merge_import_ownership(
+                    _add_import_ownership_quantities(
                         existing_o,
                         status=status,
+                        notes=existing_o.notes,
                         quantity_purchased=quantity_purchased,
                         quantity_given_away=quantity_given_away,
                     )
@@ -2189,9 +2229,8 @@ def import_confirm():
                 existing_persons[person_name.lower()] = person
                 added_persons += 1
 
-            target_color = color if color and color != UNKNOWN_COLOR else UNKNOWN_COLOR
-            variant = next((existing_variant for existing_variant in item.variants
-                            if existing_variant.color.lower() == target_color.lower()), None)
+            target_color = _resolve_import_variant_color(item.name, item.category or "", color)
+            variant = _find_import_variant(item, target_color)
             if not variant:
                 variant = ItemVariant(item_id=item.id, color=target_color, is_unicorn=is_variant_unicorn, source="collection_import")
                 db.session.add(variant)

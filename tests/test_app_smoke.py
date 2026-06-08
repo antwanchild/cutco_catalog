@@ -2303,6 +2303,98 @@ class ImportSmokeTests(SmokeBaseTest):
             item = db.session.execute(db.select(Item).filter_by(sku="RO-1")).scalar_one()
             self.assertFalse(item.in_catalog)
             self.assertEqual(item.availability, "non-catalog")
+            self.assertEqual([variant.color for variant in item.variants], [UNKNOWN_COLOR])
+
+    def test_import_confirm_normalizes_stainless_title_to_unknown_variant(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        response = self.client.post(
+            "/import/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_count": "1",
+                "own_count": "0",
+                "total_rows": "1",
+                "item_accept_0": "on",
+                "item_row_0": "2",
+                "item_name_0": "1952 Stainless Salad Fork",
+                "item_sku_0": "1952",
+                "item_color_0": "Stainless",
+                "item_edge_0": "Unknown",
+                "item_category_0": "Kitchen Knives",
+                "item_notes_0": "",
+                "item_person_0": "",
+                "item_status_0": "Owned",
+                "item_sku_unicorn_0": "",
+                "item_variant_unicorn_0": "",
+                "item_edge_unicorn_0": "",
+                "error_count": "0",
+                "conflict_count": "0",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            item = db.session.execute(db.select(Item).filter_by(sku="1952")).scalar_one()
+            self.assertEqual(item.name, "1952 Stainless Salad Fork")
+            self.assertEqual([variant.color for variant in item.variants], [UNKNOWN_COLOR])
+
+    def test_import_confirm_adds_duplicate_same_variant_quantities_together(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _ = self._add_catalog_item(name="Carving Fork", sku="1733")
+
+        response = self.client.post(
+            "/import/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "item_count": "2",
+                "own_count": "0",
+                "total_rows": "2",
+                "item_accept_0": "on",
+                "item_row_0": "2",
+                "item_name_0": "Carving Fork",
+                "item_sku_0": "1733",
+                "item_color_0": "Classic Brown",
+                "item_edge_0": "Unknown",
+                "item_category_0": "Kitchen Knives",
+                "item_person_0": "Collector One",
+                "item_status_0": "Owned",
+                "item_quantity_purchased_0": "2",
+                "item_sku_unicorn_0": "",
+                "item_variant_unicorn_0": "",
+                "item_edge_unicorn_0": "",
+                "item_notes_0": "",
+                "item_accept_1": "on",
+                "item_row_1": "3",
+                "item_name_1": "Carving Fork",
+                "item_sku_1": "1733",
+                "item_color_1": "Classic Brown",
+                "item_edge_1": "Unknown",
+                "item_category_1": "Kitchen Knives",
+                "item_person_1": "Collector One",
+                "item_status_1": "Owned",
+                "item_quantity_purchased_1": "3",
+                "item_sku_unicorn_1": "",
+                "item_variant_unicorn_1": "",
+                "item_edge_unicorn_1": "",
+                "item_notes_1": "",
+                "error_count": "0",
+                "conflict_count": "0",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            classic_variant = next(variant for variant in item.variants if variant.color == "Classic Brown")
+            ownership = Ownership.query.filter_by(variant_id=classic_variant.id).one()
+            self.assertEqual(ownership.quantity_purchased, 5)
+            self.assertEqual(ownership.person.name, "Collector One")
 
     def test_import_confirm_keeps_existing_name_for_matching_sku(self):
         self._login_as_admin()

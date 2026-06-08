@@ -5,7 +5,7 @@ import re
 from datetime import UTC, datetime
 
 from flask import has_request_context, request, session
-from sqlalchemy import event, inspect as sa_inspect
+from sqlalchemy import delete as sa_delete, event, inspect as sa_inspect
 from sqlalchemy.orm import Session as SASession
 
 from constants import UNKNOWN_COLOR
@@ -288,6 +288,49 @@ def reconcile_unknown_variant(item: Item) -> None:
     """
     real_variants = [variant for variant in item.variants if variant.color != UNKNOWN_COLOR]
     unknown_variants = [variant for variant in item.variants if variant.color == UNKNOWN_COLOR]
+    deleted_unknown_ids: set[int] = set()
+
+    def merge_variant_ownerships(source_variant: ItemVariant, target_variant: ItemVariant) -> None:
+        for ownership in list(source_variant.ownerships):
+            existing_ownership = next(
+                (
+                    candidate
+                    for candidate in target_variant.ownerships
+                    if candidate.person_id == ownership.person_id
+                ),
+                None,
+            )
+            if existing_ownership:
+                existing_ownership.quantity_purchased = (
+                    (existing_ownership.quantity_purchased or 0)
+                    + (ownership.quantity_purchased or 0)
+                ) or None
+                existing_ownership.quantity_given_away = (
+                    (existing_ownership.quantity_given_away or 0)
+                    + (ownership.quantity_given_away or 0)
+                ) or None
+                if ownership.notes:
+                    existing_ownership.notes = (
+                        f"{existing_ownership.notes}; {ownership.notes}"
+                        if existing_ownership.notes
+                        else ownership.notes
+                    )
+                db.session.delete(ownership)
+            else:
+                ownership.variant_id = target_variant.id
+
+    if len(unknown_variants) > 1:
+        keeper = unknown_variants[0]
+        for duplicate_variant in unknown_variants[1:]:
+            if duplicate_variant.ownerships:
+                merge_variant_ownerships(duplicate_variant, keeper)
+            db.session.execute(sa_delete(ItemVariant).where(ItemVariant.id == duplicate_variant.id))
+            deleted_unknown_ids.add(duplicate_variant.id)
+
+    unknown_variants = [
+        variant for variant in item.variants
+        if variant.color == UNKNOWN_COLOR and variant.id not in deleted_unknown_ids
+    ]
 
     if not real_variants:
         if not unknown_variants:
@@ -296,7 +339,7 @@ def reconcile_unknown_variant(item: Item) -> None:
 
     for unknown_variant in unknown_variants:
         if not unknown_variant.ownerships:
-            db.session.delete(unknown_variant)
+            db.session.execute(sa_delete(ItemVariant).where(ItemVariant.id == unknown_variant.id))
 
     db.session.flush()
 
