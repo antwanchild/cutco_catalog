@@ -2817,11 +2817,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Start Here", response.data)
         self.assertIn(b"Assign all rows to", response.data)
+        self.assertIn(b"Import Column Mapping", response.data)
         self.assertIn(b"<code>availability</code>", response.data)
-        self.assertIn(
-            b"Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code>",
-            response.data,
-        )
+        self.assertIn(b"<code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code>", response.data)
         self.assertIn(b"Rep only", response.data)
         self.assertIn(b"Costco", response.data)
 

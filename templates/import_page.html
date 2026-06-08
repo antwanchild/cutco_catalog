@@ -38,24 +38,24 @@
 
 <details class="form-card import-mapping">
   <summary>Import Column Mapping</summary>
-  <p class="muted">Header matching is case-insensitive, but lowercase is the easiest style to read and keep consistent.</p>
-  <p class="muted small">Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
+  <p class="muted">Case-insensitive matching. Lowercase is easiest to scan, and these are the headers we recognize.</p>
+  <p class="muted small"><code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
   <table class="data-table compact">
     <thead><tr><th>Spreadsheet Column</th><th>Maps To</th></tr></thead>
     <tbody>
       <tr><td><code>name</code></td><td>Item name</td></tr>
       <tr><td><code>sku</code></td><td>SKU</td></tr>
-      <tr><td><code>owned</code></td><td>yes → Owned, no → Wishlist, text → assigned person</td></tr>
+      <tr><td><code>owned</code></td><td>yes = Owned, no = Wishlist, text = person</td></tr>
       <tr><td><code>color</code></td><td>Variant color</td></tr>
-      <tr><td><code>availability</code></td><td>Blank → Public; <code>rep</code> → Rep only; <code>costco</code> → Costco; <code>non-catalog</code> → Non-catalog</td></tr>
-      <tr><td><code>non_catalog</code></td><td>Legacy alias for not public; unicorn flags also imply non-catalog</td></tr>
-      <tr><td><code>quantity purchased</code></td><td>Whole-number ownership field</td></tr>
-      <tr><td><code>quantity given away</code></td><td>Whole-number ownership field</td></tr>
+      <tr><td><code>availability</code></td><td>Blank = Public; <code>rep</code> = Rep only; <code>costco</code> = Costco; <code>non-catalog</code> = Non-catalog</td></tr>
+      <tr><td><code>non_catalog</code></td><td>Legacy alias for non-catalog</td></tr>
+      <tr><td><code>quantity purchased</code></td><td>Whole number</td></tr>
+      <tr><td><code>quantity given away</code></td><td>Whole number</td></tr>
       <tr><td><code>category</code></td><td>Category</td></tr>
       <tr><td><code>edge</code></td><td>Edge type</td></tr>
-      <tr><td><code>is_sku_unicorn</code></td><td>SKU/item unicorn flag (accepts yes, x, true, 1)</td></tr>
-      <tr><td><code>is_variant_unicorn</code></td><td>Variant/color unicorn flag (accepts yes, x, true, 1)</td></tr>
-      <tr><td><code>is_edge_unicorn</code></td><td>Edge/blade-type unicorn flag (accepts yes, x, true, 1)</td></tr>
+      <tr><td><code>is_sku_unicorn</code></td><td>SKU/item unicorn flag</td></tr>
+      <tr><td><code>is_variant_unicorn</code></td><td>Variant/color unicorn flag</td></tr>
+      <tr><td><code>is_edge_unicorn</code></td><td>Edge/blade-type unicorn flag</td></tr>
       <tr><td><code>price</code></td><td>Merged into notes</td></tr>
     </tbody>
   </table>
