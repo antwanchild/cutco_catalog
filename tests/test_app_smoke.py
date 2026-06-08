@@ -4029,6 +4029,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"Variant Sync Preview", preview_response.data)
+        self.assertIn(b"Review Changes", preview_response.data)
         self.assertIn(b"existing", preview_response.data)
         self.assertIn(b"create", preview_response.data)
         self.assertIn(b"not seen in sync", preview_response.data)

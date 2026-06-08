@@ -6,9 +6,12 @@
   <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-ghost">← Back</a>
 </div>
 
-<div class="form-card variant-sync-summary-card">
-  <h2>Summary</h2>
-  <p class="muted">Scope: {{ preview.scope_label }}</p>
+<div class="form-card variant-sync-summary-card variant-sync-preview-hero">
+  <div class="variant-sync-preview-heading">
+    <h2>Review Changes</h2>
+    <p class="muted">Scope: {{ preview.scope_label }}</p>
+    <p class="variant-sync-preview-note">Existing variants are left alone. Missing variants are kept rather than deleted.</p>
+  </div>
   <div class="stat-grid variant-sync-summary-grid">
     <div class="stat-card"><div class="stat-number">{{ preview.summary.items_scanned }}</div><div class="stat-label">Items scanned</div></div>
     <div class="stat-card"><div class="stat-number">{{ preview.summary.variants_found }}</div><div class="stat-label">Variants found</div></div>
@@ -16,20 +19,17 @@
     <div class="stat-card"><div class="stat-number">{{ preview.summary.variants_retained }}</div><div class="stat-label">Variants retained</div></div>
     <div class="stat-card"><div class="stat-number">{{ preview.summary.items_with_no_clear_variants }}</div><div class="stat-label">Items with no clear variants</div></div>
   </div>
-  <p class="muted" style="margin-top:.75rem;">Missing variants are kept, not deleted. Items that do not expose clear variant choices are skipped.</p>
 </div>
-
-<div class="flash flash-info variant-sync-alert">Existing variants are left alone, new colors are created, and nothing is deleted.</div>
 
 <form method="post" action="{{ url_for('data.variant_sync_confirm') }}">
   <input type="hidden" name="preview_json" value="{{ preview_json | e }}">
   <input type="hidden" name="scope_label" value="{{ preview.scope_label }}">
 
   {% if preview.promo_items %}
-  <div class="form-card variant-sync-category-block">
-    <div class="section-heading-actions" style="margin-bottom:.5rem">
+  <div class="form-card variant-sync-category-block variant-sync-preview-section">
+    <div class="section-heading-actions variant-sync-section-heading">
       <h2>Purple Promo Variants</h2>
-      <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+      <div class="variant-sync-section-actions">
         <span class="muted small">{{ preview.promo_items | length }} item{{ 's' if preview.promo_items | length != 1 }}</span>
         <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="promo">Confirm Purple Promo Only</button>
       </div>
@@ -105,10 +105,10 @@
   {% endif %}
 
   {% for category_block in preview.grouped_items %}
-  <div class="form-card variant-sync-category-block">
-    <div class="section-heading-actions" style="margin-bottom:.5rem">
+  <div class="form-card variant-sync-category-block variant-sync-preview-section">
+    <div class="section-heading-actions variant-sync-section-heading">
       <h2>{{ category_block.category }}</h2>
-      <div style="display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;">
+      <div class="variant-sync-section-actions">
         <span class="muted small">{{ category_block['items'] | length }} item{{ 's' if category_block['items'] | length != 1 }}</span>
         <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="category:{{ category_block.category }}">Confirm This Section Only</button>
       </div>
@@ -174,7 +174,7 @@
     Missing variants are kept rather than deleted.
   </div>
 
-  <div class="form-actions">
+  <div class="form-actions variant-sync-preview-actions">
     <button type="submit" class="btn btn-primary" name="confirm_target" value="all">Confirm Variant Sync</button>
     <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-secondary">Back</a>
   </div>

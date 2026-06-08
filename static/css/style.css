@@ -821,6 +821,20 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .variant-sync-summary-card {
   margin-bottom: 1rem;
 }
+.variant-sync-preview-hero {
+  gap: .85rem;
+}
+.variant-sync-preview-heading {
+  display: grid;
+  gap: .25rem;
+}
+.variant-sync-preview-note {
+  color: var(--muted);
+  font-size: .92rem;
+}
+.variant-sync-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
 .variant-sync-form {
   position: relative;
   overflow: hidden;
@@ -872,6 +886,20 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
   background: var(--bg3);
 }
 .variant-sync-category-block { margin-top: 1.5rem; }
+.variant-sync-preview-section { margin-top: 1rem; }
+.variant-sync-section-heading {
+  margin-bottom: .4rem;
+  gap: 1rem;
+}
+.variant-sync-section-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+.variant-sync-preview-actions {
+  justify-content: flex-end;
+}
 .msrp-diff-progress-panel {
   margin-bottom: 1.5rem;
 }
