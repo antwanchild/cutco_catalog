@@ -42,6 +42,9 @@
         <strong>{{ group.name }}</strong>
       </span>
       <span class="import-sku-group-meta">
+        {% if show_set_badge and group.rows and group.rows[0].matches_set_sku %}
+        <span class="badge badge-warning" title="Matches an existing set{% if group.rows[0].matched_set_name %}: {{ group.rows[0].matched_set_name }}{% endif %}">Set SKU</span>
+        {% endif %}
         {% if group.variant_colors %}
         <span class="import-sku-group-chips">
           {% for color in group.variant_colors %}
@@ -57,8 +60,7 @@
     <table class="data-table import-item-table">
       <thead>
         <tr>
-          <th>Accept</th><th>Row</th><th>Name</th><th>SKU</th><th>Color</th>
-          <th>Edge</th><th>Category</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
+          <th>Accept</th><th>Row</th><th>Color</th><th>Edge</th><th>Category</th><th>Availability</th><th>SKU 🦄</th><th>Variant 🦄</th><th>Edge 🦄</th><th>Person</th><th>Status</th><th>Notes</th>
         </tr>
       </thead>
       <tbody>
@@ -68,18 +70,11 @@
           <td>
             <input type="hidden" name="item_row_{{ item.form_index }}" value="{{ item.row }}">
             <input type="hidden" name="item_name_{{ item.form_index }}" value="{{ item.name }}">
+            <input type="hidden" name="item_sku_{{ item.form_index }}" value="{{ item.sku or '' }}">
             <input type="hidden" name="item_availability_{{ item.form_index }}" value="{{ item.availability }}">
             <input type="hidden" name="item_quantity_purchased_{{ item.form_index }}" value="{{ item.quantity_purchased if item.quantity_purchased is not none else '' }}">
             <input type="hidden" name="item_quantity_given_away_{{ item.form_index }}" value="{{ item.quantity_given_away if item.quantity_given_away is not none else '' }}">
             Row {{ item.row }}
-          </td>
-          <td>{{ item.name }}</td>
-          <td>
-            <input type="hidden" name="item_sku_{{ item.form_index }}" value="{{ item.sku or '' }}">
-            <span class="mono">{{ item.sku or '—' }}</span>
-            {% if show_set_badge and item.matches_set_sku %}
-              <span class="badge badge-warning" title="Matches existing set{% if item.matched_set_name %}: {{ item.matched_set_name }}{% endif %}">Set SKU</span>
-            {% endif %}
           </td>
           <td>
             <input type="hidden" name="item_color_{{ item.form_index }}" value="{{ item.color }}">
@@ -161,7 +156,7 @@
     <table class="data-table import-ownership-table">
       <thead>
         <tr>
-          <th>Accept</th><th>Row</th><th>Person</th><th>Item</th><th>SKU</th><th>Color</th><th>Status</th><th>Flags</th>
+          <th>Accept</th><th>Row</th><th>Person</th><th>Color</th><th>Status</th><th>Flags</th>
           <th><span class="stacked-head"><span>Qty</span><span>Purchased</span></span></th>
           <th><span class="stacked-head"><span>Qty</span><span>Given Away</span></span></th>
           <th>Notes</th>
@@ -181,14 +176,10 @@
             {% if entry.is_new_person %}<span class="badge badge-new">new</span>{% endif %}
           </td>
           <td>
+            <input type="hidden" name="own_color_{{ entry.form_index }}" value="{{ entry.color }}">
             <input type="hidden" name="own_item_id_{{ entry.form_index }}" value="{{ entry.item_id }}">
             <input type="hidden" name="own_item_name_{{ entry.form_index }}" value="{{ entry.item_name }}">
             <input type="hidden" name="own_item_sku_{{ entry.form_index }}" value="{{ entry.sku or '' }}">
-            {{ entry.item_name }}
-          </td>
-          <td><span class="mono">{{ entry.sku or '—' }}</span></td>
-          <td>
-            <input type="hidden" name="own_color_{{ entry.form_index }}" value="{{ entry.color }}">
             <div class="ownership-color-cell">
               <span class="ownership-color-label">{{ entry.display_color or entry.color }}</span>
               {% if entry.is_new_variant %}<span class="badge badge-new">new variant</span>{% endif %}
