@@ -544,7 +544,6 @@ a:hover { text-decoration: underline; }
 }
 .import-accept-cell {
   text-align: center;
-  vertical-align: middle;
 }
 .import-accept-checkbox {
   display: inline-block;
@@ -553,7 +552,6 @@ a:hover { text-decoration: underline; }
 .data-table th:has(> input[type="checkbox"]),
 .data-table td:has(> input[type="checkbox"]) {
   text-align: center;
-  vertical-align: middle;
   width: 2.5rem;
   min-width: 2.5rem;
 }
@@ -571,6 +569,28 @@ a:hover { text-decoration: underline; }
 .import-ownership-table th:nth-child(7), .import-ownership-table td:nth-child(7) { width: 10%; }
 .import-ownership-table th:nth-child(8), .import-ownership-table td:nth-child(8) { width: 10%; }
 .import-ownership-table th:nth-child(9), .import-ownership-table td:nth-child(9) { width: 18%; }
+.import-mapping {
+  padding-top: 1rem;
+}
+.import-mapping > summary {
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.import-mapping > summary::-webkit-details-marker {
+  display: none;
+}
+.import-mapping > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: .5rem;
+  color: var(--muted);
+  transition: transform .15s ease;
+}
+.import-mapping[open] > summary::before {
+  transform: rotate(90deg);
+}
 .stacked-head {
   display: inline-flex;
   flex-direction: column;

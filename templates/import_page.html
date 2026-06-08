@@ -10,7 +10,34 @@
 </div>
 
 <div class="form-card">
-  <h2>Import Column Mapping</h2>
+  <h2>Start Here</h2>
+  <p class="muted">Upload a CSV or XLSX, optionally assign every row to one person, and preview the import before anything is saved.</p>
+  <p class="muted small">If you only want to validate the file shape, use <strong>Check Headers</strong>. The mapping guide below is available when you need it.</p>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="form-card">
+  <label>File (.xlsx or .csv) *
+    <input type="file" name="csvfile" accept=".csv,.xlsx" required class="input-full">
+  </label>
+
+  <label>Assign all rows to
+    <span class="hint">If set, every row uses this person instead of the Owned column value.</span>
+    <select name="person_override" class="input-full">
+      <option value="">— use Owned column —</option>
+      {% for person in people %}
+        <option value="{{ person.name }}">{{ person.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <div class="form-actions">
+    <button type="submit" name="mode" value="preview" class="btn btn-primary">Preview Import</button>
+    <button type="submit" name="mode" value="check" class="btn btn-secondary">Check Headers</button>
+  </div>
+</form>
+
+<details class="form-card import-mapping">
+  <summary>Import Column Mapping</summary>
   <p class="muted">Header matching is case-insensitive, but lowercase is the easiest style to read and keep consistent.</p>
   <p class="muted small">Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
   <table class="data-table compact">
@@ -32,28 +59,7 @@
       <tr><td><code>price</code></td><td>Merged into notes</td></tr>
     </tbody>
   </table>
-</div>
-
-<form method="post" enctype="multipart/form-data" class="form-card">
-  <label>File (.xlsx or .csv) *
-    <input type="file" name="csvfile" accept=".csv,.xlsx" required class="input-full">
-  </label>
-
-  <label>Person override
-    <span class="hint">If set, all rows are attributed to this person instead of the Owned column value.</span>
-    <select name="person_override" class="input-full">
-      <option value="">— use Owned column —</option>
-      {% for person in people %}
-        <option value="{{ person.name }}">{{ person.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-
-  <div class="form-actions">
-    <button type="submit" name="mode" value="preview" class="btn btn-primary">Preview Import</button>
-    <button type="submit" name="mode" value="check" class="btn btn-secondary">Check Headers</button>
-  </div>
-</form>
+</details>
 
 {% if import_check %}
 <div class="form-card">
