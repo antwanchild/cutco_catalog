@@ -29,31 +29,37 @@ Anthony Child,326,2,ordered again</code></pre>
   </div>
 </div>
 
-<form method="post" enctype="multipart/form-data" class="form-card completion-import-form">
-  <label class="completion-dropzone" id="completion-dropzone">
-    <span class="completion-dropzone-title">Paste rows or drop CSV</span>
-    <span class="completion-dropzone-help">Use headers: <code>person, sku, quantity, note</code>. Tabs from Excel or Google Sheets work too.</span>
-    <textarea name="rows_text" rows="10" class="input-full completion-pastebox" placeholder="person&#9;sku&#9;quantity&#9;note&#10;Anthony Child&#9;1726&#9;1&#9;ordered from rep"></textarea>
-    <input type="file" name="csvfile" accept=".csv" class="completion-file-input" id="completion-file-input">
-    <span class="completion-dropzone-filehint">Click to choose a CSV, or drag one here.</span>
-  </label>
-
-  <label>Assign all rows to
-    <span class="hint">Optional. If set, all pasted rows use this person instead of the file contents.</span>
-    <select name="person_override" class="input-full">
-      <option value="">— use pasted person column —</option>
-      {% for person in people %}
-        <option value="{{ person.name }}">{{ person.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-
-  <p class="muted completion-next-step">Next: we’ll roll set SKUs into their member items, merge duplicates, and show unresolved rows before anything is saved.</p>
-  <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Preview Completion Import</button>
-    <a href="{{ url_for('data.import_page') }}" class="btn btn-secondary">Standard Import</a>
+<section class="detail-section completion-import-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Import Input</h2>
+    <span class="muted small">Paste rows or upload a file, then preview the result</span>
   </div>
-</form>
+  <form method="post" enctype="multipart/form-data" class="completion-import-form mt-sm">
+    <label class="completion-dropzone" id="completion-dropzone">
+      <span class="completion-dropzone-title">Paste rows or drop CSV</span>
+      <span class="completion-dropzone-help">Use headers: <code>person, sku, quantity, note</code>. Tabs from Excel or Google Sheets work too.</span>
+      <textarea name="rows_text" rows="10" class="input-full completion-pastebox" placeholder="person&#9;sku&#9;quantity&#9;note&#10;Anthony Child&#9;1726&#9;1&#9;ordered from rep"></textarea>
+      <input type="file" name="csvfile" accept=".csv" class="completion-file-input" id="completion-file-input">
+      <span class="completion-dropzone-filehint">Click to choose a CSV, or drag one here.</span>
+    </label>
+
+    <label>Assign all rows to
+      <span class="hint">Optional. If set, all pasted rows use this person instead of the file contents.</span>
+      <select name="person_override" class="input-full">
+        <option value="">— use pasted person column —</option>
+        {% for person in people %}
+          <option value="{{ person.name }}">{{ person.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <p class="muted completion-next-step">Next: we’ll roll set SKUs into their member items, merge duplicates, and show unresolved rows before anything is saved.</p>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Preview Completion Import</button>
+      <a href="{{ url_for('data.import_page') }}" class="btn btn-secondary">Standard Import</a>
+    </div>
+  </form>
+</section>
 
 <div class="detail-section completion-history-card">
   <div class="section-heading-actions">
