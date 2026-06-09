@@ -427,8 +427,8 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
         job["heartbeat_at"] = datetime.now(UTC).isoformat(timespec="seconds")
         _write_msrp_job(job)
 
-    try:
-        with app.app_context():
+    with app.app_context():
+        try:
             db_items = Item.query.filter(Item.sku.isnot(None)).all()
             log(f"Loaded {len(db_items)} DB items — using stored Cutco URLs…")
             by_sku = _build_msrp_price_targets_from_db(db_items)
@@ -440,6 +440,10 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
 
             priced = sum(1 for info in by_sku.values() if info["price"] is not None)
             log(f"Prices found: {priced}/{len(by_sku)}")
+            if by_sku and priced == 0:
+                raise RuntimeError(
+                    "Cutco.com could not be reached or returned no MSRP prices."
+                )
 
             log("Building diff from stored DB rows…")
             diff = _build_msrp_diff(db_items, by_sku)
@@ -487,17 +491,17 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
             )
             db.session.commit()
 
-    except Exception as exc:
-        logger.error("MSRP diff job failed: %s", exc)
-        job = _read_msrp_job()
-        job.update({"status": "error", "error": str(exc),
-                    "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
-                    "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds")})
-        _write_msrp_job(job)
-        record_activity(
-            "msrp_diff",
-            "MSRP diff failed",
-            str(exc),
-            occurred_at=job["finished_at"],
-        )
-        db.session.commit()
+        except Exception as exc:
+            logger.error("MSRP diff job failed: %s", exc)
+            job = _read_msrp_job()
+            job.update({"status": "error", "error": str(exc),
+                        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                        "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds")})
+            _write_msrp_job(job)
+            record_activity(
+                "msrp_diff",
+                "MSRP diff failed",
+                str(exc),
+                occurred_at=job["finished_at"],
+            )
+            db.session.commit()

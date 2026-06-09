@@ -249,6 +249,10 @@ def _run_catalog_sync_job(app) -> None:
             log("Scraping set pages…")
             scraped_sets = scrape_sets(extra_candidates=set_candidates)
             log(f"Found {len(scraped_sets)} sets on cutco.com")
+            if not scraped and not scraped_sets:
+                raise RuntimeError(
+                    "Cutco.com could not be reached or returned no catalog data."
+                )
             preview = _build_catalog_sync_preview(scraped, scraped_sets)
             finished_at = datetime.now(UTC).isoformat(timespec="seconds")
             results = {
@@ -286,6 +290,13 @@ def _run_catalog_sync_job(app) -> None:
                 "preview": None,
                 "heartbeat_at": finished_at,
             })
+            record_activity(
+                "catalog_sync",
+                "Catalog sync failed",
+                str(exc),
+                occurred_at=finished_at,
+            )
+            db.session.commit()
 
 
 def _start_catalog_sync_background_job(app) -> threading.Thread:
@@ -1820,6 +1831,8 @@ def catalog_sync():
         if job.get("status") == "done" and job.get("preview"):
             preview = job["preview"]
             return render_template("sync_preview.html", job=job, **preview)
+        if job.get("status") == "error":
+            flash(f"Catalog sync failed: {job.get('error') or 'Unknown error'}", "error")
         return render_template(
             "sync_preview.html",
             job=job,

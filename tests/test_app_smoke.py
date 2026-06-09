@@ -4079,6 +4079,20 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertNotIn(b"Create placeholder items for missing set members", response.data)
         self.assertNotIn(b'name="create_missing_set_members" value="on" checked', response.data)
 
+    def test_catalog_sync_reports_cutco_outage_when_no_data_returns(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with mock.patch("blueprints.catalog._CATALOG_SYNC_JOB_FILE", f"{self.temp_dir.name}/catalog_sync_job.json"), \
+             mock.patch("blueprints.catalog.scrape_catalog", return_value=([], [])), \
+             mock.patch("blueprints.catalog.scrape_sets", return_value=[]), \
+             mock.patch("blueprints.catalog._start_catalog_sync_background_job", side_effect=catalog_blueprint._run_catalog_sync_job):
+            response = self.client.get("/catalog/sync?run=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Catalog sync failed:", response.data)
+        self.assertIn(b"could not be reached", response.data.lower())
+
     def test_set_membership_preview_ignores_sku_alias_changes_when_names_match(self):
         self._login_as_admin()
         self._set_csrf_token()

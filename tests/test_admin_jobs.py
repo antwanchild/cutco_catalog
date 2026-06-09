@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 import unittest
@@ -205,6 +206,24 @@ class AdminJobSmokeTests(unittest.TestCase):
         first_future.result.assert_called_once()
         second_future.cancel.assert_called_once()
         self.assertEqual(fake_executor.shutdown_args, {"wait": False, "cancel_futures": True})
+
+    def test_msrp_diff_flags_cutco_outage_when_no_prices_return(self):
+        job_file = f"{self.temp_dir.name}/msrp_job.json"
+        with mock.patch.object(msrp_helpers, "_MSRP_JOB_FILE", job_file), \
+             mock.patch.object(msrp_helpers, "_build_msrp_price_targets_from_db") as targets_mock, \
+             mock.patch.object(msrp_helpers, "_fetch_live_prices_by_sku", return_value=(0, 0)), \
+             mock.patch.object(msrp_helpers, "record_activity"), \
+             mock.patch.object(msrp_helpers, "check_wishlist_targets", return_value=[]):
+            targets_mock.return_value = {
+                "A-1": {"name": "Alpha", "url": "https://www.cutco.com/p/a", "price": None},
+            }
+            msrp_helpers._run_msrp_diff_job(self.app, False)
+
+        with open(job_file, "r", encoding="utf-8") as fh:
+            job_data = json.load(fh)
+
+        self.assertEqual(job_data["status"], "error")
+        self.assertIn("cutco.com", job_data["error"].lower())
 
     def test_msrp_price_targets_prefer_db_urls_for_known_skus(self):
         live_items = [
