@@ -2836,6 +2836,7 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"All SKU Completion Import", response.data)
+        self.assertIn(b"Completion Overview", response.data)
         self.assertIn(b"Paste rows or drop CSV", response.data)
         self.assertIn(b"person, sku, quantity, note", response.data)
         self.assertIn(b"ordered from rep", response.data)
@@ -2956,6 +2957,7 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"All SKU Completion Import Preview", preview_response.data)
+        self.assertIn(b"Preview Summary", preview_response.data)
         self.assertIn(b"Rolled-Up Totals", preview_response.data)
         self.assertIn(b"Unresolved SKUs", preview_response.data)
         self.assertIn(b"Update ownership", preview_response.data)
@@ -2991,7 +2993,7 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(confirm_response.status_code, 200)
         self.assertIn(b"Completion Import Result", confirm_response.data)
-        self.assertIn(b"What Happened", confirm_response.data)
+        self.assertIn(b"Import Summary", confirm_response.data)
         self.assertIn(b"Rows processed", confirm_response.data)
         self.assertIn(b"balanced mix of new and updated ownership entries", confirm_response.data)
         self.assertIn(b"Ownership entries updated", confirm_response.data)

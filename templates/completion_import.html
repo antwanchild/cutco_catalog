@@ -6,9 +6,12 @@
   <a href="{{ url_for('data.import_page') }}" class="btn btn-ghost">← Standard Import</a>
 </div>
 
-<div class="form-card">
-  <h2>How It Works</h2>
-  <p class="muted">Paste spreadsheet rows or upload a CSV to expand set SKUs into member items and roll duplicate ownership quantities together.</p>
+<div class="detail-section completion-overview-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Completion Overview</h2>
+    <span class="muted small">Paste rows, expand set SKUs, and roll duplicates together</span>
+  </div>
+  <p class="muted">Upload a CSV or paste spreadsheet rows to expand set SKUs into member items and combine duplicate ownership quantities before anything is written.</p>
   <ul class="completion-rules">
     <li>Set SKUs expand into their member item SKUs before totals are rolled up.</li>
     <li>Unknown item or set SKUs are skipped, not created.</li>
@@ -35,7 +38,7 @@ Anthony Child,326,2,ordered again</code></pre>
     <span class="completion-dropzone-filehint">Click to choose a CSV, or drag one here.</span>
   </label>
 
-  <label>Person override
+  <label>Assign all rows to
     <span class="hint">Optional. If set, all pasted rows use this person instead of the file contents.</span>
     <select name="person_override" class="input-full">
       <option value="">— use pasted person column —</option>
@@ -52,9 +55,9 @@ Anthony Child,326,2,ordered again</code></pre>
   </div>
 </form>
 
-<div class="form-card">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Recent Completion Imports</h2>
+<div class="detail-section completion-history-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Recent Completion Imports</h2>
     <span class="muted small">Latest completion import runs</span>
   </div>
   {% if recent_completion_imports %}

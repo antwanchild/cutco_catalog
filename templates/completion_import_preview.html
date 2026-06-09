@@ -13,8 +13,11 @@
 </div>
 {% endif %}
 
-<div class="form-card completion-summary-card">
-  <h2>Summary</h2>
+<div class="detail-section completion-summary-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Preview Summary</h2>
+    <span class="muted small">What will be written if you confirm</span>
+  </div>
   <div class="stat-grid completion-summary-grid">
     <div class="stat-card"><div class="stat-number">{{ preview.summary.rows_received }}</div><div class="stat-label">Rows received</div></div>
     <div class="stat-card"><div class="stat-number">{{ preview.summary.rows_resolved }}</div><div class="stat-label">Rows resolved</div></div>
@@ -151,7 +154,7 @@
   {% endif %}
 
   <div class="completion-confirm-note flash flash-info">
-    Set SKUs expand before totals are rolled up, and only known items will be applied.
+    Set SKUs expand before totals are rolled up, and only known items are applied.
   </div>
 
   <div class="form-actions">
