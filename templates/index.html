@@ -34,12 +34,12 @@
   </div>
 </div>
 
-<section class="dash-panel dash-panel-wide dashboard-shortcuts">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Quick Actions</h2>
+<section class="detail-section dashboard-section dashboard-shortcuts">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Quick Actions</h2>
     <a class="btn btn-secondary btn-sm" href="{{ url_for('search') }}">Search</a>
   </div>
-  <div class="quick-action-grid">
+  <div class="quick-action-grid mt-sm">
     <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">Add item</span>
       <span class="quick-action-note">Create a new catalog item.</span>
@@ -76,13 +76,13 @@
   </div>
 </section>
 
-<section class="dashboard-card dashboard-color-card">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Popular Colors</h2>
+<section class="detail-section dashboard-section dashboard-color-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Popular Colors</h2>
     <a class="btn btn-secondary btn-sm" href="{{ url_for('catalog.variants_browse') }}">Browse all variants</a>
   </div>
   {% if top_colors %}
-  <div class="chip-row">
+  <div class="chip-row mt-sm">
     {% for row in top_colors %}
       <a class="chip" href="{{ url_for('catalog.variants_browse', color=row.color) }}">
         {{ row.color }} <span class="muted">({{ row.count }})</span>
@@ -101,12 +101,12 @@
   </div>
 </div>
 
-<section class="dash-panel dash-panel-wide dashboard-changes">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Recently Changed</h2>
+<section class="detail-section dashboard-section dashboard-changes">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Recently Changed</h2>
     <span class="muted small">Latest records by type</span>
   </div>
-  <div class="changes-grid">
+  <div class="changes-grid mt-sm">
     <div class="dashboard-card changes-card">
       <h3>Catalog Items</h3>
       {% for item in recent_changes['items'] %}
@@ -153,11 +153,11 @@
   </div>
 </section>
 
-<section class="dash-panel dash-panel-wide dashboard-activity">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Recent Activity</h2>
+<section class="detail-section dashboard-section dashboard-activity">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Recent Activity</h2>
   </div>
-  <div class="activity-grid">
+  <div class="activity-grid mt-sm">
     {% for entry in recent_activity %}
       <article class="dashboard-card activity-card">
         <div class="activity-head">
@@ -175,12 +175,12 @@
   </div>
 </section>
 
-<section class="dash-panel dash-panel-wide dashboard-release">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Release &amp; Diagnostics</h2>
+<section class="detail-section dashboard-section dashboard-release">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Release &amp; Diagnostics</h2>
     <a class="btn btn-secondary btn-sm" href="{{ url_for('admin.diagnostics_page') }}">Open diagnostics</a>
   </div>
-  <div class="release-grid">
+  <div class="release-grid mt-sm">
     <div class="dashboard-card release-card">
       <h3>App Version</h3>
       <div class="release-value">v{{ release_snapshot.app_version }}</div>
@@ -202,7 +202,7 @@
 </section>
 
 <div class="dash-row dashboard-lower-grid">
-  <section class="dashboard-card lower-card">
+  <section class="detail-section lower-card">
     <h3>Quick Links</h3>
     <ul class="link-list">
       <li><a href="{{ url_for('catalog.catalog') }}">📋 Browse Catalog</a></li>
@@ -221,7 +221,7 @@
     </ul>
   </section>
 
-  <section class="dashboard-card lower-card">
+  <section class="detail-section lower-card">
     <h3>Collectors</h3>
     <ul class="link-list">
       {% for person in people %}
@@ -232,7 +232,7 @@
     </ul>
   </section>
 
-  <section class="dashboard-card lower-card">
+  <section class="detail-section lower-card">
     <h3>Recent Entries</h3>
     <ul class="link-list lower-entry-list">
       {% for ownership in recent %}
