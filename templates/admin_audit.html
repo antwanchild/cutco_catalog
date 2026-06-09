@@ -5,16 +5,20 @@
   <h1 class="page-title">🧾 Audit Trail</h1>
 </div>
 
-<p class="muted" style="margin-bottom:1rem">
-  Review recent creates, updates, and deletes across the catalog, people, sets, and logs.
-</p>
+<div class="detail-section log-overview-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Audit Overview</h2>
+    <span class="muted small">Track creates, updates, and deletes across the app</span>
+  </div>
+  <p class="muted">Review recent creates, updates, and deletes across the catalog, people, sets, and logs. Use the filters below to narrow to the activity you care about.</p>
+</div>
 
-<section class="stats-panel stats-panel-wide" style="margin-bottom:1.5rem">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2 class="stats-panel-title" style="margin:0">Filters</h2>
+<section class="detail-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Filters</h2>
     <button type="button" class="help-btn" onclick="document.getElementById('audit-help-modal').showModal()" aria-label="Audit trail help" title="What this means">?</button>
   </div>
-  <form method="get" class="filter-bar" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:end">
+  <form method="get" class="filter-bar mt-sm" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:end">
     <label>
       <span class="small muted">Action</span><br>
       <select name="action">
@@ -42,13 +46,13 @@
   </form>
 </section>
 
-<section class="stats-panel stats-panel-wide">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2 class="stats-panel-title" style="margin:0">Recent Changes</h2>
+<section class="detail-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Recent Changes</h2>
     <span class="muted small">{{ events | length }} event{% if events | length != 1 %}s{% endif %} shown</span>
   </div>
 
-  <div class="table-wrap">
+  <div class="table-wrap mt-sm">
     <table class="data-table compact">
       <thead>
         <tr>

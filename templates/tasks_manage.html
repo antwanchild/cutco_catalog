@@ -15,7 +15,19 @@
   </div>
 </div>
 
-<form method="post" action="{{ url_for('logs.task_add') }}" class="form-card mb-section">
+<div class="detail-section log-overview-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Task Manager</h2>
+    <span class="muted small">Create tasks, sync suggestions, and review usage</span>
+  </div>
+  <p class="muted">Use this page to add custom tasks, refresh suggestions from Cutco, and review how many knives and logs each task is tied to.</p>
+</div>
+
+<form method="post" action="{{ url_for('logs.task_add') }}" class="detail-section mb-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Add Task</h2>
+    <span class="muted small">Create a new custom task name</span>
+  </div>
   <div class="form-row">
     <label>New Task Name *
       <input type="text" name="name" required placeholder="e.g. Julienning carrots" class="input-full">
@@ -26,37 +38,43 @@
   </div>
 </form>
 
-<div class="table-wrap">
-<table class="data-table">
-  <thead>
-    <tr><th>Task</th><th>Type</th><th>Knives</th><th>Logged Uses</th><th></th></tr>
-  </thead>
-  <tbody>
-    {% for task in all_tasks %}
-    <tr>
-      <td><a href="{{ url_for('logs.task_detail', tid=task.id) }}">{{ task.name }}</a></td>
-      <td>{% if task.is_preset %}<span class="badge badge-info">preset</span>{% else %}<span class="muted">custom</span>{% endif %}</td>
-      <td class="muted">{{ task.suggested_items | length }}</td>
-      <td class="muted">{{ task.log_entries | length }}</td>
-      <td>
-        {% if not task.is_preset and not task.log_entries %}
-        <form method="post" action="{{ url_for('logs.task_delete', tid=task.id) }}"
-              class="form-inline">
-          <button class="btn btn-xs btn-danger"
-                  data-confirm-title="Delete task"
-                  data-confirm-message="This custom task will be removed."
-                  data-confirm-count="1 task"
-                  data-confirm-preview="Task: {{ task.name | e }} | Suggested knives: {{ task.suggested_items | length }} | Logged uses: {{ task.log_entries | length }}"
-                  data-confirm-button="Delete task">Delete</button>
-        </form>
-        {% else %}
-        <span class="muted">—</span>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="detail-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">All Tasks</h2>
+    <span class="muted small">{{ all_tasks | length }} task{% if all_tasks | length != 1 %}s{% endif %} defined</span>
+  </div>
+  <div class="table-wrap mt-sm">
+    <table class="data-table">
+      <thead>
+        <tr><th>Task</th><th>Type</th><th>Knives</th><th>Logged Uses</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for task in all_tasks %}
+        <tr>
+          <td><a href="{{ url_for('logs.task_detail', tid=task.id) }}">{{ task.name }}</a></td>
+          <td>{% if task.is_preset %}<span class="badge badge-info">preset</span>{% else %}<span class="muted">custom</span>{% endif %}</td>
+          <td class="muted">{{ task.suggested_items | length }}</td>
+          <td class="muted">{{ task.log_entries | length }}</td>
+          <td>
+            {% if not task.is_preset and not task.log_entries %}
+            <form method="post" action="{{ url_for('logs.task_delete', tid=task.id) }}"
+                  class="form-inline">
+              <button class="btn btn-xs btn-danger"
+                      data-confirm-title="Delete task"
+                      data-confirm-message="This custom task will be removed."
+                      data-confirm-count="1 task"
+                      data-confirm-preview="Task: {{ task.name | e }} | Suggested knives: {{ task.suggested_items | length }} | Logged uses: {{ task.log_entries | length }}"
+                      data-confirm-button="Delete task">Delete</button>
+            </form>
+            {% else %}
+            <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 {# ── Sync Uses loading overlay ─────────────────────────────────────────────── #}
@@ -68,10 +86,17 @@
 </div>
 
 <script>
-document.getElementById('uses-sync-form').addEventListener('submit', function() {
-  document.getElementById('uses-sync-btn').textContent = 'Syncing…';
-  document.getElementById('uses-sync-btn').disabled = true;
-  document.getElementById('sync-overlay').style.display = 'flex';
-});
+(function() {
+  const syncForm = document.getElementById('uses-sync-form');
+  const syncBtn = document.getElementById('uses-sync-btn');
+  const syncOverlay = document.getElementById('sync-overlay');
+  if (!syncForm || !syncBtn || !syncOverlay) return;
+
+  syncForm.addEventListener('submit', function() {
+    syncBtn.textContent = 'Syncing…';
+    syncBtn.disabled = true;
+    syncOverlay.style.display = 'flex';
+  });
+})();
 </script>
 {% endblock %}
