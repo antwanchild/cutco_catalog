@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Admin Login – Cutco Vault{% endblock %}
 {% block content %}
-<div class="form-card centered">
-  <h1 class="page-title">Admin Login</h1>
-  <form method="post">
+<div class="detail-section auth-card centered">
+  <div class="section-heading-actions">
+    <h1 class="page-title" style="margin:0">Admin Login</h1>
+  </div>
+  <p class="muted">Enter the admin token to unlock the private tools for this session.</p>
+  <form method="post" class="mt-sm">
     <label>Token
       <div style="position:relative;display:flex;align-items:center">
         <input type="password" name="token" id="token-input" autofocus required class="input-full" style="padding-right:2.5rem">

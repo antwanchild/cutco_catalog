@@ -6,22 +6,28 @@
   <a href="{{ url_for('index') }}" class="btn btn-ghost">← Home</a>
 </div>
 
-<form method="get" action="{{ url_for('data.export_csv') }}" class="form-card" style="max-width:640px">
-  <label>File name
-    <input type="text" name="filename" value="{{ suggested_name }}" class="input-full">
-    <span class="hint">`.csv` is added automatically if missing.</span>
-  </label>
-
-  <p class="hint">
-    Save location is chosen by your browser (download folder or Save As prompt).
-  </p>
-
-  <p class="hint">
-    Need a collector gap report? Open <a href="{{ url_for('data.completion_gaps_page') }}">Completion Gaps</a>.
-  </p>
-
-  <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Download CSV</button>
+<div class="detail-section auth-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Export CSV</h2>
+    <span class="muted small">Choose a filename and download the collection export</span>
   </div>
-</form>
+  <form method="get" action="{{ url_for('data.export_csv') }}" class="mt-sm" style="max-width:640px">
+    <label>File name
+      <input type="text" name="filename" value="{{ suggested_name }}" class="input-full">
+      <span class="hint">`.csv` is added automatically if missing.</span>
+    </label>
+
+    <p class="hint">
+      Save location is chosen by your browser (download folder or Save As prompt).
+    </p>
+
+    <p class="hint">
+      Need a collector gap report? Open <a href="{{ url_for('data.completion_gaps_page') }}">Completion Gaps</a>.
+    </p>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Download CSV</button>
+    </div>
+  </form>
+</div>
 {% endblock %}

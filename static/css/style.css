@@ -740,6 +740,12 @@ a:hover { text-decoration: underline; }
   max-width: 62rem;
   line-height: 1.6;
 }
+.auth-card {
+  max-width: 640px;
+}
+.auth-card.centered {
+  margin: 4rem auto;
+}
 .completion-confirm-form {
   display: flex;
   flex-direction: column;
