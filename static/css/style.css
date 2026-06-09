@@ -2166,6 +2166,22 @@ textarea { resize: vertical; }
   font-weight: 700;
   line-height: 1.2;
 }
+.diag-intro-card {
+  margin: 1rem 0 1.25rem;
+}
+.diag-intro-card p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin-top: .8rem;
+  max-width: 60rem;
+}
+.diag-panel {
+  margin-bottom: 1.25rem;
+}
+.diag-summary-grid,
+.diag-mini-grid {
+  margin-top: .9rem;
+}
 .row-owned td:first-child { border-left: 3px solid var(--success); }
 .row-missing td:first-child { border-left: 3px solid var(--bg3); }
 

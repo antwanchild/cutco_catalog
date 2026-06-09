@@ -5,16 +5,20 @@
   <h1 class="page-title">🩺 Runtime Diagnostics</h1>
 </div>
 
-<p class="muted" style="margin-bottom:1rem">
-  Quick runtime details for confirming what the current container is actually running.
-</p>
+<div class="detail-section diag-intro-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Diagnostics Overview</h2>
+    <span class="muted small">Quick runtime details for confirming the current container</span>
+  </div>
+  <p class="muted">Use this page to confirm what the current container is actually running, which jobs are active, and whether the recorded schema/bootstrap state still lines up with the app.</p>
+</div>
 
-<section class="stats-panel stats-panel-wide" style="margin-bottom:1.5rem">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2 class="stats-panel-title" style="margin:0">Service Health</h2>
+<section class="detail-section diag-panel">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Service Health</h2>
     <button type="button" class="help-btn" onclick="document.getElementById('diag-service-modal').showModal()" aria-label="Service health help" title="What this means">?</button>
   </div>
-  <div class="stat-grid" style="margin-bottom:0">
+  <div class="stat-grid">
     <div class="stat-card{% if msrp_job.status == 'running' %} stat-card-warn{% endif %}">
       <div class="stat-number">{{ msrp_job.status | capitalize }}</div>
       <div class="stat-label">MSRP Diff</div>
@@ -34,7 +38,7 @@
   </div>
 </section>
 
-<div class="stat-grid" style="margin-bottom:1.5rem">
+<div class="stat-grid diag-summary-grid">
   <div class="stat-card">
     <div class="stat-number">v{{ details.app_version }}</div>
     <div class="stat-label">App Version</div>
@@ -69,9 +73,9 @@
 </div>
 
 <div class="stats-grid">
-  <section class="stats-panel stats-panel-wide">
-    <div class="section-heading-actions" style="margin-bottom:.6rem">
-      <h2 class="stats-panel-title" style="margin:0">Runtime Snapshot</h2>
+  <section class="detail-section diag-panel stats-panel-wide">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">Runtime Snapshot</h2>
       <button type="button" class="help-btn" onclick="document.getElementById('diag-runtime-modal').showModal()" aria-label="Runtime snapshot help" title="What this means">?</button>
     </div>
     <table class="data-table compact">
@@ -116,12 +120,12 @@
     </table>
   </section>
 
-  <section class="stats-panel">
-    <div class="section-heading-actions" style="margin-bottom:.6rem">
-      <h2 class="stats-panel-title" style="margin:0">Schema Migrations</h2>
+  <section class="detail-section diag-panel">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">Schema Migrations</h2>
       <button type="button" class="help-btn" onclick="document.getElementById('diag-schema-modal').showModal()" aria-label="Schema help" title="What this means">?</button>
     </div>
-    <div class="stat-grid" style="margin-bottom:1rem">
+    <div class="stat-grid diag-mini-grid">
       <div class="stat-card">
         <div class="stat-number">v{{ details.schema_state.version }}</div>
         <div class="stat-label">Schema Current</div>
@@ -161,12 +165,12 @@
     </div>
   </section>
 
-  <section class="stats-panel">
-    <div class="section-heading-actions" style="margin-bottom:.6rem">
-      <h2 class="stats-panel-title" style="margin:0">Bootstrap History</h2>
+  <section class="detail-section diag-panel">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">Bootstrap History</h2>
       <button type="button" class="help-btn" onclick="document.getElementById('diag-bootstrap-modal').showModal()" aria-label="Bootstrap help" title="What this means">?</button>
     </div>
-    <div class="stat-grid" style="margin-bottom:1rem">
+    <div class="stat-grid diag-mini-grid">
       <div class="stat-card">
         <div class="stat-number">v{{ details.bootstrap_state.version }}</div>
         <div class="stat-label">Current Version</div>
@@ -206,9 +210,9 @@
     </div>
   </section>
 
-  <section class="stats-panel stats-panel-wide">
-    <div class="section-heading-actions" style="margin-bottom:.6rem">
-      <h2 class="stats-panel-title" style="margin:0">Storage &amp; Paths</h2>
+  <section class="detail-section diag-panel stats-panel-wide">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">Storage &amp; Paths</h2>
       <button type="button" class="help-btn" onclick="document.getElementById('diag-storage-modal').showModal()" aria-label="Storage help" title="What this means">?</button>
     </div>
     <table class="data-table compact">
