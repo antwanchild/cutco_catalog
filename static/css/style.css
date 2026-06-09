@@ -2204,6 +2204,24 @@ textarea { resize: vertical; }
   margin-bottom: 1rem;
 }
 .detail-section .section-heading { margin-top: 0; }
+.log-overview-card p {
+  margin-top: .7rem;
+  max-width: 62rem;
+  line-height: 1.6;
+}
+.log-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1rem;
+  list-style: none;
+}
+.log-panel summary::-webkit-details-marker { display: none; }
+.log-panel .muted {
+  margin-top: .55rem;
+}
+.log-panel form {
+  margin-top: .85rem;
+}
 .chip-list { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }
 .chip {
   background: var(--bg3);

@@ -19,7 +19,14 @@
   </div>
 </div>
 
-{# ── Summary cards ─────────────────────────────────────────────────────────── #}
+<div class="detail-section log-overview-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Task Overview</h2>
+    <span class="muted small">Track what gets used and when</span>
+  </div>
+  <p class="muted">Log task usage against the knives you own, then scan the summary cards and recent entries below to spot what gets used most.</p>
+</div>
+
 <div class="stat-grid">
   <div class="stat-card">
     <div class="stat-number">{{ recent_entries | length }}</div>
@@ -35,10 +42,10 @@
   </div>
 </div>
 
-{# ── Log entry form ────────────────────────────────────────────────────────── #}
-<details class="form-card mb-section">
-  <summary style="cursor:pointer;font-weight:600;padding:.5rem 0">+ Log Usage</summary>
-  <form method="post" action="{{ url_for('logs.task_log_add') }}" style="margin-top:1rem">
+<details class="detail-section log-panel mb-section">
+  <summary class="log-panel-summary">+ Log Usage</summary>
+  <p class="muted">Pick a knife, choose the task, and add the date and notes before saving the entry.</p>
+  <form method="post" action="{{ url_for('logs.task_log_add') }}" class="mt-sm">
     <div class="form-row">
       <label>Knife *
         <select name="item_id" required class="input-full">
@@ -113,63 +120,71 @@
 })();
 </script>
 
-{# ── Usage patterns ────────────────────────────────────────────────────────── #}
 {% if item_top_task %}
-<h2 class="section-heading">Usage Patterns</h2>
-<div class="table-wrap mb-section">
-<table class="data-table">
-  <thead>
-    <tr><th>Knife</th><th>Top Task</th><th>Total Uses</th></tr>
-  </thead>
-  <tbody>
-    {% for item in owned_items %}
-      {% set uses = namespace(count=0) %}
-      {% for entry in recent_entries %}
-        {% if entry.item_id == item.id %}{% set uses.count = uses.count + 1 %}{% endif %}
-      {% endfor %}
-      {% if item.id in item_top_task %}
-      <tr>
-        <td><a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a></td>
-        <td>{{ item_top_task[item.id] }}</td>
-        <td>{{ uses.count }}</td>
-      </tr>
-      {% endif %}
-    {% endfor %}
-  </tbody>
-</table>
+<div class="detail-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Usage Patterns</h2>
+    <span class="muted small">Most-used task per knife</span>
+  </div>
+  <div class="table-wrap mt-sm">
+    <table class="data-table">
+      <thead>
+        <tr><th>Knife</th><th>Top Task</th><th>Total Uses</th></tr>
+      </thead>
+      <tbody>
+        {% for item in owned_items %}
+          {% set uses = namespace(count=0) %}
+          {% for entry in recent_entries %}
+            {% if entry.item_id == item.id %}{% set uses.count = uses.count + 1 %}{% endif %}
+          {% endfor %}
+          {% if item.id in item_top_task %}
+          <tr>
+            <td><a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a></td>
+            <td>{{ item_top_task[item.id] }}</td>
+            <td>{{ uses.count }}</td>
+          </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endif %}
 
-{# ── Recent log ────────────────────────────────────────────────────────────── #}
 {% if recent_entries %}
-<h2 class="section-heading">Recent Entries</h2>
-<div class="table-wrap">
-<table class="data-table">
-  <thead>
-    <tr><th>Date</th><th>Knife</th><th>Task</th><th>Notes</th><th></th></tr>
-  </thead>
-  <tbody>
-    {% for entry in recent_entries %}
-    <tr>
-      <td class="mono">{{ entry.logged_on }}</td>
-      <td><a href="{{ url_for('views.item_owners', item_id=entry.item.id) }}">{{ entry.item.name }}</a></td>
-      <td>{{ entry.task.name }}</td>
-      <td class="muted">{{ entry.notes or '' }}</td>
-      <td>
-        <form method="post" action="{{ url_for('logs.task_log_delete', lid=entry.id) }}"
-              class="form-inline">
-          <button class="btn btn-xs btn-danger"
-                  data-confirm-title="Delete task log entry"
-                  data-confirm-message="This log entry will be removed."
-                  data-confirm-count="1 entry"
-                  data-confirm-preview="Date: {{ entry.logged_on }} | Knife: {{ entry.item.name | e }} | Task: {{ entry.task.name | e }}"
-                  data-confirm-button="Delete entry">✕</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="detail-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Recent Entries</h2>
+    <span class="muted small">Newest task logs first</span>
+  </div>
+  <div class="table-wrap mt-sm">
+    <table class="data-table">
+      <thead>
+        <tr><th>Date</th><th>Knife</th><th>Task</th><th>Notes</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for entry in recent_entries %}
+        <tr>
+          <td class="mono">{{ entry.logged_on }}</td>
+          <td><a href="{{ url_for('views.item_owners', item_id=entry.item.id) }}">{{ entry.item.name }}</a></td>
+          <td>{{ entry.task.name }}</td>
+          <td class="muted">{{ entry.notes or '' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('logs.task_log_delete', lid=entry.id) }}"
+                  class="form-inline">
+              <button class="btn btn-xs btn-danger"
+                      data-confirm-title="Delete task log entry"
+                      data-confirm-message="This log entry will be removed."
+                      data-confirm-count="1 entry"
+                      data-confirm-preview="Date: {{ entry.logged_on }} | Knife: {{ entry.item.name | e }} | Task: {{ entry.task.name | e }}"
+                      data-confirm-button="Delete entry">✕</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% else %}
 <p class="empty">No usage logged yet. Use the form above to get started.</p>
