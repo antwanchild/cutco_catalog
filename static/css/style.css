@@ -1865,6 +1865,11 @@ textarea { resize: vertical; }
   border-radius: var(--radius);
   padding: 1rem 1.25rem;
 }
+.stats-chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
 .stats-panel-wide { grid-column: 1 / -1; }
 .stats-panel-title {
   font-size: .8rem;

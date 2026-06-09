@@ -17,21 +17,21 @@
 <p class="muted small">Includes public items plus unicorn, rep only, Costco, and non-catalog items that are marked Owned.</p>
 
 {% if top_colors %}
-<section class="dashboard-card" style="margin-bottom:1.25rem">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Top Colors</h2>
+<div class="detail-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Top Colors</h2>
     {% if top_colors | length > 2 %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('catalog.variants_browse') }}">Show all</a>
     {% endif %}
   </div>
-  <div class="chip-row">
+  <div class="chip-row mt-sm">
     {% for row in top_colors %}
       <a class="chip" href="{{ url_for('catalog.variants_browse', color=row.color, unknown=1) }}">
         {{ row.color }} <span class="muted">({{ row.count }})</span>
       </a>
     {% endfor %}
   </div>
-</section>
+</div>
 {% endif %}
 
 {# ── Summary cards ────────────────────────────────────────────────────────── #}
@@ -71,80 +71,95 @@
 
   {# Owned by category #}
   {% if cat_data %}
-  <div class="stats-panel stats-panel-wide">
-    <h2 class="stats-panel-title">Owned Items by Category</h2>
+  <section class="detail-section stats-chart-card stats-panel-wide">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">Owned Items by Category</h2>
+    </div>
     <div class="chart-wrap"><canvas id="catChart"></canvas></div>
-  </div>
+  </section>
   {% endif %}
 
   {# Catalog coverage #}
   {% if cov_cats %}
-  <div class="stats-panel stats-panel-wide">
-    <h2 class="stats-panel-title">Catalog Coverage by Category</h2>
+  <section class="detail-section stats-chart-card stats-panel-wide">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">Catalog Coverage by Category</h2>
+    </div>
     <div class="chart-wrap"><canvas id="covChart"></canvas></div>
-  </div>
+  </section>
   {% endif %}
 
   {# Handle color distribution #}
   {% if color_data %}
-  <div class="stats-panel">
-    <h2 class="stats-panel-title">Handle Colors</h2>
+  <section class="detail-section stats-chart-card">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">Handle Colors</h2>
+    </div>
     <div class="chart-wrap chart-wrap-sq"><canvas id="colorChart"></canvas></div>
-  </div>
+  </section>
   {% endif %}
 
   {# Edge type breakdown #}
   {% if edge_data %}
-  <div class="stats-panel">
-    <h2 class="stats-panel-title">Edge Types</h2>
+  <section class="detail-section stats-chart-card">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">Edge Types</h2>
+    </div>
     <div class="chart-wrap chart-wrap-sq"><canvas id="edgeChart"></canvas></div>
-  </div>
+  </section>
   {% endif %}
 
   {# Estimated value by category #}
   {% if val_data %}
-  <div class="stats-panel stats-panel-wide">
-    <h2 class="stats-panel-title">Estimated Value by Category</h2>
+  <section class="detail-section stats-chart-card stats-panel-wide">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">Estimated Value by Category</h2>
+    </div>
     <div class="chart-wrap"><canvas id="valChart"></canvas></div>
-  </div>
+  </section>
   {% endif %}
 
 </div>
 
 {# ── Collector breakdown table ─────────────────────────────────────────────── #}
 {% if collector_rows %}
-<h2 class="stats-section-title">By Collector</h2>
-<div class="table-wrap">
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>Collector</th>
-        <th>Unique Items</th>
-        <th>Catalog Coverage</th>
-        {% if summary.total_value %}<th>Est. Value</th>{% endif %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in collector_rows %}
-      <tr>
-        <td><a href="{{ url_for('people.person_collection', person_id=row.id) }}">{{ row.name }}</a></td>
-        <td>{{ row.count }}</td>
-        <td>
-          {% if summary.catalog_total %}
-            {% set pct = (100 * row.count / summary.catalog_total) | round(1) %}
-            <div class="cov-bar-wrap">
-              <div class="cov-bar" style="width:{{ [pct,100]|min }}%"></div>
-              <span class="cov-pct">{{ pct }}%</span>
-            </div>
+<div class="detail-section mt-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">By Collector</h2>
+    <span class="muted small">{{ collector_rows | length }} collector{% if collector_rows | length != 1 %}s{% endif %} shown</span>
+  </div>
+  <div class="table-wrap mt-sm">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Collector</th>
+          <th>Unique Items</th>
+          <th>Catalog Coverage</th>
+          {% if summary.total_value %}<th>Est. Value</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in collector_rows %}
+        <tr>
+          <td><a href="{{ url_for('people.person_collection', person_id=row.id) }}">{{ row.name }}</a></td>
+          <td>{{ row.count }}</td>
+          <td>
+            {% if summary.catalog_total %}
+              {% set pct = (100 * row.count / summary.catalog_total) | round(1) %}
+              <div class="cov-bar-wrap">
+                <div class="cov-bar" style="width:{{ [pct,100]|min }}%"></div>
+                <span class="cov-pct">{{ pct }}%</span>
+              </div>
+            {% endif %}
+          </td>
+          {% if summary.total_value %}
+          <td>{% if row.value %}${{ "{:,.2f}".format(row.value) }}{% else %}—{% endif %}</td>
           {% endif %}
-        </td>
-        {% if summary.total_value %}
-        <td>{% if row.value %}${{ "{:,.2f}".format(row.value) }}{% else %}—{% endif %}</td>
-        {% endif %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endif %}
 
