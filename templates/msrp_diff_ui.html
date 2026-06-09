@@ -27,48 +27,60 @@
 
 {# ── Run form ─────────────────────────────────────────────────────────────── #}
 <div class="form-card compact mb-section msrp-diff-run-card">
-  <div class="msrp-diff-actions" style="margin-top:.25rem">
-    <form method="post" action="{{ url_for('admin.msrp_diff_run') }}" id="run-form" class="inline-form">
-      <div class="inline-form" style="flex-wrap:wrap;gap:.75rem">
-        <label class="checkbox-label">
-          <input type="checkbox" name="update_db"{% if job.update_db %} checked{% endif %}>
-          Write prices to DB after scrape
-        </label>
-        {% if job.started_at %}
-        <span class="muted small">Last run: {{ format_container_time(job.started_at) }}
-          {% if job.finished_at %}→ {{ format_container_time(job.finished_at) }}{% endif %}
-        </span>
+  <div class="msrp-diff-run-hero">
+    <div class="msrp-diff-run-copy">
+      <div class="section-kicker">Scan Controls</div>
+      <p class="msrp-diff-run-text">
+        Scrape live prices from Cutco.com, compare them to the database, and optionally write changes back.
+      </p>
+      <p class="hint msrp-diff-run-note">
+        The run usually takes 1–3 minutes.
+        {% if not job.update_db and job.status != 'running' %}
+          <strong>Write prices to DB</strong> is off, so this run is read-only.
         {% endif %}
+      </p>
+      {% if job.started_at %}
+      <p class="muted small msrp-diff-run-meta">
+        Last run: {{ format_container_time(job.started_at) }}
+        {% if job.finished_at %}→ {{ format_container_time(job.finished_at) }}{% endif %}
+      </p>
+      {% endif %}
+    </div>
+
+    <div class="msrp-diff-run-controls">
+      <div class="msrp-diff-action-row">
+        <form method="post" action="{{ url_for('admin.msrp_diff_run') }}" id="run-form" class="msrp-diff-run-form">
+          <label class="checkbox-label">
+            <input type="checkbox" name="update_db"{% if job.update_db %} checked{% endif %}>
+            Write prices to DB after scrape
+          </label>
+          <button type="submit" class="btn btn-primary"
+                  id="run-btn"{% if job.status == 'running' %} disabled{% endif %}>
+            {% if job.status == 'running' %}Running…{% else %}Run Diff{% endif %}
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('admin.msrp_diff_reset') }}" class="inline-form">
+          <button type="submit" class="btn btn-ghost"
+                  data-confirm-title="Clear MSRP job state"
+                  data-confirm-message="This will reset the saved MSRP diff job back to idle."
+                  data-confirm-count="1 job state"
+                  data-confirm-preview="Any current progress log and results will be cleared."
+                  data-confirm-button="Clear job state"
+                  {% if job.status != 'running' and job.status != 'error' and not job.progress %}disabled{% endif %}>
+            Clear Job State
+          </button>
+        </form>
       </div>
-      <button type="submit" class="btn btn-primary"
-              id="run-btn"{% if job.status == 'running' %} disabled{% endif %}>
-        {% if job.status == 'running' %}Running…{% else %}Run Diff{% endif %}
-      </button>
-    </form>
-    <form method="post" action="{{ url_for('admin.msrp_diff_reset') }}" class="inline-form">
-      <button type="submit" class="btn btn-ghost"
-              data-confirm-title="Clear MSRP job state"
-              data-confirm-message="This will reset the saved MSRP diff job back to idle."
-              data-confirm-count="1 job state"
-              data-confirm-preview="Any current progress log and results will be cleared."
-              data-confirm-button="Clear job state"
-              {% if job.status != 'running' and job.status != 'error' and not job.progress %}disabled{% endif %}>
-        Clear Job State
-      </button>
-    </form>
+    </div>
   </div>
-  <p class="hint" style="margin-top:.5rem">
-    Scrapes live prices from cutco.com and compares them to the values stored in your database.
-    The scrape takes 1–3 minutes.
-    {% if not job.update_db and job.status != 'running' %}
-      <strong>Write prices to DB</strong> is off — results are read-only.
-    {% endif %}
-  </p>
 </div>
 
 {# ── Progress log (shown while running) ──────────────────────────────────── #}
 <div id="progress-panel" class="msrp-diff-progress-panel" style="{% if job.status != 'running' and not job.progress %}display:none{% endif %}">
-  <h2 class="stats-section-title">Progress</h2>
+  <div class="msrp-diff-panel-heading">
+    <h2 class="stats-section-title">Progress</h2>
+    <span class="muted small">Live job output</span>
+  </div>
   <div class="msrp-log" id="progress-log">
     {% for line in job.progress %}
       <div>{{ line }}</div>
@@ -85,6 +97,11 @@
 {% if job.results %}
 {% set r = job.results %}
 {% set changes = r.increased | length + r.decreased | length %}
+
+<div class="msrp-diff-results-heading">
+  <h2 class="stats-section-title">Scan Results</h2>
+  <p class="hint">Results are grouped by change type. Click a section to expand the details.</p>
+</div>
 
 <div class="stat-grid" style="margin:1.5rem 0 1rem">
   <div class="stat-card{% if r.increased %} stat-card-warn{% endif %}">

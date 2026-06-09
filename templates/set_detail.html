@@ -17,13 +17,36 @@
   </div>
 </div>
 
-{% if set.sku %}<p class="muted">SKU: <span class="mono">{{ set.sku }}</span></p>{% endif %}
-{% if set.notes %}<p class="set-notes">{{ set.notes }}</p>{% endif %}
+<div class="detail-section set-overview-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Set Overview</h2>
+    <span class="muted small">Imported set metadata and completion snapshot</span>
+  </div>
+  <div class="set-overview-grid">
+    <div class="set-overview-item">
+      <span class="set-overview-label">SKU</span>
+      <span class="set-overview-value mono">{{ set.sku or '—' }}</span>
+    </div>
+    <div class="set-overview-item">
+      <span class="set-overview-label">Imported members</span>
+      <span class="set-overview-value">{{ member_snapshot_rows | length }}</span>
+    </div>
+    <div class="set-overview-item">
+      <span class="set-overview-label">Owned</span>
+      <span class="set-overview-value">{{ owned_items | length }}</span>
+    </div>
+    <div class="set-overview-item">
+      <span class="set-overview-label">Not owned</span>
+      <span class="set-overview-value">{{ missing_items | length }}</span>
+    </div>
+  </div>
+  {% if set.notes %}<p class="set-overview-notes">{{ set.notes }}</p>{% endif %}
+</div>
 
 {% if top_colors %}
-<section class="dashboard-card" style="margin:1rem 0 1.25rem">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Top Colors</h2>
+<section class="detail-section set-overview-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Top Colors</h2>
     {% if top_colors | length > 2 %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('catalog.variants_browse') }}">Show all</a>
     {% endif %}
@@ -72,9 +95,11 @@
 {% endif %}
 
 {% if member_snapshot_rows %}
-<div class="imported-members-section">
-<h2 class="section-heading">📋 Imported Members ({{ member_snapshot_rows | length }})</h2>
-<p class="muted">These are the imported members captured when this set was imported. Items not in the catalog are flagged below.</p>
+<div class="detail-section imported-members-section">
+<div class="section-heading-actions">
+  <h2 class="section-heading">📋 Imported Members ({{ member_snapshot_rows | length }})</h2>
+  <span class="muted small">Items not in the catalog are flagged below.</span>
+</div>
 <div class="table-wrap">
 <table class="data-table compact imported-members-table">
   <thead>
@@ -118,7 +143,11 @@
 {% endif %}
 
 {% if owned_items %}
-<h2 class="section-heading">✅ Owned ({{ owned_items | length }})</h2>
+<div class="detail-section set-items-section">
+<div class="section-heading-actions">
+  <h2 class="section-heading">✅ Owned ({{ owned_items | length }})</h2>
+  <span class="muted small">Items already marked owned for this set.</span>
+</div>
 <div class="table-wrap">
 <table class="data-table">
   <thead>
@@ -155,10 +184,15 @@
   </tbody>
 </table>
 </div>
+</div>
 {% endif %}
 
 {% if missing_items %}
-<h2 class="section-heading">❌ Not Owned ({{ missing_items | length }})</h2>
+<div class="detail-section set-items-section">
+<div class="section-heading-actions">
+  <h2 class="section-heading">❌ Not Owned ({{ missing_items | length }})</h2>
+  <span class="muted small">Items still needed to complete the set.</span>
+</div>
 {% if person %}
 <p class="muted">These items are in the set but not owned by {{ person.name }}.</p>
 {% else %}
@@ -215,6 +249,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 </div>
 {% endif %}
 

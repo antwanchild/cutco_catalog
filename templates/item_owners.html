@@ -18,45 +18,90 @@
 </div>
 
 {# ── Meta strip ───────────────────────────────────────────────────────────── #}
-<div class="item-meta mb-section">
-  {% if item.sku %}<span><strong>SKU:</strong> <span class="mono">{{ item.sku }}</span></span>{% endif %}
-  {% if item.alternate_sku_values %}
-    <span>
-      <strong>Aliases:</strong>
-      <span class="badge badge-alias" title="{{ item.alternate_sku_values | join(', ') }}">
-        {{ item.alternate_sku_values | length }} alt SKU{{ 's' if item.alternate_sku_values | length != 1 else '' }}
-      </span>
-    </span>
-  {% endif %}
-  {% if item.availability_label %}
-    <span>
-      <strong>Availability:</strong>
-      <span class="badge {{ item.availability_badge_class }}">{{ item.availability_label }}</span>
-    </span>
-  {% endif %}
-  {% if item.set_only %}<span><strong>Status:</strong> Set-only</span>{% endif %}
-  {% if item.category %}
-    <span><strong>Category:</strong> {{ item.category }}</span>
-  {% else %}
-    <span><strong>Category:</strong> <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span></span>
-  {% endif %}
-  {% if item.edge_type != 'N/A' %}
-    <span><strong>Edge:</strong> {{ item.edge_type }}{% if item.edge_is_unicorn %} 🦄{% endif %}</span>
-  {% endif %}
-  {% if item.blade_length %}<span><strong>Blade:</strong> {{ item.blade_length }}</span>{% endif %}
-  {% if item.overall_length %}<span><strong>Overall:</strong> {{ item.overall_length }}</span>{% endif %}
-  {% if item.weight %}<span><strong>Weight:</strong> {{ item.weight }}</span>{% endif %}
-  {% if item.msrp %}<span><strong>MSRP:</strong> ${{ "%.2f"|format(item.msrp) }}</span>{% endif %}
-  {% if item.cutco_url %}<a href="{{ item.cutco_url }}" target="_blank" rel="noopener" class="btn btn-xs">Cutco.com ↗</a>{% endif %}
+<div class="detail-section item-overview-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Item Overview</h2>
+    <span class="muted small">Catalog identity and item metadata</span>
+  </div>
+  <div class="item-overview-grid">
+    <div class="item-overview-item">
+      <span class="item-overview-label">SKU</span>
+      <span class="item-overview-value mono">{{ item.sku or '—' }}</span>
+    </div>
+    <div class="item-overview-item">
+      <span class="item-overview-label">Aliases</span>
+      {% if item.alternate_sku_values %}
+        <span class="badge badge-alias" title="{{ item.alternate_sku_values | join(', ') }}">
+          {{ item.alternate_sku_values | length }} alt SKU{{ 's' if item.alternate_sku_values | length != 1 else '' }}
+        </span>
+      {% else %}
+        <span class="muted">—</span>
+      {% endif %}
+    </div>
+    <div class="item-overview-item">
+      <span class="item-overview-label">Availability</span>
+      {% if item.availability_label %}
+        <span class="badge {{ item.availability_badge_class }}">{{ item.availability_label }}</span>
+      {% else %}
+        <span class="muted">—</span>
+      {% endif %}
+    </div>
+    <div class="item-overview-item">
+      <span class="item-overview-label">Category</span>
+      {% if item.category %}
+        <span class="item-overview-value">{{ item.category }}</span>
+      {% else %}
+        <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
+      {% endif %}
+    </div>
+    {% if item.set_only %}
+    <div class="item-overview-item">
+      <span class="item-overview-label">Status</span>
+      <span class="item-overview-value">Set-only</span>
+    </div>
+    {% endif %}
+    {% if item.edge_type != 'N/A' %}
+    <div class="item-overview-item">
+      <span class="item-overview-label">Edge</span>
+      <span class="item-overview-value">{{ item.edge_type }}{% if item.edge_is_unicorn %} 🦄{% endif %}</span>
+    </div>
+    {% endif %}
+    {% if item.blade_length %}
+    <div class="item-overview-item">
+      <span class="item-overview-label">Blade</span>
+      <span class="item-overview-value">{{ item.blade_length }}</span>
+    </div>
+    {% endif %}
+    {% if item.overall_length %}
+    <div class="item-overview-item">
+      <span class="item-overview-label">Overall</span>
+      <span class="item-overview-value">{{ item.overall_length }}</span>
+    </div>
+    {% endif %}
+    {% if item.weight %}
+    <div class="item-overview-item">
+      <span class="item-overview-label">Weight</span>
+      <span class="item-overview-value">{{ item.weight }}</span>
+    </div>
+    {% endif %}
+    {% if item.msrp %}
+    <div class="item-overview-item">
+      <span class="item-overview-label">MSRP</span>
+      <span class="item-overview-value">${{ "%.2f"|format(item.msrp) }}</span>
+    </div>
+    {% endif %}
+  </div>
+  <div class="item-overview-footer">
+    {% if item.cutco_url %}<a href="{{ item.cutco_url }}" target="_blank" rel="noopener" class="btn btn-xs">Cutco.com ↗</a>{% endif %}
+    {% if item.notes %}<p class="item-overview-notes">{{ item.notes }}</p>{% endif %}
+  </div>
 </div>
-
-{% if item.notes %}<p class="item-notes mb-section">{{ item.notes }}</p>{% endif %}
 
 {# ── Two-column layout ────────────────────────────────────────────────────── #}
 {% if top_colors %}
-<section class="dashboard-card" style="margin-bottom:1.25rem">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Top Colors</h2>
+<section class="detail-section item-overview-card">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Top Colors</h2>
     {% if top_colors | length > 2 %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('catalog.variants_browse') }}">Show all</a>
     {% endif %}
