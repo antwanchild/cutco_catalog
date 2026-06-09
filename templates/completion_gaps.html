@@ -6,9 +6,12 @@
   <a href="{{ url_for('data.export_page') }}" class="btn btn-ghost">← Export CSV</a>
 </div>
 
-<div class="form-card">
-  <h2>Missing Catalog SKUs</h2>
-  <p class="muted">Select a collector, then view the gaps on screen or download them as CSV.</p>
+<div class="detail-section completion-gaps-overview">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Completion Gaps Overview</h2>
+    <span class="muted small">Compare collectors against the public catalog</span>
+  </div>
+  <p class="muted">Select a collector, then view the gaps on screen or download them as CSV. This report shows which public catalog SKUs each collector still does not own in any variant.</p>
   <div class="stat-grid" style="margin-top:.75rem;">
     <div class="stat-card">
       <div class="stat-number">{{ public_catalog_count }}</div>
@@ -20,7 +23,7 @@
     </div>
   </div>
 
-  <div class="completion-gaps-actions" style="margin-top:1rem;">
+  <div class="completion-gaps-actions mt-section">
     <form method="get" class="completion-gaps-form">
       <label>Collector
         <select name="person_id" class="select-full">
@@ -45,9 +48,9 @@
 </div>
 
 {% if missing_rows is not none %}
-<div class="form-card">
-  <div class="section-heading-actions" style="margin-bottom:.6rem">
-    <h2>Screen View</h2>
+<div class="detail-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Screen View</h2>
     <div class="inline-actions" style="gap:.5rem; align-items:center;">
       <span class="muted small">{{ missing_rows | length }} missing SKU{{ 's' if missing_rows | length != 1 }}</span>
       {% if missing_rows %}
@@ -56,7 +59,7 @@
     </div>
   </div>
   {% if missing_rows %}
-    <div class="table-wrap">
+    <div class="table-wrap mt-sm">
       <table class="data-table compact">
         <thead>
           <tr>
@@ -84,7 +87,7 @@
   {% endif %}
 </div>
 {% else %}
-<div class="form-card">
+<div class="detail-section">
   <p class="muted">Choose a collector and click <strong>View on screen</strong> to see the report here.</p>
 </div>
 {% endif %}
