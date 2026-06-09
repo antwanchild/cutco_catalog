@@ -1238,7 +1238,13 @@ textarea { resize: vertical; }
   box-shadow: 0 1px 0 rgba(255, 255, 255, .02) inset;
 }
 .stat-number { font-size: 2rem; font-weight: 700; color: var(--accent); line-height: 1; }
-.stat-label  { font-size: .75rem; color: var(--muted); }
+.stat-label  {
+  font-size: .7rem;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: .03em;
+  line-height: 1.2;
+}
 .variant-sync-summary-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
