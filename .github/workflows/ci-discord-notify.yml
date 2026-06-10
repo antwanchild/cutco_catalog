@@ -62,7 +62,8 @@ jobs:
 
           short_sha=$(printf '%s' "$HEAD_SHA" | cut -c1-7)
 
-          release_tag=$(git tag --points-at "$HEAD_SHA" --list 'v[0-9]*' --sort=-version:refname | head -1)
+          mapfile -t release_tags < <(git tag --points-at "$HEAD_SHA" --list 'v[0-9]*' --sort=-version:refname)
+          release_tag=${release_tags[0]:-}
           if [ -z "$release_tag" ]; then
             release_tag="untagged"
           fi

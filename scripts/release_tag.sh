@@ -2,7 +2,8 @@
 set -euo pipefail
 
 COMMIT_MSG=$(git log -1 --pretty=%B)
-HEAD_TAG=$(git tag --points-at HEAD --list 'v[0-9]*' --sort=-version:refname | head -1)
+mapfile -t HEAD_TAGS < <(git tag --points-at HEAD --list 'v[0-9]*' --sort=-version:refname)
+HEAD_TAG=${HEAD_TAGS[0]:-}
 
 if [ -n "$HEAD_TAG" ]; then
   echo "Head already has release tag ${HEAD_TAG}; skipping tag creation."
@@ -24,7 +25,8 @@ if [ -n "$HEAD_TAG" ]; then
   exit 0
 fi
 
-LAST_TAG=$(git tag --list 'v[0-9]*' --sort=-version:refname | head -1)
+mapfile -t TAGS < <(git tag --list 'v[0-9]*' --sort=-version:refname)
+LAST_TAG=${TAGS[0]:-}
 LAST_TAG=${LAST_TAG:-v0.0.0}
 VERSION=${LAST_TAG#v}
 IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
