@@ -4,7 +4,7 @@
 <div class="page-header">
   <h1 class="page-title">🗂️ {{ set.name }} {{ help_btn("set_detail") }}</h1>
   <div class="page-actions">
-    {% if person_id %}
+    {% if is_admin() and person_id %}
       <a href="{{ url_for('views.gift_token', set_id=set.id, person=person_id) }}" class="btn btn-secondary">🎁 Share Gift List</a>
     {% endif %}
     {% if can_restore_memberships and is_admin() %}
@@ -12,7 +12,9 @@
         <button class="btn btn-secondary" data-confirm-title="Restore set memberships" data-confirm-message="This will restore set links from the imported member snapshot without removing existing links." data-confirm-count="1 set" data-confirm-button="Restore memberships">Restore Memberships</button>
       </form>
     {% endif %}
+    {% if is_admin() %}
     <a href="{{ url_for('catalog.set_edit', set_id=set.id, next=next_target or (request.full_path[:-1] if request.full_path.endswith('?') else request.full_path)) }}" class="btn btn-secondary">Edit</a>
+    {% endif %}
     <a href="{{ next_target or (url_for('catalog.sets_list') + ('?person=' ~ person_id if person_id else '')) }}" class="btn btn-ghost">← Sets</a>
   </div>
 </div>
@@ -31,6 +33,7 @@
       <span class="set-overview-label">Imported members</span>
       <span class="set-overview-value">{{ member_snapshot_rows | length }}</span>
     </div>
+    {% if is_admin() %}
     <div class="set-overview-item">
       <span class="set-overview-label">Owned</span>
       <span class="set-overview-value">{{ owned_items | length }}</span>
@@ -39,6 +42,7 @@
       <span class="set-overview-label">Not owned</span>
       <span class="set-overview-value">{{ missing_items | length }}</span>
     </div>
+    {% endif %}
   </div>
   {% if set.notes %}<p class="set-overview-notes">{{ set.notes }}</p>{% endif %}
 </div>
@@ -61,6 +65,7 @@
 </section>
 {% endif %}
 
+{% if is_admin() %}
 {# ── Person filter ─────────────────────────────────────────────────────────── #}
 <form method="get" style="margin-bottom:1rem">
   <input type="hidden" name="sort" value="{{ sort }}">
@@ -252,8 +257,55 @@
 </div>
 </div>
 {% endif %}
+{% else %}
+{% if member_snapshot_rows %}
+<div class="detail-section imported-members-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">📋 Imported Members ({{ member_snapshot_rows | length }})</h2>
+    <span class="muted small">Items in the set snapshot.</span>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table compact imported-members-table">
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Item</th>
+          <th>Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for member in member_snapshot_rows %}
+        <tr class="{% if member.status == 'missing' %}row-missing{% endif %}">
+          <td>
+            {% if member.sku %}
+              {% if member.matched_item %}
+                <a class="mono" href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}" title="{{ member.hover_title or member.name or member.matched_item.name }}">{{ member.sku }}</a>
+              {% else %}
+                <span class="mono" title="{{ member.hover_title or member.name or '' }}">{{ member.sku }}</span>
+              {% endif %}
+            {% else %}
+              <span class="muted" title="{{ member.hover_title or member.name or '' }}">{{ member.name or 'No item #' }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if member.matched_item %}
+              <a href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}">{{ member.matched_item.name }}</a>
+            {% else %}
+              <span title="{{ member.hover_title or member.name or '' }}">{{ member.name or '—' }}</span>
+            {% endif %}
+          </td>
+          <td>{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% else %}<span class="muted">1</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+<p class="muted">Private completion details require authenticated access.</p>
+{% endif %}
 
-{% if not owned_items and not missing_items %}
+{% if is_admin() and not owned_items and not missing_items %}
 <p class="empty">No items in this set yet. Edit items from the catalog to assign them.</p>
 {% endif %}
 {% endblock %}

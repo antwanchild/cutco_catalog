@@ -20,7 +20,9 @@
     <a href="{{ url_for('search', q=query) }}" class="btn btn-sm btn-ghost">Clear</a>
   </form>
 {% else %}
-  <p class="search-kicker">Search items, collectors, sets, and tasks from one place.</p>
+  <p class="search-kicker">
+    Search items and sets from one place{% if is_admin() %}; collectors and tasks are also available{% endif %}.
+  </p>
 {% endif %}
 
 {% if shortcuts %}
@@ -65,6 +67,7 @@
     </div>
   </section>
 
+  {% if is_admin() %}
   <section class="search-section">
     <h2>Collectors ({{ results['people'] | length }})</h2>
     <div class="search-list">
@@ -86,6 +89,7 @@
       {% endfor %}
     </div>
   </section>
+  {% endif %}
 
   <section class="search-section">
     <h2>Sets ({{ results['sets'] | length }})</h2>
@@ -110,6 +114,7 @@
     </div>
   </section>
 
+  {% if is_admin() %}
   <section class="search-section">
     <h2>Tasks ({{ results['tasks'] | length }})</h2>
     <div class="search-list">
@@ -131,6 +136,7 @@
       {% endfor %}
     </div>
   </section>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

@@ -20,6 +20,7 @@
     <div class="stat-number">{{ stats.unicorns }}</div>
     <div class="stat-label">Unicorns</div>
   </div>
+  {% if is_admin() %}
   <div class="stat-card">
     <div class="stat-number">{{ stats.people }}</div>
     <div class="stat-label">Collectors</div>
@@ -32,6 +33,7 @@
     <div class="stat-number">{{ stats.wishlist }}</div>
     <div class="stat-label">Wishlist</div>
   </div>
+  {% endif %}
 </div>
 
 <section class="detail-section dashboard-section dashboard-shortcuts">
@@ -40,6 +42,22 @@
     <a class="btn btn-secondary btn-sm" href="{{ url_for('search') }}">Search</a>
   </div>
   <div class="quick-action-grid mt-sm">
+    <div class="dashboard-card quick-action-card">
+      <span class="quick-action-title">Browse catalog</span>
+      <span class="quick-action-note">Explore item and set records.</span>
+      <a class="btn btn-primary btn-sm quick-action-btn" href="{{ url_for('catalog.catalog') }}">Open Catalog</a>
+    </div>
+    <div class="dashboard-card quick-action-card">
+      <span class="quick-action-title">Browse sets</span>
+      <span class="quick-action-note">Review set metadata and components.</span>
+      <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('catalog.sets_list') }}">Open Sets</a>
+    </div>
+    <div class="dashboard-card quick-action-card">
+      <span class="quick-action-title">Collection stats</span>
+      <span class="quick-action-note">See product summaries and coverage.</span>
+      <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('views.stats') }}">Open Stats</a>
+    </div>
+    {% if is_admin() %}
     <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">Add item</span>
       <span class="quick-action-note">Create a new catalog item.</span>
@@ -55,7 +73,6 @@
       <span class="quick-action-note">Check runtime, migrations, and storage.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('admin.diagnostics_page') }}">Open Diagnostics</a>
     </div>
-    {% if is_admin() %}
     <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">Catalog sync</span>
       <span class="quick-action-note">Preview and import Cutco updates.</span>
@@ -101,6 +118,7 @@
   </div>
 </div>
 
+{% if is_admin() %}
 <section class="detail-section dashboard-section dashboard-changes">
   <div class="section-heading-actions">
     <h2 class="section-heading">Recently Changed</h2>
@@ -152,7 +170,6 @@
     </div>
   </div>
 </section>
-
 <section class="detail-section dashboard-section dashboard-activity">
   <div class="section-heading-actions">
     <h2 class="section-heading">Recent Activity</h2>
@@ -174,11 +191,14 @@
     {% endfor %}
   </div>
 </section>
+{% endif %}
 
 <section class="detail-section dashboard-section dashboard-release">
   <div class="section-heading-actions">
     <h2 class="section-heading">Release &amp; Diagnostics</h2>
-    <a class="btn btn-secondary btn-sm" href="{{ url_for('admin.diagnostics_page') }}">Open diagnostics</a>
+    {% if is_admin() %}
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('admin.diagnostics_page') }}">Open diagnostics</a>
+    {% endif %}
   </div>
   <div class="release-grid mt-sm">
     <div class="dashboard-card release-card">
@@ -201,6 +221,7 @@
   </div>
 </section>
 
+{% if is_admin() %}
 <div class="dash-row dashboard-lower-grid">
   <section class="detail-section lower-card">
     <h3>Quick Links</h3>
@@ -251,6 +272,7 @@
     </ul>
   </section>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

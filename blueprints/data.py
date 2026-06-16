@@ -1113,6 +1113,7 @@ def _build_import_header_report(uploaded_file, ext: str) -> dict:
 
 
 @data_bp.route("/export")
+@admin_required
 def export_page():
     """Render the export page."""
     suggested_name = f"cutco_collection_{date.today().isoformat()}.csv"
@@ -1120,6 +1121,7 @@ def export_page():
 
 
 @data_bp.route("/export/csv")
+@admin_required
 def export_csv():
     """Export the collection as CSV."""
     rows = (db.session.query(Ownership, ItemVariant, Item, Person)
@@ -1425,6 +1427,7 @@ def variant_sync_confirm():
 
 
 @data_bp.route("/import/template")
+@admin_required
 def import_template():
     """Download a starter CSV template for imports."""
     csv_buffer = io.StringIO()

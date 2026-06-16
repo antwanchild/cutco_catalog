@@ -98,7 +98,7 @@
 </div>
 
 {# ── Two-column layout ────────────────────────────────────────────────────── #}
-{% if top_colors %}
+{% if is_admin() and top_colors %}
 <section class="detail-section item-overview-card">
   <div class="section-heading-actions">
     <h2 class="section-heading">Top Colors</h2>
@@ -202,6 +202,7 @@
     </section>
     {% endif %}
 
+    {% if is_admin() %}
     {# Suggested uses from Cutco #}
     {% if item.suggested_tasks %}
     <section class="detail-section">
@@ -230,12 +231,14 @@
       </div>
     </section>
     {% endif %}
+    {% endif %}
 
   </div>
 
   {# ── Right column ───────────────────────────────────────────────────────── #}
   <div class="detail-col">
 
+    {% if is_admin() %}
     {# Collectors #}
     <section class="detail-section">
       <h2 class="section-heading">Collectors ({{ entries | length }})</h2>
@@ -281,6 +284,7 @@
       </div>
       {% endif %}
     </section>
+    {% endif %}
 
   </div>
 </div>

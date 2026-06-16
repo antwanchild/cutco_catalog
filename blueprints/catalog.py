@@ -1640,8 +1640,9 @@ def set_detail(set_id=None, sid=None):
     item_set    = db.session.get(Set, set_id)
     if not item_set:
         abort(404)
-    all_persons = Person.query.order_by(Person.name).all()
-    person_id   = request.args.get("person", type=int)
+    private_view = is_admin()
+    all_persons = Person.query.order_by(Person.name).all() if private_view else []
+    person_id   = request.args.get("person", type=int) if private_view else None
     person      = db.session.get(Person, person_id) if person_id else None
     sort_field  = (request.args.get("sort", "name") or "name").strip().lower()
     direction   = (request.args.get("dir", "asc") or "asc").strip().lower()
@@ -1651,17 +1652,20 @@ def set_detail(set_id=None, sid=None):
         sort_field = "name"
 
     # Split items into owned vs. missing for the selected person (or globally)
-    owned_q = Ownership.query.filter_by(status="Owned")
-    if person_id:
-        owned_q = owned_q.filter_by(person_id=person_id)
-    owned_ownerships = [
-        ownership for ownership in owned_q.all()
-        if ownership.variant is not None and ownership.variant.item is not None
-    ]
-    owned_item_ids = {ownership.variant.item_id for ownership in owned_ownerships}
+    owned_ownerships = []
+    owned_item_ids: set[int] = set()
+    if private_view:
+        owned_q = Ownership.query.filter_by(status="Owned")
+        if person_id:
+            owned_q = owned_q.filter_by(person_id=person_id)
+        owned_ownerships = [
+            ownership for ownership in owned_q.all()
+            if ownership.variant is not None and ownership.variant.item is not None
+        ]
+        owned_item_ids = {ownership.variant.item_id for ownership in owned_ownerships}
 
     wishlisted_item_ids: set[int] = set()
-    if person_id:
+    if private_view and person_id:
         wishlisted_item_ids = {
             ownership.variant.item_id
             for ownership in Ownership.query.filter_by(person_id=person_id, status="Wishlist").all()
@@ -1678,16 +1682,18 @@ def set_detail(set_id=None, sid=None):
         catalog_sku_lookup,
     )
 
-    color_counts: dict[str, int] = {}
-    for ownership in owned_ownerships:
-        color = ownership.variant.color or UNKNOWN_COLOR
-        if color == UNKNOWN_COLOR:
-            continue
-        color_counts[color] = color_counts.get(color, 0) + 1
-    top_colors = [
-        {"color": color, "count": count}
-        for color, count in sorted(color_counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))[:8]
-    ]
+    top_colors = []
+    if private_view:
+        color_counts: dict[str, int] = {}
+        for ownership in owned_ownerships:
+            color = ownership.variant.color or UNKNOWN_COLOR
+            if color == UNKNOWN_COLOR:
+                continue
+            color_counts[color] = color_counts.get(color, 0) + 1
+        top_colors = [
+            {"color": color, "count": count}
+            for color, count in sorted(color_counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))[:8]
+        ]
 
     def _sort_items(items: list[Item]) -> list[Item]:
         if sort_field == "msrp":
@@ -1710,8 +1716,8 @@ def set_detail(set_id=None, sid=None):
         key_fn = key_map.get(sort_field, key_map["name"])
         return sorted(items, key=key_fn, reverse=(direction == "desc"))
 
-    owned_items   = _sort_items([item for item in item_set.items if item.id in owned_item_ids])
-    missing_items = _sort_items([item for item in item_set.items if item.id not in owned_item_ids])
+    owned_items   = _sort_items([item for item in item_set.items if item.id in owned_item_ids]) if private_view else []
+    missing_items = _sort_items([item for item in item_set.items if item.id not in owned_item_ids]) if private_view else []
 
     total = len(item_set.items)
     owned_count = len(owned_items)
@@ -1738,7 +1744,7 @@ def set_detail(set_id=None, sid=None):
                            not_in_catalog_skus=not_in_catalog_skus,
                            top_colors=top_colors,
                            next_target=next_target,
-                           can_restore_memberships=bool(item_set.member_data),
+                           can_restore_memberships=bool(item_set.member_data) and private_view,
                            COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
@@ -1804,12 +1810,9 @@ def catalog_sync_uses():
 # ── Catalog Sync ──────────────────────────────────────────────────────────────
 
 @catalog_bp.route("/catalog/sync")
+@admin_required
 def catalog_sync():
     """Render the catalog sync preview page."""
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("catalog.catalog"))
-
     start_requested = request.args.get("run") == "1"
     job = _read_catalog_sync_job()
 
@@ -1899,20 +1902,16 @@ def catalog_sync():
 
 
 @catalog_bp.route("/catalog/sync/status")
+@admin_required
 def catalog_sync_status():
     """Return the current catalog sync job state."""
-    if not is_admin():
-        abort(403)
     return jsonify(_read_catalog_sync_job())
 
 
 @catalog_bp.route("/catalog/sync/confirm", methods=["POST"])
+@admin_required
 def catalog_sync_confirm():
     """Apply a catalog sync preview."""
-    if not is_admin():
-        flash("Admin access required.", "error")
-        return redirect(url_for("catalog.catalog"))
-
     selected = set(request.form.getlist("selected_skus"))
     item_data = {}
     for key, val in request.form.items():

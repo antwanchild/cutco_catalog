@@ -141,15 +141,31 @@ class PublicSmokeTests(SmokeBaseTest):
     def test_public_pages_load(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Recent Activity", response.data)
         self.assertIn(b"Quick Actions", response.data)
+        self.assertIn(b"Browse catalog", response.data)
+        self.assertIn(b"Browse sets", response.data)
+        self.assertIn(b"Collection stats", response.data)
         self.assertIn(b"Popular Colors", response.data)
-        self.assertIn(b"Recently Changed", response.data)
-        self.assertIn(b"Release &amp; Diagnostics", response.data)
+        self.assertNotIn(b"Collectors", response.data)
+        self.assertNotIn(b"Recently Changed", response.data)
+        self.assertNotIn(b"Recent Activity", response.data)
         self.assertIn(b"\xc2\xa9", response.data)
         self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
         self.assertNotIn("Strict-Transport-Security", response.headers)
         self.assertEqual(self.client.get("/robots.txt").status_code, 200)
+
+    def test_private_pages_redirect_without_auth(self):
+        response = self.client.get("/people")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login", response.headers["Location"])
+
+        response = self.client.get("/wishlist")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login", response.headers["Location"])
+
+        response = self.client.get("/views/matrix")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login", response.headers["Location"])
 
     def test_nav_menus_are_sectioned_for_admin(self):
         self._login_as_admin()

@@ -35,6 +35,10 @@ if ADMIN_TOKEN == "admin":
         "Set the ADMIN_TOKEN environment variable to a strong secret before exposing this service.",
         stacklevel=2,
     )
+TRUSTED_AUTH_USERNAME_HEADER = os.environ.get(
+    "TRUSTED_AUTH_USERNAME_HEADER",
+    os.environ.get("AUTHENTIK_USERNAME_HEADER", "X-Forwarded-User"),
+)
 ADMIN_SESSION_SECONDS   = int(os.environ.get("ADMIN_SESSION_SECONDS", str(2 * 60 * 60)))  # default 2 h
 DATA_DIR                = os.environ.get("DATA_DIR", "/data")
 DISCORD_WEBHOOK_URL     = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()

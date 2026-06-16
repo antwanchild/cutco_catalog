@@ -257,6 +257,7 @@ def _register_routes(app: Flask) -> None:
     @app.route("/")
     def index():
         from models import ItemVariant, Ownership, Person, Set
+        private_view = is_admin()
 
         stats = dict(
             item_count=Item.query.count(),
@@ -273,8 +274,8 @@ def _register_routes(app: Flask) -> None:
             variants=ItemVariant.query.filter(ItemVariant.color != UNKNOWN_COLOR).count(),
             sets=Set.query.count(),
         )
-        people = Person.query.order_by(Person.name).all()
-        recent = Ownership.query.order_by(Ownership.id.desc()).limit(10).all()
+        people = Person.query.order_by(Person.name).all() if private_view else []
+        recent = Ownership.query.order_by(Ownership.id.desc()).limit(10).all() if private_view else []
         top_colors = [
             {"color": color, "count": count}
             for color, count in (
@@ -286,13 +287,15 @@ def _register_routes(app: Flask) -> None:
                 .all()
             )
         ]
+        recent_activity = _recent_activity() if private_view else []
+        recent_changes = _recent_changes() if private_view else {"items": [], "people": [], "entries": []}
         return render_template(
             "index.html",
             stats=stats,
             people=people,
             recent=recent,
-            recent_activity=_recent_activity(),
-            recent_changes=_recent_changes(),
+            recent_activity=recent_activity,
+            recent_changes=recent_changes,
             release_snapshot=_release_snapshot(),
             top_colors=top_colors,
         )
@@ -301,6 +304,7 @@ def _register_routes(app: Flask) -> None:
     def search():
         query = request.args.get("q", "").strip()
         cat_filter = request.args.get("category", "").strip()
+        private_view = is_admin()
         categories = [
             row[0]
             for row in db.session.query(Item.category)
@@ -310,16 +314,22 @@ def _register_routes(app: Flask) -> None:
             .all()
         ]
         if not query:
+            shortcuts = [
+                {"label": "Catalog", "url": url_for("catalog.catalog"), "description": "Browse and filter items."},
+                {"label": "Sets", "url": url_for("catalog.sets_list"), "description": "Browse product sets."},
+                {"label": "Stats", "url": url_for("views.stats"), "description": "View catalog summaries."},
+            ]
+            if private_view:
+                shortcuts.extend([
+                    {"label": "People", "url": url_for("people.people"), "description": "Open collector records."},
+                    {"label": "Tasks", "url": url_for("logs.tasks_manage"), "description": "Manage knife tasks."},
+                    {"label": "Diagnostics", "url": url_for("admin.diagnostics_page"), "description": "Check runtime health."},
+                ])
             return render_template(
                 "search.html",
                 query="",
                 results={},
-                shortcuts=[
-                {"label": "Catalog", "url": url_for("catalog.catalog"), "description": "Browse and filter items."},
-                {"label": "People", "url": url_for("people.people"), "description": "Open collector records."},
-                {"label": "Tasks", "url": url_for("logs.tasks_manage"), "description": "Manage knife tasks."},
-                {"label": "Diagnostics", "url": url_for("admin.diagnostics_page"), "description": "Check runtime health."},
-                ],
+                shortcuts=shortcuts,
                 categories=categories,
                 cat_filter=cat_filter,
                 UNCATEGORIZED_FILTER="__uncategorized__",
@@ -340,13 +350,6 @@ def _register_routes(app: Flask) -> None:
             item_query = item_query.filter(Item.category == cat_filter)
         item_results = item_query.order_by(Item.name).limit(20).all()
 
-        person_results = Person.query.filter(
-            db.or_(
-                Person.name.ilike(like),
-                Person.notes.ilike(like),
-            )
-        ).order_by(Person.name).limit(20).all()
-
         set_results = Set.query.filter(
             db.or_(
                 Set.name.ilike(like),
@@ -355,9 +358,19 @@ def _register_routes(app: Flask) -> None:
             )
         ).order_by(Set.name).limit(20).all()
 
-        task_results = KnifeTask.query.filter(
-            KnifeTask.name.ilike(like)
-        ).order_by(KnifeTask.name).limit(20).all()
+        person_results = []
+        task_results = []
+        if private_view:
+            person_results = Person.query.filter(
+                db.or_(
+                    Person.name.ilike(like),
+                    Person.notes.ilike(like),
+                )
+            ).order_by(Person.name).limit(20).all()
+
+            task_results = KnifeTask.query.filter(
+                KnifeTask.name.ilike(like)
+            ).order_by(KnifeTask.name).limit(20).all()
 
         return render_template(
             "search.html",

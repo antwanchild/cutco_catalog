@@ -24,6 +24,7 @@ def _parse_optional_whole_number(raw_value: str, label: str) -> tuple[int | None
 
 
 @people_bp.route("/people")
+@admin_required
 def people():
     """Render the people list."""
     people = Person.query.order_by(Person.name).all()
@@ -104,6 +105,7 @@ def purge_collection(person_id):
 
 
 @people_bp.route("/people/<int:person_id>/collection")
+@admin_required
 def person_collection(person_id):
     """Render a person's collection detail page."""
     person     = db.session.get(Person, person_id)
@@ -348,6 +350,7 @@ def bulk_status_update(person_id):
 # ── Wishlist ──────────────────────────────────────────────────────────────────
 
 @people_bp.route("/wishlist")
+@admin_required
 def wishlist():
     """Render the wishlist page."""
     person_id   = request.args.get("person", type=int)

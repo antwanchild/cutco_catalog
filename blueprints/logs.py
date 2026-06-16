@@ -49,6 +49,7 @@ def _is_sharpening_page_item(item: Item) -> bool:
 # ── Sharpening Log ────────────────────────────────────────────────────────────
 
 @logs_bp.route("/sharpening")
+@admin_required
 def sharpening():
     """Render the sharpening log page."""
     today       = date.today()
@@ -271,6 +272,7 @@ def sharpening_notify():
 # ── Cookware ──────────────────────────────────────────────────────────────────
 
 @logs_bp.route("/cookware", endpoint="cookware")
+@admin_required
 def cookware():
     """Render the cookware usage log page."""
     today       = date.today()
@@ -522,6 +524,7 @@ def cookware_notify():
 # ── Knife Task Pairing ────────────────────────────────────────────────────────
 
 @logs_bp.route("/tasks")
+@admin_required
 def tasks():
     """Render the task log page."""
     today = date.today()
@@ -681,6 +684,7 @@ def task_log_purge_all():
 
 
 @logs_bp.route("/tasks/manage")
+@admin_required
 def tasks_manage():
     """Render the task management page."""
     all_tasks = KnifeTask.query.order_by(KnifeTask.is_preset.desc(), KnifeTask.name).all()
@@ -688,6 +692,7 @@ def tasks_manage():
 
 
 @logs_bp.route("/tasks/manage/<int:tid>")
+@admin_required
 def task_detail(tid):
     """Render task details and usage history."""
     task = db.session.get(KnifeTask, tid)

@@ -11,18 +11,24 @@ import requests
 from flask import abort, current_app, flash, redirect, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
 
-from constants import DISCORD_WEBHOOK_URL
+from constants import DISCORD_WEBHOOK_URL, TRUSTED_AUTH_USERNAME_HEADER
 from models import Ownership
 
 logger = logging.getLogger(__name__)
 
 
+def is_authentik_authenticated() -> bool:
+    """Return whether the current request came through a trusted auth proxy."""
+    header_value = request.headers.get(TRUSTED_AUTH_USERNAME_HEADER, "").strip()
+    return bool(header_value)
+
+
 def is_admin() -> bool:
-    """Return whether the current session has admin access."""
+    """Return whether the current request has private access."""
     # Primary auth path: signed Flask session flag.
     if session.get("is_admin") is True:
         return True
-    return False
+    return is_authentik_authenticated()
 
 
 def admin_required(fn):

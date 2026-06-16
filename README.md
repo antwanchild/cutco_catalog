@@ -31,6 +31,7 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 - 🧩 **Completion Reports** — Standalone completion-gaps reporting and completion-import rollups for rep-style collection lists
 - 📊 **Matrix View** — Cross-tabulate items vs. collectors at a glance
 - 🔒 **Admin Controls** — Token-protected admin mode for catalog edits, syncing, and MSRP diffs
+- 🔐 **Public / Private Split** — Product browse pages stay public; collector, import, and mutation routes stay private; signed gift/collection links remain shareable
 - 🔔 **Discord Notifications** — Optional webhook integration for wishlist price alerts, sharpening reminders, and cookware reminders
 - 🌙 **Dark / Light Mode** — Toggle between dark (default) and light themes; preference saved in localStorage
 - 🎁 **Gift List Sharing** — Generate a signed shareable link showing missing set items for a person; no login required, print-friendly
@@ -102,6 +103,7 @@ ruff check .
 | `LOG_LEVEL` | `INFO` | No | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_DIR` | `/data/logs` | No | Directory for rotating log files |
 | `SESSION_COOKIE_SECURE` | `false` | No | Set to `true` when served over HTTPS so session cookies are sent only via TLS |
+| `TRUSTED_AUTH_USERNAME_HEADER` | `X-Forwarded-User` | No | Trusted reverse-proxy header that marks a request as authenticated via your auth proxy |
 | `ALLOW_INSECURE_DEFAULTS` | `false` | No | Set to `true` to bypass startup safety checks that reject default `SECRET_KEY` / `ADMIN_TOKEN` in production |
 | `SYNC_BLOCKED_CATEGORIES` | *(empty)* | No | Comma-separated category names to exclude from catalog sync |
 | `DISCORD_WEBHOOK_URL` | *(empty)* | No | Incoming webhook URL for Discord notifications |
@@ -133,6 +135,55 @@ SYNC_BLOCKED_CATEGORIES=Tableware,Accessories
 ```
 
 Variant color maintenance lives on a separate **Variant Sync** page. It scans product pages for color options, previews `existing` / `create` / `not seen in sync` states, and only creates missing variants. Missing variants are retained so possible unicorn colors are not deleted by accident. You can open it from the catalog page or the More menu.
+
+## 🔐 Public vs Private Pages
+
+Public pages describe products and can be shared without a password:
+
+- `/`
+- `/search`
+- `/catalog`
+- `/sets/<id>`
+- `/views/item/<id>`
+- `/attachments/<id>`
+- `/gifts/<token>`
+- `/collection-card/<token>`
+- `/health`
+- `/version`
+
+Private pages describe collector data or allow changes:
+
+- `/people/*`
+- `/wishlist`
+- `/sharpening`
+- `/cookware`
+- `/tasks`
+- `/admin/*`
+- import, export, completion, sync, and other mutation routes
+
+If you put an auth proxy in front of the app, authenticated requests can be treated as private by setting `TRUSTED_AUTH_USERNAME_HEADER` to the trusted username header your proxy forwards. The legacy `AUTHENTIK_USERNAME_HEADER` name is still accepted for compatibility.
+
+### Traefik + authentik
+
+```yaml
+services:
+  cutco-vault:
+    image: ghcr.io/antwanchild/cutco_catalog:latest
+    environment:
+      - TRUSTED_AUTH_USERNAME_HEADER=X-Forwarded-User
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.cutco.rule=Host(`cutco.example.com`)
+      - traefik.http.routers.cutco.entrypoints=websecure
+      - traefik.http.routers.cutco.tls=true
+      - traefik.http.routers.cutco.middlewares=cutco-auth@docker
+      - traefik.http.services.cutco.loadbalancer.server.port=8095
+      - traefik.http.middlewares.cutco-auth.forwardauth.address=https://auth.example.com/outpost.goauthentik.io/auth/traefik
+      - traefik.http.middlewares.cutco-auth.forwardauth.authResponseHeaders=X-Forwarded-User
+      - traefik.http.middlewares.cutco-auth.forwardauth.headerField=X-Forwarded-User
+```
+
+Traefik should forward the authenticated username into the same trusted header the app reads, and the app should read that exact header name.
 
 ---
 

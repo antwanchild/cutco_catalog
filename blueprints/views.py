@@ -7,7 +7,7 @@ from flask import Blueprint, abort, current_app, flash, render_template, request
 
 from constants import COOKWARE_CATEGORIES, STATUS_RANK, UNKNOWN_COLOR
 from extensions import db
-from helpers import admin_required, db_commit
+from helpers import admin_required, db_commit, is_admin
 from helpers import (_collection_token, _gift_token,
                      _verify_collection_token, _verify_gift_token)
 from models import Item, ItemAttachment, ItemVariant, KnifeTaskLog, Ownership, Person, Set, SharpeningLog
@@ -83,17 +83,21 @@ def item_owners(item_id):
     if not item:
         abort(404)
 
-    entries = (Ownership.query
-               .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
-               .filter(ItemVariant.item_id == item_id)
-               .order_by(Ownership.status).all())
-    owner_ids      = {entry.person_id for entry in entries}
-    people_without = (Person.query
-                      .filter(~Person.id.in_(owner_ids))
-                      .order_by(Person.name).all())
+    private_view = is_admin()
+    entries = []
+    people_without = []
+    if private_view:
+        entries = (Ownership.query
+                   .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
+                   .filter(ItemVariant.item_id == item_id)
+                   .order_by(Ownership.status).all())
+        owner_ids      = {entry.person_id for entry in entries}
+        people_without = (Person.query
+                          .filter(~Person.id.in_(owner_ids))
+                          .order_by(Person.name).all())
 
     sharpening = []
-    if item.category not in COOKWARE_CATEGORIES:
+    if private_view and item.category not in COOKWARE_CATEGORIES:
         sharpening = (SharpeningLog.query
                       .filter_by(item_id=item_id)
                       .order_by(SharpeningLog.sharpened_on.desc())
@@ -103,6 +107,8 @@ def item_owners(item_id):
                 .filter_by(item_id=item_id)
                 .order_by(KnifeTaskLog.logged_on.desc())
                 .all())
+    if not private_view:
+        task_log = []
 
     # Task usage summary: task name → count
     task_counts: dict[str, int] = {}
@@ -120,6 +126,8 @@ def item_owners(item_id):
         {"color": color, "count": count}
         for color, count in sorted(color_counts.items(), key=lambda kv: kv[1], reverse=True)[:8]
     ]
+    if not private_view:
+        top_colors = []
 
     attachments = item.attachments
 
@@ -175,6 +183,7 @@ def attachment_delete(attachment_id):
 
 
 @views_bp.route("/views/matrix")
+@admin_required
 def matrix():
     """Render the ownership matrix view."""
     people_list = Person.query.order_by(Person.name).all()
@@ -229,17 +238,20 @@ def matrix():
 def stats():
     """Render collection summary statistics."""
     person_id   = request.args.get("person", type=int)
-    people_list = Person.query.order_by(Person.name).all()
+    private_view = is_admin()
+    people_list = Person.query.order_by(Person.name).all() if private_view else []
 
-    owned_q = (
-        db.session.query(Ownership)
-        .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
-        .join(Item, ItemVariant.item_id == Item.id)
-        .filter(Ownership.status == "Owned")
-    )
-    if person_id:
-        owned_q = owned_q.filter(Ownership.person_id == person_id)
-    owned = owned_q.all()
+    owned = []
+    if private_view:
+        owned_q = (
+            db.session.query(Ownership)
+            .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
+            .join(Item, ItemVariant.item_id == Item.id)
+            .filter(Ownership.status == "Owned")
+        )
+        if person_id:
+            owned_q = owned_q.filter(Ownership.person_id == person_id)
+        owned = owned_q.all()
 
     owned_item_map: dict[int, Item] = {}
     for ownership in owned:
@@ -275,20 +287,33 @@ def stats():
         edge_counts[edge] = edge_counts.get(edge, 0) + 1
 
     collector_rows = []
-    for person in people_list:
-        person_owned = Ownership.query.filter_by(person_id=person.id, status="Owned").all()
-        person_item_ids = {ownership.variant.item_id for ownership in person_owned}
-        person_items = Item.query.filter(Item.id.in_(person_item_ids)).all() if person_item_ids else []
-        person_value = sum(item.msrp for item in person_items if item.msrp)
-        collector_rows.append(dict(
-            id=person.id, name=person.name,
-            count=len(person_item_ids), value=person_value,
-        ))
-    collector_rows.sort(key=lambda row: row["count"], reverse=True)
+    if private_view:
+        for person in people_list:
+            person_owned = Ownership.query.filter_by(person_id=person.id, status="Owned").all()
+            person_item_ids = {ownership.variant.item_id for ownership in person_owned}
+            person_items = Item.query.filter(Item.id.in_(person_item_ids)).all() if person_item_ids else []
+            person_value = sum(item.msrp for item in person_items if item.msrp)
+            collector_rows.append(dict(
+                id=person.id, name=person.name,
+                count=len(person_item_ids), value=person_value,
+            ))
+        collector_rows.sort(key=lambda row: row["count"], reverse=True)
 
     total_value  = sum(item.msrp for item in owned_items if item.msrp)
     priced_count = sum(1 for item in owned_items if item.msrp)
     catalog_total = Item.query.count()
+    public_summary = dict(
+        item_count=Item.query.count(),
+        variants=ItemVariant.query.filter(ItemVariant.color != UNKNOWN_COLOR).count(),
+        sets=Set.query.count(),
+        unicorns=Item.query.filter(
+            db.or_(
+                Item.is_unicorn,
+                Item.edge_is_unicorn,
+                Item.variants.any(ItemVariant.is_unicorn == True),  # noqa: E712
+            )
+        ).count(),
+    )
 
     summary = dict(
         owned_items   = len(owned_items),
@@ -308,7 +333,7 @@ def stats():
         for color, count in sorted(color_counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))[:8]
     ]
 
-    cov_cats   = sorted(cat_catalog.keys())
+    cov_cats   = sorted(cat_catalog.keys()) if private_view else []
     cov_owned  = [cat_counts.get(cat, 0)   for cat in cov_cats]
     cov_gap    = [cat_catalog.get(cat, 0) - cat_counts.get(cat, 0) for cat in cov_cats]
 
@@ -317,6 +342,7 @@ def stats():
         people=people_list,
         person_id=person_id,
         summary=summary,
+        public_summary=public_summary,
         cat_data=cat_data,
         val_data=val_data,
         color_data=color_data,
