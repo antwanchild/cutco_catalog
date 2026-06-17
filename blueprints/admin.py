@@ -14,7 +14,7 @@ from flask import Blueprint, abort, current_app, flash, jsonify, redirect, rende
 from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION, get_git_sha_info
 from extensions import db
 from extensions import limiter
-from helpers import admin_required, is_admin
+from helpers import admin_required, is_admin, is_trusted_proxy_admin
 from models import ActivityEvent, Item, get_recent_audit_events
 from schema_migrations import get_schema_history, get_schema_state, SCHEMA_VERSION
 from startup import BOOTSTRAP_VERSION, get_bootstrap_history, get_bootstrap_state
@@ -283,7 +283,12 @@ def inject_admin_status_strip():
 @limiter.limit("10 per minute; 30 per hour")
 def admin_login():
     """Handle admin login requests."""
-    if is_admin():
+    if is_trusted_proxy_admin():
+        session["is_admin"] = True
+        session.permanent = ADMIN_SESSION_SECONDS > 0
+        flash("Admin access granted via proxy.", "success")
+        return redirect(url_for("admin.diagnostics_page"))
+    if session.get("is_admin") is True:
         return redirect(url_for("admin.diagnostics_page"))
     if request.method == "POST":
         if request.form.get("token") == ADMIN_TOKEN:

@@ -640,10 +640,16 @@ class PublicSmokeTests(SmokeBaseTest):
                     "X-Forwarded-Groups": "admins,users",
                 },
                 follow_redirects=False,
-            )
+        )
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/diagnostics", response.headers["Location"])
+        with self.client.session_transaction() as session:
+            self.assertTrue(session.get("is_admin"))
+
+        home_response = self.client.get("/")
+        self.assertEqual(home_response.status_code, 200)
+        self.assertIn(b"Admin", home_response.data)
 
     def test_admin_root_redirects_without_login(self):
         response = self.client.get("/admin", follow_redirects=False)
