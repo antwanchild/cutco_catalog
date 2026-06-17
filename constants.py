@@ -37,7 +37,22 @@ if ADMIN_TOKEN == "admin":
     )
 TRUSTED_AUTH_USERNAME_HEADER = os.environ.get(
     "TRUSTED_AUTH_USERNAME_HEADER",
-    os.environ.get("AUTHENTIK_USERNAME_HEADER", "X-Forwarded-User"),
+    os.environ.get(
+        "AUTHENTIK_USERNAME_HEADER",
+        os.environ.get("AUTHELIA_USERNAME_HEADER", "X-Forwarded-User"),
+    ),
+)
+TRUSTED_AUTH_GROUPS_HEADER = os.environ.get(
+    "TRUSTED_AUTH_GROUPS_HEADER",
+    os.environ.get(
+        "AUTHENTIK_GROUPS_HEADER",
+        os.environ.get("AUTHELIA_GROUPS_HEADER", "X-Forwarded-Groups"),
+    ),
+)
+TRUSTED_AUTH_ADMIN_GROUPS = tuple(
+    group.strip()
+    for group in os.environ.get("TRUSTED_AUTH_ADMIN_GROUPS", "").split(",")
+    if group.strip()
 )
 ADMIN_SESSION_SECONDS   = int(os.environ.get("ADMIN_SESSION_SECONDS", str(2 * 60 * 60)))  # default 2 h
 DATA_DIR                = os.environ.get("DATA_DIR", "/data")

@@ -11,7 +11,12 @@ import requests
 from flask import abort, current_app, flash, redirect, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
 
-from constants import DISCORD_WEBHOOK_URL, TRUSTED_AUTH_USERNAME_HEADER
+from constants import (
+    DISCORD_WEBHOOK_URL,
+    TRUSTED_AUTH_ADMIN_GROUPS,
+    TRUSTED_AUTH_GROUPS_HEADER,
+    TRUSTED_AUTH_USERNAME_HEADER,
+)
 from models import Ownership
 
 logger = logging.getLogger(__name__)
@@ -23,14 +28,35 @@ def is_trusted_proxy_authenticated() -> bool:
     return bool(header_value)
 
 
+def _trusted_proxy_groups() -> set[str]:
+    """Return normalized group names reported by the trusted auth proxy."""
+    raw_groups = request.headers.get(TRUSTED_AUTH_GROUPS_HEADER, "").strip()
+    if not raw_groups:
+        return set()
+    groups = set()
+    for chunk in raw_groups.replace("|", ",").replace(";", ",").split(","):
+        cleaned = chunk.strip()
+        if cleaned:
+            groups.add(cleaned.casefold())
+    return groups
+
+
 def is_admin() -> bool:
     """Return whether the current request has admin access."""
-    return session.get("is_admin") is True
+    return session.get("is_admin") is True or is_trusted_proxy_admin()
 
 
 def is_authenticated_user() -> bool:
     """Return whether the current request is authenticated for private user pages."""
     return is_admin() or is_trusted_proxy_authenticated()
+
+
+def is_trusted_proxy_admin() -> bool:
+    """Return whether the trusted auth proxy says this user should be admin."""
+    if not is_trusted_proxy_authenticated() or not TRUSTED_AUTH_ADMIN_GROUPS:
+        return False
+    allowed_groups = {group.casefold() for group in TRUSTED_AUTH_ADMIN_GROUPS}
+    return bool(_trusted_proxy_groups() & allowed_groups)
 
 
 def user_required(fn):

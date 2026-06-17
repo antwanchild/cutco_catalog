@@ -304,6 +304,14 @@ def admin_logout():
     return redirect(url_for("index"))
 
 
+@admin_bp.route("/admin")
+def admin_root():
+    """Send admin traffic to a useful landing page."""
+    if is_admin():
+        return redirect(url_for("admin.diagnostics_page"))
+    return redirect(url_for("admin.admin_login"))
+
+
 @admin_bp.route("/api/variants/<int:item_id>")
 @admin_required
 def api_variants(item_id):

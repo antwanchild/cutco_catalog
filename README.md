@@ -103,7 +103,9 @@ ruff check .
 | `LOG_LEVEL` | `INFO` | No | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_DIR` | `/data/logs` | No | Directory for rotating log files |
 | `SESSION_COOKIE_SECURE` | `false` | No | Set to `true` when served over HTTPS so session cookies are sent only via TLS |
-| `TRUSTED_AUTH_USERNAME_HEADER` | `X-Forwarded-User` | No | Trusted reverse-proxy header that marks a request as authenticated via your auth proxy |
+| `TRUSTED_AUTH_USERNAME_HEADER` | `X-Forwarded-User` | No | Trusted reverse-proxy username header that marks a request as authenticated via your auth proxy |
+| `TRUSTED_AUTH_GROUPS_HEADER` | `X-Forwarded-Groups` | No | Trusted reverse-proxy groups header used to recognize proxy-admin users |
+| `TRUSTED_AUTH_ADMIN_GROUPS` | *(empty)* | No | Comma-separated group names that should count as admin when reported by the trusted proxy |
 | `ALLOW_INSECURE_DEFAULTS` | `false` | No | Set to `true` to bypass startup safety checks that reject default `SECRET_KEY` / `ADMIN_TOKEN` in production |
 | `SYNC_BLOCKED_CATEGORIES` | *(empty)* | No | Comma-separated category names to exclude from catalog sync |
 | `DISCORD_WEBHOOK_URL` | *(empty)* | No | Incoming webhook URL for Discord notifications |
@@ -161,7 +163,13 @@ Private pages describe collector data or allow changes:
 - `/admin/*`
 - import, export, completion, sync, and other mutation routes
 
-If you put an auth proxy in front of the app, authenticated requests can be treated as private by setting `TRUSTED_AUTH_USERNAME_HEADER` to the trusted username header your proxy forwards. The legacy `AUTHENTIK_USERNAME_HEADER` name is still accepted for compatibility.
+If you put an auth proxy in front of the app, authenticated requests can be treated as private by setting `TRUSTED_AUTH_USERNAME_HEADER` to the trusted username header your proxy forwards. If your proxy also forwards group membership, set `TRUSTED_AUTH_GROUPS_HEADER` and `TRUSTED_AUTH_ADMIN_GROUPS` so the app can recognize proxy-based admin access. The legacy `AUTHENTIK_USERNAME_HEADER` and `AUTHENTIK_GROUPS_HEADER` names are still accepted for compatibility, and `AUTHELIA_USERNAME_HEADER` / `AUTHELIA_GROUPS_HEADER` are also supported as fallbacks.
+
+For example, you might set:
+
+- Authentik: `TRUSTED_AUTH_USERNAME_HEADER=X-authentik-username`, `TRUSTED_AUTH_GROUPS_HEADER=X-authentik-groups`
+- Authelia: `TRUSTED_AUTH_USERNAME_HEADER=Remote-User`, `TRUSTED_AUTH_GROUPS_HEADER=Remote-Groups`
+- Header-normalized Traefik: `TRUSTED_AUTH_USERNAME_HEADER=X-Forwarded-User`, `TRUSTED_AUTH_GROUPS_HEADER=X-Forwarded-Groups`
 
 ### Traefik + authentik
 
@@ -171,7 +179,9 @@ services:
     image: ghcr.io/antwanchild/cutco_catalog:latest
     environment:
       - TRUSTED_AUTH_USERNAME_HEADER=X-Forwarded-User
-    labels:
+      - TRUSTED_AUTH_GROUPS_HEADER=X-Forwarded-Groups
+      - TRUSTED_AUTH_ADMIN_GROUPS=admins
+      labels:
       - traefik.enable=true
       - traefik.http.routers.cutco.rule=Host(`cutco.example.com`)
       - traefik.http.routers.cutco.entrypoints=websecure
@@ -179,11 +189,11 @@ services:
       - traefik.http.routers.cutco.middlewares=cutco-auth@docker
       - traefik.http.services.cutco.loadbalancer.server.port=8095
       - traefik.http.middlewares.cutco-auth.forwardauth.address=https://auth.example.com/outpost.goauthentik.io/auth/traefik
-      - traefik.http.middlewares.cutco-auth.forwardauth.authResponseHeaders=X-Forwarded-User
+      - traefik.http.middlewares.cutco-auth.forwardauth.authResponseHeaders=X-Forwarded-User,X-Forwarded-Groups
       - traefik.http.middlewares.cutco-auth.forwardauth.headerField=X-Forwarded-User
 ```
 
-Traefik should forward the authenticated username into the same trusted header the app reads, and the app should read that exact header name.
+Traefik should forward the authenticated username into the same trusted header the app reads, and if you want proxy-based admin access, forward group membership as well. You can either pass the proxy's native headers through or normalize them into `X-Forwarded-*` headers.
 
 ---
 
