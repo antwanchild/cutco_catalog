@@ -631,6 +631,20 @@ class PublicSmokeTests(SmokeBaseTest):
         with self.client.session_transaction() as session:
             self.assertTrue(session.get("is_admin"))
 
+    def test_proxy_admin_bypasses_admin_login_form(self):
+        with mock.patch("helpers.TRUSTED_AUTH_ADMIN_GROUPS", ("admins",)):
+            response = self.client.get(
+                "/admin/login",
+                headers={
+                    "X-Forwarded-User": "proxy-admin",
+                    "X-Forwarded-Groups": "admins,users",
+                },
+                follow_redirects=False,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/diagnostics", response.headers["Location"])
+
     def test_admin_root_redirects_without_login(self):
         response = self.client.get("/admin", follow_redirects=False)
 

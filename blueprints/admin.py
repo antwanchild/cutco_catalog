@@ -283,6 +283,8 @@ def inject_admin_status_strip():
 @limiter.limit("10 per minute; 30 per hour")
 def admin_login():
     """Handle admin login requests."""
+    if is_admin():
+        return redirect(url_for("admin.diagnostics_page"))
     if request.method == "POST":
         if request.form.get("token") == ADMIN_TOKEN:
             session["is_admin"] = True
