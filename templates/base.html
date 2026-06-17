@@ -50,7 +50,7 @@
     {% if is_private_user() %}
     <details class="nav-group">
       <summary class="nav-group-toggle
-        {% if request.endpoint in ['views.matrix', 'people.people', 'people.wishlist', 'logs.sharpening', 'logs.cookware', 'logs.tasks'] or (request.endpoint and ('cookware' in request.endpoint or 'task' in request.endpoint or 'wishlist' in request.endpoint or 'sharpening' in request.endpoint)) %}active{% endif %}">
+        {% if request.endpoint in ['views.matrix', 'people.people', 'people.wishlist', 'logs.sharpening', 'logs.cookware', 'logs.tasks', 'data.import_page', 'data.export_page', 'data.completion_gaps_page', 'data.completion_import_page', 'data.variant_sync_page'] or (request.endpoint and ('cookware' in request.endpoint or 'task' in request.endpoint or 'wishlist' in request.endpoint or 'sharpening' in request.endpoint or request.endpoint.startswith('data.'))) %}active{% endif %}">
         More
       </summary>
       <div class="nav-group-menu">
@@ -65,6 +65,14 @@
           <a href="{{ url_for('logs.sharpening') }}" {% if request.endpoint and 'sharpening' in request.endpoint %}class="active"{% endif %}>Sharpening</a>
           <a href="{{ url_for('logs.cookware') }}" {% if request.endpoint and 'cookware' in request.endpoint %}class="active"{% endif %}>Cookware</a>
           <a href="{{ url_for('logs.tasks') }}" {% if request.endpoint and 'task' in request.endpoint %}class="active"{% endif %}>Tasks</a>
+        </div>
+        <div class="nav-group-section nav-group-section-last">
+          <div class="nav-group-heading">Tools</div>
+          <a href="{{ url_for('data.import_page') }}" {% if request.endpoint == 'data.import_page' %}class="active"{% endif %}>Import</a>
+          <a href="{{ url_for('data.completion_import_page') }}" {% if request.endpoint == 'data.completion_import_page' %}class="active"{% endif %}>Completion Import</a>
+          <a href="{{ url_for('data.completion_gaps_page') }}" {% if request.endpoint == 'data.completion_gaps_page' %}class="active"{% endif %}>Completion Gaps</a>
+          <a href="{{ url_for('data.export_page') }}" {% if request.endpoint == 'data.export_page' %}class="active"{% endif %}>Export</a>
+          <a href="{{ url_for('data.variant_sync_page') }}" {% if request.endpoint == 'data.variant_sync_page' %}class="active"{% endif %}>Variant Sync</a>
         </div>
       </div>
     </details>
