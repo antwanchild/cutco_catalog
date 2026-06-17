@@ -452,6 +452,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         LOG_LEVEL=os.environ.get("LOG_LEVEL", "INFO").upper(),
         TESTING=False,
     )
+    app.url_map.strict_slashes = False
     if test_config:
         app.config.update(test_config)
 

@@ -141,6 +141,8 @@ class PublicSmokeTests(SmokeBaseTest):
     def test_public_pages_load(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get("/catalog/").status_code, 200)
+        self.assertEqual(self.client.get("/sets/").status_code, 200)
         self.assertIn(b"Quick Actions", response.data)
         self.assertIn(b"Browse catalog", response.data)
         self.assertIn(b"Browse sets", response.data)
@@ -155,6 +157,10 @@ class PublicSmokeTests(SmokeBaseTest):
 
     def test_private_pages_redirect_without_auth(self):
         response = self.client.get("/people")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login", response.headers["Location"])
+
+        response = self.client.get("/people/")
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/login", response.headers["Location"])
 
