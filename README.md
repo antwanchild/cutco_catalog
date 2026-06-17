@@ -165,6 +165,8 @@ Private pages describe collector data or allow changes:
 
 If you put an auth proxy in front of the app, authenticated requests can be treated as private by setting `TRUSTED_AUTH_USERNAME_HEADER` to the trusted username header your proxy forwards. If your proxy also forwards group membership, set `TRUSTED_AUTH_GROUPS_HEADER` and `TRUSTED_AUTH_ADMIN_GROUPS` so the app can recognize proxy-based admin access. The legacy `AUTHENTIK_USERNAME_HEADER` and `AUTHENTIK_GROUPS_HEADER` names are still accepted for compatibility, and `AUTHELIA_USERNAME_HEADER` / `AUTHELIA_GROUPS_HEADER` are also supported as fallbacks.
 
+Admin access is hybrid: local direct access still uses the app's `ADMIN_TOKEN`, while proxy-authenticated users in the configured admin group can skip the token form and go straight to admin pages.
+
 For example, you might set:
 
 - Authentik: `TRUSTED_AUTH_USERNAME_HEADER=X-authentik-username`, `TRUSTED_AUTH_GROUPS_HEADER=X-authentik-groups`
