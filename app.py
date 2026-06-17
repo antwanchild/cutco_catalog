@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, Response, jsonify, render_template, request, url_for
+from flask import Flask, Response, jsonify, render_template, request, session, url_for
 from sqlalchemy import func
 
 from constants import (
@@ -404,6 +404,35 @@ def _register_routes(app: Flask) -> None:
     @app.route("/version")
     def version():
         return jsonify(version=APP_VERSION, git_sha=GIT_SHA)
+
+    @app.route("/auth-debug")
+    def auth_debug():
+        """Return a temporary auth snapshot for troubleshooting proxy headers."""
+        if not _env_flag("AUTH_DEBUG"):
+            return render_template("error.html", code=404, icon="🔍", message="Page not found."), 404
+
+        header_name = os.environ.get("TRUSTED_AUTH_USERNAME_HEADER", "X-Forwarded-User")
+        groups_name = os.environ.get("TRUSTED_AUTH_GROUPS_HEADER", "X-Forwarded-Groups")
+        payload = {
+            "path": request.path,
+            "host": request.host,
+            "trusted_username_header": header_name,
+            "trusted_username_value": request.headers.get(header_name, ""),
+            "trusted_groups_header": groups_name,
+            "trusted_groups_value": request.headers.get(groups_name, ""),
+            "is_authenticated_user": is_authenticated_user(),
+            "is_admin": is_admin(),
+            "session_is_admin": session.get("is_admin") is True,
+        }
+        logger.info(
+            "Auth debug snapshot path=%s user_header=%r groups_header=%r authenticated=%s admin=%s",
+            payload["path"],
+            payload["trusted_username_value"],
+            payload["trusted_groups_value"],
+            payload["is_authenticated_user"],
+            payload["is_admin"],
+        )
+        return jsonify(payload)
 
 
 def create_app(test_config: dict | None = None) -> Flask:
