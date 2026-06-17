@@ -180,25 +180,6 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/login", response.headers["Location"])
 
-    def test_auth_debug_reports_trusted_proxy_headers(self):
-        response = self.client.get(
-            "/auth-debug",
-            headers={
-                "X-authentik-username": "anthony",
-                "X-authentik-groups": "authentik Admins, collectors",
-            },
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.get_json()
-        self.assertEqual(payload["trusted_username_header"], "X-Forwarded-User")
-        self.assertEqual(payload["trusted_username_value"], "")
-        self.assertEqual(payload["trusted_groups_header"], "X-Forwarded-Groups")
-        self.assertEqual(payload["trusted_groups_value"], "")
-        self.assertFalse(payload["session_is_admin"])
-        self.assertFalse(payload["is_admin"])
-        self.assertFalse(payload["is_private_user"])
-
     def test_nav_menus_are_sectioned_for_admin(self):
         self._login_as_admin()
 

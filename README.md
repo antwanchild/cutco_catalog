@@ -206,15 +206,13 @@ services:
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.service=cutco
 
       # Admin pages and mutating routes
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.rule=Host(`cutco.${DOMAIN}`) && (PathPrefix(`/admin`) || PathPrefix(`/auth-debug`) || PathPrefix(`/data/import`) || PathPrefix(`/data/export`) || PathPrefix(`/data/completion-gaps`) || PathPrefix(`/data/completion-import`) || PathPrefix(`/data/variant-sync`) || PathPrefix(`/catalog/add`) || PathPrefix(`/catalog/`) || PathPrefix(`/sets/add`) || PathPrefix(`/sets/`) || PathPrefix(`/views/item/`) || PathPrefix(`/attachments/`))
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.rule=Host(`cutco.${DOMAIN}`) && (PathPrefix(`/admin`) || PathPrefix(`/data/import`) || PathPrefix(`/data/export`) || PathPrefix(`/data/completion-gaps`) || PathPrefix(`/data/completion-import`) || PathPrefix(`/data/variant-sync`) || PathPrefix(`/catalog/add`) || PathPrefix(`/catalog/`) || PathPrefix(`/sets/add`) || PathPrefix(`/sets/`) || PathPrefix(`/views/item/`) || PathPrefix(`/attachments/`))
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.priority=200
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.middlewares=chain-auth-shit-NOerrors@file
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.service=cutco
 ```
-
-For a quick header check, keep `/auth-debug` on the same authenticated router while you test. Once you confirm the headers are flowing, you can remove that path from the admin rule again.
 
 If you want Authentik to recognize proxy-authenticated users inside the app, make sure your forwardAuth middleware passes these headers through:
 
