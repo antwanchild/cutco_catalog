@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, Response, jsonify, render_template, request, url_for
+from flask import Flask, Response, jsonify, render_template, request, session, url_for
 from sqlalchemy import func
 
 from constants import (
@@ -14,6 +14,9 @@ from constants import (
     APP_VERSION,
     GIT_SHA,
     DATA_DIR,
+    TRUSTED_AUTH_ADMIN_GROUPS,
+    TRUSTED_AUTH_GROUPS_HEADER,
+    TRUSTED_AUTH_USERNAME_HEADER,
     UNKNOWN_COLOR,
     get_git_sha_info,
 )
@@ -404,6 +407,23 @@ def _register_routes(app: Flask) -> None:
     @app.route("/version")
     def version():
         return jsonify(version=APP_VERSION, git_sha=GIT_SHA)
+
+    @app.route("/auth-debug")
+    def auth_debug():
+        return jsonify(
+            host=request.host,
+            path=request.path,
+            endpoint=request.endpoint,
+            remote_addr=request.headers.get("X-Forwarded-For", request.remote_addr),
+            is_admin=is_admin(),
+            is_private_user=is_authenticated_user(),
+            session_is_admin=session.get("is_admin") is True,
+            trusted_username_header=TRUSTED_AUTH_USERNAME_HEADER,
+            trusted_username_value=request.headers.get(TRUSTED_AUTH_USERNAME_HEADER, ""),
+            trusted_groups_header=TRUSTED_AUTH_GROUPS_HEADER,
+            trusted_groups_value=request.headers.get(TRUSTED_AUTH_GROUPS_HEADER, ""),
+            trusted_admin_groups=list(TRUSTED_AUTH_ADMIN_GROUPS),
+        )
 
 
 def create_app(test_config: dict | None = None) -> Flask:
