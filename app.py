@@ -128,6 +128,14 @@ def _register_error_handlers(app: Flask) -> None:
 
     @app.errorhandler(404)
     def err_404(error):
+        logger.warning(
+            "404 request path=%s url=%s endpoint=%s method=%s referrer=%s",
+            request.path,
+            request.url,
+            request.endpoint,
+            request.method,
+            request.referrer,
+        )
         return render_template("error.html", code=404, icon="🔍", message="Page not found."), 404
 
     @app.errorhandler(429)
