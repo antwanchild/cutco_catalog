@@ -173,27 +173,63 @@ For example, you might set:
 
 ### Traefik + authentik
 
+This layout keeps product browsing public, while private collector pages and admin/mutation pages require Authentik.
+
 ```yaml
 services:
   cutco-vault:
     image: ghcr.io/antwanchild/cutco_catalog:latest
     environment:
-      - TRUSTED_AUTH_USERNAME_HEADER=X-Forwarded-User
-      - TRUSTED_AUTH_GROUPS_HEADER=X-Forwarded-Groups
-      - TRUSTED_AUTH_ADMIN_GROUPS=admins
-      labels:
+      - TRUSTED_AUTH_USERNAME_HEADER=X-authentik-username
+      - TRUSTED_AUTH_GROUPS_HEADER=X-authentik-groups
+      - TRUSTED_AUTH_ADMIN_GROUPS=authentik Admins
+    labels:
       - traefik.enable=true
-      - traefik.http.routers.cutco.rule=Host(`cutco.example.com`)
-      - traefik.http.routers.cutco.entrypoints=websecure
-      - traefik.http.routers.cutco.tls=true
-      - traefik.http.routers.cutco.middlewares=cutco-auth@docker
       - traefik.http.services.cutco.loadbalancer.server.port=8095
-      - traefik.http.middlewares.cutco-auth.forwardauth.address=https://auth.example.com/outpost.goauthentik.io/auth/traefik
-      - traefik.http.middlewares.cutco-auth.forwardauth.authResponseHeaders=X-Forwarded-User,X-Forwarded-Groups
-      - traefik.http.middlewares.cutco-auth.forwardauth.headerField=X-Forwarded-User
+
+      # Public pages: catalog browsing, sets, product views, health/version
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.rule=Host(`cutco.${DOMAIN}`)
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.entrypoints=websecure
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.tls=true
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.priority=1
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.middlewares=chain-no-auth-NOerrors@file
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.service=cutco
+
+      # Private collector pages
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.rule=Host(`cutco.${DOMAIN}`) && (PathPrefix(`/people`) || PathPrefix(`/wishlist`) || PathPrefix(`/sharpening`) || PathPrefix(`/cookware`) || PathPrefix(`/tasks`) || Path(`/stats`) || PathPrefix(`/views/matrix`))
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.entrypoints=websecure
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.tls=true
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.priority=100
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.middlewares=chain-auth-shit-NOerrors@file
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.service=cutco
+
+      # Admin pages and mutating routes
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.rule=Host(`cutco.${DOMAIN}`) && (PathPrefix(`/admin`) || PathPrefix(`/data/import`) || PathPrefix(`/data/export`) || PathPrefix(`/data/completion-gaps`) || PathPrefix(`/data/completion-import`) || PathPrefix(`/data/variant-sync`) || PathPrefix(`/catalog/add`) || PathPrefix(`/catalog/`) || PathPrefix(`/sets/add`) || PathPrefix(`/sets/`) || PathPrefix(`/views/item/`) || PathPrefix(`/attachments/`))
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.entrypoints=websecure
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.tls=true
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.priority=200
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.middlewares=chain-auth-shit-NOerrors@file
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.service=cutco
 ```
 
-Traefik should forward the authenticated username into the same trusted header the app reads, and if you want proxy-based admin access, forward group membership as well. You can either pass the proxy's native headers through or normalize them into `X-Forwarded-*` headers.
+If you want Authentik to recognize proxy-authenticated users inside the app, make sure your forwardAuth middleware passes these headers through:
+
+```yaml
+middlewares-authentik:
+  forwardAuth:
+    address: http://authentik_server:9000/outpost.goauthentik.io/auth/traefik
+    trustForwardHeader: true
+    authResponseHeaders:
+      - X-authentik-username
+      - X-authentik-groups
+      - X-authentik-email
+      - X-authentik-name
+      - X-authentik-uid
+```
+
+The app reads the Authentik headers directly from Flask requests, so the important part is that Traefik forwards the Authentik username and groups into the same header names configured above.
+
+One practical note: the admin router above intentionally covers the app's mutating routes, but the public router still handles read-only browsing routes like `/catalog`, `/sets/<id>`, `/views/item/<id>`, `/attachments/<id>`, `/health`, and `/version`.
 
 ---
 
