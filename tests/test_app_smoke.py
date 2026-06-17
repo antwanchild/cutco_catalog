@@ -170,6 +170,10 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/login", response.headers["Location"])
 
+        response = self.client.get("/stats/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login", response.headers["Location"])
+
     def test_nav_menus_are_sectioned_for_admin(self):
         self._login_as_admin()
 

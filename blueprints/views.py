@@ -234,7 +234,7 @@ def matrix():
                            UNKNOWN_COLOR=UNKNOWN_COLOR)
 
 
-@views_bp.route("/stats")
+@views_bp.route("/stats", strict_slashes=False)
 @user_required
 def stats():
     """Render collection summary statistics."""
