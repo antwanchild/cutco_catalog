@@ -144,7 +144,6 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Quick Actions", response.data)
         self.assertIn(b"Browse catalog", response.data)
         self.assertIn(b"Browse sets", response.data)
-        self.assertIn(b"Collection stats", response.data)
         self.assertIn(b"Popular Colors", response.data)
         self.assertNotIn(b"Collectors", response.data)
         self.assertNotIn(b"Recently Changed", response.data)
@@ -167,6 +166,10 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/login", response.headers["Location"])
 
+        response = self.client.get("/stats")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login", response.headers["Location"])
+
     def test_nav_menus_are_sectioned_for_admin(self):
         self._login_as_admin()
 
@@ -176,7 +179,6 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"More", response.data)
         self.assertIn(b"Explore", response.data)
         self.assertIn(b"Track", response.data)
-        self.assertIn(b"Data", response.data)
         self.assertIn(b'/catalog?unicorn=1', response.data)
         self.assertIn(b"Admin", response.data)
         self.assertIn(b"Review", response.data)
@@ -2092,6 +2094,7 @@ class UtilitySmokeTests(SmokeBaseTest):
 
 class ImportSmokeTests(SmokeBaseTest):
     def test_import_template_downloads_csv(self):
+        self._login_as_admin()
         response = self.client.get("/import/template")
 
         self.assertEqual(response.status_code, 200)

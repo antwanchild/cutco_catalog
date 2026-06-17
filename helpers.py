@@ -17,18 +17,31 @@ from models import Ownership
 logger = logging.getLogger(__name__)
 
 
-def is_authentik_authenticated() -> bool:
+def is_trusted_proxy_authenticated() -> bool:
     """Return whether the current request came through a trusted auth proxy."""
     header_value = request.headers.get(TRUSTED_AUTH_USERNAME_HEADER, "").strip()
     return bool(header_value)
 
 
 def is_admin() -> bool:
-    """Return whether the current request has private access."""
-    # Primary auth path: signed Flask session flag.
-    if session.get("is_admin") is True:
-        return True
-    return is_authentik_authenticated()
+    """Return whether the current request has admin access."""
+    return session.get("is_admin") is True
+
+
+def is_authenticated_user() -> bool:
+    """Return whether the current request is authenticated for private user pages."""
+    return is_admin() or is_trusted_proxy_authenticated()
+
+
+def user_required(fn):
+    """Require a private-user session or trusted auth proxy for a route."""
+    @wraps(fn)
+    def _wrapped(*args, **kwargs):
+        if not is_authenticated_user():
+            flash("Authentication required.", "error")
+            return redirect(url_for("admin.admin_login"))
+        return fn(*args, **kwargs)
+    return _wrapped
 
 
 def admin_required(fn):
@@ -40,6 +53,10 @@ def admin_required(fn):
             return redirect(url_for("admin.admin_login"))
         return fn(*args, **kwargs)
     return _wrapped
+
+
+# Backwards compatibility for older references.
+is_authentik_authenticated = is_trusted_proxy_authenticated
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────

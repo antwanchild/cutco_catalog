@@ -6,7 +6,7 @@
   <div class="page-actions">
     <a href="{{ url_for('people.ownership_add', person_id=person.id) }}" class="btn btn-primary btn-sm">+ Add Entry</a>
     <a href="{{ url_for('views.collection_token', person_id=person.id) }}" class="btn btn-secondary btn-sm">🃏 Share Card</a>
-    {% if is_admin() %}
+    {% if is_private_user() %}
     <form method="post" action="{{ url_for('people.purge_collection', person_id=person.id) }}" class="form-inline">
       <button type="submit" class="btn btn-danger btn-sm"
               data-confirm-title="Purge collection"

@@ -12,7 +12,7 @@
         {% endfor %}
       </select>
     </form>
-    {% if is_admin() and rows %}
+    {% if is_private_user() and rows %}
     <form method="post" action="{{ url_for('people.wishlist_check') }}">
       <button class="btn btn-secondary btn-sm"
               title="{% if has_discord %}Check targets and notify Discord{% else %}Check targets (set DISCORD_WEBHOOK_URL to enable notifications){% endif %}">

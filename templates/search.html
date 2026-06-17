@@ -21,7 +21,7 @@
   </form>
 {% else %}
   <p class="search-kicker">
-    Search items and sets from one place{% if is_admin() %}; collectors and tasks are also available{% endif %}.
+    Search items and sets from one place{% if is_private_user() %}; collectors and tasks are also available{% endif %}.
   </p>
 {% endif %}
 
@@ -67,7 +67,7 @@
     </div>
   </section>
 
-  {% if is_admin() %}
+  {% if is_private_user() %}
   <section class="search-section">
     <h2>Collectors ({{ results['people'] | length }})</h2>
     <div class="search-list">
@@ -114,7 +114,7 @@
     </div>
   </section>
 
-  {% if is_admin() %}
+  {% if is_private_user() %}
   <section class="search-section">
     <h2>Tasks ({{ results['tasks'] | length }})</h2>
     <div class="search-list">

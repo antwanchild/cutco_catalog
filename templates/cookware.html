@@ -4,7 +4,7 @@
 <div class="page-header">
   <h1 class="page-title">🍳 Cookware Usage Tracker {{ help_btn("cookware") }}</h1>
   <div class="page-actions">
-    {% if is_admin() and tracked %}
+    {% if is_private_user() and tracked %}
     <form method="post" action="{{ url_for('logs.cookware_notify') }}">
       <button class="btn btn-secondary btn-sm">
         {% if has_discord %}🔔{% else %}🔍{% endif %} Check Idle
@@ -118,7 +118,7 @@
         <th>Days Since</th>
         <th>Sessions</th>
         <th>Avg Rating</th>
-        {% if is_admin() %}<th></th>{% endif %}
+        {% if is_private_user() %}<th></th>{% endif %}
       </tr>
     </thead>
     <tbody>
@@ -146,7 +146,7 @@
             <span class="muted">—</span>
           {% endif %}
         </td>
-        {% if is_admin() %}
+        {% if is_private_user() %}
         <td class="actions">
           <form method="post" action="{{ url_for('logs.cookware_purge_item', item_id=row.item.id) }}"
                 class="form-inline">

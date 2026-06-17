@@ -4,7 +4,7 @@
 <div class="page-header">
   <h1 class="page-title">🗂️ {{ set.name }} {{ help_btn("set_detail") }}</h1>
   <div class="page-actions">
-    {% if is_admin() and person_id %}
+    {% if is_private_user() and person_id %}
       <a href="{{ url_for('views.gift_token', set_id=set.id, person=person_id) }}" class="btn btn-secondary">🎁 Share Gift List</a>
     {% endif %}
     {% if can_restore_memberships and is_admin() %}
@@ -33,7 +33,7 @@
       <span class="set-overview-label">Imported members</span>
       <span class="set-overview-value">{{ member_snapshot_rows | length }}</span>
     </div>
-    {% if is_admin() %}
+    {% if is_private_user() %}
     <div class="set-overview-item">
       <span class="set-overview-label">Owned</span>
       <span class="set-overview-value">{{ owned_items | length }}</span>
@@ -47,7 +47,7 @@
   {% if set.notes %}<p class="set-overview-notes">{{ set.notes }}</p>{% endif %}
 </div>
 
-{% if top_colors %}
+{% if is_private_user() and top_colors %}
 <section class="detail-section set-overview-card">
   <div class="section-heading-actions">
     <h2 class="section-heading">Top Colors</h2>
@@ -65,7 +65,7 @@
 </section>
 {% endif %}
 
-{% if is_admin() %}
+{% if is_private_user() %}
 {# ── Person filter ─────────────────────────────────────────────────────────── #}
 <form method="get" style="margin-bottom:1rem">
   <input type="hidden" name="sort" value="{{ sort }}">
@@ -98,171 +98,13 @@
   </div>
 </div>
 {% endif %}
-
-{% if member_snapshot_rows %}
-<div class="detail-section imported-members-section">
-<div class="section-heading-actions">
-  <h2 class="section-heading">📋 Imported Members ({{ member_snapshot_rows | length }})</h2>
-  <span class="muted small">Items not in the catalog are flagged below.</span>
-</div>
-<div class="table-wrap">
-<table class="data-table compact imported-members-table">
-  <thead>
-    <tr>
-      <th>SKU</th>
-      <th>Item</th>
-      <th>Qty</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for member in member_snapshot_rows %}
-    <tr class="{% if member.status == 'missing' %}row-missing{% endif %}">
-      <td>
-        {% if member.sku %}
-          {% if member.matched_item %}
-            <a class="mono" href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}" title="{{ member.hover_title or member.name or member.matched_item.name }}">{{ member.sku }}</a>
-          {% else %}
-            <span class="mono" title="{{ member.hover_title or member.name or '' }}">{{ member.sku }}</span>
-          {% endif %}
-        {% else %}
-          <span class="muted" title="{{ member.hover_title or member.name or '' }}">{{ member.name or 'No item #' }}</span>
-        {% endif %}
-      </td>
-      <td>
-        {% if member.matched_item %}
-          <a href="{{ url_for('views.item_owners', item_id=member.matched_item.id) }}">{{ member.matched_item.name }}</a>
-        {% else %}
-          <span title="{{ member.hover_title or member.name or '' }}">{{ member.name or '—' }}</span>
-        {% endif %}
-      </td>
-      <td>{% if member.quantity > 1 %}<span class="badge badge-info">×{{ member.quantity }}</span>{% else %}<span class="muted">1</span>{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
-{% if not_in_catalog_skus %}
-<p class="muted">Not in catalog: {% for sku in not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</p>
-{% endif %}
-</div>
 {% endif %}
 
-{% if owned_items %}
-<div class="detail-section set-items-section">
-<div class="section-heading-actions">
-  <h2 class="section-heading">✅ Owned ({{ owned_items | length }})</h2>
-  <span class="muted small">Items already marked owned for this set.</span>
-</div>
-<div class="table-wrap">
-<table class="data-table">
-  <thead>
-    <tr><th>Name</th><th>SKU</th><th>Category</th><th>Edge</th><th>Variants</th></tr>
-  </thead>
-  <tbody>
-    {% for item in owned_items %}
-    <tr class="row-owned">
-      <td>
-        <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
-        {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
-        {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
-      </td>
-      <td class="mono">{{ item.sku or '—' }}</td>
-      <td>
-        {% if item.category %}
-          {{ item.category }}
-        {% else %}
-          <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
-        {% endif %}
-      </td>
-      <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>
-        {% if item.category in COOKWARE_CATEGORIES %}
-          <span class="muted">—</span>
-        {% else %}
-          <a href="{{ url_for('catalog.variants', item_id=item.id) }}">
-            {{ item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length }} color(s)
-          </a>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
-</div>
-{% endif %}
-
-{% if missing_items %}
-<div class="detail-section set-items-section">
-<div class="section-heading-actions">
-  <h2 class="section-heading">❌ Not Owned ({{ missing_items | length }})</h2>
-  <span class="muted small">Items still needed to complete the set.</span>
-</div>
-{% if person %}
-<p class="muted">These items are in the set but not owned by {{ person.name }}.</p>
-{% else %}
-<p class="muted">These items are in the set but not owned by anyone in the catalog yet.</p>
-{% endif %}
-<div class="table-wrap">
-<table class="data-table">
-  <thead>
-    <tr>
-      {% set next_name_dir = 'desc' if sort == 'name' and direction == 'asc' else 'asc' %}
-      {% set next_sku_dir = 'desc' if sort == 'sku' and direction == 'asc' else 'asc' %}
-      {% set next_category_dir = 'desc' if sort == 'category' and direction == 'asc' else 'asc' %}
-      {% set next_edge_dir = 'desc' if sort == 'edge' and direction == 'asc' else 'asc' %}
-      {% set next_msrp_dir = 'desc' if sort == 'msrp' and direction == 'asc' else 'asc' %}
-      {% set next_wishlist_dir = 'desc' if sort == 'wishlist' and direction == 'asc' else 'asc' %}
-      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='name', dir=next_name_dir) }}">Name{% if sort == 'name' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
-      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='sku', dir=next_sku_dir) }}">SKU{% if sort == 'sku' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
-      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='category', dir=next_category_dir) }}">Category{% if sort == 'category' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
-      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='edge', dir=next_edge_dir) }}">Edge{% if sort == 'edge' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
-      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='msrp', dir=next_msrp_dir) }}">MSRP{% if sort == 'msrp' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
-      <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='wishlist', dir=next_wishlist_dir) }}">Wishlist{% if sort == 'wishlist' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for item in missing_items %}
-    <tr class="row-missing">
-      <td>
-        <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
-        {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
-        {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
-      </td>
-      <td class="mono">{{ item.sku or '—' }}</td>
-      <td>
-        {% if item.category %}
-          {{ item.category }}
-        {% else %}
-          <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
-        {% endif %}
-      </td>
-      <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>{% if item.msrp %}${{ "%.2f"|format(item.msrp) }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>
-        {% if person_id and item.id in wishlisted_item_ids %}
-        <span class="muted">Wishlisted</span>
-        {% elif person_id %}
-        <a href="{{ url_for('people.ownership_add', item_id=item.id, person_id=person_id) }}?status=Wishlist"
-           class="btn btn-xs btn-ghost">+ Wishlist</a>
-        {% else %}
-        <a href="{{ url_for('people.ownership_add', item_id=item.id) }}?status=Wishlist"
-           class="btn btn-xs btn-ghost">+ Wishlist</a>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
-</div>
-{% endif %}
-{% else %}
 {% if member_snapshot_rows %}
 <div class="detail-section imported-members-section">
   <div class="section-heading-actions">
     <h2 class="section-heading">📋 Imported Members ({{ member_snapshot_rows | length }})</h2>
-    <span class="muted small">Items in the set snapshot.</span>
+    <span class="muted small">Items not in the catalog are flagged below.</span>
   </div>
   <div class="table-wrap">
     <table class="data-table compact imported-members-table">
@@ -300,12 +142,126 @@
       </tbody>
     </table>
   </div>
+  {% if not_in_catalog_skus %}
+  <p class="muted">Not in catalog: {% for sku in not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</p>
+  {% endif %}
 </div>
 {% endif %}
-<p class="muted">Private completion details require authenticated access.</p>
+
+{% if is_private_user() %}
+  {% if owned_items %}
+  <div class="detail-section set-items-section">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">✅ Owned ({{ owned_items | length }})</h2>
+      <span class="muted small">Items already marked owned for this set.</span>
+    </div>
+    <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>Name</th><th>SKU</th><th>Category</th><th>Edge</th><th>Variants</th></tr>
+      </thead>
+      <tbody>
+        {% for item in owned_items %}
+        <tr class="row-owned">
+          <td>
+            <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
+            {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+            {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
+          </td>
+          <td class="mono">{{ item.sku or '—' }}</td>
+          <td>
+            {% if item.category %}
+              {{ item.category }}
+            {% else %}
+              <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
+            {% endif %}
+          </td>
+          <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>
+            {% if item.category in COOKWARE_CATEGORIES %}
+              <span class="muted">—</span>
+            {% else %}
+              <a href="{{ url_for('catalog.variants', item_id=item.id) }}">
+                {{ item.variants | selectattr('color', 'ne', UNKNOWN_COLOR) | list | length }} color(s)
+              </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if missing_items %}
+  <div class="detail-section set-items-section">
+    <div class="section-heading-actions">
+      <h2 class="section-heading">❌ Not Owned ({{ missing_items | length }})</h2>
+      <span class="muted small">Items still needed to complete the set.</span>
+    </div>
+    {% if person %}
+    <p class="muted">These items are in the set but not owned by {{ person.name }}.</p>
+    {% else %}
+    <p class="muted">These items are in the set but not owned by anyone in the catalog yet.</p>
+    {% endif %}
+    <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          {% set next_name_dir = 'desc' if sort == 'name' and direction == 'asc' else 'asc' %}
+          {% set next_sku_dir = 'desc' if sort == 'sku' and direction == 'asc' else 'asc' %}
+          {% set next_category_dir = 'desc' if sort == 'category' and direction == 'asc' else 'asc' %}
+          {% set next_edge_dir = 'desc' if sort == 'edge' and direction == 'asc' else 'asc' %}
+          {% set next_msrp_dir = 'desc' if sort == 'msrp' and direction == 'asc' else 'asc' %}
+          {% set next_wishlist_dir = 'desc' if sort == 'wishlist' and direction == 'asc' else 'asc' %}
+          <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='name', dir=next_name_dir) }}">Name{% if sort == 'name' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+          <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='sku', dir=next_sku_dir) }}">SKU{% if sort == 'sku' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+          <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='category', dir=next_category_dir) }}">Category{% if sort == 'category' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+          <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='edge', dir=next_edge_dir) }}">Edge{% if sort == 'edge' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+          <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='msrp', dir=next_msrp_dir) }}">MSRP{% if sort == 'msrp' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+          <th><a href="{{ url_for('catalog.set_detail', set_id=set.id, person=person_id, sort='wishlist', dir=next_wishlist_dir) }}">Wishlist{% if sort == 'wishlist' %} {{ '▲' if direction == 'asc' else '▼' }}{% endif %}</a></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in missing_items %}
+        <tr class="row-missing">
+          <td>
+            <a href="{{ url_for('views.item_owners', item_id=item.id) }}">{{ item.name }}</a>
+            {% if item.any_unicorn %}<span class="badge badge-unicorn">🦄</span>{% endif %}
+            {% if qty_map.get(item.id, 1) > 1 %}<span class="badge badge-info">×{{ qty_map.get(item.id) }}</span>{% endif %}
+          </td>
+          <td class="mono">{{ item.sku or '—' }}</td>
+          <td>
+            {% if item.category %}
+              {{ item.category }}
+            {% else %}
+              <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
+            {% endif %}
+          </td>
+          <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if item.msrp %}${{ "%.2f"|format(item.msrp) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>
+            {% if person_id and item.id in wishlisted_item_ids %}
+            <span class="muted">Wishlisted</span>
+            {% elif person_id %}
+            <a href="{{ url_for('people.ownership_add', item_id=item.id, person_id=person_id) }}?status=Wishlist"
+               class="btn btn-xs btn-ghost">+ Wishlist</a>
+            {% else %}
+            <a href="{{ url_for('people.ownership_add', item_id=item.id) }}?status=Wishlist"
+               class="btn btn-xs btn-ghost">+ Wishlist</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
 {% endif %}
 
-{% if is_admin() and not owned_items and not missing_items %}
+{% if is_private_user() and not owned_items and not missing_items %}
 <p class="empty">No items in this set yet. Edit items from the catalog to assign them.</p>
 {% endif %}
 {% endblock %}

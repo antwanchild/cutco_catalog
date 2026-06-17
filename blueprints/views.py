@@ -7,7 +7,7 @@ from flask import Blueprint, abort, current_app, flash, render_template, request
 
 from constants import COOKWARE_CATEGORIES, STATUS_RANK, UNKNOWN_COLOR
 from extensions import db
-from helpers import admin_required, db_commit, is_admin
+from helpers import admin_required, db_commit, is_authenticated_user, user_required
 from helpers import (_collection_token, _gift_token,
                      _verify_collection_token, _verify_gift_token)
 from models import Item, ItemAttachment, ItemVariant, KnifeTaskLog, Ownership, Person, Set, SharpeningLog
@@ -83,7 +83,7 @@ def item_owners(item_id):
     if not item:
         abort(404)
 
-    private_view = is_admin()
+    private_view = is_authenticated_user()
     entries = []
     people_without = []
     if private_view:
@@ -183,7 +183,7 @@ def attachment_delete(attachment_id):
 
 
 @views_bp.route("/views/matrix")
-@admin_required
+@user_required
 def matrix():
     """Render the ownership matrix view."""
     people_list = Person.query.order_by(Person.name).all()
@@ -235,10 +235,11 @@ def matrix():
 
 
 @views_bp.route("/stats")
+@user_required
 def stats():
     """Render collection summary statistics."""
     person_id   = request.args.get("person", type=int)
-    private_view = is_admin()
+    private_view = is_authenticated_user()
     people_list = Person.query.order_by(Person.name).all() if private_view else []
 
     owned = []

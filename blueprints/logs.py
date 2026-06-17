@@ -13,7 +13,7 @@ from constants import (
     SHARPEN_THRESHOLD_DAYS,
 )
 from extensions import db
-from helpers import _notify_discord, admin_required, db_commit
+from helpers import _notify_discord, db_commit, user_required
 from models import (
     CookwareSession,
     Item,
@@ -49,7 +49,7 @@ def _is_sharpening_page_item(item: Item) -> bool:
 # ── Sharpening Log ────────────────────────────────────────────────────────────
 
 @logs_bp.route("/sharpening")
-@admin_required
+@user_required
 def sharpening():
     """Render the sharpening log page."""
     today       = date.today()
@@ -100,7 +100,7 @@ def sharpening():
 
 
 @logs_bp.route("/sharpening/add", methods=["POST"])
-@admin_required
+@user_required
 def sharpening_add():
     """Add a sharpening log entry."""
     item_id      = request.form.get("item_id", type=int)
@@ -133,7 +133,7 @@ def sharpening_add():
 
 
 @logs_bp.route("/sharpening/<int:lid>/edit", methods=["GET", "POST"])
-@admin_required
+@user_required
 def sharpening_edit(lid):
     """Edit a sharpening log entry."""
     entry = db.session.get(SharpeningLog, lid)
@@ -155,7 +155,7 @@ def sharpening_edit(lid):
 
 
 @logs_bp.route("/sharpening/<int:lid>/delete", methods=["POST"])
-@admin_required
+@user_required
 def sharpening_delete(lid):
     """Delete a sharpening log entry."""
     entry = db.session.get(SharpeningLog, lid)
@@ -181,7 +181,7 @@ def sharpening_delete(lid):
 
 
 @logs_bp.route("/sharpening/item/<int:item_id>/purge", methods=["POST"])
-@admin_required
+@user_required
 def sharpening_purge_item(item_id):
     """Delete all sharpening entries for one item."""
     item = db.session.get(Item, item_id)
@@ -205,7 +205,7 @@ def sharpening_purge_item(item_id):
 
 
 @logs_bp.route("/sharpening/purge-all", methods=["POST"])
-@admin_required
+@user_required
 def sharpening_purge_all():
     """Delete every sharpening log entry."""
     count = SharpeningLog.query.count()
@@ -225,7 +225,7 @@ def sharpening_purge_all():
 
 
 @logs_bp.route("/sharpening/notify", methods=["POST"])
-@admin_required
+@user_required
 def sharpening_notify():
     """Send sharpening notifications to Discord."""
     today       = date.today()
@@ -272,7 +272,7 @@ def sharpening_notify():
 # ── Cookware ──────────────────────────────────────────────────────────────────
 
 @logs_bp.route("/cookware", endpoint="cookware")
-@admin_required
+@user_required
 def cookware():
     """Render the cookware usage log page."""
     today       = date.today()
@@ -342,7 +342,7 @@ def cookware():
 
 
 @logs_bp.route("/cookware/add", methods=["POST"], endpoint="cookware_add")
-@admin_required
+@user_required
 def cookware_add():
     """Add a cookware session entry."""
     item_id   = request.form.get("item_id", type=int)
@@ -382,7 +382,7 @@ def cookware_add():
 
 
 @logs_bp.route("/cookware/<int:session_id>/edit", methods=["GET", "POST"], endpoint="cookware_edit")
-@admin_required
+@user_required
 def cookware_edit(session_id):
     """Edit a cookware session entry."""
     cookware_session = db.session.get(CookwareSession, session_id)
@@ -410,7 +410,7 @@ def cookware_edit(session_id):
 
 
 @logs_bp.route("/cookware/<int:session_id>/delete", methods=["POST"], endpoint="cookware_delete")
-@admin_required
+@user_required
 def cookware_delete(session_id):
     """Delete a cookware session entry."""
     cookware_session = db.session.get(CookwareSession, session_id)
@@ -436,7 +436,7 @@ def cookware_delete(session_id):
 
 
 @logs_bp.route("/cookware/item/<int:item_id>/purge", methods=["POST"], endpoint="cookware_purge_item")
-@admin_required
+@user_required
 def cookware_purge_item(item_id):
     """Delete all cookware entries for one item."""
     item = db.session.get(Item, item_id)
@@ -460,7 +460,7 @@ def cookware_purge_item(item_id):
 
 
 @logs_bp.route("/cookware/purge-all", methods=["POST"], endpoint="cookware_purge_all")
-@admin_required
+@user_required
 def cookware_purge_all():
     """Delete every cookware session entry."""
     count = CookwareSession.query.count()
@@ -480,7 +480,7 @@ def cookware_purge_all():
 
 
 @logs_bp.route("/cookware/notify", methods=["POST"], endpoint="cookware_notify")
-@admin_required
+@user_required
 def cookware_notify():
     """Send cookware notifications to Discord."""
     today        = date.today()
@@ -524,7 +524,7 @@ def cookware_notify():
 # ── Knife Task Pairing ────────────────────────────────────────────────────────
 
 @logs_bp.route("/tasks")
-@admin_required
+@user_required
 def tasks():
     """Render the task log page."""
     today = date.today()
@@ -577,7 +577,7 @@ def tasks():
 
 
 @logs_bp.route("/tasks/add", methods=["POST"])
-@admin_required
+@user_required
 def task_log_add():
     """Add a task log entry."""
     item_id   = request.form.get("item_id", type=int)
@@ -613,7 +613,7 @@ def task_log_add():
 
 
 @logs_bp.route("/tasks/log/<int:lid>/delete", methods=["POST"])
-@admin_required
+@user_required
 def task_log_delete(lid):
     """Delete a task log entry."""
     entry = db.session.get(KnifeTaskLog, lid)
@@ -640,7 +640,7 @@ def task_log_delete(lid):
 
 
 @logs_bp.route("/tasks/item/<int:item_id>/purge", methods=["POST"])
-@admin_required
+@user_required
 def task_log_purge_item(item_id):
     """Delete all task log entries for one item."""
     item = db.session.get(Item, item_id)
@@ -664,7 +664,7 @@ def task_log_purge_item(item_id):
 
 
 @logs_bp.route("/tasks/purge-all", methods=["POST"])
-@admin_required
+@user_required
 def task_log_purge_all():
     """Delete every task log entry."""
     count = KnifeTaskLog.query.count()
@@ -684,7 +684,7 @@ def task_log_purge_all():
 
 
 @logs_bp.route("/tasks/manage")
-@admin_required
+@user_required
 def tasks_manage():
     """Render the task management page."""
     all_tasks = KnifeTask.query.order_by(KnifeTask.is_preset.desc(), KnifeTask.name).all()
@@ -692,7 +692,7 @@ def tasks_manage():
 
 
 @logs_bp.route("/tasks/manage/<int:tid>")
-@admin_required
+@user_required
 def task_detail(tid):
     """Render task details and usage history."""
     task = db.session.get(KnifeTask, tid)
@@ -714,7 +714,7 @@ def task_detail(tid):
 
 
 @logs_bp.route("/tasks/manage/add", methods=["POST"])
-@admin_required
+@user_required
 def task_add():
     """Add a task definition."""
     name = request.form.get("name", "").strip()
@@ -732,7 +732,7 @@ def task_add():
 
 
 @logs_bp.route("/tasks/manage/<int:tid>/delete", methods=["POST"])
-@admin_required
+@user_required
 def task_delete(tid):
     """Delete a task definition."""
     task = db.session.get(KnifeTask, tid)

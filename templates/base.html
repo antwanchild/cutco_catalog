@@ -20,7 +20,7 @@
 <nav class="navbar">
   <a class="brand" href="{{ url_for('index') }}">⚔️ Cutco Vault</a>
   <form class="nav-search" method="get" action="{{ url_for('search') }}">
-    <input type="search" name="q" placeholder="{% if is_admin() %}Search catalog, people, tasks…{% else %}Search catalog and sets…{% endif %}" value="{{ request.args.get('q', '') }}" aria-label="Search">
+    <input type="search" name="q" placeholder="{% if is_private_user() %}Search catalog, people, tasks…{% else %}Search catalog and sets…{% endif %}" value="{{ request.args.get('q', '') }}" aria-label="Search">
     <button type="submit" class="btn btn-sm">Search</button>
   </form>
   <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark mode">🌙</button>
@@ -41,14 +41,16 @@
       </div>
     </details>
     <a href="{{ url_for('catalog.sets_list') }}" {% if request.endpoint and 'set' in request.endpoint %}class="active"{% endif %}>Sets</a>
+    {% if is_private_user() %}
     <a href="{{ url_for('views.stats') }}"
        {% if request.endpoint == 'views.stats' %}class="active"{% endif %}>Stats</a>
+    {% endif %}
     <a href="{{ url_for('catalog.variants_browse') }}" {% if request.endpoint == 'catalog.variants_browse' %}class="active"{% endif %}>All Variants</a>
 
-    {% if is_admin() %}
+    {% if is_private_user() %}
     <details class="nav-group">
       <summary class="nav-group-toggle
-        {% if request.endpoint in ['views.matrix', 'people.people', 'people.wishlist', 'logs.sharpening', 'logs.cookware', 'logs.tasks', 'data.import_page', 'data.export_page', 'data.export_csv', 'data.import_template', 'data.completion_gaps_page', 'data.variant_sync_page', 'data.variant_sync_confirm'] or (request.endpoint and ('cookware' in request.endpoint or 'task' in request.endpoint or 'wishlist' in request.endpoint or 'sharpening' in request.endpoint or 'import' in request.endpoint or 'export' in request.endpoint or 'completion_gaps' in request.endpoint or 'variant_sync' in request.endpoint)) %}active{% endif %}">
+        {% if request.endpoint in ['views.matrix', 'people.people', 'people.wishlist', 'logs.sharpening', 'logs.cookware', 'logs.tasks'] or (request.endpoint and ('cookware' in request.endpoint or 'task' in request.endpoint or 'wishlist' in request.endpoint or 'sharpening' in request.endpoint)) %}active{% endif %}">
         More
       </summary>
       <div class="nav-group-menu">
@@ -63,14 +65,6 @@
           <a href="{{ url_for('logs.sharpening') }}" {% if request.endpoint and 'sharpening' in request.endpoint %}class="active"{% endif %}>Sharpening</a>
           <a href="{{ url_for('logs.cookware') }}" {% if request.endpoint and 'cookware' in request.endpoint %}class="active"{% endif %}>Cookware</a>
           <a href="{{ url_for('logs.tasks') }}" {% if request.endpoint and 'task' in request.endpoint %}class="active"{% endif %}>Tasks</a>
-        </div>
-        <div class="nav-group-section nav-group-section-last">
-          <div class="nav-group-heading">Data</div>
-          <a href="{{ url_for('data.import_page') }}" {% if request.endpoint and 'import' in request.endpoint %}class="active"{% endif %}>Import</a>
-          <a href="{{ url_for('data.completion_import_page') }}" {% if request.endpoint and 'completion_import' in request.endpoint %}class="active"{% endif %}>Completion Import</a>
-          <a href="{{ url_for('data.variant_sync_page') }}" {% if request.endpoint and 'variant_sync' in request.endpoint %}class="active"{% endif %}>Variant Sync</a>
-          <a href="{{ url_for('data.completion_gaps_page') }}" {% if request.endpoint and 'completion_gaps' in request.endpoint %}class="active"{% endif %}>Completion Gaps</a>
-          <a href="{{ url_for('data.export_page') }}" {% if request.endpoint and 'export' in request.endpoint %}class="active"{% endif %}>Export CSV</a>
         </div>
       </div>
     </details>

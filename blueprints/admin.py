@@ -14,7 +14,7 @@ from flask import Blueprint, abort, current_app, flash, jsonify, redirect, rende
 from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION, get_git_sha_info
 from extensions import db
 from extensions import limiter
-from helpers import is_admin
+from helpers import admin_required, is_admin
 from models import ActivityEvent, Item, get_recent_audit_events
 from schema_migrations import get_schema_history, get_schema_state, SCHEMA_VERSION
 from startup import BOOTSTRAP_VERSION, get_bootstrap_history, get_bootstrap_state
@@ -305,6 +305,7 @@ def admin_logout():
 
 
 @admin_bp.route("/api/variants/<int:item_id>")
+@admin_required
 def api_variants(item_id):
     """Return item variants as JSON for admin tooling."""
     item = db.session.get(Item, item_id)

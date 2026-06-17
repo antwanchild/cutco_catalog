@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">📈 Collection Stats {{ help_btn("stats") }}</h1>
-  {% if is_admin() %}
+  {% if is_private_user() %}
   <div class="page-actions">
     <form method="get" action="{{ url_for('views.stats') }}" class="inline-form">
       <select name="person" class="select-sm" onchange="this.form.submit()">
@@ -17,7 +17,6 @@
   {% endif %}
 </div>
 
-{% if is_admin() %}
 <p class="muted small">Includes public items plus unicorn, rep only, Costco, and non-catalog items that are marked Owned.</p>
 
 {% if top_colors %}
@@ -166,28 +165,6 @@
   </div>
 </div>
 {% endif %}
-{% else %}
-<p class="muted small">Public stats show catalog counts. Collector and ownership analytics are private.</p>
-<div class="stat-grid" style="margin-bottom:1.75rem">
-  <div class="stat-card">
-    <div class="stat-number">{{ public_summary.item_count }}</div>
-    <div class="stat-label">Catalog Items</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ public_summary.variants }}</div>
-    <div class="stat-label">Color Variants</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ public_summary.sets }}</div>
-    <div class="stat-label">Sets</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ public_summary.unicorns }}</div>
-    <div class="stat-label">Unicorns</div>
-  </div>
-</div>
-{% endif %}
-
 {# ── Chart.js ─────────────────────────────────────────────────────────────── #}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>

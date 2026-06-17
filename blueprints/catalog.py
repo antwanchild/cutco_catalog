@@ -19,7 +19,7 @@ from constants import (
     canonicalize_availability,
 )
 from extensions import db
-from helpers import admin_required, db_commit, is_admin
+from helpers import admin_required, db_commit, is_admin, is_authenticated_user
 from models import (
     Item,
     ItemAttachment,
@@ -1640,7 +1640,7 @@ def set_detail(set_id=None, sid=None):
     item_set    = db.session.get(Set, set_id)
     if not item_set:
         abort(404)
-    private_view = is_admin()
+    private_view = is_authenticated_user()
     all_persons = Person.query.order_by(Person.name).all() if private_view else []
     person_id   = request.args.get("person", type=int) if private_view else None
     person      = db.session.get(Person, person_id) if person_id else None

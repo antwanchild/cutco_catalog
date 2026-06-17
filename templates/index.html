@@ -20,7 +20,7 @@
     <div class="stat-number">{{ stats.unicorns }}</div>
     <div class="stat-label">Unicorns</div>
   </div>
-  {% if is_admin() %}
+  {% if is_private_user() %}
   <div class="stat-card">
     <div class="stat-number">{{ stats.people }}</div>
     <div class="stat-label">Collectors</div>
@@ -52,12 +52,14 @@
       <span class="quick-action-note">Review set metadata and components.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('catalog.sets_list') }}">Open Sets</a>
     </div>
+    {% if is_private_user() %}
     <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">Collection stats</span>
       <span class="quick-action-note">See product summaries and coverage.</span>
       <a class="btn btn-secondary btn-sm quick-action-btn" href="{{ url_for('views.stats') }}">Open Stats</a>
     </div>
-    {% if is_admin() %}
+    {% endif %}
+    {% if is_private_user() %}
     <div class="dashboard-card quick-action-card">
       <span class="quick-action-title">Add item</span>
       <span class="quick-action-note">Create a new catalog item.</span>
@@ -118,7 +120,7 @@
   </div>
 </div>
 
-{% if is_admin() %}
+{% if is_private_user() %}
 <section class="detail-section dashboard-section dashboard-changes">
   <div class="section-heading-actions">
     <h2 class="section-heading">Recently Changed</h2>
@@ -196,7 +198,7 @@
 <section class="detail-section dashboard-section dashboard-release">
   <div class="section-heading-actions">
     <h2 class="section-heading">Release &amp; Diagnostics</h2>
-    {% if is_admin() %}
+    {% if is_private_user() %}
       <a class="btn btn-secondary btn-sm" href="{{ url_for('admin.diagnostics_page') }}">Open diagnostics</a>
     {% endif %}
   </div>
@@ -221,7 +223,7 @@
   </div>
 </section>
 
-{% if is_admin() %}
+{% if is_private_user() %}
 <div class="dash-row dashboard-lower-grid">
   <section class="detail-section lower-card">
     <h3>Quick Links</h3>

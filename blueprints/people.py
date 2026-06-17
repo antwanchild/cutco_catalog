@@ -7,7 +7,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, s
 
 from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
 from extensions import db
-from helpers import _notify_discord, admin_required, check_wishlist_targets, db_commit
+from helpers import _notify_discord, check_wishlist_targets, db_commit, user_required
 from models import Item, Ownership, Person, record_audit_event
 
 people_bp = Blueprint("people", __name__)
@@ -24,7 +24,7 @@ def _parse_optional_whole_number(raw_value: str, label: str) -> tuple[int | None
 
 
 @people_bp.route("/people")
-@admin_required
+@user_required
 def people():
     """Render the people list."""
     people = Person.query.order_by(Person.name).all()
@@ -34,7 +34,7 @@ def people():
 
 
 @people_bp.route("/people/add", methods=["GET", "POST"])
-@admin_required
+@user_required
 def people_add():
     """Create a person record."""
     if request.method == "POST":
@@ -49,7 +49,7 @@ def people_add():
 
 
 @people_bp.route("/people/<int:person_id>/edit", methods=["GET", "POST"])
-@admin_required
+@user_required
 def people_edit(person_id):
     """Edit an existing person record."""
     person = db.session.get(Person, person_id)
@@ -66,7 +66,7 @@ def people_edit(person_id):
 
 
 @people_bp.route("/people/<int:person_id>/delete", methods=["POST"])
-@admin_required
+@user_required
 def people_delete(person_id):
     """Delete a person record."""
     person = db.session.get(Person, person_id)
@@ -81,7 +81,7 @@ def people_delete(person_id):
 
 
 @people_bp.route("/people/<int:person_id>/purge-collection", methods=["POST"])
-@admin_required
+@user_required
 def purge_collection(person_id):
     """Delete all ownership records for a person."""
     person = db.session.get(Person, person_id)
@@ -105,7 +105,7 @@ def purge_collection(person_id):
 
 
 @people_bp.route("/people/<int:person_id>/collection")
-@admin_required
+@user_required
 def person_collection(person_id):
     """Render a person's collection detail page."""
     person     = db.session.get(Person, person_id)
@@ -153,7 +153,7 @@ def person_collection(person_id):
 # ── Ownership CRUD ────────────────────────────────────────────────────────────
 
 @people_bp.route("/ownership/add", methods=["GET", "POST"])
-@admin_required
+@user_required
 def ownership_add():
     """Create an ownership record."""
     person_id   = request.args.get("person_id", type=int)
@@ -227,7 +227,7 @@ def ownership_add():
 
 
 @people_bp.route("/ownership/<int:ownership_id>/edit", methods=["GET", "POST"])
-@admin_required
+@user_required
 def ownership_edit(ownership_id):
     """Edit an ownership record."""
     ownership = db.session.get(Ownership, ownership_id)
@@ -275,7 +275,7 @@ def ownership_edit(ownership_id):
 
 
 @people_bp.route("/ownership/<int:ownership_id>/delete", methods=["POST"])
-@admin_required
+@user_required
 def ownership_delete(ownership_id):
     """Delete an ownership record."""
     ownership = db.session.get(Ownership, ownership_id)
@@ -292,7 +292,7 @@ def ownership_delete(ownership_id):
 # ── Bulk status update ────────────────────────────────────────────────────────
 
 @people_bp.route("/people/<int:person_id>/bulk-status", methods=["POST"])
-@admin_required
+@user_required
 def bulk_status_update(person_id):
     """Update the status of multiple ownership records."""
     if not db.session.get(Person, person_id):
@@ -350,7 +350,7 @@ def bulk_status_update(person_id):
 # ── Wishlist ──────────────────────────────────────────────────────────────────
 
 @people_bp.route("/wishlist")
-@admin_required
+@user_required
 def wishlist():
     """Render the wishlist page."""
     person_id   = request.args.get("person", type=int)
@@ -412,7 +412,7 @@ def wishlist():
 
 
 @people_bp.route("/wishlist/check", methods=["POST"])
-@admin_required
+@user_required
 def wishlist_check():
     """Check wishlist targets and notify when items hit their price."""
     hits = check_wishlist_targets()

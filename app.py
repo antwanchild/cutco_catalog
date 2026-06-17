@@ -18,7 +18,7 @@ from constants import (
     get_git_sha_info,
 )
 from extensions import db, limiter
-from helpers import _csrf_token, is_admin, validate_csrf
+from helpers import _csrf_token, is_admin, is_authenticated_user, validate_csrf
 from models import Item, KnifeTask, Ownership, Person, Set, get_latest_activity
 from schema_migrations import get_schema_history, get_schema_state
 from startup import get_bootstrap_history, get_bootstrap_state
@@ -115,6 +115,7 @@ def _register_hooks(app: Flask) -> None:
             app_version=APP_VERSION,
             current_year=datetime.now().year,
             is_admin=is_admin,
+            is_private_user=is_authenticated_user,
             UNKNOWN_COLOR=UNKNOWN_COLOR,
             csrf_token=_csrf_token,
         )
@@ -257,7 +258,7 @@ def _register_routes(app: Flask) -> None:
     @app.route("/")
     def index():
         from models import ItemVariant, Ownership, Person, Set
-        private_view = is_admin()
+        private_view = is_authenticated_user()
 
         stats = dict(
             item_count=Item.query.count(),
@@ -304,7 +305,7 @@ def _register_routes(app: Flask) -> None:
     def search():
         query = request.args.get("q", "").strip()
         cat_filter = request.args.get("category", "").strip()
-        private_view = is_admin()
+        private_view = is_authenticated_user()
         categories = [
             row[0]
             for row in db.session.query(Item.category)
