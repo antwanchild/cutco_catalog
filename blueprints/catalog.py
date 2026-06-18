@@ -31,9 +31,13 @@ from models import (
     reconcile_unknown_variant,
 )
 from scraping import (
+    scrape_catalog,
+    scrape_item_specs,
+    scrape_item_variant_colors,
     scrape_item_uses,
     scrape_sets,
 )
+import blueprints.catalog_helpers as catalog_helpers
 
 from blueprints.catalog_helpers import (
     catalog_bp,
@@ -56,6 +60,22 @@ from blueprints.catalog_helpers import (
 )
 logger = logging.getLogger(__name__)
 UNCATEGORIZED_FILTER = "__uncategorized__"
+_CATALOG_SYNC_JOB_FILE = catalog_helpers._CATALOG_SYNC_JOB_FILE
+
+
+def _sync_catalog_sync_helpers() -> None:
+    """Keep the helper module pointed at the patchable route-level scrapers."""
+    catalog_helpers._CATALOG_SYNC_JOB_FILE = _CATALOG_SYNC_JOB_FILE
+    catalog_helpers.scrape_catalog = scrape_catalog
+    catalog_helpers.scrape_item_specs = scrape_item_specs
+    catalog_helpers.scrape_item_variant_colors = scrape_item_variant_colors
+    catalog_helpers.scrape_sets = scrape_sets
+
+
+def _run_catalog_sync_job(app) -> None:
+    """Run the catalog sync job with the route-level scraper bindings."""
+    _sync_catalog_sync_helpers()
+    catalog_helpers._run_catalog_sync_job(app)
 
 
 @catalog_bp.route("/catalog")
@@ -1073,6 +1093,7 @@ def catalog_sync_uses():
 @admin_required
 def catalog_sync():
     """Render the catalog sync preview page."""
+    _sync_catalog_sync_helpers()
     start_requested = request.args.get("run") == "1"
     job = _read_catalog_sync_job()
 
