@@ -15,98 +15,14 @@ from msrp_scrape_helpers import (  # noqa: F401
     _build_msrp_price_targets,
     _build_msrp_price_targets_from_db,
     _scrape_price_from_page,
-    _fetch_live_prices_by_sku,
 )
+from msrp_specs_helpers import _read_specs_job, _run_specs_backfill_job, _write_specs_job  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
 _MSRP_JOB_FILE   = os.path.join(DATA_DIR, "msrp_job.json")
 _msrp_write_lock  = threading.Lock()
 _MSRP_JOB_STALE_AFTER = timedelta(minutes=30)
-_SPECS_JOB_FILE  = os.path.join(DATA_DIR, "specs_job.json")
-_specs_write_lock = threading.Lock()
-
-
-def _read_specs_job() -> dict:
-    return read_json_file(_SPECS_JOB_FILE, {"status": "idle", "progress": [], "results": None, "error": None,
-                "started_at": None, "finished_at": None})
-
-
-def _write_specs_job(data: dict) -> None:
-    write_json_file(_SPECS_JOB_FILE, data, lock=_specs_write_lock)
-
-
-def _run_specs_backfill_job(app) -> None:
-    """Backfill item specs from cutco_url pages.
-
-    Updates blade_length, overall_length, weight, and msrp
-    (only when msrp is not already set).
-    """
-    from scraping import scrape_item_specs
-
-    with app.app_context():
-        items = Item.query.filter(Item.cutco_url.isnot(None)).all()
-        total = len(items)
-        progress = []
-
-        def _log(msg):
-            progress.append(msg)
-            _write_specs_job({"status": "running", "progress": list(progress),
-                              "results": None, "error": None,
-                              "started_at": started_at, "finished_at": None})
-
-        started_at = datetime.now(UTC).isoformat(timespec="seconds")
-        _log(f"Starting specs backfill for {total} items…")
-
-        updated = skipped = errors = 0
-
-        with ThreadPoolExecutor(max_workers=6) as pool:
-            future_map = {pool.submit(scrape_item_specs, item.cutco_url): item
-                          for item in items}
-            done = 0
-            for future in as_completed(future_map):
-                item = future_map[future]
-                done += 1
-                try:
-                    specs = future.result()
-                    changed = False
-                    if specs.get("blade_length") and not item.blade_length:
-                        item.blade_length = specs["blade_length"]
-                        changed = True
-                    if specs.get("overall_length") and not item.overall_length:
-                        item.overall_length = specs["overall_length"]
-                        changed = True
-                    if specs.get("weight") and not item.weight:
-                        item.weight = specs["weight"]
-                        changed = True
-                    if specs.get("msrp") and not item.msrp:
-                        item.msrp = specs["msrp"]
-                        changed = True
-                    if changed:
-                        db.session.commit()
-                        updated += 1
-                        _log(f"[{done}/{total}] ✓ {item.name} ({item.sku})")
-                    else:
-                        skipped += 1
-                except Exception as exc:
-                    db.session.rollback()
-                    errors += 1
-                    _log(f"[{done}/{total}] ✗ {item.name}: {exc}")
-
-        finished_at = datetime.now(UTC).isoformat(timespec="seconds")
-        results = {"updated": updated, "skipped": skipped, "errors": errors, "total": total}
-        _log(f"Done — {updated} updated, {skipped} already complete, {errors} errors.")
-        _write_specs_job({"status": "done", "progress": progress, "results": results,
-                          "error": None, "started_at": started_at, "finished_at": finished_at})
-        record_activity(
-            "specs_backfill",
-            "Specs backfill complete",
-            f"Updated {updated} items, skipped {skipped}, {errors} errors.",
-            occurred_at=finished_at,
-        )
-        db.session.commit()
-
-
 def _read_msrp_job() -> dict:
     job = read_json_file(_MSRP_JOB_FILE, {"status": "idle", "progress": [], "results": None,
                 "error": None, "started_at": None, "finished_at": None,
@@ -152,6 +68,56 @@ def _reset_msrp_job() -> None:
         "update_db": True,
         "heartbeat_at": None,
     }, lock=_msrp_write_lock)
+
+
+def _fetch_live_prices_by_sku(
+    by_sku: dict[str, dict],
+    *,
+    workers: int = 12,
+    log_fn=None,
+) -> tuple[int, int]:
+    """Fetch live prices for the provided SKU map."""
+    fetched = 0
+    timed_out = 0
+    completed: set = set()
+    executor = ThreadPoolExecutor(max_workers=workers)
+    try:
+        future_map = {
+            executor.submit(_scrape_price_from_page, info["url"], info["name"], sku): sku
+            for sku, info in by_sku.items()
+            if info.get("url")
+        }
+        try:
+            for future in as_completed(future_map, timeout=180):
+                sku = future_map[future]
+                completed.add(future)
+                try:
+                    by_sku[sku]["price"] = future.result()
+                except Exception as exc:
+                    by_sku[sku]["price"] = None
+                    if log_fn:
+                        log_fn(f"  ! {sku} price fetch failed: {exc}")
+                fetched += 1
+                if fetched % 20 == 0 and log_fn:
+                    log_fn(f"  …{fetched}/{len(future_map)} prices fetched")
+        except TimeoutError:
+            pass
+
+        pending = [future for future in future_map if future not in completed]
+        timed_out = len(pending)
+        for future in pending:
+            sku = future_map[future]
+            by_sku[sku]["price"] = None
+            future.cancel()
+        if timed_out and log_fn:
+            log_fn(
+                f"Timed out waiting for {timed_out} price fetch(es); "
+                "continuing without them."
+            )
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    return fetched, timed_out
 
 
 def _build_msrp_diff(db_items: list, live: dict) -> dict:
