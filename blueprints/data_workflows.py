@@ -118,6 +118,28 @@ def _read_completion_rows(uploaded_file, paste_text: str) -> tuple[list[dict], s
     return parsed_rows, None
 
 
+def _import_row_label(row_num: int | None, name: str | None = None, sku: str | None = None) -> str:
+    """Build a compact human-readable row label for import summaries."""
+    parts = []
+    if row_num is not None:
+        parts.append(f"Row {row_num}")
+    if name:
+        parts.append(name)
+    if sku:
+        parts.append(f"SKU {sku}")
+    return " - ".join(parts) if parts else "Unknown row"
+
+
+def _safe_csv_filename(raw_name: str) -> str:
+    """Normalize a user-provided filename into a safe CSV filename."""
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (raw_name or "").strip()).strip("._")
+    if not cleaned:
+        cleaned = "cutco_collection"
+    if not cleaned.lower().endswith(".csv"):
+        cleaned += ".csv"
+    return cleaned
+
+
 def _build_completion_preview(
     parsed_rows: list[dict],
     *,

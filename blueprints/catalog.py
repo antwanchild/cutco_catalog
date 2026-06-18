@@ -39,6 +39,7 @@ from blueprints.catalog_helpers import (
     catalog_bp,
     _aggregate_resolved_members,
     _build_member_name_lookup,
+    _build_set_membership_preview,  # noqa: F401 - re-exported for tests/backwards compatibility
     _build_member_status_rows,
     _catalog_category_options,
     _delete_attachment_files,
