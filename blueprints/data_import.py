@@ -1,4 +1,4 @@
-"""Shared import and completion parsing helpers for the data blueprint."""
+"""Shared import and completion parsing for the data blueprint."""
 
 from __future__ import annotations
 

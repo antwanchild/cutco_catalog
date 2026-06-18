@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models import Item  # noqa: E402
-from msrp_helpers import _build_msrp_price_targets_from_db, _fetch_live_prices_by_sku  # noqa: E402
+from msrp_jobs import _build_msrp_price_targets_from_db, _fetch_live_prices_by_sku  # noqa: E402
 from helpers import check_wishlist_targets, _notify_discord  # noqa: E402
 
 def scrape_live_prices(

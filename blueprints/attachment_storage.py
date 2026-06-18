@@ -1,4 +1,4 @@
-"""Attachment storage helpers for item views."""
+"""Attachment storage for item views."""
 
 from __future__ import annotations
 

@@ -8,8 +8,8 @@ from helpers import admin_required, db_commit, is_authenticated_user, user_requi
 from helpers import (_collection_token, _gift_token,
                      _verify_collection_token, _verify_gift_token)
 from models import Item, ItemAttachment, Person, Set
-from blueprints.views_attachment_helpers import _attachment_dir, _store_attachment
-from blueprints.views_helpers import (
+from blueprints.attachment_storage import _attachment_dir, _store_attachment
+from blueprints.views_context import (
     _build_item_owners_context,
     _build_matrix_context,
     _build_collection_card_context,

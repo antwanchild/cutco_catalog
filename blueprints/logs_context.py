@@ -1,4 +1,4 @@
-"""Shared helpers for sharpening and cookware log views."""
+"""Context builders for sharpening and cookware log views."""
 
 from __future__ import annotations
 
@@ -98,4 +98,3 @@ def _build_cookware_rows(
 
     tracked.sort(key=lambda row: (0 if row["stale"] else 1, -row["days_since"]))
     return tracked, count_by_item, rating_by_item, set(last_by_item)
-

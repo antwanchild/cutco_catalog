@@ -12,7 +12,7 @@ import openpyxl
 from flask import flash
 from sqlalchemy.orm import selectinload
 
-from blueprints.data_helpers import (
+from blueprints.data_import import (
     _build_item_name_lookup,
     _build_item_sku_lookup,
     _build_set_sku_lookup,

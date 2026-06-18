@@ -12,7 +12,7 @@ from constants import (
 )
 from extensions import db
 from helpers import _notify_discord, db_commit, user_required
-from blueprints.logs_helpers import (
+from blueprints.logs_context import (
     _build_cookware_rows,
     _build_sharpening_rows,
     _is_sharpening_page_item,

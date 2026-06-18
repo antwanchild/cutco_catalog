@@ -1,4 +1,4 @@
-"""Shared view context helpers."""
+"""Shared view context builders."""
 
 from __future__ import annotations
 

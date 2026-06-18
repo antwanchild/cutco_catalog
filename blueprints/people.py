@@ -8,7 +8,7 @@ from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
 from extensions import db
 from number_utils import parse_nonnegative_whole_number
 from helpers import _notify_discord, check_wishlist_targets, db_commit, user_required
-from blueprints.views_helpers import _build_person_collection_context, _build_wishlist_rows
+from blueprints.views_context import _build_person_collection_context, _build_wishlist_rows
 from models import Item, Ownership, Person, record_audit_event
 
 people_bp = Blueprint("people", __name__)

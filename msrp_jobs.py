@@ -11,7 +11,7 @@ from extensions import db
 from helpers import _notify_discord, check_wishlist_targets
 from job_state import read_json_file, reset_json_file, write_json_file
 from models import Item, record_activity
-from msrp_scrape_helpers import (  # noqa: F401
+from msrp_scrape import (  # noqa: F401
     _build_msrp_price_targets,
     _build_msrp_price_targets_from_db,
     _scrape_price_from_page,

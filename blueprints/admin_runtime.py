@@ -1,4 +1,4 @@
-"""Helper functions for admin diagnostics and runtime snapshots."""
+"""Runtime snapshot helpers for the admin area."""
 
 from __future__ import annotations
 

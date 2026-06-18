@@ -16,7 +16,7 @@ from constants import UNKNOWN_COLOR
 from extensions import db
 from helpers import _collection_token, _gift_token, _notify_discord, _verify_collection_token, _verify_gift_token, check_wishlist_targets
 from msrp_diff import find_stale_msrp_rows
-from msrp_helpers import _scrape_price_from_page
+from msrp_scrape import _scrape_price_from_page
 from models import (
     CookwareSession,
     ActivityEvent,

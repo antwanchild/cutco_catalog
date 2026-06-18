@@ -1,4 +1,4 @@
-"""Scraping helpers for MSRP background jobs."""
+"""Scraping logic for MSRP background jobs."""
 
 from __future__ import annotations
 

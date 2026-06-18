@@ -1,4 +1,4 @@
-"""Catalog, item, set, and sync routes."""
+"""Catalog sync helpers for the catalog blueprint."""
 
 import json
 import logging
@@ -775,5 +775,4 @@ def _build_set_membership_preview(
         "current_count": len(current_rows),
         "incoming_count": len(incoming_rows),
     }
-
 

@@ -37,9 +37,9 @@ from scraping import (
     scrape_item_uses,
     scrape_sets,
 )
-import blueprints.catalog_helpers as catalog_helpers
+import blueprints.catalog_sync as catalog_sync_module
 
-from blueprints.catalog_helpers import (
+from blueprints.catalog_sync import (
     catalog_bp,
     _aggregate_resolved_members,
     _build_member_name_lookup,
@@ -50,32 +50,48 @@ from blueprints.catalog_helpers import (
     _item_alternate_skus_text,
     _load_member_snapshot,
     _normalize_member_sku,
-    _read_catalog_sync_job,
-    _reset_catalog_sync_job,
     _safe_redirect_target,
     _set_name_options,
     _set_sku_options,
-    _start_catalog_sync_background_job,
-    _write_catalog_sync_job,
 )
 logger = logging.getLogger(__name__)
 UNCATEGORIZED_FILTER = "__uncategorized__"
-_CATALOG_SYNC_JOB_FILE = catalog_helpers._CATALOG_SYNC_JOB_FILE
+_CATALOG_SYNC_JOB_FILE = catalog_sync_module._CATALOG_SYNC_JOB_FILE
 
 
 def _sync_catalog_sync_helpers() -> None:
     """Keep the helper module pointed at the patchable route-level scrapers."""
-    catalog_helpers._CATALOG_SYNC_JOB_FILE = _CATALOG_SYNC_JOB_FILE
-    catalog_helpers.scrape_catalog = scrape_catalog
-    catalog_helpers.scrape_item_specs = scrape_item_specs
-    catalog_helpers.scrape_item_variant_colors = scrape_item_variant_colors
-    catalog_helpers.scrape_sets = scrape_sets
+    catalog_sync_module._CATALOG_SYNC_JOB_FILE = _CATALOG_SYNC_JOB_FILE
+    catalog_sync_module.scrape_catalog = scrape_catalog
+    catalog_sync_module.scrape_item_specs = scrape_item_specs
+    catalog_sync_module.scrape_item_variant_colors = scrape_item_variant_colors
+    catalog_sync_module.scrape_sets = scrape_sets
+
+
+def _read_catalog_sync_job() -> dict:
+    _sync_catalog_sync_helpers()
+    return catalog_sync_module._read_catalog_sync_job()
+
+
+def _write_catalog_sync_job(data: dict) -> None:
+    _sync_catalog_sync_helpers()
+    catalog_sync_module._write_catalog_sync_job(data)
+
+
+def _reset_catalog_sync_job() -> None:
+    _sync_catalog_sync_helpers()
+    catalog_sync_module._reset_catalog_sync_job()
+
+
+def _start_catalog_sync_background_job(app) -> None:
+    _sync_catalog_sync_helpers()
+    catalog_sync_module._start_catalog_sync_background_job(app)
 
 
 def _run_catalog_sync_job(app) -> None:
     """Run the catalog sync job with the route-level scraper bindings."""
     _sync_catalog_sync_helpers()
-    catalog_helpers._run_catalog_sync_job(app)
+    catalog_sync_module._run_catalog_sync_job(app)
 
 
 @catalog_bp.route("/catalog")

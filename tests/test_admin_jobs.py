@@ -11,7 +11,7 @@ from app import create_app
 import constants
 from constants import KNIFE_TASK_PRESETS
 from extensions import db
-import msrp_helpers
+import msrp_jobs
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Set
 from schema_migrations import SCHEMA_VERSION, SchemaState, apply_schema_migrations
 from startup import BOOTSTRAP_VERSION, BootstrapState, initialize_database
@@ -157,8 +157,8 @@ class AdminJobSmokeTests(unittest.TestCase):
             import json
             json.dump(job_data, fh)
 
-        with mock.patch.object(msrp_helpers, "_MSRP_JOB_FILE", job_file):
-            recovered = msrp_helpers._read_msrp_job()
+        with mock.patch.object(msrp_jobs, "_MSRP_JOB_FILE", job_file):
+            recovered = msrp_jobs._read_msrp_job()
 
         self.assertEqual(recovered["status"], "error")
         self.assertIn("stale", recovered["error"].lower())
@@ -191,9 +191,9 @@ class AdminJobSmokeTests(unittest.TestCase):
 
         fake_executor = FakeExecutor()
 
-        with mock.patch("msrp_helpers.ThreadPoolExecutor", return_value=fake_executor), \
-             mock.patch("msrp_helpers.as_completed", new=fake_as_completed):
-            fetched, timed_out = msrp_helpers._fetch_live_prices_by_sku(
+        with mock.patch("msrp_jobs.ThreadPoolExecutor", return_value=fake_executor), \
+             mock.patch("msrp_jobs.as_completed", new=fake_as_completed):
+            fetched, timed_out = msrp_jobs._fetch_live_prices_by_sku(
                 by_sku,
                 workers=2,
                 log_fn=lambda _msg: None,
@@ -209,15 +209,15 @@ class AdminJobSmokeTests(unittest.TestCase):
 
     def test_msrp_diff_flags_cutco_outage_when_no_prices_return(self):
         job_file = f"{self.temp_dir.name}/msrp_job.json"
-        with mock.patch.object(msrp_helpers, "_MSRP_JOB_FILE", job_file), \
-             mock.patch.object(msrp_helpers, "_build_msrp_price_targets_from_db") as targets_mock, \
-             mock.patch.object(msrp_helpers, "_fetch_live_prices_by_sku", return_value=(0, 0)), \
-             mock.patch.object(msrp_helpers, "record_activity"), \
-             mock.patch.object(msrp_helpers, "check_wishlist_targets", return_value=[]):
+        with mock.patch.object(msrp_jobs, "_MSRP_JOB_FILE", job_file), \
+             mock.patch.object(msrp_jobs, "_build_msrp_price_targets_from_db") as targets_mock, \
+             mock.patch.object(msrp_jobs, "_fetch_live_prices_by_sku", return_value=(0, 0)), \
+             mock.patch.object(msrp_jobs, "record_activity"), \
+             mock.patch.object(msrp_jobs, "check_wishlist_targets", return_value=[]):
             targets_mock.return_value = {
                 "A-1": {"name": "Alpha", "url": "https://www.cutco.com/p/a", "price": None},
             }
-            msrp_helpers._run_msrp_diff_job(self.app, False)
+            msrp_jobs._run_msrp_diff_job(self.app, False)
 
         with open(job_file, "r", encoding="utf-8") as fh:
             job_data = json.load(fh)
@@ -232,11 +232,11 @@ class AdminJobSmokeTests(unittest.TestCase):
         ]
 
         with self.app.app_context():
-            with mock.patch.object(msrp_helpers.Item, "query") as query_mock:
+            with mock.patch.object(msrp_jobs.Item, "query") as query_mock:
                 query_mock.filter.return_value.all.return_value = [
                     mock.Mock(sku="125", cutco_url="https://www.cutco.com/p/medium-cutting-board"),
                 ]
-                targets = msrp_helpers._build_msrp_price_targets(live_items)
+                targets = msrp_jobs._build_msrp_price_targets(live_items)
 
         self.assertEqual(targets["125"]["url"], "https://www.cutco.com/p/medium-cutting-board")
         self.assertEqual(targets["999"]["url"], "https://www.cutco.com/p/new-thing")
@@ -248,7 +248,7 @@ class AdminJobSmokeTests(unittest.TestCase):
             db.session.add_all([item_a, item_b])
             db.session.commit()
 
-            targets = msrp_helpers._build_msrp_price_targets_from_db(Item.query.all())
+            targets = msrp_jobs._build_msrp_price_targets_from_db(Item.query.all())
 
         self.assertEqual(targets["A-1"]["url"], "https://www.cutco.com/p/knife-a")
         self.assertEqual(targets["125"]["url"], "https://www.cutco.com/p/medium-cutting-board")
