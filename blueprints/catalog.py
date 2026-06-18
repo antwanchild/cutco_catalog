@@ -3,9 +3,11 @@
 import json
 import logging
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from flask import (
     abort,
+    Flask,
     current_app,
     flash,
     jsonify,
@@ -59,6 +61,7 @@ from blueprints.catalog_sync import (
     _build_set_membership_preview,  # noqa: F401 - re-exported for tests/backwards compatibility
     _build_member_status_rows,
     _catalog_category_options,
+    _coerce_quantity,
     _delete_attachment_files,
     _item_alternate_skus_text,
     _load_member_snapshot,
@@ -617,7 +620,10 @@ def variant_edit(vid):
     if not color:
         flash("Color cannot be empty.", "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
-    if (variant.item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
+    item = variant.item
+    if item is None:
+        abort(404)
+    if (item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
         flash(
             "Cookware items use a single Unknown variant; color variants are not supported.",
             "warning",
@@ -627,7 +633,7 @@ def variant_edit(vid):
     variant.notes = request.form.get("notes", "").strip() or None
     variant.is_unicorn = request.form.get("is_unicorn") == "on"
     db.session.flush()
-    reconcile_unknown_variant(variant.item)
+    reconcile_unknown_variant(item)
     if db_commit(db.session):
         logger.info("Variant updated: item %d → %s", item_id, color)
         flash(f'Updated to "{color}".', "success")
@@ -642,6 +648,8 @@ def variant_reset_unknown(vid):
     if not variant:
         abort(404)
     item = variant.item
+    if item is None:
+        abort(404)
     item_id = variant.item_id
     if len(item.variants) != 1:
         flash(
@@ -672,11 +680,13 @@ def variant_delete(vid):
     variant = db.session.get(ItemVariant, vid)
     if not variant:
         abort(404)
-    if len(variant.item.variants) == 1:
+    item = variant.item
+    if item is None:
+        abort(404)
+    if len(item.variants) == 1:
         flash("Cannot delete the only variant. Add another first.", "error")
         return redirect(url_for("catalog.variants", item_id=variant.item_id))
     item_id = variant.item_id
-    item = variant.item
     db.session.delete(variant)
     db.session.flush()
     reconcile_unknown_variant(item)
@@ -712,9 +722,9 @@ def sets_list():
     owned_item_ids = {ownership.variant.item_id for ownership in owned_ownerships}
 
     catalog_sku_lookup = {
-        _normalize_member_sku(item.sku): item
+        sku: item
         for item in Item.query.filter(Item.sku.isnot(None)).all()
-        if _normalize_member_sku(item.sku)
+        if (sku := _normalize_member_sku(item.sku))
     }
 
     completion = {}
@@ -876,7 +886,7 @@ def _restore_set_memberships_from_snapshot(item_set: Set) -> tuple[int, int, boo
 
 def _reconcile_set_memberships_from_entries(
     item_set: Set,
-    member_entries: list[dict],
+    member_entries: list[dict[str, Any]],
     *,
     replace_memberships: bool,
 ) -> tuple[int, int, bool]:
@@ -902,7 +912,7 @@ def _reconcile_set_memberships_from_entries(
     incoming_member_ids: set[int] = set()
     for item_id, resolved in resolved_members.items():
         item = resolved["item"]
-        qty = max(1, int(resolved.get("quantity") or 1))
+        qty = _coerce_quantity(resolved.get("quantity"))
         membership = existing_members.get(item_id)
         if membership is None:
             db.session.add(
@@ -981,9 +991,9 @@ def bulk_resync_set_memberships():
         return redirect(url_for("catalog.sets_list"))
 
     scraped_lookup = {
-        scraped_set["name"].lower(): scraped_set
+        name.lower(): scraped_set
         for scraped_set in scraped_sets
-        if scraped_set.get("name")
+        if isinstance(name := scraped_set.get("name"), str)
     }
     restored_sets = 0
     restored_memberships = 0
@@ -994,7 +1004,8 @@ def bulk_resync_set_memberships():
         if not scraped_set:
             skipped_sets += 1
             continue
-        member_entries = scraped_set.get("member_entries") or []
+        raw_member_entries = scraped_set.get("member_entries")
+        member_entries = raw_member_entries if isinstance(raw_member_entries, list) else []
         if member_entries:
             item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
         restored, updated, matched = _reconcile_set_memberships_from_entries(
@@ -1157,9 +1168,9 @@ def set_detail(set_id=None, sid=None):
         }
 
     catalog_sku_lookup = {
-        _normalize_member_sku(item.sku): item
+        sku: item
         for item in Item.query.filter(Item.sku.isnot(None)).all()
-        if _normalize_member_sku(item.sku)
+        if (sku := _normalize_member_sku(item.sku))
     }
     member_snapshot_rows, not_in_catalog_skus = _build_member_status_rows(
         _load_member_snapshot(item_set.member_data),
@@ -1339,7 +1350,7 @@ def catalog_sync():
                     "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
                 }
             )
-            _start_catalog_sync_background_job(current_app._get_current_object())
+            _start_catalog_sync_background_job(cast(Flask, current_app))
         job = _read_catalog_sync_job()
         if job.get("status") == "done" and job.get("preview"):
             preview = job["preview"]
@@ -1613,7 +1624,7 @@ def catalog_sync_confirm():
         created_missing_items += created_now
         for item_id, resolved in resolved_members.items():
             item = resolved["item"]
-            qty = max(1, int(resolved.get("quantity") or 1))
+            qty = _coerce_quantity(resolved.get("quantity"))
             if item_id not in existing_members:
                 membership = ItemSetMember(
                     set_id=item_set.id, item_id=item.id, quantity=qty
@@ -1690,7 +1701,7 @@ def catalog_sync_confirm():
         created_existing_missing_items += created_now
         for item_id, resolved in resolved_members.items():
             item = resolved["item"]
-            qty = max(1, int(resolved.get("quantity") or 1))
+            qty = _coerce_quantity(resolved.get("quantity"))
             if item_id not in existing_member_ids:
                 db.session.add(
                     ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty)

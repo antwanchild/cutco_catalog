@@ -354,6 +354,8 @@ def import_page():
                 io.BytesIO(uploaded_file.stream.read()), data_only=True
             )
             ws = wb.active
+            if ws is None:
+                raise ValueError("Workbook has no active worksheet")
             raw_headers = [
                 str(cell.value).strip() if cell.value is not None else ""
                 for cell in ws[1]
@@ -901,6 +903,15 @@ def completion_import_confirm():
                         "row": row_num,
                         "label": _import_row_label(row_num, item_name, sku),
                         "reason": qty_error,
+                    }
+                )
+                continue
+            if quantity is None:
+                skipped_details.append(
+                    {
+                        "row": row_num,
+                        "label": _import_row_label(row_num, item_name, sku),
+                        "reason": "Quantity is required.",
                     }
                 )
                 continue

@@ -7,10 +7,12 @@ import threading
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 from urllib.parse import urlsplit, urlunsplit
 
 from flask import (
     Blueprint,
+    Flask,
     abort,
     current_app,
     flash,
@@ -175,7 +177,7 @@ def msrp_diff_run():
             "finished_at": None,
         }
     )
-    app = current_app._get_current_object()
+    app = cast(Flask, current_app)
     logger.info("MSRP diff job started (update_db=%s)", update_db)
     threading.Thread(
         target=_run_msrp_diff_job,
@@ -240,7 +242,7 @@ def specs_backfill_run():
             "finished_at": None,
         }
     )
-    app = current_app._get_current_object()
+    app = cast(Flask, current_app)
     logger.info("Specs backfill job started")
     threading.Thread(target=_run_specs_backfill_job, args=(app,), daemon=True).start()
     return redirect(url_for("admin.specs_backfill_page"))

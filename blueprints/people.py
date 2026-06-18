@@ -1,6 +1,8 @@
 """People, ownership, and wishlist routes."""
 
 import logging
+from collections.abc import MutableMapping
+from typing import Any
 
 from flask import (
     Blueprint,
@@ -29,7 +31,9 @@ people_bp = Blueprint("people", __name__)
 logger = logging.getLogger(__name__)
 
 
-def _build_person_collection_context(person_id: int, *, session: dict) -> dict:
+def _build_person_collection_context(
+    person_id: int, *, session: MutableMapping[str, Any]
+) -> dict:
     """Build the collection page context for a person."""
     person = db.session.get(Person, person_id)
     if not person:
@@ -40,7 +44,11 @@ def _build_person_collection_context(person_id: int, *, session: dict) -> dict:
         Ownership.query.filter_by(person_id=person_id).order_by(Ownership.status).all()
     )
 
-    owned_item_ids = {o.variant.item_id for o in ownerships if o.status == "Owned"}
+    owned_item_ids = {
+        o.variant.item_id
+        for o in ownerships
+        if o.status == "Owned" and o.variant is not None
+    }
     all_items = Item.query.order_by(Item.name).all()
     item_gaps = [item for item in all_items if item.id not in owned_item_ids]
 
@@ -378,9 +386,9 @@ def ownership_edit(ownership_id):
         items_list=Item.query.order_by(Item.name).all(),
         status_options=STATUS_OPTIONS,
         sel_person_id=ownership.person_id,
-        sel_item_id=ownership.variant.item_id,
+        sel_item_id=ownership.variant.item_id if ownership.variant else None,
         sel_variant_id=ownership.variant_id,
-        sel_item=ownership.variant.item,
+        sel_item=ownership.variant.item if ownership.variant else None,
         action="Edit",
         UNKNOWN_COLOR=UNKNOWN_COLOR,
     )

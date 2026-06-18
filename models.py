@@ -1,29 +1,47 @@
 """Database models and item normalization helpers."""
 
+from __future__ import annotations
+
 import json
 import re
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from flask import has_request_context, request, session
 from sqlalchemy import delete as sa_delete, event, inspect as sa_inspect
-from sqlalchemy.orm import Session as SASession
+from sqlalchemy.orm import Mapped, Session as SASession, relationship
 
 from constants import UNKNOWN_COLOR
 from extensions import db
 
 
+class BaseModel(db.Model):
+    """Shared base class that keeps SQLAlchemy models Pylance-friendly."""
+
+    __abstract__ = True
+    __allow_unmapped__ = True
+
+    if TYPE_CHECKING:
+        def __init__(self, **kwargs: Any) -> None:
+            """Pylance-only constructor signature."""
+
+
 # Association object: items <-> sets (with quantity per member)
-class ItemSetMember(db.Model):
+class ItemSetMember(BaseModel):
     """Association row linking items to sets with quantities."""
 
     __tablename__ = "item_sets"
+
+    if TYPE_CHECKING:
+        item: Mapped[Item | None]
+        set: Mapped[Set | None]
 
     item_id = db.Column(db.Integer, db.ForeignKey("items.id"), primary_key=True)
     set_id = db.Column(db.Integer, db.ForeignKey("sets.id"), primary_key=True)
     quantity = db.Column(db.Integer, nullable=False, default=1)
 
-    item = db.relationship("Item", back_populates="set_memberships")
-    set = db.relationship("Set", back_populates="members")
+    item: Mapped[Item | None] = relationship("Item", back_populates="set_memberships")
+    set: Mapped[Set | None] = relationship("Set", back_populates="members")
 
 
 # Many-to-many join table: items <-> knife_tasks (Cutco-sourced suggested uses)
@@ -34,10 +52,20 @@ item_tasks = db.Table(
 )
 
 
-class Item(db.Model):
+class Item(BaseModel):
     """A cataloged item that may have one or more variants."""
 
     __tablename__ = "items"
+
+    if TYPE_CHECKING:
+        variants: Mapped[list[ItemVariant]]
+        set_memberships: Mapped[list[ItemSetMember]]
+        sets: Mapped[list[Set]]
+        suggested_tasks: Mapped[list[KnifeTask]]
+        attachments: Mapped[list[ItemAttachment]]
+        cookware_sessions: Mapped[list[CookwareSession]]
+        sharpening_log: Mapped[list[SharpeningLog]]
+        task_log: Mapped[list[KnifeTaskLog]]
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(160), nullable=False)
@@ -57,35 +85,53 @@ class Item(db.Model):
     weight = db.Column(db.String(20), nullable=True)
     notes = db.Column(db.Text, nullable=True)
 
-    variants = db.relationship(
+    variants: Mapped[list[ItemVariant]] = relationship(
         "ItemVariant",
-        backref="item",
+        back_populates="item",
         lazy=True,
         cascade="all, delete-orphan",
         order_by="ItemVariant.color",
     )
-    set_memberships = db.relationship(
+    set_memberships: Mapped[list[ItemSetMember]] = relationship(
         "ItemSetMember", back_populates="item", cascade="all, delete-orphan"
     )
-    sets = db.relationship(
+    sets: Mapped[list[Set]] = relationship(
         "Set",
         secondary="item_sets",
         back_populates="items",
         viewonly=True,
         lazy="select",
     )
-    suggested_tasks = db.relationship(
+    suggested_tasks: Mapped[list[KnifeTask]] = relationship(
         "KnifeTask",
         secondary="item_tasks",
         back_populates="suggested_items",
         lazy="select",
     )
-    attachments = db.relationship(
+    attachments: Mapped[list[ItemAttachment]] = relationship(
         "ItemAttachment",
         back_populates="item",
         cascade="all, delete-orphan",
         lazy="select",
         order_by="ItemAttachment.created_at.desc()",
+    )
+    cookware_sessions: Mapped[list[CookwareSession]] = relationship(
+        "CookwareSession",
+        back_populates="item",
+        lazy=True,
+        order_by="CookwareSession.used_on.desc()",
+    )
+    sharpening_log: Mapped[list[SharpeningLog]] = relationship(
+        "SharpeningLog",
+        back_populates="item",
+        lazy=True,
+        order_by="SharpeningLog.sharpened_on.desc()",
+    )
+    task_log: Mapped[list[KnifeTaskLog]] = relationship(
+        "KnifeTaskLog",
+        back_populates="item",
+        lazy=True,
+        order_by="KnifeTaskLog.logged_on.desc()",
     )
 
     @property
@@ -94,7 +140,7 @@ class Item(db.Model):
         return (
             self.is_unicorn
             or self.edge_is_unicorn
-            or any(variant.is_unicorn for variant in self.variants)
+            or any(variant.is_unicorn for variant in (self.variants or []))
         )
 
     @property
@@ -123,10 +169,14 @@ class Item(db.Model):
         return badge_classes.get((self.availability or "").strip())
 
 
-class ItemVariant(db.Model):
+class ItemVariant(BaseModel):
     """A color-specific variant of a catalog item."""
 
     __tablename__ = "item_variants"
+
+    if TYPE_CHECKING:
+        item: Mapped[Item | None]
+        ownerships: Mapped[list[Ownership]]
 
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
@@ -135,15 +185,19 @@ class ItemVariant(db.Model):
     source = db.Column(db.String(40), nullable=True, default="manual")
     notes = db.Column(db.Text, nullable=True)
 
-    ownerships = db.relationship(
-        "Ownership", backref="variant", lazy=True, cascade="all, delete-orphan"
+    item: Mapped[Item | None] = relationship("Item", back_populates="variants")
+    ownerships: Mapped[list[Ownership]] = relationship(
+        "Ownership", back_populates="variant", lazy=True, cascade="all, delete-orphan"
     )
 
 
-class ItemAttachment(db.Model):
+class ItemAttachment(BaseModel):
     """An uploaded image or attachment for a catalog item."""
 
     __tablename__ = "item_attachments"
+
+    if TYPE_CHECKING:
+        item: Mapped[Item | None]
 
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
@@ -157,13 +211,17 @@ class ItemAttachment(db.Model):
         default=lambda: datetime.now(UTC).isoformat(timespec="seconds"),
     )
 
-    item = db.relationship("Item", back_populates="attachments")
+    item: Mapped[Item | None] = relationship("Item", back_populates="attachments")
 
 
-class Set(db.Model):
+class Set(BaseModel):
     """A knife set or bundle that can contain multiple items."""
 
     __tablename__ = "sets"
+
+    if TYPE_CHECKING:
+        members: Mapped[list[ItemSetMember]]
+        items: Mapped[list[Item]]
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False, unique=True)
@@ -171,10 +229,10 @@ class Set(db.Model):
     notes = db.Column(db.Text, nullable=True)
     member_data = db.Column(db.Text, nullable=True)
 
-    members = db.relationship(
+    members: Mapped[list[ItemSetMember]] = relationship(
         "ItemSetMember", back_populates="set", cascade="all, delete-orphan"
     )
-    items = db.relationship(
+    items: Mapped[list[Item]] = relationship(
         "Item",
         secondary="item_sets",
         back_populates="sets",
@@ -183,24 +241,31 @@ class Set(db.Model):
     )
 
 
-class Person(db.Model):
+class Person(BaseModel):
     """A person or collector tracked by the application."""
 
     __tablename__ = "people"
+
+    if TYPE_CHECKING:
+        ownerships: Mapped[list[Ownership]]
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     notes = db.Column(db.Text, nullable=True)
 
-    ownerships = db.relationship(
-        "Ownership", backref="person", lazy=True, cascade="all, delete-orphan"
+    ownerships: Mapped[list[Ownership]] = relationship(
+        "Ownership", back_populates="person", lazy=True, cascade="all, delete-orphan"
     )
 
 
-class Ownership(db.Model):
+class Ownership(BaseModel):
     """A person's ownership record for a specific item variant."""
 
     __tablename__ = "ownership"
+
+    if TYPE_CHECKING:
+        variant: Mapped[ItemVariant | None]
+        person: Mapped[Person | None]
 
     id = db.Column(db.Integer, primary_key=True)
     variant_id = db.Column(
@@ -213,12 +278,19 @@ class Ownership(db.Model):
     quantity_given_away = db.Column(db.Integer, nullable=True)
     notes = db.Column(db.Text, nullable=True)
 
+    variant: Mapped[ItemVariant | None] = relationship(
+        "ItemVariant", back_populates="ownerships"
+    )
+    person: Mapped[Person | None] = relationship(
+        "Person", back_populates="ownerships"
+    )
+
     __table_args__ = (
         db.UniqueConstraint("variant_id", "person_id", name="uq_variant_person"),
     )
 
 
-class ActivityEvent(db.Model):
+class ActivityEvent(BaseModel):
     """A recorded activity item for dashboard summaries."""
 
     __tablename__ = "activity_events"
@@ -237,10 +309,13 @@ class ActivityEvent(db.Model):
     payload = db.Column(db.Text, nullable=True)
 
 
-class CookwareSession(db.Model):
+class CookwareSession(BaseModel):
     """A log entry for cookware usage."""
 
     __tablename__ = "cookware_sessions"
+
+    if TYPE_CHECKING:
+        item: Mapped[Item | None]
 
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
@@ -249,20 +324,18 @@ class CookwareSession(db.Model):
     rating = db.Column(db.Integer, nullable=True)  # 1–5
     notes = db.Column(db.Text, nullable=True)
 
-    item = db.relationship(
-        "Item",
-        backref=db.backref(
-            "cookware_sessions",
-            lazy=True,
-            order_by="CookwareSession.used_on.desc()",
-        ),
+    item: Mapped[Item | None] = relationship(
+        "Item", back_populates="cookware_sessions"
     )
 
 
-class SharpeningLog(db.Model):
+class SharpeningLog(BaseModel):
     """A log entry for sharpening activity."""
 
     __tablename__ = "sharpening_log"
+
+    if TYPE_CHECKING:
+        item: Mapped[Item | None]
 
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
@@ -270,34 +343,41 @@ class SharpeningLog(db.Model):
     method = db.Column(db.String(60), nullable=False, default="Home Sharpener")
     notes = db.Column(db.Text, nullable=True)
 
-    item = db.relationship(
-        "Item",
-        backref=db.backref(
-            "sharpening_log",
-            lazy=True,
-            order_by="SharpeningLog.sharpened_on.desc()",
-        ),
+    item: Mapped[Item | None] = relationship(
+        "Item", back_populates="sharpening_log"
     )
 
 
-class KnifeTask(db.Model):
+class KnifeTask(BaseModel):
     """A suggested use or task associated with an item."""
 
     __tablename__ = "knife_tasks"
+
+    if TYPE_CHECKING:
+        suggested_items: Mapped[list[Item]]
+        log_entries: Mapped[list[KnifeTaskLog]]
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False, unique=True)
     is_preset = db.Column(db.Boolean, nullable=False, default=False)
 
-    suggested_items = db.relationship(
+    suggested_items: Mapped[list[Item]] = relationship(
         "Item", secondary="item_tasks", back_populates="suggested_tasks", lazy="select"
     )
 
+    log_entries: Mapped[list[KnifeTaskLog]] = relationship(
+        "KnifeTaskLog", back_populates="task", lazy=True
+    )
 
-class KnifeTaskLog(db.Model):
+
+class KnifeTaskLog(BaseModel):
     """A history row linking an item to a task log entry."""
 
     __tablename__ = "knife_task_log"
+
+    if TYPE_CHECKING:
+        item: Mapped[Item | None]
+        task: Mapped[KnifeTask | None]
 
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
@@ -305,23 +385,20 @@ class KnifeTaskLog(db.Model):
     notes = db.Column(db.Text, nullable=True)
     logged_on = db.Column(db.String(10), nullable=False)  # ISO date YYYY-MM-DD
 
-    item = db.relationship(
-        "Item",
-        backref=db.backref(
-            "task_log",
-            lazy=True,
-            order_by="KnifeTaskLog.logged_on.desc()",
-        ),
+    item: Mapped[Item | None] = relationship("Item", back_populates="task_log")
+    task: Mapped[KnifeTask | None] = relationship(
+        "KnifeTask", back_populates="log_entries"
     )
-    task = db.relationship("KnifeTask", backref=db.backref("log_entries", lazy=True))
 
 
 def ensure_unknown_variant(item: Item) -> None:
     """Guarantee every item has an 'Unknown / Unspecified' color variant."""
-    if not any(variant.color == UNKNOWN_COLOR for variant in item.variants):
-        db.session.add(
-            ItemVariant(item_id=item.id, color=UNKNOWN_COLOR, source="fallback_unknown")
-        )
+    if not any(variant.color == UNKNOWN_COLOR for variant in (item.variants or [])):
+        variant = ItemVariant()
+        variant.item_id = item.id
+        variant.color = UNKNOWN_COLOR
+        variant.source = "fallback_unknown"
+        db.session.add(variant)
         db.session.flush()
 
 
@@ -331,11 +408,10 @@ def reconcile_unknown_variant(item: Item) -> None:
     Safety rule: if an Unknown variant already has ownership records,
     keep it to avoid breaking historical links.
     """
-    real_variants = [
-        variant for variant in item.variants if variant.color != UNKNOWN_COLOR
-    ]
+    variants = item.variants or []
+    real_variants = [variant for variant in variants if variant.color != UNKNOWN_COLOR]
     unknown_variants = [
-        variant for variant in item.variants if variant.color == UNKNOWN_COLOR
+        variant for variant in variants if variant.color == UNKNOWN_COLOR
     ]
     deleted_unknown_ids: set[int] = set()
 
@@ -556,7 +632,7 @@ def record_activity(
     record_audit_event(kind=kind, title=title, details=details, occurred_at=occurred_at)
 
 
-def _audit_tracked_models() -> tuple[type[db.Model], ...]:
+def _audit_tracked_models() -> tuple[type[BaseModel], ...]:
     """Return the model classes that should appear in the audit trail."""
     return (
         Item,

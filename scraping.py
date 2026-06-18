@@ -4,13 +4,15 @@ import json
 import logging
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import TypedDict
 from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
+from bs4.element import PageElement, Tag
 
 from constants import (
     COOKWARE_CATEGORIES,
@@ -33,6 +35,58 @@ _CUTTING_BOARD_URLS = {
 }
 
 
+class StructuredSetMember(TypedDict):
+    """Structured member data parsed from Cutco set JSON."""
+
+    sku: str | None
+    name: str | None
+    quantity: int
+
+
+class VisibleSetRow(TypedDict):
+    """Visible set member row parsed from Cutco page markup."""
+
+    name: str
+    sku: str | None
+    is_set_only: bool
+
+
+class SetMemberEntry(TypedDict):
+    """Normalized set member data returned to catalog sync."""
+
+    sku: str | None
+    name: str | None
+    quantity: int
+    is_set_only: bool
+
+
+def _tag_attr_text(tag: PageElement | None, *attrs: str) -> str | None:
+    """Return the first non-empty string attribute from a BeautifulSoup tag."""
+    if not isinstance(tag, Tag):
+        return None
+    for attr in attrs:
+        value = tag.get(attr)
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if cleaned:
+                return cleaned
+        elif value is not None:
+            cleaned = str(value).strip()
+            if cleaned:
+                return cleaned
+    return None
+
+
+def _tag_classes(tag: Tag) -> set[str]:
+    """Return a normalized class set from a BeautifulSoup tag."""
+    classes = tag.get("class")
+    if isinstance(classes, str):
+        return {classes.lower()}
+    if isinstance(classes, (list, tuple, set)):
+        return {str(cls).lower() for cls in classes}
+    return set()
+
+
 def _extract_cutco_canonical_url(
     raw_html: str, *, fallback_url: str | None = None
 ) -> str | None:
@@ -44,7 +98,7 @@ def _extract_cutco_canonical_url(
     ):
         if not tag:
             continue
-        candidate = (tag.get("href") or tag.get("content") or "").strip()
+        candidate = _tag_attr_text(tag, "href", "content")
         if candidate and "/p/" in candidate:
             return candidate
     return fallback_url
@@ -72,18 +126,18 @@ def _find_cutco_item_link(
     wants_sheath = "sheath" in normalized_item or "gift box" in normalized_item
     best_match: tuple[int, str] | None = None
     for anchor in soup.select("a[href*='/p/']"):
-        href = (anchor.get("href") or "").strip()
+        href = _tag_attr_text(anchor, "href")
         if not href:
             continue
         texts = [
             anchor.get_text(" ", strip=True),
-            anchor.get("aria-label", ""),
-            anchor.get("title", ""),
+            _tag_attr_text(anchor, "aria-label") or "",
+            _tag_attr_text(anchor, "title") or "",
             href,
         ]
         image = anchor.find("img", alt=True)
         if image:
-            texts.append(image.get("alt", ""))
+            texts.append(_tag_attr_text(image, "alt") or "")
         candidate_text = " ".join(texts)
         normalized_text = _normalize_text_for_match(candidate_text)
         if not normalized_text:
@@ -296,15 +350,25 @@ def _extract_primary_visible_price(
     return None
 
 
-def _coerce_positive_price(raw_price: str | float | int | None) -> float | None:
+def _coerce_positive_price(raw_price: object) -> float | None:
     """Convert a scraped value to a positive price, rejecting placeholders."""
-    if raw_price is None:
+    if not isinstance(raw_price, str | float | int):
         return None
     try:
         price = float(raw_price)
     except (TypeError, ValueError):
         return None
     return price if price > 0 else None
+
+
+def _coerce_int(raw_value: object, default: int = 1) -> int:
+    """Convert a scraped value to an int, falling back on invalid input."""
+    if not isinstance(raw_value, str | float | int):
+        return default
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _extract_cutco_price(
@@ -353,7 +417,7 @@ def _extract_cutco_price(
     # select the matching one instead of blindly taking the first offer.
     for ld_tag in soup.find_all("script", type="application/ld+json"):
         try:
-            data = json.loads(ld_tag.string or "")
+            data = json.loads(str(ld_tag.string or ""))
             entries = data if isinstance(data, list) else [data]
             for entry in entries:
                 if not isinstance(entry, dict) or entry.get("@type") != "Product":
@@ -381,15 +445,16 @@ def _extract_cutco_price(
             pass
 
     og_tag = soup.find("meta", property="og:price:amount")
-    if og_tag and og_tag.get("content", "").strip():
-        price = _coerce_positive_price(og_tag["content"].replace(",", ""))
+    og_content = _tag_attr_text(og_tag, "content")
+    if og_content:
+        price = _coerce_positive_price(og_content.replace(",", ""))
         if price is not None:
             return price
 
     price_el = soup.find(attrs={"itemprop": "price"})
     if price_el:
-        raw = price_el.get("content") or price_el.get_text(strip=True)
-        price_match = re.search(r"[\d,]+\.?\d*", raw)
+        raw = _tag_attr_text(price_el, "content") or price_el.get_text(strip=True)
+        price_match = re.search(r"[\d,]+\.?\d*", raw or "")
         if price_match:
             price = _coerce_positive_price(price_match.group().replace(",", ""))
             if price is not None:
@@ -440,8 +505,8 @@ def _discover_categories() -> list[tuple[str, str]]:
         "https://www.cutco.com/",
         "https://www.cutco.com/products/knives/",
     ]
-    discovered = []
-    seen_slugs = set()
+    discovered: list[tuple[str, str]] = []
+    seen_slugs: set[str] = set()
     try:
         resp = None
         for url in discovery_urls:
@@ -458,7 +523,7 @@ def _discover_categories() -> list[tuple[str, str]]:
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         for anchor in soup.select("a[href*='/shop/']"):
-            href = anchor.get("href", "").rstrip("/")
+            href = (_tag_attr_text(anchor, "href") or "").rstrip("/")
             slug = href.split("/shop/")[-1].split("?")[0]
             if not slug or slug in seen_slugs or "knife-set" in slug or "set" == slug:
                 continue
@@ -475,10 +540,12 @@ def _discover_categories() -> list[tuple[str, str]]:
 def _build_category_list() -> list[tuple[str, str]]:
     """Merge auto-discovered categories with the hardcoded SCRAPE_CATEGORIES list."""
 
-    def slug_of(url):
+    def slug_of(url: str) -> str:
         return url.rstrip("/").split("/shop/")[-1].split("?")[0].lower()
 
-    known = {slug_of(url): (name, url) for name, url in SCRAPE_CATEGORIES}
+    known: dict[str, tuple[str, str]] = {
+        slug_of(url): (name, url) for name, url in SCRAPE_CATEGORIES
+    }
 
     for name, url in _discover_categories():
         slug = slug_of(url)
@@ -488,7 +555,9 @@ def _build_category_list() -> list[tuple[str, str]]:
     return list(known.values())
 
 
-def _product_link_name(anchor) -> str | None:
+def _product_link_name(anchor: Tag | None) -> str | None:
+    if anchor is None:
+        return None
     name_el = anchor.find(["h2", "h3"])
     if name_el:
         title = name_el.get_text(" ", strip=True)
@@ -498,11 +567,13 @@ def _product_link_name(anchor) -> str | None:
     return text or None
 
 
-def _dedupe_product_links(product_links) -> list[tuple[object, str, str | None]]:
+def _dedupe_product_links(
+    product_links: list[Tag],
+) -> list[tuple[Tag, str, str | None]]:
     """Keep one /p/ anchor per base URL, preferring the anchor with a title."""
-    unique_links: dict[str, tuple[object, str, str | None]] = {}
+    unique_links: dict[str, tuple[Tag, str, str | None]] = {}
     for anchor in product_links:
-        full_href = anchor.get("href", "")
+        full_href = _tag_attr_text(anchor, "href") or ""
         base_href = full_href.split("&")[0]
         name = _product_link_name(anchor)
         existing = unique_links.get(base_href)
@@ -526,12 +597,12 @@ def _norm_member_name(value: str) -> str:
 
 
 def _build_set_member_entries(
-    structured_members: list[dict[str, str | int | None]],
-    visible_rows: list[dict],
+    structured_members: Sequence[Mapping[str, object]],
+    visible_rows: Sequence[Mapping[str, object]],
     member_skus: list[str],
     member_quantities: dict[str, int],
-) -> list[dict]:
-    member_entries: list[dict] = []
+) -> list[SetMemberEntry]:
+    member_entries: list[SetMemberEntry] = []
     if structured_members:
         used_visible: set[int] = set()
         for structured in structured_members:
@@ -560,16 +631,21 @@ def _build_set_member_entries(
                 else structured.get("sku"),
             )
             chosen_sku = visible_sku or structured_sku or fallback_sku
+            entry_name_value = (
+                matched_visible.get("name")
+                if matched_visible and matched_visible.get("name")
+                else structured.get("name")
+            )
+            entry_quantity = _coerce_int(structured.get("quantity"))
+            entry_is_set_only = (
+                bool(matched_visible.get("is_set_only")) if matched_visible else False
+            )
             member_entries.append(
                 {
                     "sku": chosen_sku,
-                    "name": matched_visible.get("name")
-                    if matched_visible and matched_visible.get("name")
-                    else structured.get("name") or None,
-                    "quantity": structured.get("quantity", 1),
-                    "is_set_only": matched_visible.get("is_set_only", False)
-                    if matched_visible
-                    else False,
+                    "name": str(entry_name_value) if entry_name_value else None,
+                    "quantity": entry_quantity,
+                    "is_set_only": entry_is_set_only,
                 }
             )
 
@@ -597,9 +673,11 @@ def _build_set_member_entries(
             member_entries.append(
                 {
                     "sku": chosen_sku,
-                    "name": visible_row.get("name") or None,
+                    "name": str(visible_row.get("name"))
+                    if visible_row.get("name")
+                    else None,
                     "quantity": member_quantities.get(chosen_sku, 1),
-                    "is_set_only": visible_row.get("is_set_only", False),
+                    "is_set_only": bool(visible_row.get("is_set_only")),
                 }
             )
     else:
@@ -699,9 +777,14 @@ def _resolve_visible_member_sku(
 
 
 def _collect_visible_set_piece_rows(
-    pieces_list, *, context_url: str | None = None, set_sku: str | None = None
-) -> list[dict]:
-    visible_rows: list[dict] = []
+    pieces_list: Tag | None,
+    *,
+    context_url: str | None = None,
+    set_sku: str | None = None,
+) -> list[VisibleSetRow]:
+    visible_rows: list[VisibleSetRow] = []
+    if pieces_list is None:
+        return visible_rows
     for anchor in pieces_list.select("a.pdp-set-item-detail"):
         visible_name = ""
         name_tag = anchor.select_one(".pdp-use-detail")
@@ -709,20 +792,22 @@ def _collect_visible_set_piece_rows(
             visible_name = name_tag.get_text(" ", strip=True)
         if not visible_name:
             image = anchor.find("img", alt=True)
-            visible_name = image.get("alt", "").strip() if image else ""
+            visible_name = _tag_attr_text(image, "alt") or ""
         if not visible_name:
             continue
-        visible_sku = _normalize_set_member_sku(anchor.get("data-item-selected"))
+        visible_sku = _normalize_set_member_sku(
+            _tag_attr_text(anchor, "data-item-selected")
+        )
         if not visible_sku:
             visible_sku = _normalize_set_member_sku(
                 _extract_sku_from_image_src(
-                    anchor.find("img", src=True).get("src")
+                    _tag_attr_text(anchor.find("img", src=True), "src")
                     if anchor.find("img", src=True)
                     else None
                 )
             )
         if not visible_sku:
-            href = anchor.get("href") or ""
+            href = _tag_attr_text(anchor, "href") or ""
             visible_sku = _resolve_visible_member_sku(
                 [href] if "/p/" in href else None,
                 visible_name,
@@ -743,12 +828,12 @@ def _collect_visible_set_piece_rows(
             visible_name = name_tag.get_text(" ", strip=True)
         if not visible_name:
             image = li.find("img", alt=True)
-            visible_name = image.get("alt", "").strip() if image else ""
+            visible_name = _tag_attr_text(image, "alt") or ""
         if not visible_name:
             continue
         visible_sku = _normalize_set_member_sku(
             _extract_sku_from_image_src(
-                li.find("img", src=True).get("src")
+                _tag_attr_text(li.find("img", src=True), "src")
                 if li.find("img", src=True)
                 else None
             )
@@ -763,7 +848,7 @@ def _collect_visible_set_piece_rows(
     return visible_rows
 
 
-def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
+def _normalize_set_member_sku(raw_sku: object) -> str | None:
     sku = (
         str(raw_sku or "").upper().strip().split("/")[0] if raw_sku is not None else ""
     )
@@ -814,7 +899,7 @@ def _fetch_sku_from_page(
         if not sku:
             for ld in soup.find_all("script", type="application/ld+json"):
                 try:
-                    data = json.loads(ld.string or "")
+                    data = json.loads(str(ld.string or ""))
                     entries = data if isinstance(data, list) else [data]
                     for entry in entries:
                         if isinstance(entry, dict) and entry.get("@type") == "Product":
@@ -861,8 +946,9 @@ def _fetch_sku_from_page(
                 tag = soup.find("meta", property=attr) or soup.find(
                     "meta", attrs={"name": attr}
                 )
-                if tag and tag.get("content", "").strip():
-                    sku = tag["content"].strip().upper()
+                content = _tag_attr_text(tag, "content")
+                if content:
+                    sku = content.upper()
                     strategy_log.append(f"meta={sku}")
                     break
 
@@ -872,7 +958,7 @@ def _fetch_sku_from_page(
         # Strategy 5: on-page visible text containing "#XXXX"
         if not sku:
             sku_text = soup.find(string=re.compile(r"#\d{2,4}(?:-\d+|[A-Z]{0,2})?\b"))
-            if sku_text:
+            if isinstance(sku_text, str):
                 sku_match = re.search(
                     r"#(\d{2,4}(?:-\d+|[A-Z]{0,2})?)\b", sku_text.strip(), re.IGNORECASE
                 )
@@ -933,7 +1019,7 @@ def scrape_item_uses(url: str) -> list[str]:
         soup = BeautifulSoup(raw_html, "html.parser")
 
         # Find the heading that starts with "Uses" (e.g. "Uses+")
-        uses_heading = None
+        uses_heading: Tag | None = None
         for tag in soup.find_all(["h2", "h3", "h4"]):
             if tag.get_text(strip=True).lower().startswith("uses"):
                 uses_heading = tag
@@ -946,10 +1032,10 @@ def scrape_item_uses(url: str) -> list[str]:
         uses_ul = uses_heading.find_next_sibling("ul")
         if not uses_ul:
             parent = uses_heading.parent
-            uses_ul = parent.find_next_sibling("ul") if parent else None
+            uses_ul = parent.find_next_sibling("ul") if isinstance(parent, Tag) else None
         if not uses_ul:
             uses_ul = uses_heading.find_next("ul")
-        if not uses_ul:
+        if not isinstance(uses_ul, Tag):
             return []
 
         uses = [
@@ -978,7 +1064,7 @@ _EDGE_NORMALIZE = {
 }
 
 
-def scrape_item_specs(url: str) -> dict:
+def scrape_item_specs(url: str) -> dict[str, str | float | None]:
     """Fetch a product page and return edge, price, and key measurements.
 
     edge_type: 'N/A' = no blade edge, 'Unknown' = fetch failure or ambiguous.
@@ -1214,17 +1300,17 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
     for fieldset in soup.select("fieldset.swatch-group"):
         group_text = " ".join(
             [
-                " ".join(fieldset.get("class", [])),
-                str(fieldset.get("data-type", "")),
+                " ".join(_tag_classes(fieldset)),
+                _tag_attr_text(fieldset, "data-type") or "",
                 fieldset.get_text(" ", strip=True),
             ]
         ).lower()
         if not any(keyword in group_text for keyword in ("color", "finish")):
             continue
-        preferred_swatch_nodes: list = []
-        generic_swatch_nodes: list = []
+        preferred_swatch_nodes: list[Tag] = []
+        generic_swatch_nodes: list[Tag] = []
         for swatch in fieldset.select(".swatch.product-option"):
-            swatch_classes = {cls.lower() for cls in swatch.get("class", [])}
+            swatch_classes = _tag_classes(swatch)
             if swatch_classes & {
                 "engraving-swatch",
                 "design-button",
@@ -1240,11 +1326,11 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
         swatch_nodes = preferred_swatch_nodes or generic_swatch_nodes
         for swatch in swatch_nodes:
             swatch_sources = (
-                swatch.get("data-option"),
-                swatch.get("data-value"),
-                swatch.get("aria-label"),
-                swatch.get("title"),
-                swatch.get("data-code"),
+                _tag_attr_text(swatch, "data-option"),
+                _tag_attr_text(swatch, "data-value"),
+                _tag_attr_text(swatch, "aria-label"),
+                _tag_attr_text(swatch, "title"),
+                _tag_attr_text(swatch, "data-code"),
             )
             added = False
             for source in swatch_sources:
@@ -1307,8 +1393,8 @@ def _page_has_size_selector(soup: BeautifulSoup) -> bool:
     for fieldset in soup.select("fieldset.swatch-group"):
         group_text = " ".join(
             [
-                " ".join(fieldset.get("class", [])),
-                str(fieldset.get("data-type", "")),
+                " ".join(_tag_classes(fieldset)),
+                _tag_attr_text(fieldset, "data-type") or "",
                 fieldset.get_text(" ", strip=True),
             ]
         ).lower()
@@ -1405,8 +1491,10 @@ def scrape_purple_campaign_variants() -> tuple[dict[str, str], ...]:
         candidates: list[dict[str, str]] = []
         seen: set[tuple[str, str]] = set()
         for promo_input in soup.select('input[data-type*="Purple Products"]'):
-            promo_name = _normalize_variant_label(promo_input.get("value") or "")
-            promo_code = (promo_input.get("data-code") or "").strip().upper()
+            promo_name = _normalize_variant_label(
+                _tag_attr_text(promo_input, "value") or ""
+            )
+            promo_code = (_tag_attr_text(promo_input, "data-code") or "").upper()
             if not promo_name or not promo_code:
                 continue
             key = (promo_name.lower(), promo_code)
@@ -1455,21 +1543,22 @@ def scrape_purple_campaign_variants() -> tuple[dict[str, str], ...]:
 # Keep old name as alias so existing callers still work
 def scrape_edge_type(url: str) -> str:
     """Return the scraped edge type for a product page."""
-    return scrape_item_specs(url)["edge_type"]
+    edge_type = scrape_item_specs(url)["edge_type"]
+    return edge_type if isinstance(edge_type, str) else "Unknown"
 
 
 def scrape_catalog(
     progress_cb: Callable[[str], None] | None = None,
-) -> tuple[list[dict], list[tuple[str, str]]]:
+) -> tuple[list[dict[str, object]], list[tuple[str, str]]]:
     """Scrape all item categories and return items plus set candidates."""
 
     def _progress(msg: str) -> None:
         if progress_cb is not None:
             progress_cb(msg)
 
-    results = []
+    results: list[dict[str, object]] = []
     set_candidates: list[tuple[str, str]] = []
-    seen_skus = set()
+    seen_skus: set[str] = set()
     seen_set_urls: set[str] = set()
     slug_queue: list[tuple[str, str, str | None]] = []
     seen_slug_urls: set[str] = set()
@@ -1487,8 +1576,10 @@ def scrape_catalog(
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
 
-            product_links = []
+            product_links: list[Tag] = []
             for element in soup.descendants:
+                if not isinstance(element, Tag):
+                    continue
                 if element.name in ("h2", "h3", "h4") and product_links:
                     if any(
                         kw in element.get_text(strip=True).lower()
@@ -1500,14 +1591,14 @@ def scrape_catalog(
                             element.get_text(strip=True),
                         )
                         break
-                if element.name == "a" and "/p/" in element.get("href", ""):
+                if element.name == "a" and "/p/" in (_tag_attr_text(element, "href") or ""):
                     product_links.append(element)
 
             logger.debug(
                 "%s: found %d /p/ links — %s",
                 cat_name,
                 len(product_links),
-                [anchor.get("href", "") for anchor in product_links[:10]],
+                [_tag_attr_text(anchor, "href") or "" for anchor in product_links[:10]],
             )
 
             for anchor, href, name_hint in _dedupe_product_links(product_links):
@@ -1609,11 +1700,11 @@ def scrape_catalog(
 
 def scrape_sets(
     extra_candidates: list[tuple[str, str]] | None = None,
-) -> list[dict]:
+) -> list[dict[str, object]]:
     """Scrape the knife-sets listing page and each set detail page."""
-    results = []
+    results: list[dict[str, object]] = []
     seen_slugs: set[str] = set()
-    set_links = []
+    set_links: list[dict[str, str]] = []
 
     try:
         resp = requests.get(
@@ -1622,12 +1713,13 @@ def scrape_sets(
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         for anchor in soup.select("a[href*='/p/']"):
-            href = anchor.get("href", "")
+            href = _tag_attr_text(anchor, "href") or ""
             if not href:
                 continue
             name_el = anchor.find(["h2", "h3"])
-            if not name_el and anchor.parent:
-                name_el = anchor.parent.find(["h2", "h3"])
+            parent = anchor.parent if isinstance(anchor.parent, Tag) else None
+            if not name_el and parent is not None:
+                name_el = parent.find(["h2", "h3"])
             name = name_el.get_text(strip=True) if name_el else None
             if not name:
                 continue
@@ -1647,7 +1739,7 @@ def scrape_sets(
 
     sku_pattern = re.compile(r"/rolo/([0-9]+[A-Z]?)-h\.", re.IGNORECASE)
 
-    def _fetch_set_detail(set_link: dict) -> dict | None:
+    def _fetch_set_detail(set_link: dict[str, str]) -> dict[str, object] | None:
         fetch_url = set_link["url"]
         if "view=product" not in fetch_url:
             sep = "&" if "?" in fetch_url else "?"
@@ -1666,7 +1758,7 @@ def scrape_sets(
             member_quantities: dict[str, int] = {}
             member_is_set_only: list[bool] = []
             seen_member: set[str] = set()
-            structured_members: list[dict[str, str | int | None]] = []
+            structured_members: list[StructuredSetMember] = []
 
             # Strategy 1: parse itemSetList JSON embedded in page JS
             # Page has webItemsMap with one itemSetList per variant — search
@@ -1695,14 +1787,14 @@ def scrape_sets(
 
             if _set_list_json:
                 try:
-                    set_list = json.loads(_set_list_json)
+                    set_list: list[dict[str, object]] = json.loads(_set_list_json)
                     for entry in set_list:
                         base_sku = _normalize_set_member_sku(
                             entry.get("childItemNumber")
                         )
                         if not base_sku:
                             continue
-                        qty = int(entry.get("qty") or 1)
+                        qty = _coerce_int(entry.get("qty"))
                         if base_sku not in seen_member:
                             seen_member.add(base_sku)
                             member_skus.append(base_sku)
@@ -1739,7 +1831,7 @@ def scrape_sets(
             # Strategy 2: fallback — image /rolo/ SKU extraction
             if not member_skus:
                 for img in detail.select("img[src*='/rolo/']"):
-                    match = sku_pattern.search(img.get("src", ""))
+                    match = sku_pattern.search(_tag_attr_text(img, "src") or "")
                     if match:
                         base_sku = _normalize_set_member_sku(match.group(1))
                         if not base_sku:
@@ -1764,15 +1856,15 @@ def scrape_sets(
                 )
 
             # Strategy 3: visible Set Pieces labels, if present
-            visible_rows: list[dict] = []
-            heading = None
+            visible_rows: list[VisibleSetRow] = []
+            heading: Tag | None = None
             for tag in detail.find_all(["h2", "h3", "h4"]):
                 if tag.get_text(strip=True).lower().startswith("set pieces"):
                     heading = tag
                     break
             if heading:
                 pieces_list = heading.find_next("ul")
-                if pieces_list:
+                if isinstance(pieces_list, Tag):
                     visible_rows.extend(
                         _collect_visible_set_piece_rows(
                             pieces_list,
@@ -1790,7 +1882,7 @@ def scrape_sets(
             def _norm_member_name(value: str) -> str:
                 return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
 
-            member_entries = []
+            member_entries: list[SetMemberEntry] = []
             if visible_rows:
                 used_structured: set[int] = set()
                 for idx, visible_row in enumerate(visible_rows):
@@ -1821,38 +1913,40 @@ def scrape_sets(
                         if idx < len(member_skus)
                         else None
                     )
-                    fallback_qty = member_quantities.get(
-                        visible_sku or structured_sku or fallback_sku,
-                        1,
+                    quantity_sku = visible_sku or structured_sku or fallback_sku
+                    fallback_qty = (
+                        member_quantities.get(quantity_sku, 1)
+                        if quantity_sku
+                        else 1
                     )
                     chosen_sku = visible_sku or structured_sku or fallback_sku
                     if chosen_sku and set_sku and chosen_sku == set_sku:
                         chosen_sku = visible_sku or structured_sku or fallback_sku
                     member_entries.append(
-                        dict(
-                            sku=chosen_sku,
-                            name=visible_name,
-                            quantity=matched_structured["quantity"]
+                        {
+                            "sku": chosen_sku,
+                            "name": visible_name,
+                            "quantity": matched_structured["quantity"]
                             if matched_structured
                             else fallback_qty,
-                            is_set_only=visible_row["is_set_only"]
+                            "is_set_only": visible_row["is_set_only"]
                             if matched_structured is None
                             else False,
-                        )
+                        }
                     )
             else:
                 for idx, sku in enumerate(member_skus):
                     member_entries.append(
-                        dict(
-                            sku=sku,
-                            name=member_names[idx]
+                        {
+                            "sku": sku,
+                            "name": member_names[idx]
                             if idx < len(member_names) and member_names[idx]
                             else None,
-                            quantity=member_quantities.get(sku, 1),
-                            is_set_only=member_is_set_only[idx]
+                            "quantity": member_quantities.get(sku, 1),
+                            "is_set_only": member_is_set_only[idx]
                             if idx < len(member_is_set_only)
                             else False,
-                        )
+                        }
                     )
 
             logger.debug(

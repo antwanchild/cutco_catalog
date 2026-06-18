@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any, cast
 
 from flask import flash, redirect, render_template, request, url_for
 from sqlalchemy.orm import selectinload
@@ -58,8 +59,8 @@ def variant_sync_page():
     selected_skus = _parse_variant_sync_selected_skus(selected_skus_text)
 
     # Variant color pages can change over time, so always start with a fresh scrape.
-    data_module.scrape_item_variant_colors.cache_clear()
-    data_module.scrape_purple_campaign_variants.cache_clear()
+    cast(Any, data_module.scrape_item_variant_colors).cache_clear()
+    cast(Any, data_module.scrape_purple_campaign_variants).cache_clear()
     items, selection_error = _resolve_variant_sync_items(scope, category, selected_skus)
     if selection_error:
         flash(selection_error, "error")

@@ -223,6 +223,8 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
 
     owned_item_map: dict[int, Item] = {}
     for ownership in owned:
+        if ownership.variant is None or ownership.variant.item is None:
+            continue
         item = ownership.variant.item
         if item.id not in owned_item_map:
             owned_item_map[item.id] = item
@@ -243,6 +245,8 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
 
     color_counts: dict[str, int] = {}
     for ownership in owned:
+        if ownership.variant is None:
+            continue
         color = ownership.variant.color
         if color == UNKNOWN_COLOR:
             color = "Unknown"
@@ -637,7 +641,7 @@ def gift_token(set_id=None, sid=None):
     """Generate a shareable gift list token."""
     set_id = set_id if set_id is not None else sid
     person_id = request.args.get("person", type=int)
-    if not person_id:
+    if set_id is None or not person_id:
         abort(400)
     # Validate both exist
     if not db.session.get(Set, set_id):

@@ -133,7 +133,7 @@ def _read_completion_rows(
     for row_num, row in enumerate(reader, start=2):
         if not any((cell or "").strip() for cell in row.values() if cell is not None):
             continue
-        normalized: dict[str, str] = {}
+        normalized: dict[str, str | int] = {}
         for orig_key, val in row.items():
             field_name = _completion_field_name(orig_key)
             if not field_name:
@@ -217,6 +217,18 @@ def _build_completion_preview(
                     "quantity": row.get("quantity", "") or "—",
                     "note": note or "—",
                     "reason": qty_error,
+                }
+            )
+            continue
+        if quantity is None:
+            unresolved_rows.append(
+                {
+                    "row": row_num,
+                    "person": person or "—",
+                    "sku": sku or "—",
+                    "quantity": "—",
+                    "note": note or "—",
+                    "reason": "Quantity is required.",
                 }
             )
             continue
@@ -1062,6 +1074,8 @@ def _build_import_header_report(uploaded_file, ext: str) -> dict:
             io.BytesIO(uploaded_file.stream.read()), data_only=True
         )
         worksheet = workbook.active
+        if worksheet is None:
+            return {"raw_headers": [], "recognized": {}, "missing": []}
         for cell in worksheet[1]:
             if cell.value is None:
                 continue

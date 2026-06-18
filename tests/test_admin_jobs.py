@@ -467,6 +467,7 @@ class AdminJobSmokeTests(unittest.TestCase):
         with self.app.app_context():
             schema_state = db.session.get(SchemaState, "schema")
             self.assertIsNotNone(schema_state)
+            assert schema_state is not None
             self.assertEqual(schema_state.version, SCHEMA_VERSION)
             initial_task_names = {
                 task.name
@@ -474,6 +475,7 @@ class AdminJobSmokeTests(unittest.TestCase):
             }
             bootstrap_state = db.session.get(BootstrapState, "bootstrap")
             self.assertIsNotNone(bootstrap_state)
+            assert bootstrap_state is not None
             self.assertEqual(bootstrap_state.version, BOOTSTRAP_VERSION)
             initial_updated_at = bootstrap_state.updated_at
             initial_version = bootstrap_state.version
@@ -486,6 +488,7 @@ class AdminJobSmokeTests(unittest.TestCase):
             }
             self.assertEqual(initial_task_names, set(KNIFE_TASK_PRESETS))
             self.assertIsNotNone(second_state)
+            assert second_state is not None
             self.assertEqual(second_task_names, initial_task_names)
             self.assertEqual(second_state.version, initial_version)
             self.assertEqual(second_state.updated_at, initial_updated_at)

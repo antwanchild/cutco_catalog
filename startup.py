@@ -12,7 +12,7 @@ from constants import (
     canonicalize_category,
 )
 from extensions import db
-from models import Item, KnifeTask, Ownership, ensure_unknown_variant
+from models import BaseModel, Item, KnifeTask, Ownership, ensure_unknown_variant
 from schema_migrations import apply_schema_migrations
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 BOOTSTRAP_STATE_NAME = "bootstrap"
 
 
-class BootstrapState(db.Model):
+class BootstrapState(BaseModel):
     """Current bootstrap version metadata."""
 
     __tablename__ = "bootstrap_state"
@@ -30,7 +30,7 @@ class BootstrapState(db.Model):
     updated_at = db.Column(db.String(32), nullable=False)
 
 
-class BootstrapHistory(db.Model):
+class BootstrapHistory(BaseModel):
     """Applied bootstrap migration history."""
 
     __tablename__ = "bootstrap_history"

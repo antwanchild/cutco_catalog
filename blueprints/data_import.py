@@ -55,7 +55,9 @@ def _preview_import_color(color: str, is_cookware: bool = False) -> str:
     return _display_import_color(color)
 
 
-def _resolve_import_variant_color(name: str, category: str, color: str) -> str:
+def _resolve_import_variant_color(
+    name: str, category: str | None, color: str
+) -> str:
     """Return the stored variant color to use for import rows."""
     resolved_color = _normalize_import_color(color)
     if category in COOKWARE_CATEGORIES:
@@ -82,7 +84,7 @@ def _match_import_item(
     *,
     existing_items: dict[str, Item],
     existing_names: dict[str, Item],
-    sku: str,
+    sku: str | None,
     name: str,
 ) -> Item | None:
     """Match an import row to an existing item, preferring SKU over name."""
@@ -211,7 +213,7 @@ def _read_completion_rows(
     for row_num, row in enumerate(reader, start=2):
         if not any((cell or "").strip() for cell in row.values() if cell is not None):
             continue
-        normalized: dict[str, str] = {}
+        normalized: dict[str, str | int] = {}
         for orig_key, cell_value in row.items():
             field_name = _completion_field_name(orig_key)
             if not field_name:
@@ -261,6 +263,8 @@ def _build_import_header_report(uploaded_file, ext: str) -> dict:
             io.BytesIO(uploaded_file.stream.read()), data_only=True
         )
         worksheet = workbook.active
+        if worksheet is None:
+            return {"raw_headers": [], "recognized": {}, "missing": []}
         for cell in worksheet[1]:
             if cell.value is None:
                 continue

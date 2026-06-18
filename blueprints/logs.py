@@ -662,7 +662,7 @@ def tasks():
     # Top task per owned item
     item_top_task: dict[int, str] = {}
     for item_id, task_counts in usage.items():
-        top_tid = max(task_counts, key=task_counts.get)
+        top_tid = max(task_counts, key=lambda task_id: task_counts[task_id])
         top_task = db.session.get(KnifeTask, top_tid)
         if top_task:
             item_top_task[item_id] = top_task.name
@@ -718,7 +718,8 @@ def task_log_add():
     if db_commit(db.session):
         item = db.session.get(Item, item_id)
         task = db.session.get(KnifeTask, task_id)
-        logger.info("Task logged: %s → %s on %s", item.name, task.name, logged_on)
+        if item is not None and task is not None:
+            logger.info("Task logged: %s → %s on %s", item.name, task.name, logged_on)
         flash("Usage logged.", "success")
     return redirect(url_for("logs.tasks"))
 

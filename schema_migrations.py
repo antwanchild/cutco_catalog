@@ -8,13 +8,14 @@ from typing import Callable
 from sqlalchemy import inspect as sa_inspect
 
 from extensions import db
+from models import BaseModel
 
 logger = logging.getLogger(__name__)
 
 SCHEMA_STATE_NAME = "schema"
 
 
-class SchemaState(db.Model):
+class SchemaState(BaseModel):
     """Current schema version metadata."""
 
     __tablename__ = "schema_state"
@@ -24,7 +25,7 @@ class SchemaState(db.Model):
     updated_at = db.Column(db.String(32), nullable=False)
 
 
-class SchemaHistory(db.Model):
+class SchemaHistory(BaseModel):
     """Applied schema migration history."""
 
     __tablename__ = "schema_history"
@@ -274,7 +275,7 @@ def _schema_item_attachment_migrations() -> None:
     """Create the item attachment table when needed."""
     from models import ItemAttachment
 
-    ItemAttachment.__table__.create(db.engine, checkfirst=True)
+    db.metadata.tables[ItemAttachment.__tablename__].create(db.engine, checkfirst=True)
 
 
 def _schema_item_variant_source_migrations() -> None:

@@ -1,3 +1,4 @@
+# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
 import json
 import os
 from io import BytesIO

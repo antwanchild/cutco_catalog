@@ -8,6 +8,7 @@ import threading
 from collections import OrderedDict
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, TypedDict, cast
 
 from flask import Blueprint, current_app
 from sqlalchemy.orm import selectinload
@@ -40,6 +41,13 @@ logger = logging.getLogger(__name__)
 UNCATEGORIZED_FILTER = "__uncategorized__"
 _CATALOG_SYNC_JOB_FILE = os.path.join(DATA_DIR, "catalog_sync_job.json")
 _catalog_sync_job_lock = threading.Lock()
+
+
+class ResolvedMember(TypedDict):
+    """A set member resolved to a catalog item with an aggregate quantity."""
+
+    item: Item
+    quantity: int
 
 
 def _read_catalog_sync_job() -> dict:
@@ -80,7 +88,9 @@ def _reset_catalog_sync_job() -> None:
 
 
 def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -> dict:
-    existing_skus = {item.sku for item in Item.query.filter(Item.sku.isnot(None)).all()}
+    existing_skus = {
+        item.sku for item in Item.query.filter(Item.sku.isnot(None)).all() if item.sku
+    }
     new_items = [
         scraped_item
         for scraped_item in scraped
@@ -108,22 +118,15 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
 
         _details_map: dict[str, dict] = {}
         with ThreadPoolExecutor(max_workers=8) as pool:
-            _future_map = {
-                pool.submit(scrape_item_specs, item_data["url"]): (
-                    "specs",
-                    item_data["sku"],
+            _future_map: dict[Any, tuple[str, str]] = {}
+            for item_data in new_items:
+                sku = str(item_data["sku"])
+                url = str(item_data["url"])
+                _future_map[pool.submit(scrape_item_specs, url)] = ("specs", sku)
+                _future_map[pool.submit(scrape_item_variant_colors, url)] = (
+                    "variant_colors",
+                    sku,
                 )
-                for item_data in new_items
-            }
-            _future_map.update(
-                {
-                    pool.submit(scrape_item_variant_colors, item_data["url"]): (
-                        "variant_colors",
-                        item_data["sku"],
-                    )
-                    for item_data in new_items
-                }
-            )
             for future in _as_completed(_future_map):
                 kind, sku = _future_map[future]
                 _details_map.setdefault(sku, {})[kind] = future.result()
@@ -167,9 +170,9 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
     }
 
     catalog_sku_lookup = {
-        _normalize_member_sku(item.sku): item
+        sku: item
         for item in Item.query.filter(Item.sku.isnot(None)).all()
-        if _normalize_member_sku(item.sku)
+        if (sku := _normalize_member_sku(item.sku))
     }
     preview_name_lookup = _build_member_name_lookup(
         [
@@ -178,9 +181,7 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
         ]
     )
     scraped_sku_lookup = {
-        _normalize_member_sku(item["sku"])
-        for item in new_items
-        if _normalize_member_sku(item.get("sku"))
+        sku for item in new_items if (sku := _normalize_member_sku(item.get("sku")))
     }
     for item_set in (*new_sets, *existing_sets_data):
         member_entries = item_set.get("member_entries") or []
@@ -355,16 +356,26 @@ def _item_alternate_skus_text(item: Item | None) -> str:
     return ", ".join(parse_alternate_skus(item.alternate_skus))
 
 
-def _normalize_member_sku(value: str | None) -> str | None:
+def _normalize_member_sku(value: object) -> str | None:
     sku = str(value).strip().upper() if value is not None else ""
     return sku or None
 
 
-def _normalize_member_name(value: str | None) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+def _normalize_member_name(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
 
 
-def _get_item_field(item: object, field: str) -> object | None:
+def _coerce_quantity(value: object, default: int = 1) -> int:
+    """Convert scraped quantity values to a positive integer."""
+    if not isinstance(value, str | float | int):
+        return default
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _get_item_field(item: object, field: str) -> Any:
     if isinstance(item, dict):
         return item.get(field)
     return getattr(item, field, None)
@@ -394,7 +405,7 @@ def _get_item_identity(item: object) -> tuple[str | None, str | None]:
 
 
 def _resolve_member_item(
-    entry: dict,
+    entry: dict[str, Any],
     catalog_sku_lookup: dict[str, Item],
     catalog_name_lookup: dict[str, object],
     *,
@@ -450,7 +461,7 @@ def _set_sku_options() -> list[str]:
     ]
 
 
-def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
+def _load_member_snapshot(raw_member_data: str | None) -> list[dict[str, Any]]:
     if not raw_member_data:
         return []
     try:
@@ -461,8 +472,8 @@ def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
         payload = payload.get("members") or payload.get("member_entries") or []
     if not isinstance(payload, list):
         return []
-    rows: list[dict] = []
-    seen: OrderedDict[str, dict] = OrderedDict()
+    rows: list[dict[str, Any]] = []
+    seen: OrderedDict[str, dict[str, Any]] = OrderedDict()
     for entry in payload:
         if not isinstance(entry, dict):
             continue
@@ -489,7 +500,7 @@ def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
 
 
 def _build_member_status_rows(
-    member_entries: list[dict],
+    member_entries: list[dict[str, Any]],
     catalog_sku_lookup: dict[str, Item],
     catalog_name_lookup: dict[str, object] | None = None,
     *,
@@ -505,11 +516,7 @@ def _build_member_status_rows(
         item = _resolve_member_item(
             entry, catalog_sku_lookup, catalog_name_lookup, set_sku=set_sku
         )
-        quantity = entry.get("quantity", 1)
-        try:
-            quantity = max(1, int(quantity))
-        except (TypeError, ValueError):
-            quantity = 1
+        quantity = _coerce_quantity(entry.get("quantity"))
         if item is not None:
             status = "present"
             status_label = "In catalog"
@@ -553,7 +560,7 @@ def _build_member_status_rows(
     return rows, missing_skus
 
 
-def _create_missing_set_member_item(member: dict, set_name: str) -> Item:
+def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> Item:
     sku = _normalize_member_sku(member.get("sku"))
     if not sku:
         raise ValueError("Missing member SKU")
@@ -580,15 +587,15 @@ def _create_missing_set_member_item(member: dict, set_name: str) -> Item:
 
 
 def _aggregate_resolved_members(
-    member_entries: list[dict],
+    member_entries: list[dict[str, Any]],
     sku_to_item: dict[str, Item],
     name_to_item: dict[str, object],
     *,
     set_sku: str | None = None,
     create_missing: bool = False,
     set_name: str | None = None,
-) -> tuple[OrderedDict[int, dict[str, object]], int]:
-    resolved_members: OrderedDict[int, dict[str, object]] = OrderedDict()
+) -> tuple[OrderedDict[int, ResolvedMember], int]:
+    resolved_members: OrderedDict[int, ResolvedMember] = OrderedDict()
     created_missing_items = 0
     for member in member_entries:
         resolved_item = _resolve_member_item(
@@ -601,7 +608,7 @@ def _aggregate_resolved_members(
             continue
         item = sku_to_item.get(member_sku.upper())
         if resolved_item is not None and getattr(resolved_item, "sku", None):
-            item = resolved_item
+            item = cast(Item, resolved_item)
         if not item and create_missing and set_name:
             item = _create_missing_set_member_item(member, set_name)
             sku_to_item[item.sku.upper()] = item
@@ -609,10 +616,7 @@ def _aggregate_resolved_members(
             created_missing_items += 1
         if not item:
             continue
-        try:
-            quantity = max(1, int(member.get("quantity") or 1))
-        except (TypeError, ValueError):
-            quantity = 1
+        quantity = _coerce_quantity(member.get("quantity"))
         aggregated = resolved_members.get(item.id)
         if aggregated is None:
             resolved_members[item.id] = {"item": item, "quantity": quantity}
@@ -685,16 +689,13 @@ def _member_preview_sort_key(member: dict[str, object]) -> tuple[int, int, str]:
 
 
 def _aggregate_member_preview_rows(
-    member_entries: list[dict],
+    member_entries: list[dict[str, Any]],
 ) -> OrderedDict[str, dict[str, object]]:
     """Aggregate member rows by stable preview key."""
     rows: OrderedDict[str, dict[str, object]] = OrderedDict()
     for entry in member_entries:
         sku = _normalize_member_sku(entry.get("sku"))
-        try:
-            quantity = max(1, int(entry.get("quantity") or 1))
-        except (TypeError, ValueError):
-            quantity = 1
+        quantity = _coerce_quantity(entry.get("quantity"))
         name = _member_preview_name(entry.get("name"), quantity)
         key = _member_preview_key(sku, name)
         if not key:
@@ -707,7 +708,7 @@ def _aggregate_member_preview_rows(
                 "quantity": quantity,
             }
         else:
-            current["quantity"] = max(1, int(current.get("quantity") or 1)) + quantity
+            current["quantity"] = _coerce_quantity(current.get("quantity")) + quantity
             if not current.get("sku") and sku:
                 current["sku"] = sku
             if not current.get("name") and name:
@@ -717,7 +718,7 @@ def _aggregate_member_preview_rows(
 
 def _build_set_membership_preview(
     item_set: Set,
-    member_entries: list[dict],
+    member_entries: list[dict[str, Any]],
     catalog_sku_lookup: dict[str, Item] | None = None,
     catalog_name_lookup: dict[str, object] | None = None,
 ) -> dict:
@@ -757,11 +758,12 @@ def _build_set_membership_preview(
             catalog_name_lookup,
             set_sku=set_sku,
         )
-        compare_key = f"item:{resolved_item.id}" if resolved_item is not None else key
-        incoming["item_id"] = resolved_item.id if resolved_item is not None else None
+        matched_item = cast(Item, resolved_item) if resolved_item is not None else None
+        compare_key = f"item:{matched_item.id}" if matched_item is not None else key
+        incoming["item_id"] = matched_item.id if matched_item is not None else None
         incoming["source_sku"] = incoming.get("sku")
         incoming["display_sku"] = _normalize_member_sku(
-            getattr(resolved_item, "sku", None)
+            getattr(matched_item, "sku", None)
         ) or incoming.get("sku")
         incoming_compare_rows[compare_key] = incoming
         if resolved_item is not None:
@@ -774,7 +776,9 @@ def _build_set_membership_preview(
             incoming_row_notes[key] = "Will be skipped."
         incoming_row_notes_by_compare[compare_key] = incoming_row_notes[key]
     for row in incoming_rows_list:
-        row_key = _member_preview_key(row.get("sku"), row.get("name"))
+        row_sku = _normalize_member_sku(row.get("sku"))
+        row_name = str(row.get("name")) if row.get("name") else None
+        row_key = _member_preview_key(row_sku, row_name)
         if row_key:
             row["resolution_note"] = incoming_row_notes.get(row_key)
 
