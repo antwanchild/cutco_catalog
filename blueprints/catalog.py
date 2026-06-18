@@ -4,13 +4,26 @@ import json
 import logging
 from datetime import UTC, datetime
 
-from flask import abort, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import (
+    abort,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 
 from constants import (
-    AVAILABILITY_CHOICES, COOKWARE_CATEGORIES, EDGE_TYPES,
-    SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR, canonicalize_category,
+    AVAILABILITY_CHOICES,
+    COOKWARE_CATEGORIES,
+    EDGE_TYPES,
+    SYNC_BLOCKED_CATEGORIES,
+    UNKNOWN_COLOR,
+    canonicalize_category,
     canonicalize_availability,
 )
 from extensions import db
@@ -54,6 +67,7 @@ from blueprints.catalog_sync import (
     _set_name_options,
     _set_sku_options,
 )
+
 logger = logging.getLogger(__name__)
 UNCATEGORIZED_FILTER = "__uncategorized__"
 _CATALOG_SYNC_JOB_FILE = catalog_sync_module._CATALOG_SYNC_JOB_FILE
@@ -99,27 +113,33 @@ def catalog():
     """Render the catalog browser."""
     search_query = request.args.get("q", "").strip()
     cat_filter = request.args.get("category", "")
-    unicorn_f  = request.args.get("unicorn", "")
-    status_f   = request.args.get("status", "")
+    unicorn_f = request.args.get("unicorn", "")
+    status_f = request.args.get("status", "")
     availability_f = request.args.get("availability", "")
-    sort       = request.args.get("sort", "name")
-    direction  = request.args.get("dir", "asc")
+    sort = request.args.get("sort", "name")
+    direction = request.args.get("dir", "asc")
 
     query = Item.query
     if search_query:
         query = query.filter(
-            db.or_(Item.name.ilike(f"%{search_query}%"), Item.sku.ilike(f"%{search_query}%")))
+            db.or_(
+                Item.name.ilike(f"%{search_query}%"),
+                Item.sku.ilike(f"%{search_query}%"),
+            )
+        )
     if cat_filter:
         if cat_filter == UNCATEGORIZED_FILTER:
             query = query.filter(db.or_(Item.category.is_(None), Item.category == ""))
         else:
             query = query.filter(Item.category == cat_filter)
     if unicorn_f == "1":
-        query = query.filter(db.or_(
-            Item.is_unicorn,
-            Item.edge_is_unicorn,
-            Item.variants.any(ItemVariant.is_unicorn == True)  # noqa: E712
-        ))
+        query = query.filter(
+            db.or_(
+                Item.is_unicorn,
+                Item.edge_is_unicorn,
+                Item.variants.any(ItemVariant.is_unicorn == True),  # noqa: E712
+            )
+        )
     if status_f == "set_only":
         query = query.filter(Item.set_only.is_(True))
     elif status_f == "off_catalog":
@@ -130,111 +150,164 @@ def catalog():
         query = query.filter(Item.availability == availability_f)
 
     from sqlalchemy.orm import selectinload
-    sort_cols = {"name": Item.name, "sku": Item.sku, "category": Item.category, "edge_type": Item.edge_type}
+
+    sort_cols = {
+        "name": Item.name,
+        "sku": Item.sku,
+        "category": Item.category,
+        "edge_type": Item.edge_type,
+    }
     col = sort_cols.get(sort, Item.name)
     if sort == "category":
         category_col = db.func.lower(db.func.coalesce(Item.category, ""))
         name_col = db.func.lower(db.func.coalesce(Item.name, ""))
-        items = (query
-                 .options(selectinload(Item.variants), selectinload(Item.sets))
-                 .order_by(
-                     category_col.desc() if direction == "desc" else category_col,
-                     name_col.desc() if direction == "desc" else name_col,
-                 )
-                 .all())
+        items = (
+            query.options(selectinload(Item.variants), selectinload(Item.sets))
+            .order_by(
+                category_col.desc() if direction == "desc" else category_col,
+                name_col.desc() if direction == "desc" else name_col,
+            )
+            .all()
+        )
     elif sort == "edge_type":
         edge_col = db.func.lower(db.func.coalesce(Item.edge_type, ""))
         name_col = db.func.lower(db.func.coalesce(Item.name, ""))
-        items = (query
-                 .options(selectinload(Item.variants), selectinload(Item.sets))
-                 .order_by(
-                     edge_col.desc() if direction == "desc" else edge_col,
-                     name_col.desc() if direction == "desc" else name_col,
-                 )
-                 .all())
+        items = (
+            query.options(selectinload(Item.variants), selectinload(Item.sets))
+            .order_by(
+                edge_col.desc() if direction == "desc" else edge_col,
+                name_col.desc() if direction == "desc" else name_col,
+            )
+            .all()
+        )
     elif sort == "variants":
         variant_count = db.func.count(ItemVariant.id)
         name_col = db.func.lower(db.func.coalesce(Item.name, ""))
-        items = (query
-                 .outerjoin(Item.variants)
-                 .options(selectinload(Item.variants), selectinload(Item.sets))
-                 .group_by(Item.id)
-                 .order_by(
-                     variant_count.desc() if direction == "desc" else variant_count,
-                     name_col.desc() if direction == "desc" else name_col,
-                 )
-                 .all())
+        items = (
+            query.outerjoin(Item.variants)
+            .options(selectinload(Item.variants), selectinload(Item.sets))
+            .group_by(Item.id)
+            .order_by(
+                variant_count.desc() if direction == "desc" else variant_count,
+                name_col.desc() if direction == "desc" else name_col,
+            )
+            .all()
+        )
     else:
-        items = (query
-                 .options(selectinload(Item.variants), selectinload(Item.sets))
-                 .order_by(col.desc() if direction == "desc" else col)
-                 .all())
+        items = (
+            query.options(selectinload(Item.variants), selectinload(Item.sets))
+            .order_by(col.desc() if direction == "desc" else col)
+            .all()
+        )
 
-    categories = [row[0] for row in
-                  db.session.query(Item.category)
-                  .filter(Item.category.isnot(None))
-                  .distinct().order_by(Item.category).all()]
-    referenced_item_ids = {ownership.variant.item_id for ownership in Ownership.query.all()}
-    unreferenced_count = Item.query.filter(~Item.id.in_(referenced_item_ids)).count() if referenced_item_ids else Item.query.count()
+    categories = [
+        row[0]
+        for row in db.session.query(Item.category)
+        .filter(Item.category.isnot(None))
+        .distinct()
+        .order_by(Item.category)
+        .all()
+    ]
+    referenced_item_ids = {
+        ownership.variant.item_id for ownership in Ownership.query.all()
+    }
+    unreferenced_count = (
+        Item.query.filter(~Item.id.in_(referenced_item_ids)).count()
+        if referenced_item_ids
+        else Item.query.count()
+    )
     all_item_count = Item.query.count()
     set_count = Set.query.count()
 
-    return render_template("catalog.html", items=items, categories=categories,
-                           q=search_query, cat_filter=cat_filter, unicorn_f=unicorn_f,
-                           status_f=status_f, availability_f=availability_f,
-                           sort=sort, direction=direction,
-                           availability_choices=AVAILABILITY_CHOICES,
-                           edge_types=EDGE_TYPES,
-                           UNCATEGORIZED_FILTER=UNCATEGORIZED_FILTER,
-                           COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
-                           UNKNOWN_COLOR=UNKNOWN_COLOR,
-                           unreferenced_count=unreferenced_count,
-                           all_item_count=all_item_count,
-                           set_count=set_count)
+    return render_template(
+        "catalog.html",
+        items=items,
+        categories=categories,
+        q=search_query,
+        cat_filter=cat_filter,
+        unicorn_f=unicorn_f,
+        status_f=status_f,
+        availability_f=availability_f,
+        sort=sort,
+        direction=direction,
+        availability_choices=AVAILABILITY_CHOICES,
+        edge_types=EDGE_TYPES,
+        UNCATEGORIZED_FILTER=UNCATEGORIZED_FILTER,
+        COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
+        UNKNOWN_COLOR=UNKNOWN_COLOR,
+        unreferenced_count=unreferenced_count,
+        all_item_count=all_item_count,
+        set_count=set_count,
+    )
 
 
 @catalog_bp.route("/catalog/add", methods=["GET", "POST"])
 @admin_required
 def catalog_add():
     """Create a catalog item."""
-    next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
+    next_target = (
+        request.form.get("next", "")
+        if request.method == "POST"
+        else request.args.get("next", "")
+    )
     if request.method == "POST":
-        availability = canonicalize_availability(request.form.get("availability", "public"))
+        availability = canonicalize_availability(
+            request.form.get("availability", "public")
+        )
         item = Item(
-            name       = request.form["name"].strip(),
-            sku        = normalize_sku_value(request.form.get("sku", "")),
-            alternate_skus = ", ".join(parse_alternate_skus(request.form.get("alternate_skus", ""))) or None,
-            category   = canonicalize_category(request.form.get("category", "")),
-            availability = availability,
-            edge_type  = request.form.get("edge_type", "Unknown"),
-            is_unicorn = request.form.get("is_unicorn") == "on",
-            edge_is_unicorn = request.form.get("edge_is_unicorn") == "on",
-            set_only   = request.form.get("set_only") == "on",
-            in_catalog = availability == "public" and request.form.get("set_only") != "on",
-            cutco_url  = request.form.get("cutco_url", "").strip() or None,
-            notes      = request.form.get("notes", "").strip() or None,
+            name=request.form["name"].strip(),
+            sku=normalize_sku_value(request.form.get("sku", "")),
+            alternate_skus=", ".join(
+                parse_alternate_skus(request.form.get("alternate_skus", ""))
+            )
+            or None,
+            category=canonicalize_category(request.form.get("category", "")),
+            availability=availability,
+            edge_type=request.form.get("edge_type", "Unknown"),
+            is_unicorn=request.form.get("is_unicorn") == "on",
+            edge_is_unicorn=request.form.get("edge_is_unicorn") == "on",
+            set_only=request.form.get("set_only") == "on",
+            in_catalog=availability == "public"
+            and request.form.get("set_only") != "on",
+            cutco_url=request.form.get("cutco_url", "").strip() or None,
+            notes=request.form.get("notes", "").strip() or None,
         )
         db.session.add(item)
         db.session.flush()
-        colors = [raw_color.strip() for raw_color in request.form.get("colors", "").split(",") if raw_color.strip()]
+        colors = [
+            raw_color.strip()
+            for raw_color in request.form.get("colors", "").split(",")
+            if raw_color.strip()
+        ]
         for color in colors:
-            if color != UNKNOWN_COLOR and (item.category or "") not in COOKWARE_CATEGORIES:
-                db.session.add(ItemVariant(item_id=item.id, color=color, source="manual"))
+            if (
+                color != UNKNOWN_COLOR
+                and (item.category or "") not in COOKWARE_CATEGORIES
+            ):
+                db.session.add(
+                    ItemVariant(item_id=item.id, color=color, source="manual")
+                )
         db.session.flush()
         reconcile_unknown_variant(item)
         if db_commit(db.session):
             logger.info("Item added: %s (SKU: %s)", item.name, item.sku or "none")
             flash(f'Added "{item.name}" to catalog.', "success")
-        return redirect(_safe_redirect_target(next_target) or url_for("catalog.catalog"))
+        return redirect(
+            _safe_redirect_target(next_target) or url_for("catalog.catalog")
+        )
 
-    return render_template("item_form.html", item=None,
-                           edge_types=EDGE_TYPES, action="Add",
-                           UNKNOWN_COLOR=UNKNOWN_COLOR,
-                           all_sets=Set.query.order_by(Set.name).all(),
-                           categories=_catalog_category_options(),
-                           availability_choices=AVAILABILITY_CHOICES,
-                           alternate_skus_text="",
-                           next_target=_safe_redirect_target(next_target))
+    return render_template(
+        "item_form.html",
+        item=None,
+        edge_types=EDGE_TYPES,
+        action="Add",
+        UNKNOWN_COLOR=UNKNOWN_COLOR,
+        all_sets=Set.query.order_by(Set.name).all(),
+        categories=_catalog_category_options(),
+        availability_choices=AVAILABILITY_CHOICES,
+        alternate_skus_text="",
+        next_target=_safe_redirect_target(next_target),
+    )
 
 
 @catalog_bp.route("/catalog/<int:item_id>/edit", methods=["GET", "POST"])
@@ -244,21 +317,32 @@ def catalog_edit(item_id):
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)
-    next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
+    next_target = (
+        request.form.get("next", "")
+        if request.method == "POST"
+        else request.args.get("next", "")
+    )
     if request.method == "POST":
-        availability = canonicalize_availability(request.form.get("availability", "public"))
-        item.name       = request.form["name"].strip()
-        item.sku        = normalize_sku_value(request.form.get("sku", ""))
-        item.alternate_skus = ", ".join(parse_alternate_skus(request.form.get("alternate_skus", ""))) or None
-        item.category   = canonicalize_category(request.form.get("category", ""))
+        availability = canonicalize_availability(
+            request.form.get("availability", "public")
+        )
+        item.name = request.form["name"].strip()
+        item.sku = normalize_sku_value(request.form.get("sku", ""))
+        item.alternate_skus = (
+            ", ".join(parse_alternate_skus(request.form.get("alternate_skus", "")))
+            or None
+        )
+        item.category = canonicalize_category(request.form.get("category", ""))
         item.availability = availability
-        item.edge_type  = request.form.get("edge_type", "Unknown")
+        item.edge_type = request.form.get("edge_type", "Unknown")
         item.is_unicorn = request.form.get("is_unicorn") == "on"
         item.edge_is_unicorn = request.form.get("edge_is_unicorn") == "on"
-        item.set_only   = request.form.get("set_only") == "on"
-        item.in_catalog = availability == "public" and request.form.get("set_only") != "on"
-        item.cutco_url  = request.form.get("cutco_url", "").strip() or None
-        item.notes      = request.form.get("notes", "").strip() or None
+        item.set_only = request.form.get("set_only") == "on"
+        item.in_catalog = (
+            availability == "public" and request.form.get("set_only") != "on"
+        )
+        item.cutco_url = request.form.get("cutco_url", "").strip() or None
+        item.notes = request.form.get("notes", "").strip() or None
 
         selected_set_ids: set[int] = set()
         invalid_set_id_seen = False
@@ -269,11 +353,17 @@ def catalog_edit(item_id):
                 invalid_set_id_seen = True
         if invalid_set_id_seen:
             flash("Some set selections were invalid and were ignored.", "warning")
-        current_memberships = {membership.set_id: membership for membership in item.set_memberships}
-        selected_sets = {
-            selected_set.id: selected_set
-            for selected_set in Set.query.filter(Set.id.in_(selected_set_ids)).all()
-        } if selected_set_ids else {}
+        current_memberships = {
+            membership.set_id: membership for membership in item.set_memberships
+        }
+        selected_sets = (
+            {
+                selected_set.id: selected_set
+                for selected_set in Set.query.filter(Set.id.in_(selected_set_ids)).all()
+            }
+            if selected_set_ids
+            else {}
+        )
 
         for existing_set_id, existing_member in list(current_memberships.items()):
             if existing_set_id not in selected_sets:
@@ -281,21 +371,29 @@ def catalog_edit(item_id):
 
         for set_id in selected_sets:
             if set_id not in current_memberships:
-                db.session.add(ItemSetMember(item_id=item.id, set_id=set_id, quantity=1))
+                db.session.add(
+                    ItemSetMember(item_id=item.id, set_id=set_id, quantity=1)
+                )
 
         if db_commit(db.session):
             logger.info("Item updated: %s (SKU: %s)", item.name, item.sku or "none")
             flash(f'Updated "{item.name}".', "success")
-        return redirect(_safe_redirect_target(next_target) or url_for("catalog.catalog"))
+        return redirect(
+            _safe_redirect_target(next_target) or url_for("catalog.catalog")
+        )
 
-    return render_template("item_form.html", item=item,
-                           edge_types=EDGE_TYPES, action="Edit",
-                           UNKNOWN_COLOR=UNKNOWN_COLOR,
-                           all_sets=Set.query.order_by(Set.name).all(),
-                           categories=_catalog_category_options(),
-                           availability_choices=AVAILABILITY_CHOICES,
-                           alternate_skus_text=_item_alternate_skus_text(item),
-                           next_target=_safe_redirect_target(next_target))
+    return render_template(
+        "item_form.html",
+        item=item,
+        edge_types=EDGE_TYPES,
+        action="Edit",
+        UNKNOWN_COLOR=UNKNOWN_COLOR,
+        all_sets=Set.query.order_by(Set.name).all(),
+        categories=_catalog_category_options(),
+        availability_choices=AVAILABILITY_CHOICES,
+        alternate_skus_text=_item_alternate_skus_text(item),
+        next_target=_safe_redirect_target(next_target),
+    )
 
 
 @catalog_bp.route("/catalog/purge-unreferenced", methods=["POST"])
@@ -304,8 +402,14 @@ def catalog_purge_unreferenced():
     if not is_admin():
         flash("Admin access required.", "error")
         return redirect(url_for("catalog.catalog"))
-    referenced_item_ids = {ownership.variant.item_id for ownership in Ownership.query.all()}
-    items = Item.query.filter(~Item.id.in_(referenced_item_ids)).all() if referenced_item_ids else Item.query.all()
+    referenced_item_ids = {
+        ownership.variant.item_id for ownership in Ownership.query.all()
+    }
+    items = (
+        Item.query.filter(~Item.id.in_(referenced_item_ids)).all()
+        if referenced_item_ids
+        else Item.query.all()
+    )
     count = len(items)
     for item in items:
         _delete_attachment_files(item)
@@ -320,7 +424,10 @@ def catalog_purge_unreferenced():
             entity_name="Unreferenced catalog items",
             payload={"items_deleted": count},
         )
-        flash(f"Removed {count} item{'s' if count != 1 else ''} with no ownership records.", "info")
+        flash(
+            f"Removed {count} item{'s' if count != 1 else ''} with no ownership records.",
+            "info",
+        )
     return redirect(url_for("catalog.catalog"))
 
 
@@ -339,7 +446,9 @@ def catalog_purge_all():
     Item.query.delete()
     Set.query.delete()
     if db_commit(db.session):
-        logger.info("Full catalog purge: %d items deleted, %d sets deleted", count, set_count)
+        logger.info(
+            "Full catalog purge: %d items deleted, %d sets deleted", count, set_count
+        )
         record_audit_event(
             kind="audit",
             title="Purged full catalog",
@@ -376,6 +485,7 @@ def catalog_delete(item_id):
 
 # ── Variants ──────────────────────────────────────────────────────────────────
 
+
 @catalog_bp.route("/variants")
 def variants_browse():
     """Browse variants across the catalog with optional color filtering."""
@@ -390,29 +500,39 @@ def variants_browse():
         query = query.filter(func.lower(ItemVariant.color) == color.lower())
     if q:
         like = f"%{q}%"
-        query = query.filter(or_(
-            Item.name.ilike(like),
-            Item.sku.ilike(like),
-            Item.category.ilike(like),
-            ItemVariant.color.ilike(like),
-            ItemVariant.notes.ilike(like),
-        ))
+        query = query.filter(
+            or_(
+                Item.name.ilike(like),
+                Item.sku.ilike(like),
+                Item.category.ilike(like),
+                ItemVariant.color.ilike(like),
+                ItemVariant.notes.ilike(like),
+            )
+        )
 
-    variants = query.order_by(ItemVariant.color.asc(), Item.name.asc(), Item.sku.asc()).all()
-    color_counts = db.session.query(ItemVariant.color, func.count(ItemVariant.id)).join(Item)
+    variants = query.order_by(
+        ItemVariant.color.asc(), Item.name.asc(), Item.sku.asc()
+    ).all()
+    color_counts = db.session.query(ItemVariant.color, func.count(ItemVariant.id)).join(
+        Item
+    )
     if not include_unknown:
         color_counts = color_counts.filter(ItemVariant.color != UNKNOWN_COLOR)
     if color:
-        color_counts = color_counts.filter(func.lower(ItemVariant.color) == color.lower())
+        color_counts = color_counts.filter(
+            func.lower(ItemVariant.color) == color.lower()
+        )
     if q:
         like = f"%{q}%"
-        color_counts = color_counts.filter(or_(
-            Item.name.ilike(like),
-            Item.sku.ilike(like),
-            Item.category.ilike(like),
-            ItemVariant.color.ilike(like),
-            ItemVariant.notes.ilike(like),
-        ))
+        color_counts = color_counts.filter(
+            or_(
+                Item.name.ilike(like),
+                Item.sku.ilike(like),
+                Item.category.ilike(like),
+                ItemVariant.color.ilike(like),
+                ItemVariant.notes.ilike(like),
+            )
+        )
     color_counts = [
         {"color": color_name, "count": count}
         for color_name, count in (
@@ -441,7 +561,9 @@ def variants(item_id):
     if not item:
         abort(404)
     is_cookware = (item.category or "") in COOKWARE_CATEGORIES
-    return render_template("variants.html", item=item, UNKNOWN_COLOR=UNKNOWN_COLOR, is_cookware=is_cookware)
+    return render_template(
+        "variants.html", item=item, UNKNOWN_COLOR=UNKNOWN_COLOR, is_cookware=is_cookware
+    )
 
 
 @catalog_bp.route("/catalog/<int:item_id>/variants/add", methods=["POST"])
@@ -456,14 +578,25 @@ def variant_add(item_id):
         flash("Color is required.", "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
     if (item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
-        flash("Cookware items use a single Unknown variant; color variants are not supported.", "warning")
+        flash(
+            "Cookware items use a single Unknown variant; color variants are not supported.",
+            "warning",
+        )
         return redirect(url_for("catalog.variants", item_id=item_id))
-    if any(existing_variant.color.lower() == color.lower() for existing_variant in item.variants):
+    if any(
+        existing_variant.color.lower() == color.lower()
+        for existing_variant in item.variants
+    ):
         flash(f'"{color}" already exists for this item.', "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
-    db.session.add(ItemVariant(item_id=item_id, color=color,
-                               source="manual",
-                               notes=request.form.get("notes", "").strip() or None))
+    db.session.add(
+        ItemVariant(
+            item_id=item_id,
+            color=color,
+            source="manual",
+            notes=request.form.get("notes", "").strip() or None,
+        )
+    )
     db.session.flush()
     reconcile_unknown_variant(item)
     if db_commit(db.session):
@@ -479,16 +612,19 @@ def variant_edit(vid):
     variant = db.session.get(ItemVariant, vid)
     if not variant:
         abort(404)
-    item_id     = variant.item_id
-    color   = request.form.get("color", "").strip()
+    item_id = variant.item_id
+    color = request.form.get("color", "").strip()
     if not color:
         flash("Color cannot be empty.", "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
     if (variant.item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
-        flash("Cookware items use a single Unknown variant; color variants are not supported.", "warning")
+        flash(
+            "Cookware items use a single Unknown variant; color variants are not supported.",
+            "warning",
+        )
         return redirect(url_for("catalog.variants", item_id=item_id))
-    variant.color      = color
-    variant.notes      = request.form.get("notes", "").strip() or None
+    variant.color = color
+    variant.notes = request.form.get("notes", "").strip() or None
     variant.is_unicorn = request.form.get("is_unicorn") == "on"
     db.session.flush()
     reconcile_unknown_variant(variant.item)
@@ -508,7 +644,10 @@ def variant_reset_unknown(vid):
     item = variant.item
     item_id = variant.item_id
     if len(item.variants) != 1:
-        flash("Reset to Unknown is only available when this is the only variant.", "warning")
+        flash(
+            "Reset to Unknown is only available when this is the only variant.",
+            "warning",
+        )
         return redirect(url_for("catalog.variants", item_id=item_id))
     if variant.color == UNKNOWN_COLOR:
         flash("This variant is already Unknown.", "info")
@@ -549,13 +688,15 @@ def variant_delete(vid):
 
 # ── Sets ──────────────────────────────────────────────────────────────────────
 
+
 @catalog_bp.route("/sets")
 def sets_list():
     """Render the set list page."""
     from models import Ownership, Person
-    all_sets    = Set.query.order_by(Set.name).all()
+
+    all_sets = Set.query.order_by(Set.name).all()
     all_persons = Person.query.order_by(Person.name).all()
-    person_id   = request.args.get("person", type=int)
+    person_id = request.args.get("person", type=int)
     not_in_catalog_f = request.args.get("missing", "")
     incomplete_f = request.args.get("incomplete", "")
 
@@ -564,7 +705,8 @@ def sets_list():
     if person_id:
         owned_q = owned_q.filter_by(person_id=person_id)
     owned_ownerships = [
-        ownership for ownership in owned_q.all()
+        ownership
+        for ownership in owned_q.all()
         if ownership.variant is not None and ownership.variant.item is not None
     ]
     owned_item_ids = {ownership.variant.item_id for ownership in owned_ownerships}
@@ -594,17 +736,27 @@ def sets_list():
         completion[item_set.id] = dict(total=total, owned=owned, pct=pct)
         filtered_sets.append(item_set)
 
-    return render_template("sets.html", sets=filtered_sets, completion=completion,
-                           not_in_catalog_counts=not_in_catalog_counts,
-                           all_persons=all_persons, person_id=person_id,
-                           not_in_catalog_f=not_in_catalog_f, incomplete_f=incomplete_f)
+    return render_template(
+        "sets.html",
+        sets=filtered_sets,
+        completion=completion,
+        not_in_catalog_counts=not_in_catalog_counts,
+        all_persons=all_persons,
+        person_id=person_id,
+        not_in_catalog_f=not_in_catalog_f,
+        incomplete_f=incomplete_f,
+    )
 
 
 @catalog_bp.route("/sets/add", methods=["GET", "POST"])
 @admin_required
 def set_add():
     """Create a set."""
-    next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
+    next_target = (
+        request.form.get("next", "")
+        if request.method == "POST"
+        else request.args.get("next", "")
+    )
     if request.method == "POST":
         name = request.form["name"].strip()
         if Set.query.filter(db.func.lower(Set.name) == name.lower()).first():
@@ -619,7 +771,9 @@ def set_add():
         if db_commit(db.session):
             logger.info("Set created: %s", name)
             flash(f'Created set "{name}".', "success")
-        return redirect(_safe_redirect_target(next_target) or url_for("catalog.sets_list"))
+        return redirect(
+            _safe_redirect_target(next_target) or url_for("catalog.sets_list")
+        )
     return render_template(
         "set_form.html",
         set=None,
@@ -641,13 +795,17 @@ def set_edit(set_id=None, sid=None):
     item_set = db.session.get(Set, set_id)
     if not item_set:
         abort(404)
-    next_target = request.form.get("next", "") if request.method == "POST" else request.args.get("next", "")
+    next_target = (
+        request.form.get("next", "")
+        if request.method == "POST"
+        else request.args.get("next", "")
+    )
     all_items = Item.query.order_by(Item.name).all()
     member_qty_map = {member.item_id: member.quantity for member in item_set.members}
 
     if request.method == "POST":
-        item_set.name  = request.form["name"].strip()
-        item_set.sku   = request.form.get("sku", "").strip().upper() or None
+        item_set.name = request.form["name"].strip()
+        item_set.sku = request.form.get("sku", "").strip().upper() or None
         item_set.notes = request.form.get("notes", "").strip() or None
 
         selected_item_ids: set[int] = set()
@@ -657,9 +815,16 @@ def set_edit(set_id=None, sid=None):
             except (TypeError, ValueError):
                 continue
 
-        valid_item_ids = {
-            item_id for (item_id,) in db.session.query(Item.id).filter(Item.id.in_(selected_item_ids)).all()
-        } if selected_item_ids else set()
+        valid_item_ids = (
+            {
+                item_id
+                for (item_id,) in db.session.query(Item.id)
+                .filter(Item.id.in_(selected_item_ids))
+                .all()
+            }
+            if selected_item_ids
+            else set()
+        )
 
         existing_members = {member.item_id: member for member in item_set.members}
 
@@ -679,12 +844,16 @@ def set_edit(set_id=None, sid=None):
             if item_id in existing_members:
                 existing_members[item_id].quantity = qty
             else:
-                db.session.add(ItemSetMember(set_id=item_set.id, item_id=item_id, quantity=qty))
+                db.session.add(
+                    ItemSetMember(set_id=item_set.id, item_id=item_id, quantity=qty)
+                )
 
         if db_commit(db.session):
             logger.info("Set updated: %s", item_set.name)
             flash(f'Updated set "{item_set.name}".', "success")
-        return redirect(_safe_redirect_target(next_target) or url_for("catalog.sets_list"))
+        return redirect(
+            _safe_redirect_target(next_target) or url_for("catalog.sets_list")
+        )
     return render_template(
         "set_form.html",
         set=item_set,
@@ -736,7 +905,9 @@ def _reconcile_set_memberships_from_entries(
         qty = max(1, int(resolved.get("quantity") or 1))
         membership = existing_members.get(item_id)
         if membership is None:
-            db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
+            db.session.add(
+                ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty)
+            )
             restored += 1
         elif membership.quantity != qty:
             membership.quantity = qty
@@ -766,7 +937,12 @@ def set_restore_memberships(set_id=None, sid=None):
         return redirect(url_for("catalog.set_detail", set_id=item_set.id))
 
     if db_commit(db.session):
-        logger.info("Set memberships restored: %s (+%d memberships, %d updated)", item_set.name, restored, updated)
+        logger.info(
+            "Set memberships restored: %s (+%d memberships, %d updated)",
+            item_set.name,
+            restored,
+            updated,
+        )
         flash(f'Restored {restored} membership(s) for "{item_set.name}".', "success")
     return redirect(url_for("catalog.set_detail", set_id=item_set.id))
 
@@ -804,7 +980,11 @@ def bulk_resync_set_memberships():
         flash("Could not re-scrape Cutco sets right now.", "error")
         return redirect(url_for("catalog.sets_list"))
 
-    scraped_lookup = {scraped_set["name"].lower(): scraped_set for scraped_set in scraped_sets if scraped_set.get("name")}
+    scraped_lookup = {
+        scraped_set["name"].lower(): scraped_set
+        for scraped_set in scraped_sets
+        if scraped_set.get("name")
+    }
     restored_sets = 0
     restored_memberships = 0
     updated_memberships = 0
@@ -846,7 +1026,9 @@ def bulk_resync_set_memberships():
                 f"Skipped {skipped_sets} set{'s' if skipped_sets != 1 else ''} that could not be matched from Cutco.",
                 "warning",
             )
-    return redirect(_safe_redirect_target(request.form.get("next")) or url_for("catalog.sets_list"))
+    return redirect(
+        _safe_redirect_target(request.form.get("next")) or url_for("catalog.sets_list")
+    )
 
 
 @catalog_bp.route("/sets/bulk-restore-memberships", methods=["POST"])
@@ -905,7 +1087,9 @@ def bulk_restore_set_memberships():
                 f"Skipped {skipped_sets} set{'s' if skipped_sets != 1 else ''} with no imported member snapshot.",
                 "warning",
             )
-    return redirect(_safe_redirect_target(request.form.get("next")) or url_for("catalog.sets_list"))
+    return redirect(
+        _safe_redirect_target(request.form.get("next")) or url_for("catalog.sets_list")
+    )
 
 
 @catalog_bp.route("/sets/<int:set_id>/delete", methods=["POST"])
@@ -933,15 +1117,16 @@ def set_detail(set_id=None, sid=None):
     """Render a set detail page."""
     set_id = set_id if set_id is not None else sid
     from models import Ownership, Person
-    item_set    = db.session.get(Set, set_id)
+
+    item_set = db.session.get(Set, set_id)
     if not item_set:
         abort(404)
     private_view = is_authenticated_user()
     all_persons = Person.query.order_by(Person.name).all() if private_view else []
-    person_id   = request.args.get("person", type=int) if private_view else None
-    person      = db.session.get(Person, person_id) if person_id else None
-    sort_field  = (request.args.get("sort", "name") or "name").strip().lower()
-    direction   = (request.args.get("dir", "asc") or "asc").strip().lower()
+    person_id = request.args.get("person", type=int) if private_view else None
+    person = db.session.get(Person, person_id) if person_id else None
+    sort_field = (request.args.get("sort", "name") or "name").strip().lower()
+    direction = (request.args.get("dir", "asc") or "asc").strip().lower()
     if direction not in {"asc", "desc"}:
         direction = "asc"
     if sort_field not in {"name", "sku", "category", "edge", "msrp", "wishlist"}:
@@ -955,7 +1140,8 @@ def set_detail(set_id=None, sid=None):
         if person_id:
             owned_q = owned_q.filter_by(person_id=person_id)
         owned_ownerships = [
-            ownership for ownership in owned_q.all()
+            ownership
+            for ownership in owned_q.all()
             if ownership.variant is not None and ownership.variant.item is not None
         ]
         owned_item_ids = {ownership.variant.item_id for ownership in owned_ownerships}
@@ -964,7 +1150,9 @@ def set_detail(set_id=None, sid=None):
     if private_view and person_id:
         wishlisted_item_ids = {
             ownership.variant.item_id
-            for ownership in Ownership.query.filter_by(person_id=person_id, status="Wishlist").all()
+            for ownership in Ownership.query.filter_by(
+                person_id=person_id, status="Wishlist"
+            ).all()
             if ownership.variant is not None and ownership.variant.item is not None
         }
 
@@ -988,18 +1176,22 @@ def set_detail(set_id=None, sid=None):
             color_counts[color] = color_counts.get(color, 0) + 1
         top_colors = [
             {"color": color, "count": count}
-            for color, count in sorted(color_counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))[:8]
+            for color, count in sorted(
+                color_counts.items(), key=lambda kv: (-kv[1], kv[0].lower())
+            )[:8]
         ]
 
     def _sort_items(items: list[Item]) -> list[Item]:
         if sort_field == "msrp":
             if direction == "desc":
-                return sorted(items, key=lambda item: (item.msrp is None, -(item.msrp or 0)))
+                return sorted(
+                    items, key=lambda item: (item.msrp is None, -(item.msrp or 0))
+                )
             return sorted(items, key=lambda item: (item.msrp is None, item.msrp or 0))
         if sort_field == "wishlist":
             return sorted(
                 items,
-                key=lambda item: (item.id in wishlisted_item_ids),
+                key=lambda item: item.id in wishlisted_item_ids,
                 reverse=(direction == "desc"),
             )
 
@@ -1012,40 +1204,53 @@ def set_detail(set_id=None, sid=None):
         key_fn = key_map.get(sort_field, key_map["name"])
         return sorted(items, key=key_fn, reverse=(direction == "desc"))
 
-    owned_items   = _sort_items([item for item in item_set.items if item.id in owned_item_ids]) if private_view else []
-    missing_items = _sort_items([item for item in item_set.items if item.id not in owned_item_ids]) if private_view else []
+    owned_items = (
+        _sort_items([item for item in item_set.items if item.id in owned_item_ids])
+        if private_view
+        else []
+    )
+    missing_items = (
+        _sort_items([item for item in item_set.items if item.id not in owned_item_ids])
+        if private_view
+        else []
+    )
 
     total = len(item_set.items)
     owned_count = len(owned_items)
     pct = round(100 * owned_count / total) if total else 0
 
-    qty_map = {membership.item_id: membership.quantity for membership in item_set.members}
+    qty_map = {
+        membership.item_id: membership.quantity for membership in item_set.members
+    }
     next_target = _safe_redirect_target(request.args.get("next"))
 
-    return render_template("set_detail.html",
-                           set=item_set,
-                           owned_items=owned_items,
-                           missing_items=missing_items,
-                           owned_count=owned_count,
-                           total=total,
-                           pct=pct,
-                           all_persons=all_persons,
-                           person_id=person_id,
-                           person=person,
-                           sort=sort_field,
-                           direction=direction,
-                           wishlisted_item_ids=wishlisted_item_ids,
-                           qty_map=qty_map,
-                           member_snapshot_rows=member_snapshot_rows,
-                           not_in_catalog_skus=not_in_catalog_skus,
-                           top_colors=top_colors,
-                           next_target=next_target,
-                           can_restore_memberships=bool(item_set.member_data) and private_view,
-                           COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
-                           UNKNOWN_COLOR=UNKNOWN_COLOR)
+    return render_template(
+        "set_detail.html",
+        set=item_set,
+        owned_items=owned_items,
+        missing_items=missing_items,
+        owned_count=owned_count,
+        total=total,
+        pct=pct,
+        all_persons=all_persons,
+        person_id=person_id,
+        person=person,
+        sort=sort_field,
+        direction=direction,
+        wishlisted_item_ids=wishlisted_item_ids,
+        qty_map=qty_map,
+        member_snapshot_rows=member_snapshot_rows,
+        not_in_catalog_skus=not_in_catalog_skus,
+        top_colors=top_colors,
+        next_target=next_target,
+        can_restore_memberships=bool(item_set.member_data) and private_view,
+        COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
+        UNKNOWN_COLOR=UNKNOWN_COLOR,
+    )
 
 
 # ── Uses Sync ─────────────────────────────────────────────────────────────────
+
 
 @catalog_bp.route("/catalog/sync-uses", methods=["POST"])
 @admin_required
@@ -1071,9 +1276,9 @@ def catalog_sync_uses():
                 item_uses[future_map[future]] = uses
 
     # Apply results in main thread
-    item_lookup  = {item.id: item for item in items_with_url}
-    tasks_added  = 0
-    links_added  = 0
+    item_lookup = {item.id: item for item in items_with_url}
+    tasks_added = 0
+    links_added = 0
 
     for item_id, uses in item_uses.items():
         item = item_lookup[item_id]
@@ -1093,7 +1298,12 @@ def catalog_sync_uses():
                 links_added += 1
 
     db_commit(db.session)
-    logger.info("Uses sync: %d items, %d new tasks, %d links", len(item_uses), tasks_added, links_added)
+    logger.info(
+        "Uses sync: %d items, %d new tasks, %d links",
+        len(item_uses),
+        tasks_added,
+        links_added,
+    )
     flash(
         f"Uses sync complete — {len(item_uses)} items processed, "
         f"{tasks_added} new task{'s' if tasks_added != 1 else ''}, "
@@ -1104,6 +1314,7 @@ def catalog_sync_uses():
 
 
 # ── Catalog Sync ──────────────────────────────────────────────────────────────
+
 
 @catalog_bp.route("/catalog/sync")
 @admin_required
@@ -1116,23 +1327,27 @@ def catalog_sync():
     if start_requested:
         if job.get("status") != "running":
             _reset_catalog_sync_job()
-            _write_catalog_sync_job({
-                "status": "running",
-                "progress": ["Preparing catalog sync…"],
-                "results": None,
-                "error": None,
-                "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
-                "finished_at": None,
-                "preview": None,
-                "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
-            })
+            _write_catalog_sync_job(
+                {
+                    "status": "running",
+                    "progress": ["Preparing catalog sync…"],
+                    "results": None,
+                    "error": None,
+                    "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                    "finished_at": None,
+                    "preview": None,
+                    "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                }
+            )
             _start_catalog_sync_background_job(current_app._get_current_object())
         job = _read_catalog_sync_job()
         if job.get("status") == "done" and job.get("preview"):
             preview = job["preview"]
             return render_template("sync_preview.html", job=job, **preview)
         if job.get("status") == "error":
-            flash(f"Catalog sync failed: {job.get('error') or 'Unknown error'}", "error")
+            flash(
+                f"Catalog sync failed: {job.get('error') or 'Unknown error'}", "error"
+            )
         return render_template(
             "sync_preview.html",
             job=job,
@@ -1212,11 +1427,19 @@ def catalog_sync_confirm():
     selected = set(request.form.getlist("selected_skus"))
     item_data = {}
     for key, val in request.form.items():
-        for prefix in ("name_", "category_", "url_", "edge_type_",
-                       "msrp_", "blade_length_", "overall_length_", "weight_",
-                       "variant_colors_"):
+        for prefix in (
+            "name_",
+            "category_",
+            "url_",
+            "edge_type_",
+            "msrp_",
+            "blade_length_",
+            "overall_length_",
+            "weight_",
+            "variant_colors_",
+        ):
             if key.startswith(prefix):
-                sku = key[len(prefix):]
+                sku = key[len(prefix) :]
                 item_data.setdefault(sku, {})[prefix.rstrip("_")] = val
 
     added_items = 0
@@ -1229,14 +1452,22 @@ def catalog_sync_confirm():
             msrp = float(data["msrp"]) if data.get("msrp") else None
         except ValueError:
             msrp = None
-        item = Item(name=data.get("name", sku), sku=sku,
-                    category=canonicalize_category(data.get("category")), cutco_url=data.get("url"),
-                    availability="public", in_catalog=True, set_only=False, is_unicorn=False, edge_is_unicorn=False,
-                    edge_type=data.get("edge_type") or "Unknown",
-                    msrp=msrp,
-                    blade_length=data.get("blade_length") or None,
-                    overall_length=data.get("overall_length") or None,
-                    weight=data.get("weight") or None)
+        item = Item(
+            name=data.get("name", sku),
+            sku=sku,
+            category=canonicalize_category(data.get("category")),
+            cutco_url=data.get("url"),
+            availability="public",
+            in_catalog=True,
+            set_only=False,
+            is_unicorn=False,
+            edge_is_unicorn=False,
+            edge_type=data.get("edge_type") or "Unknown",
+            msrp=msrp,
+            blade_length=data.get("blade_length") or None,
+            overall_length=data.get("overall_length") or None,
+            weight=data.get("weight") or None,
+        )
         db.session.add(item)
         db.session.flush()
         raw_variant_colors = data.get("variant_colors")
@@ -1259,7 +1490,10 @@ def catalog_sync_confirm():
             if color_key in seen_colors:
                 continue
             seen_colors.add(color_key)
-            if any(existing_variant.color.lower() == color_key for existing_variant in item.variants):
+            if any(
+                existing_variant.color.lower() == color_key
+                for existing_variant in item.variants
+            ):
                 continue
             db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
         db.session.flush()
@@ -1275,7 +1509,10 @@ def catalog_sync_confirm():
         item = Item.query.filter_by(sku=sku).first()
         if not item:
             continue
-        if any(existing_variant.color != UNKNOWN_COLOR for existing_variant in item.variants):
+        if any(
+            existing_variant.color != UNKNOWN_COLOR
+            for existing_variant in item.variants
+        ):
             continue
         raw_variant_colors = data.get("variant_colors")
         variant_colors: list[str] = []
@@ -1297,7 +1534,10 @@ def catalog_sync_confirm():
             if color_key in seen_colors:
                 continue
             seen_colors.add(color_key)
-            if any(existing_variant.color.lower() == color_key for existing_variant in item.variants):
+            if any(
+                existing_variant.color.lower() == color_key
+                for existing_variant in item.variants
+            ):
                 continue
             db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
             reconciled_item_variants += 1
@@ -1306,13 +1546,17 @@ def catalog_sync_confirm():
             reconcile_unknown_variant(item)
 
     selected_sets = set(request.form.getlist("selected_sets"))
-    added_sets    = 0
-    linked_items  = 0
+    added_sets = 0
+    linked_items = 0
     created_missing_items = 0
     create_missing_set_members = request.form.get("create_missing_set_members") == "on"
 
-    sku_to_item = {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()}
-    name_to_item = _build_member_name_lookup(Item.query.filter(Item.sku.isnot(None)).all())
+    sku_to_item = {
+        item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()
+    }
+    name_to_item = _build_member_name_lookup(
+        Item.query.filter(Item.sku.isnot(None)).all()
+    )
 
     set_count = int(request.form.get("set_count", 0))
     for index in range(set_count):
@@ -1320,10 +1564,15 @@ def catalog_sync_confirm():
         if not set_name or set_name not in selected_sets:
             continue
         member_entries_raw = request.form.get(f"set_member_entries_{index}", "").strip()
-        member_entries = _load_member_snapshot(member_entries_raw) if member_entries_raw else []
+        member_entries = (
+            _load_member_snapshot(member_entries_raw) if member_entries_raw else []
+        )
         if not member_entries:
-            legacy_member_skus = [raw.strip() for raw in
-                                  request.form.get(f"set_members_{index}", "").split("|") if raw.strip()]
+            legacy_member_skus = [
+                raw.strip()
+                for raw in request.form.get(f"set_members_{index}", "").split("|")
+                if raw.strip()
+            ]
             legacy_member_qtys = {}
             for raw_pair in request.form.get(f"set_member_qtys_{index}", "").split("|"):
                 if ":" in raw_pair:
@@ -1338,7 +1587,9 @@ def catalog_sync_confirm():
             ]
         set_sku = request.form.get(f"set_sku_{index}", "").strip() or None
 
-        pre_existing_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
+        pre_existing_set = Set.query.filter(
+            db.func.lower(Set.name) == set_name.lower()
+        ).first()
         item_set = get_or_create_set(set_name)
         if pre_existing_set is None:
             added_sets += 1
@@ -1347,7 +1598,9 @@ def catalog_sync_confirm():
         if member_entries_raw:
             item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
 
-        existing_members = {membership.item_id: membership for membership in item_set.members}
+        existing_members = {
+            membership.item_id: membership for membership in item_set.members
+        }
         incoming_member_ids: set[int] = set()
         resolved_members, created_now = _aggregate_resolved_members(
             member_entries,
@@ -1362,7 +1615,9 @@ def catalog_sync_confirm():
             item = resolved["item"]
             qty = max(1, int(resolved.get("quantity") or 1))
             if item_id not in existing_members:
-                membership = ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty)
+                membership = ItemSetMember(
+                    set_id=item_set.id, item_id=item.id, quantity=qty
+                )
                 db.session.add(membership)
                 existing_members[item_id] = membership
                 linked_items += 1
@@ -1374,8 +1629,10 @@ def catalog_sync_confirm():
                 if membership.item_id not in incoming_member_ids:
                     db.session.delete(membership)
         elif member_entries_raw:
-            logger.warning("Skipping set membership reconciliation for %s because no members were resolved",
-                           set_name)
+            logger.warning(
+                "Skipping set membership reconciliation for %s because no members were resolved",
+                set_name,
+            )
 
     # Update quantities on existing sets (no new rows, just qty backfill)
     existing_set_count = int(request.form.get("existing_set_count", 0))
@@ -1388,13 +1645,24 @@ def catalog_sync_confirm():
         item_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         if not item_set:
             continue
-        member_entries_raw = request.form.get(f"existing_set_member_entries_{index}", "").strip()
-        member_entries = _load_member_snapshot(member_entries_raw) if member_entries_raw else []
+        member_entries_raw = request.form.get(
+            f"existing_set_member_entries_{index}", ""
+        ).strip()
+        member_entries = (
+            _load_member_snapshot(member_entries_raw) if member_entries_raw else []
+        )
         if not member_entries:
-            legacy_member_skus = [raw.strip() for raw in
-                                  request.form.get(f"existing_set_member_skus_{index}", "").split("|") if raw.strip()]
+            legacy_member_skus = [
+                raw.strip()
+                for raw in request.form.get(
+                    f"existing_set_member_skus_{index}", ""
+                ).split("|")
+                if raw.strip()
+            ]
             legacy_member_qtys = {}
-            for raw_pair in request.form.get(f"existing_set_member_qtys_{index}", "").split("|"):
+            for raw_pair in request.form.get(
+                f"existing_set_member_qtys_{index}", ""
+            ).split("|"):
                 if ":" in raw_pair:
                     sku_part, qty_part = raw_pair.split(":", 1)
                     try:
@@ -1424,10 +1692,19 @@ def catalog_sync_confirm():
             item = resolved["item"]
             qty = max(1, int(resolved.get("quantity") or 1))
             if item_id not in existing_member_ids:
-                db.session.add(ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty))
+                db.session.add(
+                    ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty)
+                )
                 existing_member_ids.add(item_id)
             else:
-                membership = next((member for member in item_set.members if member.item_id == item_id), None)
+                membership = next(
+                    (
+                        member
+                        for member in item_set.members
+                        if member.item_id == item_id
+                    ),
+                    None,
+                )
                 if membership and membership.quantity != qty:
                     membership.quantity = qty
                     qty_updates += 1
@@ -1437,13 +1714,21 @@ def catalog_sync_confirm():
                 if membership.item_id not in incoming_member_ids:
                     db.session.delete(membership)
         elif member_entries_raw:
-            logger.warning("Skipping existing set membership reconciliation for %s because no members were resolved",
-                           set_name)
+            logger.warning(
+                "Skipping existing set membership reconciliation for %s because no members were resolved",
+                set_name,
+            )
 
     db_commit(db.session)
-    logger.info("Sync complete: %d items, %d sets, %d memberships, %d qty updates, %d placeholders, %d variants",
-                added_items, added_sets, linked_items, qty_updates,
-                created_missing_items + created_existing_missing_items, reconciled_item_variants)
+    logger.info(
+        "Sync complete: %d items, %d sets, %d memberships, %d qty updates, %d placeholders, %d variants",
+        added_items,
+        added_sets,
+        linked_items,
+        qty_updates,
+        created_missing_items + created_existing_missing_items,
+        reconciled_item_variants,
+    )
     record_activity(
         "sync",
         "Catalog sync complete",
@@ -1460,8 +1745,13 @@ def catalog_sync_confirm():
         parts.append(f"{linked_items} set membership{'s' if linked_items != 1 else ''}")
     placeholder_items = created_missing_items + created_existing_missing_items
     if placeholder_items:
-        parts.append(f"{placeholder_items} placeholder item{'s' if placeholder_items != 1 else ''}")
-    flash("Sync complete — added " + (", ".join(parts) if parts else "nothing new") + ".", "success")
+        parts.append(
+            f"{placeholder_items} placeholder item{'s' if placeholder_items != 1 else ''}"
+        )
+    flash(
+        "Sync complete — added " + (", ".join(parts) if parts else "nothing new") + ".",
+        "success",
+    )
     if detected_variant_color_total:
         flash(
             f"Detected {detected_variant_color_total} variant color{'s' if detected_variant_color_total != 1 else ''} in the catalog scrape.",

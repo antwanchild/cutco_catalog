@@ -13,8 +13,15 @@ import requests
 from bs4 import BeautifulSoup
 
 from constants import (
-    COOKWARE_CATEGORIES, REQUEST_TIMEOUT, SCRAPE_CATEGORIES, SCRAPE_HEADERS, SCRAPE_SETS_URL,
-    SYNC_BLOCKED_CATEGORIES, _BUNDLE_KEYWORDS, _resolve_category, _is_set_product,
+    COOKWARE_CATEGORIES,
+    REQUEST_TIMEOUT,
+    SCRAPE_CATEGORIES,
+    SCRAPE_HEADERS,
+    SCRAPE_SETS_URL,
+    SYNC_BLOCKED_CATEGORIES,
+    _BUNDLE_KEYWORDS,
+    _resolve_category,
+    _is_set_product,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,7 +33,9 @@ _CUTTING_BOARD_URLS = {
 }
 
 
-def _extract_cutco_canonical_url(raw_html: str, *, fallback_url: str | None = None) -> str | None:
+def _extract_cutco_canonical_url(
+    raw_html: str, *, fallback_url: str | None = None
+) -> str | None:
     """Return a canonical Cutco product URL from page metadata when present."""
     soup = BeautifulSoup(raw_html, "html.parser")
     for tag in (
@@ -49,7 +58,9 @@ def _resolve_cutco_product_url(url: str) -> str:
     return url
 
 
-def _find_cutco_item_link(raw_html: str, item_name: str | None, sku: str | None = None) -> str | None:
+def _find_cutco_item_link(
+    raw_html: str, item_name: str | None, sku: str | None = None
+) -> str | None:
     """Return a matching product link from a family page when the item identity is known."""
     normalized_item = _normalize_text_for_match(item_name or "")
     normalized_sku = _normalize_text_for_match(sku or "")
@@ -85,15 +96,20 @@ def _find_cutco_item_link(raw_html: str, item_name: str | None, sku: str | None 
                 score += 80
             elif normalized_item in normalized_text:
                 score += 60
-            if normalized_item.split()[:2] and " ".join(normalized_item.split()[:2]) in normalized_text:
+            if (
+                normalized_item.split()[:2]
+                and " ".join(normalized_item.split()[:2]) in normalized_text
+            ):
                 score += 10
         if normalized_sku:
             if normalized_sku in normalized_text:
                 score += 90
             if normalized_sku in _normalize_text_for_match(href):
                 score += 80
-        if re.search(r"\b(with\s+sheath|knife\s+and\s+sheath|knife\s+sheath|sheath\s+set|gift\s+box|bundle)\b",
-                     normalized_text):
+        if re.search(
+            r"\b(with\s+sheath|knife\s+and\s+sheath|knife\s+sheath|sheath\s+set|gift\s+box|bundle)\b",
+            normalized_text,
+        ):
             score -= 50 if not wants_sheath else 0
         if re.search(r"\b(set|kit)\b", normalized_text) and not wants_sheath:
             score -= 10
@@ -113,14 +129,18 @@ def _fetch_cutco_page(
     """Fetch a Cutco page and follow canonical or item-specific URLs when exposed."""
     try:
         resolved_request_url = _resolve_cutco_product_url(url)
-        resp = requests.get(resolved_request_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(
+            resolved_request_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+        )
         if resp.status_code != 200:
             return None, None
         if item_name or sku:
             item_url = _find_cutco_item_link(resp.text, item_name, sku)
             if item_url and item_url != resp.url:
                 try:
-                    item_resp = requests.get(item_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+                    item_resp = requests.get(
+                        item_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+                    )
                     if item_resp.status_code == 200:
                         return item_resp.url, item_resp.text
                 except Exception:
@@ -128,7 +148,9 @@ def _fetch_cutco_page(
         canonical_url = _extract_cutco_canonical_url(resp.text, fallback_url=resp.url)
         if canonical_url and canonical_url != resp.url:
             try:
-                canonical_resp = requests.get(canonical_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+                canonical_resp = requests.get(
+                    canonical_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+                )
                 if canonical_resp.status_code == 200:
                     return canonical_resp.url, canonical_resp.text
             except Exception:
@@ -155,7 +177,9 @@ def _normalize_cutco_title(value: str) -> str:
     return normalized.strip()
 
 
-def _line_matches_item_identity(line: str, item_name: str | None, sku: str | None = None) -> bool:
+def _line_matches_item_identity(
+    line: str, item_name: str | None, sku: str | None = None
+) -> bool:
     """Return True when a visible line looks like the target product."""
     normalized_item = _normalize_cutco_title(item_name or "")
     normalized_line = _normalize_cutco_title(line)
@@ -163,9 +187,15 @@ def _line_matches_item_identity(line: str, item_name: str | None, sku: str | Non
         return False
     if sku:
         normalized_sku = _normalize_text_for_match(sku)
-        if normalized_sku and re.search(rf"(?<![a-z0-9]){re.escape(normalized_sku)}(?![a-z0-9])",
-                                        _normalize_text_for_match(line)):
-            if not normalized_item or normalized_item in normalized_line or normalized_line in normalized_item:
+        if normalized_sku and re.search(
+            rf"(?<![a-z0-9]){re.escape(normalized_sku)}(?![a-z0-9])",
+            _normalize_text_for_match(line),
+        ):
+            if (
+                not normalized_item
+                or normalized_item in normalized_line
+                or normalized_line in normalized_item
+            ):
                 return True
             # Some Cutco pages expose a slightly different product title; the SKU
             # is still a reliable anchor for the main product block.
@@ -175,7 +205,9 @@ def _line_matches_item_identity(line: str, item_name: str | None, sku: str | Non
         return False
     if normalized_line == normalized_item:
         return True
-    if normalized_line.startswith(normalized_item) or normalized_item.startswith(normalized_line):
+    if normalized_line.startswith(normalized_item) or normalized_item.startswith(
+        normalized_line
+    ):
         return True
     return normalized_item in normalized_line or normalized_line in normalized_item
 
@@ -200,7 +232,9 @@ def _extract_primary_visible_price(
     start_index = 0
     normalized_candidate = _normalize_text_for_match(candidate_text or "")
     normalized_heading = _normalize_text_for_match(heading_text or "")
-    wants_sheath = "sheath" in normalized_candidate or "gift box" in normalized_candidate
+    wants_sheath = (
+        "sheath" in normalized_candidate or "gift box" in normalized_candidate
+    )
     if normalized_candidate:
         for index, line in enumerate(lines):
             if _line_matches_item_identity(line, candidate_text, sku=sku):
@@ -245,8 +279,10 @@ def _extract_primary_visible_price(
     for line in truncated_lines:
         normalized_line = _normalize_text_for_match(line)
         if normalized_candidate and not wants_sheath:
-            if re.search(r"\b(with\s+sheath|knife\s+and\s+sheath|knife\s+sheath|sheath\s+set|gift\s+box|bundle)\b",
-                         normalized_line):
+            if re.search(
+                r"\b(with\s+sheath|knife\s+and\s+sheath|knife\s+sheath|sheath\s+set|gift\s+box|bundle)\b",
+                normalized_line,
+            ):
                 continue
         for dollar_match in re.finditer(r"\$\s*([\d,]+(?:\.\d{2})?)", line):
             try:
@@ -323,8 +359,16 @@ def _extract_cutco_price(
                 if not isinstance(entry, dict) or entry.get("@type") != "Product":
                     continue
                 if page_sku:
-                    entry_sku = str(entry.get("sku") or entry.get("productID") or "").strip().upper()
-                    if entry_sku and page_sku not in entry_sku and entry_sku not in page_sku:
+                    entry_sku = (
+                        str(entry.get("sku") or entry.get("productID") or "")
+                        .strip()
+                        .upper()
+                    )
+                    if (
+                        entry_sku
+                        and page_sku not in entry_sku
+                        and entry_sku not in page_sku
+                    ):
                         continue
                 offers = entry.get("offers", {})
                 if isinstance(offers, list):
@@ -354,16 +398,18 @@ def _extract_cutco_price(
     return None
 
 
-def _extract_sku_from_href(href: str, *, preserve_lettered_code: bool = False) -> str | None:
+def _extract_sku_from_href(
+    href: str, *, preserve_lettered_code: bool = False
+) -> str | None:
     """Pull a base SKU from a /p/ product URL."""
     parts = href.rstrip("/").split("/")
     slug = parts[-1].split("?")[0].split("&")[0].upper()
     if not slug:
         return None
     if preserve_lettered_code:
-        lead = re.match(r'^(\d{3,}(?:[A-Z]{0,3}(?:-\d+)?)?)', slug)
+        lead = re.match(r"^(\d{3,}(?:[A-Z]{0,3}(?:-\d+)?)?)", slug)
     else:
-        lead = re.match(r'^(\d{3,}[A-Z]{0,3})', slug)
+        lead = re.match(r"^(\d{3,}[A-Z]{0,3})", slug)
     if lead:
         candidate = lead.group(1)
     elif any(char.isdigit() for char in slug) and len(slug) <= 12:
@@ -395,12 +441,14 @@ def _discover_categories() -> list[tuple[str, str]]:
         "https://www.cutco.com/products/knives/",
     ]
     discovered = []
-    seen_slugs  = set()
+    seen_slugs = set()
     try:
         resp = None
         for url in discovery_urls:
             try:
-                resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+                resp = requests.get(
+                    url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+                )
                 if resp.status_code == 200:
                     break
             except Exception:
@@ -414,7 +462,7 @@ def _discover_categories() -> list[tuple[str, str]]:
             slug = href.split("/shop/")[-1].split("?")[0]
             if not slug or slug in seen_slugs or "knife-set" in slug or "set" == slug:
                 continue
-            url  = href if href.startswith("http") else f"https://www.cutco.com{href}"
+            url = href if href.startswith("http") else f"https://www.cutco.com{href}"
             name = slug.replace("-", " ").title()
             seen_slugs.add(slug)
             discovered.append((name, url))
@@ -426,6 +474,7 @@ def _discover_categories() -> list[tuple[str, str]]:
 
 def _build_category_list() -> list[tuple[str, str]]:
     """Merge auto-discovered categories with the hardcoded SCRAPE_CATEGORIES list."""
+
     def slug_of(url):
         return url.rstrip("/").split("/shop/")[-1].split("?")[0].lower()
 
@@ -499,7 +548,11 @@ def _build_set_member_entries(
                     break
             if matched_index is not None:
                 used_visible.add(matched_index)
-            visible_sku = _normalize_set_member_sku(matched_visible.get("sku")) if matched_visible else None
+            visible_sku = (
+                _normalize_set_member_sku(matched_visible.get("sku"))
+                if matched_visible
+                else None
+            )
             structured_sku = _normalize_set_member_sku(structured.get("sku"))
             fallback_sku = _normalize_set_member_sku(
                 member_skus[matched_index]
@@ -507,12 +560,18 @@ def _build_set_member_entries(
                 else structured.get("sku"),
             )
             chosen_sku = visible_sku or structured_sku or fallback_sku
-            member_entries.append({
-                "sku": chosen_sku,
-                "name": matched_visible.get("name") if matched_visible and matched_visible.get("name") else structured.get("name") or None,
-                "quantity": structured.get("quantity", 1),
-                "is_set_only": matched_visible.get("is_set_only", False) if matched_visible else False,
-            })
+            member_entries.append(
+                {
+                    "sku": chosen_sku,
+                    "name": matched_visible.get("name")
+                    if matched_visible and matched_visible.get("name")
+                    else structured.get("name") or None,
+                    "quantity": structured.get("quantity", 1),
+                    "is_set_only": matched_visible.get("is_set_only", False)
+                    if matched_visible
+                    else False,
+                }
+            )
 
         # Preserve any remaining visible rows that have a fallback SKU from the structured list.
         seen_skus = {
@@ -524,27 +583,35 @@ def _build_set_member_entries(
             if visible_index in used_visible:
                 continue
             visible_sku = _normalize_set_member_sku(visible_row.get("sku"))
-            fallback_sku = _normalize_set_member_sku(member_skus[visible_index]) if visible_index < len(member_skus) else None
+            fallback_sku = (
+                _normalize_set_member_sku(member_skus[visible_index])
+                if visible_index < len(member_skus)
+                else None
+            )
             chosen_sku = visible_sku or fallback_sku
             if not chosen_sku:
                 continue
             normalized_sku = _norm_member_name(chosen_sku)
             if normalized_sku in seen_skus:
                 continue
-            member_entries.append({
-                "sku": chosen_sku,
-                "name": visible_row.get("name") or None,
-                "quantity": member_quantities.get(chosen_sku, 1),
-                "is_set_only": visible_row.get("is_set_only", False),
-            })
+            member_entries.append(
+                {
+                    "sku": chosen_sku,
+                    "name": visible_row.get("name") or None,
+                    "quantity": member_quantities.get(chosen_sku, 1),
+                    "is_set_only": visible_row.get("is_set_only", False),
+                }
+            )
     else:
         for idx, sku in enumerate(member_skus):
-            member_entries.append({
-                "sku": sku,
-                "name": None,
-                "quantity": member_quantities.get(sku, 1),
-                "is_set_only": False,
-            })
+            member_entries.append(
+                {
+                    "sku": sku,
+                    "name": None,
+                    "quantity": member_quantities.get(sku, 1),
+                    "is_set_only": False,
+                }
+            )
     return member_entries
 
 
@@ -558,13 +625,19 @@ def _member_hover_title(member_name: str | None) -> str | None:
     if re.search(r"\s+[—–-]\s+", title):
         title = re.split(r"\s+[—–-]\s+", title, maxsplit=1)[0].strip()
     words = title.split()
-    if len(words) > 4 and not any(separator in title for separator in (",", ";", " / ")) and not re.search(r"\s+[—–]\s+", title):
+    if (
+        len(words) > 4
+        and not any(separator in title for separator in (",", ";", " / "))
+        and not re.search(r"\s+[—–]\s+", title)
+    ):
         title = " ".join(words[:2]).strip()
     return title or None
 
 
 @lru_cache(maxsize=512)
-def _infer_visible_member_sku(member_name: str | None, *, context_url: str | None = None) -> str | None:
+def _infer_visible_member_sku(
+    member_name: str | None, *, context_url: str | None = None
+) -> str | None:
     name = str(member_name or "").strip()
     if not name:
         return None
@@ -589,7 +662,9 @@ def _infer_visible_member_sku(member_name: str | None, *, context_url: str | Non
         if compact_slug != slug:
             candidate_slugs.append(compact_slug)
     for candidate_slug in candidate_slugs:
-        inferred_sku, _ = _fetch_sku_from_page(f"https://www.cutco.com/p/{candidate_slug}", preserve_lettered_code=True)
+        inferred_sku, _ = _fetch_sku_from_page(
+            f"https://www.cutco.com/p/{candidate_slug}", preserve_lettered_code=True
+        )
         if inferred_sku:
             return inferred_sku
     if context_url and "box" in lower:
@@ -614,14 +689,18 @@ def _resolve_visible_member_sku(
         if normalized_href_sku and normalized_href_sku != set_sku_norm:
             return href_sku
     for candidate_href in hrefs:
-        fetched_sku, _ = _fetch_sku_from_page(candidate_href, preserve_lettered_code=True)
+        fetched_sku, _ = _fetch_sku_from_page(
+            candidate_href, preserve_lettered_code=True
+        )
         normalized_fetched_sku = _normalize_set_member_sku(fetched_sku)
         if normalized_fetched_sku and normalized_fetched_sku != set_sku_norm:
             return fetched_sku
     return None
 
 
-def _collect_visible_set_piece_rows(pieces_list, *, context_url: str | None = None, set_sku: str | None = None) -> list[dict]:
+def _collect_visible_set_piece_rows(
+    pieces_list, *, context_url: str | None = None, set_sku: str | None = None
+) -> list[dict]:
     visible_rows: list[dict] = []
     for anchor in pieces_list.select("a.pdp-set-item-detail"):
         visible_name = ""
@@ -635,7 +714,13 @@ def _collect_visible_set_piece_rows(pieces_list, *, context_url: str | None = No
             continue
         visible_sku = _normalize_set_member_sku(anchor.get("data-item-selected"))
         if not visible_sku:
-            visible_sku = _normalize_set_member_sku(_extract_sku_from_image_src(anchor.find("img", src=True).get("src") if anchor.find("img", src=True) else None))
+            visible_sku = _normalize_set_member_sku(
+                _extract_sku_from_image_src(
+                    anchor.find("img", src=True).get("src")
+                    if anchor.find("img", src=True)
+                    else None
+                )
+            )
         if not visible_sku:
             href = anchor.get("href") or ""
             visible_sku = _resolve_visible_member_sku(
@@ -644,11 +729,13 @@ def _collect_visible_set_piece_rows(pieces_list, *, context_url: str | None = No
                 context_url=context_url,
                 set_sku=set_sku,
             )
-        visible_rows.append({
-            "name": visible_name,
-            "sku": visible_sku,
-            "is_set_only": not visible_sku,
-        })
+        visible_rows.append(
+            {
+                "name": visible_name,
+                "sku": visible_sku,
+                "is_set_only": not visible_sku,
+            }
+        )
     for li in pieces_list.select("li.pdp-piece-no-details"):
         visible_name = ""
         name_tag = li.select_one(".pdp-use-detail")
@@ -659,17 +746,27 @@ def _collect_visible_set_piece_rows(pieces_list, *, context_url: str | None = No
             visible_name = image.get("alt", "").strip() if image else ""
         if not visible_name:
             continue
-        visible_sku = _normalize_set_member_sku(_extract_sku_from_image_src(li.find("img", src=True).get("src") if li.find("img", src=True) else None))
-        visible_rows.append({
-            "name": visible_name,
-            "sku": visible_sku,
-            "is_set_only": not visible_sku,
-        })
+        visible_sku = _normalize_set_member_sku(
+            _extract_sku_from_image_src(
+                li.find("img", src=True).get("src")
+                if li.find("img", src=True)
+                else None
+            )
+        )
+        visible_rows.append(
+            {
+                "name": visible_name,
+                "sku": visible_sku,
+                "is_set_only": not visible_sku,
+            }
+        )
     return visible_rows
 
 
 def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
-    sku = (str(raw_sku or "").upper().strip().split("/")[0] if raw_sku is not None else "")
+    sku = (
+        str(raw_sku or "").upper().strip().split("/")[0] if raw_sku is not None else ""
+    )
     if not sku:
         return None
     sku = re.sub(r"[\s\-]+$", "", sku)
@@ -691,7 +788,9 @@ def _normalize_set_member_sku(raw_sku: str | None) -> str | None:
 
 
 @lru_cache(maxsize=1024)
-def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> tuple[str | None, str | None]:
+def _fetch_sku_from_page(
+    url: str, *, preserve_lettered_code: bool = False
+) -> tuple[str | None, str | None]:
     """Fetch a product page and return (sku, name) from on-page content."""
     try:
         resp = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
@@ -704,7 +803,9 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
         strategy_log: list[str] = []
 
         # Strategy 0: SKU embedded in the URL slug
-        url_slug_sku = _extract_sku_from_href(url, preserve_lettered_code=preserve_lettered_code)
+        url_slug_sku = _extract_sku_from_href(
+            url, preserve_lettered_code=preserve_lettered_code
+        )
         if url_slug_sku:
             sku = url_slug_sku
             strategy_log.append(f"slug={sku}")
@@ -733,9 +834,10 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
             for js_var_name in ("prPageId", "defaultWebItemSingle"):
                 sku_match = re.search(
                     rf"""(?:const|var|let)\s+{js_var_name}\s*=\s*["']([^"']+)["']""",
-                    raw_html)
+                    raw_html,
+                )
                 if sku_match:
-                    digits = re.match(r'^(\d{2,}(?:-\d+)?)', sku_match.group(1).strip())
+                    digits = re.match(r"^(\d{2,}(?:-\d+)?)", sku_match.group(1).strip())
                     if digits:
                         sku = digits.group(1)
                         break
@@ -746,7 +848,9 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
         if not sku:
             sku_match = re.search(
                 r"""["']?sku["']?\s*:\s*["']?(\d{2,4}(?:-\d+|[A-Z]{0,2})?)["']?""",
-                raw_html, re.IGNORECASE)
+                raw_html,
+                re.IGNORECASE,
+            )
             if sku_match:
                 sku = sku_match.group(1).upper()
                 strategy_log.append(f"inline-js={sku}")
@@ -754,7 +858,9 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
         # Strategy 4: meta tags
         if not sku:
             for attr in ("product:retailer_item_id", "product:sku"):
-                tag = soup.find("meta", property=attr) or soup.find("meta", attrs={"name": attr})
+                tag = soup.find("meta", property=attr) or soup.find(
+                    "meta", attrs={"name": attr}
+                )
                 if tag and tag.get("content", "").strip():
                     sku = tag["content"].strip().upper()
                     strategy_log.append(f"meta={sku}")
@@ -767,7 +873,9 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
         if not sku:
             sku_text = soup.find(string=re.compile(r"#\d{2,4}(?:-\d+|[A-Z]{0,2})?\b"))
             if sku_text:
-                sku_match = re.search(r"#(\d{2,4}(?:-\d+|[A-Z]{0,2})?)\b", sku_text.strip(), re.IGNORECASE)
+                sku_match = re.search(
+                    r"#(\d{2,4}(?:-\d+|[A-Z]{0,2})?)\b", sku_text.strip(), re.IGNORECASE
+                )
                 if sku_match:
                     sku = sku_match.group(1).upper()
                     strategy_log.append(f"visible-text={sku}")
@@ -777,7 +885,9 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
             page_text = soup.get_text(" ", strip=True)
             sku_match = re.search(
                 r"(?:model|item|sku|product)\s*(?:no\.?|number|#)?\s*[:#]?\s*(\d{2,4}(?:-\d+|[A-Z]{0,2})?)\b",
-                page_text, re.IGNORECASE)
+                page_text,
+                re.IGNORECASE,
+            )
             if sku_match:
                 sku = sku_match.group(1).upper()
                 strategy_log.append(f"keyword={sku}")
@@ -790,13 +900,22 @@ def _fetch_sku_from_page(url: str, *, preserve_lettered_code: bool = False) -> t
                 sku = stripped
 
         # Reject CSS hex colors, but keep valid Cutco codes like 2130CD.
-        if sku and re.fullmatch(r"[0-9A-F]{6}", sku, re.IGNORECASE) and not sku[0].isdigit():
+        if (
+            sku
+            and re.fullmatch(r"[0-9A-F]{6}", sku, re.IGNORECASE)
+            and not sku[0].isdigit()
+        ):
             sku = None
 
         page_heading = soup.find("h1")
         name = page_heading.get_text(strip=True) if page_heading else None
-        logger.info("SKU fetch: %s → sku=%s [%s] name=%s",
-                    url, sku, ", ".join(strategy_log) or "none", name)
+        logger.info(
+            "SKU fetch: %s → sku=%s [%s] name=%s",
+            url,
+            sku,
+            ", ".join(strategy_log) or "none",
+            name,
+        )
         return sku, name
     except Exception as exc:
         logger.warning("SKU fetch failed: %s — %s", url, exc)
@@ -833,7 +952,11 @@ def scrape_item_uses(url: str) -> list[str]:
         if not uses_ul:
             return []
 
-        uses = [li.get_text(strip=True) for li in uses_ul.find_all("li") if li.get_text(strip=True)]
+        uses = [
+            li.get_text(strip=True)
+            for li in uses_ul.find_all("li")
+            if li.get_text(strip=True)
+        ]
         logger.debug("Uses fetch: %s → %d uses", resolved_url or clean_url, len(uses))
         return uses
     except Exception as exc:
@@ -842,16 +965,16 @@ def scrape_item_uses(url: str) -> list[str]:
 
 
 _EDGE_NORMALIZE = {
-    "double-d":           "Double-D",
-    "double-d®":          "Double-D",
-    "micro double-d™":    "Micro Double-D",
-    "micro double-d":     "Micro Double-D",
-    "straight":           "Straight",
-    "serrated":           "Serrated",
-    "micro-d":            "Micro-D",
-    "micro-d®":           "Micro-D",
-    "tec edge":           "Tec Edge",
-    "tec-edge":           "Tec Edge",
+    "double-d": "Double-D",
+    "double-d®": "Double-D",
+    "micro double-d™": "Micro Double-D",
+    "micro double-d": "Micro Double-D",
+    "straight": "Straight",
+    "serrated": "Serrated",
+    "micro-d": "Micro-D",
+    "micro-d®": "Micro-D",
+    "tec edge": "Tec Edge",
+    "tec-edge": "Tec Edge",
 }
 
 
@@ -863,11 +986,11 @@ def scrape_item_specs(url: str) -> dict:
     """
     clean_url = url.split("&view=")[0].split("?view=")[0]
     result = {
-        "edge_type":      "Unknown",
-        "msrp":           None,
-        "blade_length":   None,
+        "edge_type": "Unknown",
+        "msrp": None,
+        "blade_length": None,
         "overall_length": None,
-        "weight":         None,
+        "weight": None,
     }
     try:
         resolved_url, raw_html = _fetch_cutco_page(clean_url)
@@ -876,28 +999,40 @@ def scrape_item_specs(url: str) -> dict:
         # ── Edge type ────────────────────────────────────────────────────────
         item_class_match = re.search(r'"itemClass"\s*:\s*"([^"]+)"', raw_html)
         item_subclass_match = re.search(r'"itemSubclass"\s*:\s*"([^"]+)"', raw_html)
-        if (item_class_match and item_class_match.group(1) == "FLA"
-                and item_subclass_match and item_subclass_match.group(1) == "STL"):
+        if (
+            item_class_match
+            and item_class_match.group(1) == "FLA"
+            and item_subclass_match
+            and item_subclass_match.group(1) == "STL"
+        ):
             result["edge_type"] = "N/A"
         else:
-            edge_match = re.search(r'"specName"\s*:\s*"Edge"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html)
+            edge_match = re.search(
+                r'"specName"\s*:\s*"Edge"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html
+            )
             if not edge_match:
-                edge_match = re.search(r'"specValue"\s*:\s*"([^"]+)"\s*,\s*"specName"\s*:\s*"Edge"', raw_html)
+                edge_match = re.search(
+                    r'"specValue"\s*:\s*"([^"]+)"\s*,\s*"specName"\s*:\s*"Edge"',
+                    raw_html,
+                )
             if edge_match:
-                result["edge_type"] = _EDGE_NORMALIZE.get(edge_match.group(1).strip().lower(), "Unknown")
+                result["edge_type"] = _EDGE_NORMALIZE.get(
+                    edge_match.group(1).strip().lower(), "Unknown"
+                )
             else:
                 result["edge_type"] = "N/A"
 
         # ── itemSpecs (blade length, overall length, weight) ─────────────────
         spec_map = {
-            "length - blade":   "blade_length",
+            "length - blade": "blade_length",
             "length - overall": "overall_length",
             "weight - knife only": "weight",
-            "weight":           "weight",
+            "weight": "weight",
         }
         for spec_match in re.finditer(
-                r'"specName"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"specValue"\s*:\s*"((?:\\.|[^"\\])*)"',
-                raw_html):
+            r'"specName"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"specValue"\s*:\s*"((?:\\.|[^"\\])*)"',
+            raw_html,
+        ):
             try:
                 spec_name = json.loads(f'"{spec_match.group(1)}"').strip().lower()
                 spec_value = json.loads(f'"{spec_match.group(2)}"').strip()
@@ -909,7 +1044,9 @@ def scrape_item_specs(url: str) -> dict:
                 result[field] = spec_value
 
         # ── MSRP ─────────────────────────────────────────────────────────────
-        result["msrp"] = _extract_cutco_price(raw_html, page_url=resolved_url or clean_url)
+        result["msrp"] = _extract_cutco_price(
+            raw_html, page_url=resolved_url or clean_url
+        )
 
         logger.debug("Specs: %s → %s", resolved_url or clean_url, result)
     except Exception as exc:
@@ -1030,10 +1167,14 @@ _VARIANT_COLOR_WORDS = {
     "yellow",
 }
 
-_PAGE_COLOR_RE = re.compile(r"\bColor:\s*([A-Za-z][A-Za-z0-9'’&()./\-\s]{0,60})", re.IGNORECASE)
+_PAGE_COLOR_RE = re.compile(
+    r"\bColor:\s*([A-Za-z][A-Za-z0-9'’&()./\-\s]{0,60})", re.IGNORECASE
+)
 
 
-def _collect_variant_candidate(candidates: list[str], seen: set[str], value: str | None) -> None:
+def _collect_variant_candidate(
+    candidates: list[str], seen: set[str], value: str | None
+) -> None:
     candidate = _normalize_variant_label(value or "")
     if not candidate:
         return
@@ -1084,7 +1225,12 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
         generic_swatch_nodes: list = []
         for swatch in fieldset.select(".swatch.product-option"):
             swatch_classes = {cls.lower() for cls in swatch.get("class", [])}
-            if swatch_classes & {"engraving-swatch", "design-button", "location-button", "font-swatch"}:
+            if swatch_classes & {
+                "engraving-swatch",
+                "design-button",
+                "location-button",
+                "font-swatch",
+            }:
                 continue
             if swatch_classes & _VARIANT_SWATCH_CLASS_HINTS:
                 preferred_swatch_nodes.append(swatch)
@@ -1107,7 +1253,9 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
                 normalized = _normalize_variant_label(source)
                 if not normalized:
                     continue
-                if swatch in generic_swatch_nodes and not _looks_like_variant_color(normalized):
+                if swatch in generic_swatch_nodes and not _looks_like_variant_color(
+                    normalized
+                ):
                     continue
                 _collect_variant_candidate(candidates, seen, source)
                 added = True
@@ -1117,12 +1265,16 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
             reader_only = swatch.select_one(".reader-only")
             if reader_only:
                 reader_text = reader_only.get_text(" ", strip=True)
-                if swatch in generic_swatch_nodes and not _looks_like_variant_color(reader_text):
+                if swatch in generic_swatch_nodes and not _looks_like_variant_color(
+                    reader_text
+                ):
                     continue
                 _collect_variant_candidate(candidates, seen, reader_text)
             else:
                 swatch_text = swatch.get_text(" ", strip=True)
-                if swatch in generic_swatch_nodes and not _looks_like_variant_color(swatch_text):
+                if swatch in generic_swatch_nodes and not _looks_like_variant_color(
+                    swatch_text
+                ):
                     continue
                 _collect_variant_candidate(candidates, seen, swatch_text)
     return tuple(candidates)
@@ -1241,9 +1393,13 @@ def scrape_purple_campaign_variants() -> tuple[dict[str, str], ...]:
     """Fetch the Cutco Cares purple campaign page and return promo variant hints."""
     campaign_url = "https://www.cutco.com/p/cutco-cares-alzheimers/"
     try:
-        resp = requests.get(campaign_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(
+            campaign_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+        )
         if resp.status_code != 200:
-            logger.debug("Purple campaign fetch: HTTP %d for %s", resp.status_code, campaign_url)
+            logger.debug(
+                "Purple campaign fetch: HTTP %d for %s", resp.status_code, campaign_url
+            )
             return ()
         soup = BeautifulSoup(resp.text, "html.parser")
         candidates: list[dict[str, str]] = []
@@ -1287,7 +1443,9 @@ def scrape_purple_campaign_variants() -> tuple[dict[str, str], ...]:
                     "color": "Purple",
                 }
             )
-        logger.debug("Purple campaign fetch: %s → %d candidates", campaign_url, len(candidates))
+        logger.debug(
+            "Purple campaign fetch: %s → %d candidates", campaign_url, len(candidates)
+        )
         return tuple(candidates)
     except Exception as exc:
         logger.warning("Purple campaign scrape failed for %s: %s", campaign_url, exc)
@@ -1300,15 +1458,18 @@ def scrape_edge_type(url: str) -> str:
     return scrape_item_specs(url)["edge_type"]
 
 
-def scrape_catalog(progress_cb: Callable[[str], None] | None = None) -> tuple[list[dict], list[tuple[str, str]]]:
+def scrape_catalog(
+    progress_cb: Callable[[str], None] | None = None,
+) -> tuple[list[dict], list[tuple[str, str]]]:
     """Scrape all item categories and return items plus set candidates."""
+
     def _progress(msg: str) -> None:
         if progress_cb is not None:
             progress_cb(msg)
 
-    results        = []
+    results = []
     set_candidates: list[tuple[str, str]] = []
-    seen_skus      = set()
+    seen_skus = set()
     seen_set_urls: set[str] = set()
     slug_queue: list[tuple[str, str, str | None]] = []
     seen_slug_urls: set[str] = set()
@@ -1320,35 +1481,55 @@ def scrape_catalog(progress_cb: Callable[[str], None] | None = None) -> tuple[li
             continue
         _progress(f"Scraping category: {cat_name}…")
         try:
-            resp = requests.get(cat_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+            resp = requests.get(
+                cat_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+            )
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
 
             product_links = []
             for element in soup.descendants:
                 if element.name in ("h2", "h3", "h4") and product_links:
-                    if any(kw in element.get_text(strip=True).lower()
-                           for kw in _BUNDLE_KEYWORDS):
-                        logger.debug("Bundle section detected on %s: '%s'",
-                                     cat_url, element.get_text(strip=True))
+                    if any(
+                        kw in element.get_text(strip=True).lower()
+                        for kw in _BUNDLE_KEYWORDS
+                    ):
+                        logger.debug(
+                            "Bundle section detected on %s: '%s'",
+                            cat_url,
+                            element.get_text(strip=True),
+                        )
                         break
                 if element.name == "a" and "/p/" in element.get("href", ""):
                     product_links.append(element)
 
-            logger.debug("%s: found %d /p/ links — %s",
-                         cat_name, len(product_links),
-                         [anchor.get("href", "") for anchor in product_links[:10]])
+            logger.debug(
+                "%s: found %d /p/ links — %s",
+                cat_name,
+                len(product_links),
+                [anchor.get("href", "") for anchor in product_links[:10]],
+            )
 
             for anchor, href, name_hint in _dedupe_product_links(product_links):
                 base_href = href.split("&")[0]
-                preserve_lettered_code = cat_name in COOKWARE_CATEGORIES or cat_name == "Sheaths"
-                sku = _extract_sku_from_href(base_href, preserve_lettered_code=preserve_lettered_code)
-                prod_url = href if href.startswith("http") else f"https://www.cutco.com{href}"
+                preserve_lettered_code = (
+                    cat_name in COOKWARE_CATEGORIES or cat_name == "Sheaths"
+                )
+                sku = _extract_sku_from_href(
+                    base_href, preserve_lettered_code=preserve_lettered_code
+                )
+                prod_url = (
+                    href if href.startswith("http") else f"https://www.cutco.com{href}"
+                )
                 prod_url = _resolve_cutco_product_url(prod_url)
 
                 name = name_hint
 
-                if cat_name == "Sheaths" or (name and "sheath" in name.lower() and "with sheath" not in name.lower()):
+                if cat_name == "Sheaths" or (
+                    name
+                    and "sheath" in name.lower()
+                    and "with sheath" not in name.lower()
+                ):
                     sku = None
 
                 if not sku:
@@ -1367,9 +1548,14 @@ def scrape_catalog(progress_cb: Callable[[str], None] | None = None) -> tuple[li
                         set_candidates.append((name, prod_url))
                     continue
                 seen_skus.add(sku)
-                results.append(dict(name=name, sku=sku,
-                                    category=_resolve_category(sku, cat_name, name),
-                                    url=prod_url))
+                results.append(
+                    dict(
+                        name=name,
+                        sku=sku,
+                        category=_resolve_category(sku, cat_name, name),
+                        url=prod_url,
+                    )
+                )
             time.sleep(0.4)
             _progress(f"Finished category: {cat_name} ({len(results)} items so far)")
         except Exception as exc:
@@ -1385,7 +1571,8 @@ def scrape_catalog(progress_cb: Callable[[str], None] | None = None) -> tuple[li
                 pool.submit(
                     _fetch_sku_from_page,
                     prod_url,
-                    preserve_lettered_code=cat_name in COOKWARE_CATEGORIES or cat_name == "Sheaths",
+                    preserve_lettered_code=cat_name in COOKWARE_CATEGORIES
+                    or cat_name == "Sheaths",
                 ): (prod_url, cat_name, cat_name_hint)
                 for prod_url, cat_name, cat_name_hint in slug_queue
             }
@@ -1401,11 +1588,20 @@ def scrape_catalog(progress_cb: Callable[[str], None] | None = None) -> tuple[li
                         set_candidates.append((name, prod_url))
                     continue
                 seen_skus.add(sku)
-                results.append(dict(name=name, sku=sku,
-                                    category=_resolve_category(sku, cat_name, name),
-                                    url=prod_url))
+                results.append(
+                    dict(
+                        name=name,
+                        sku=sku,
+                        category=_resolve_category(sku, cat_name, name),
+                        url=prod_url,
+                    )
+                )
                 added_from_slugs += 1
-        logger.info("Slug queue: %d pages fetched, %d items added", len(slug_queue), added_from_slugs)
+        logger.info(
+            "Slug queue: %d pages fetched, %d items added",
+            len(slug_queue),
+            added_from_slugs,
+        )
         _progress(f"Finished slug pages: {added_from_slugs} items added")
 
     return results, set_candidates
@@ -1420,7 +1616,9 @@ def scrape_sets(
     set_links = []
 
     try:
-        resp = requests.get(SCRAPE_SETS_URL, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(
+            SCRAPE_SETS_URL, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+        )
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         for anchor in soup.select("a[href*='/p/']"):
@@ -1441,7 +1639,7 @@ def scrape_sets(
     except Exception as exc:
         logger.warning("Scrape failed for sets listing: %s", exc)
 
-    for name, url in (extra_candidates or []):
+    for name, url in extra_candidates or []:
         slug = url.rstrip("/").split("/")[-1].split("&")[0]
         if slug not in seen_slugs:
             seen_slugs.add(slug)
@@ -1456,7 +1654,9 @@ def scrape_sets(
             fetch_url += sep + "view=product"
         try:
             set_sku, _ = _fetch_sku_from_page(fetch_url)
-            resp = requests.get(fetch_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+            resp = requests.get(
+                fetch_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+            )
             resp.raise_for_status()
             raw_html = resp.text
             detail = BeautifulSoup(raw_html, "html.parser")
@@ -1474,9 +1674,9 @@ def scrape_sets(
             _set_list_json = None
             _url_variant = fetch_url.split("/")[-1].split("?")[0].split("&")[0].upper()
             _search_from = 0
-            if re.match(r'^\d+[A-Z]?$', _url_variant):
+            if re.match(r"^\d+[A-Z]?$", _url_variant):
                 # Find the webItemsMap entry specifically (key followed by {)
-                _var_pos = raw_html.find(f'"{_url_variant}"' + ':{')
+                _var_pos = raw_html.find(f'"{_url_variant}"' + ":{")
                 if _var_pos >= 0:
                     _search_from = _var_pos
             _key_match = re.search(r'"itemSetList"\s*:\s*\[', raw_html[_search_from:])
@@ -1484,9 +1684,9 @@ def scrape_sets(
                 _start = _search_from + _key_match.end() - 1  # abs pos of opening [
                 _depth, _end = 0, _start
                 for _i, _ch in enumerate(raw_html[_start:], _start):
-                    if _ch == '[':
+                    if _ch == "[":
                         _depth += 1
-                    elif _ch == ']':
+                    elif _ch == "]":
                         _depth -= 1
                         if _depth == 0:
                             _end = _i + 1
@@ -1497,22 +1697,36 @@ def scrape_sets(
                 try:
                     set_list = json.loads(_set_list_json)
                     for entry in set_list:
-                        base_sku = _normalize_set_member_sku(entry.get("childItemNumber"))
+                        base_sku = _normalize_set_member_sku(
+                            entry.get("childItemNumber")
+                        )
                         if not base_sku:
                             continue
                         qty = int(entry.get("qty") or 1)
                         if base_sku not in seen_member:
                             seen_member.add(base_sku)
                             member_skus.append(base_sku)
-                            member_names.append(str(entry.get("name") or entry.get("itemName") or "").strip())
+                            member_names.append(
+                                str(
+                                    entry.get("name") or entry.get("itemName") or ""
+                                ).strip()
+                            )
                             member_quantities[base_sku] = qty
                             member_is_set_only.append(False)
-                            structured_members.append({
-                                "sku": base_sku,
-                                "name": str(entry.get("name") or entry.get("itemName") or "").strip(),
-                                "quantity": qty,
-                            })
-                    logger.debug("Set '%s': itemSetList → %d members", set_link["name"], len(member_skus))
+                            structured_members.append(
+                                {
+                                    "sku": base_sku,
+                                    "name": str(
+                                        entry.get("name") or entry.get("itemName") or ""
+                                    ).strip(),
+                                    "quantity": qty,
+                                }
+                            )
+                    logger.debug(
+                        "Set '%s': itemSetList → %d members",
+                        set_link["name"],
+                        len(member_skus),
+                    )
                 except (json.JSONDecodeError, ValueError, TypeError) as exc:
                     logger.debug("itemSetList parse failed for %s: %s", fetch_url, exc)
                     member_skus.clear()
@@ -1536,12 +1750,18 @@ def scrape_sets(
                             member_names.append("")
                             member_quantities[base_sku] = 1
                             member_is_set_only.append(False)
-                            structured_members.append({
-                                "sku": base_sku,
-                                "name": "",
-                                "quantity": 1,
-                            })
-                logger.debug("Set '%s': image fallback → %d members", set_link["name"], len(member_skus))
+                            structured_members.append(
+                                {
+                                    "sku": base_sku,
+                                    "name": "",
+                                    "quantity": 1,
+                                }
+                            )
+                logger.debug(
+                    "Set '%s': image fallback → %d members",
+                    set_link["name"],
+                    len(member_skus),
+                )
 
             # Strategy 3: visible Set Pieces labels, if present
             visible_rows: list[dict] = []
@@ -1553,13 +1773,19 @@ def scrape_sets(
             if heading:
                 pieces_list = heading.find_next("ul")
                 if pieces_list:
-                    visible_rows.extend(_collect_visible_set_piece_rows(
-                        pieces_list,
-                        context_url=set_link["url"],
-                        set_sku=set_sku,
-                    ))
+                    visible_rows.extend(
+                        _collect_visible_set_piece_rows(
+                            pieces_list,
+                            context_url=set_link["url"],
+                            set_sku=set_sku,
+                        )
+                    )
             if visible_rows:
-                logger.debug("Set '%s': visible Set Pieces labels → %d names", set_link["name"], len(visible_rows))
+                logger.debug(
+                    "Set '%s': visible Set Pieces labels → %d names",
+                    set_link["name"],
+                    len(visible_rows),
+                )
 
             def _norm_member_name(value: str) -> str:
                 return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
@@ -1575,7 +1801,9 @@ def scrape_sets(
                     for inner_idx, structured in enumerate(structured_members):
                         if inner_idx in used_structured:
                             continue
-                        structured_name = _norm_member_name(str(structured.get("name") or ""))
+                        structured_name = _norm_member_name(
+                            str(structured.get("name") or "")
+                        )
                         if visible_norm and structured_name == visible_norm:
                             matched_structured = structured
                             matched_index = inner_idx
@@ -1583,8 +1811,16 @@ def scrape_sets(
                     if matched_index is not None:
                         used_structured.add(matched_index)
                     visible_sku = _normalize_set_member_sku(visible_row.get("sku"))
-                    structured_sku = _normalize_set_member_sku(matched_structured.get("sku")) if matched_structured else None
-                    fallback_sku = _normalize_set_member_sku(member_skus[idx]) if idx < len(member_skus) else None
+                    structured_sku = (
+                        _normalize_set_member_sku(matched_structured.get("sku"))
+                        if matched_structured
+                        else None
+                    )
+                    fallback_sku = (
+                        _normalize_set_member_sku(member_skus[idx])
+                        if idx < len(member_skus)
+                        else None
+                    )
                     fallback_qty = member_quantities.get(
                         visible_sku or structured_sku or fallback_sku,
                         1,
@@ -1592,29 +1828,46 @@ def scrape_sets(
                     chosen_sku = visible_sku or structured_sku or fallback_sku
                     if chosen_sku and set_sku and chosen_sku == set_sku:
                         chosen_sku = visible_sku or structured_sku or fallback_sku
-                    member_entries.append(dict(
-                        sku=chosen_sku,
-                        name=visible_name,
-                        quantity=matched_structured["quantity"] if matched_structured else fallback_qty,
-                        is_set_only=visible_row["is_set_only"] if matched_structured is None else False,
-                    ))
+                    member_entries.append(
+                        dict(
+                            sku=chosen_sku,
+                            name=visible_name,
+                            quantity=matched_structured["quantity"]
+                            if matched_structured
+                            else fallback_qty,
+                            is_set_only=visible_row["is_set_only"]
+                            if matched_structured is None
+                            else False,
+                        )
+                    )
             else:
                 for idx, sku in enumerate(member_skus):
-                    member_entries.append(dict(
-                        sku=sku,
-                        name=member_names[idx] if idx < len(member_names) and member_names[idx] else None,
-                        quantity=member_quantities.get(sku, 1),
-                        is_set_only=member_is_set_only[idx] if idx < len(member_is_set_only) else False,
-                    ))
+                    member_entries.append(
+                        dict(
+                            sku=sku,
+                            name=member_names[idx]
+                            if idx < len(member_names) and member_names[idx]
+                            else None,
+                            quantity=member_quantities.get(sku, 1),
+                            is_set_only=member_is_set_only[idx]
+                            if idx < len(member_is_set_only)
+                            else False,
+                        )
+                    )
 
-            logger.debug("Set '%s': sku=%s, %d members", set_link["name"], set_sku, len(member_skus))
+            logger.debug(
+                "Set '%s': sku=%s, %d members",
+                set_link["name"],
+                set_sku,
+                len(member_skus),
+            )
             return dict(
-                name             = set_link["name"],
-                sku              = set_sku,
-                url              = set_link["url"],
-                member_skus      = member_skus,
-                member_quantities= member_quantities,
-                member_entries   = member_entries,
+                name=set_link["name"],
+                sku=set_sku,
+                url=set_link["url"],
+                member_skus=member_skus,
+                member_quantities=member_quantities,
+                member_entries=member_entries,
             )
         except Exception as exc:
             logger.warning("Scrape failed for set %s: %s", set_link["url"], exc)

@@ -6,7 +6,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Callable
 
-from constants import KNIFE_TASK_PRESETS, canonicalize_availability, canonicalize_category
+from constants import (
+    KNIFE_TASK_PRESETS,
+    canonicalize_availability,
+    canonicalize_category,
+)
 from extensions import db
 from models import Item, KnifeTask, Ownership, ensure_unknown_variant
 from schema_migrations import apply_schema_migrations
@@ -61,14 +65,20 @@ def get_bootstrap_state() -> dict:
     state = db.session.get(BootstrapState, BOOTSTRAP_STATE_NAME)
     if state is None:
         return {"name": BOOTSTRAP_STATE_NAME, "version": 0, "updated_at": None}
-    return {"name": state.name, "version": state.version, "updated_at": state.updated_at}
+    return {
+        "name": state.name,
+        "version": state.version,
+        "updated_at": state.updated_at,
+    }
 
 
 def get_bootstrap_history(limit: int = 10) -> list[dict]:
     """Return the most recent bootstrap migration rows."""
     history = (
         db.session.execute(
-            db.select(BootstrapHistory).order_by(BootstrapHistory.version.desc()).limit(limit)
+            db.select(BootstrapHistory)
+            .order_by(BootstrapHistory.version.desc())
+            .limit(limit)
         )
         .scalars()
         .all()
@@ -83,7 +93,9 @@ def _set_bootstrap_version(version: int) -> None:
     """Update the stored bootstrap version."""
     state = db.session.get(BootstrapState, BOOTSTRAP_STATE_NAME)
     if state is None:
-        state = BootstrapState(name=BOOTSTRAP_STATE_NAME, version=version, updated_at=_now_utc())
+        state = BootstrapState(
+            name=BOOTSTRAP_STATE_NAME, version=version, updated_at=_now_utc()
+        )
         db.session.add(state)
     else:
         state.version = version
@@ -94,7 +106,9 @@ def _record_history(version: int, name: str) -> None:
     """Record or refresh a bootstrap history entry."""
     history = db.session.get(BootstrapHistory, version)
     if history is None:
-        db.session.add(BootstrapHistory(version=version, name=name, applied_at=_now_utc()))
+        db.session.add(
+            BootstrapHistory(version=version, name=name, applied_at=_now_utc())
+        )
     else:
         history.name = name
         history.applied_at = _now_utc()
@@ -127,8 +141,12 @@ BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
     BootstrapMigration(1, "seed_tasks", lambda: _seed_default_tasks()),
     BootstrapMigration(2, "cleanup_invalid_skus", lambda: _cleanup_invalid_items()),
     BootstrapMigration(3, "normalize_categories", lambda: _normalize_categories()),
-    BootstrapMigration(4, "ensure_unknown_variants", lambda: _ensure_unknown_variants()),
-    BootstrapMigration(5, "split_ownership_quantity_notes", lambda: _split_quantity_notes()),
+    BootstrapMigration(
+        4, "ensure_unknown_variants", lambda: _ensure_unknown_variants()
+    ),
+    BootstrapMigration(
+        5, "split_ownership_quantity_notes", lambda: _split_quantity_notes()
+    ),
     BootstrapMigration(6, "normalize_availability", lambda: _normalize_availability()),
 )
 
@@ -148,7 +166,11 @@ def _cleanup_invalid_items() -> None:
     """Remove obviously invalid imported items."""
     invalid_items = Item.query.filter(Item.sku.op("GLOB")("[0-9]")).all()
     for item in invalid_items:
-        logger.info("Removing item with invalid single-digit SKU: %s (sku=%s)", item.name, item.sku)
+        logger.info(
+            "Removing item with invalid single-digit SKU: %s (sku=%s)",
+            item.name,
+            item.sku,
+        )
         db.session.delete(item)
 
 
@@ -162,7 +184,10 @@ def _normalize_categories() -> None:
             item.category = canonical_category
             renamed_categories += 1
     if renamed_categories:
-        logger.info("Category normalization: updated %d item category value(s)", renamed_categories)
+        logger.info(
+            "Category normalization: updated %d item category value(s)",
+            renamed_categories,
+        )
 
 
 def _normalize_availability() -> None:
@@ -187,7 +212,9 @@ def _ensure_unknown_variants() -> None:
         ensure_unknown_variant(item)
 
 
-def _split_quantity_fields_from_notes(notes: str | None) -> tuple[int | None, int | None, str | None]:
+def _split_quantity_fields_from_notes(
+    notes: str | None,
+) -> tuple[int | None, int | None, str | None]:
     """Extract quantity fields from legacy ownership notes."""
     if not notes:
         return None, None, None
@@ -215,7 +242,9 @@ def _split_quantity_notes() -> None:
     """Backfill ownership quantity fields from notes."""
     updated = 0
     for ownership in Ownership.query.all():
-        purchased, given_away, cleaned_notes = _split_quantity_fields_from_notes(ownership.notes)
+        purchased, given_away, cleaned_notes = _split_quantity_fields_from_notes(
+            ownership.notes
+        )
         changed = False
         if purchased is not None and ownership.quantity_purchased is None:
             ownership.quantity_purchased = purchased

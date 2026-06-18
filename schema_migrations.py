@@ -59,13 +59,19 @@ def get_schema_state() -> dict:
     state = db.session.get(SchemaState, SCHEMA_STATE_NAME)
     if state is None:
         return {"name": SCHEMA_STATE_NAME, "version": 0, "updated_at": None}
-    return {"name": state.name, "version": state.version, "updated_at": state.updated_at}
+    return {
+        "name": state.name,
+        "version": state.version,
+        "updated_at": state.updated_at,
+    }
 
 
 def get_schema_history(limit: int = 10) -> list[dict]:
     """Return the most recent schema migration history rows."""
     history = (
-        db.session.execute(db.select(SchemaHistory).order_by(SchemaHistory.version.desc()).limit(limit))
+        db.session.execute(
+            db.select(SchemaHistory).order_by(SchemaHistory.version.desc()).limit(limit)
+        )
         .scalars()
         .all()
     )
@@ -79,7 +85,9 @@ def _set_schema_version(version: int) -> None:
     """Update the stored schema version."""
     state = db.session.get(SchemaState, SCHEMA_STATE_NAME)
     if state is None:
-        state = SchemaState(name=SCHEMA_STATE_NAME, version=version, updated_at=_now_utc())
+        state = SchemaState(
+            name=SCHEMA_STATE_NAME, version=version, updated_at=_now_utc()
+        )
         db.session.add(state)
     else:
         state.version = version
@@ -96,7 +104,9 @@ def _record_history(version: int, name: str) -> None:
         history.applied_at = _now_utc()
 
 
-def _backfill_history(current_version: int, migrations: tuple[SchemaMigration, ...]) -> bool:
+def _backfill_history(
+    current_version: int, migrations: tuple[SchemaMigration, ...]
+) -> bool:
     """Backfill missing history rows for already-applied migrations."""
     if current_version <= 0:
         return False
@@ -139,18 +149,40 @@ def _schema_column_migrations() -> None:
         "ALTER TABLE item_variants ADD COLUMN is_unicorn BOOLEAN NOT NULL DEFAULT 0",
     )
     _add_column("items", "msrp", "ALTER TABLE items ADD COLUMN msrp REAL")
-    _add_column("ownership", "target_price", "ALTER TABLE ownership ADD COLUMN target_price REAL")
-    _add_column("item_sets", "quantity", "ALTER TABLE item_sets ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1")
-    _add_column("items", "blade_length", "ALTER TABLE items ADD COLUMN blade_length VARCHAR(20)")
-    _add_column("items", "overall_length", "ALTER TABLE items ADD COLUMN overall_length VARCHAR(20)")
+    _add_column(
+        "ownership",
+        "target_price",
+        "ALTER TABLE ownership ADD COLUMN target_price REAL",
+    )
+    _add_column(
+        "item_sets",
+        "quantity",
+        "ALTER TABLE item_sets ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1",
+    )
+    _add_column(
+        "items", "blade_length", "ALTER TABLE items ADD COLUMN blade_length VARCHAR(20)"
+    )
+    _add_column(
+        "items",
+        "overall_length",
+        "ALTER TABLE items ADD COLUMN overall_length VARCHAR(20)",
+    )
     _add_column("items", "weight", "ALTER TABLE items ADD COLUMN weight VARCHAR(20)")
     _add_column(
         "items",
         "edge_is_unicorn",
         "ALTER TABLE items ADD COLUMN edge_is_unicorn BOOLEAN NOT NULL DEFAULT 0",
     )
-    _add_column("ownership", "quantity_purchased", "ALTER TABLE ownership ADD COLUMN quantity_purchased INTEGER")
-    _add_column("ownership", "quantity_given_away", "ALTER TABLE ownership ADD COLUMN quantity_given_away INTEGER")
+    _add_column(
+        "ownership",
+        "quantity_purchased",
+        "ALTER TABLE ownership ADD COLUMN quantity_purchased INTEGER",
+    )
+    _add_column(
+        "ownership",
+        "quantity_given_away",
+        "ALTER TABLE ownership ADD COLUMN quantity_given_away INTEGER",
+    )
 
 
 def _schema_set_only_migrations() -> None:
@@ -201,21 +233,41 @@ def _schema_item_availability_migrations() -> None:
 
 def _schema_activity_event_audit_migrations() -> None:
     """Add audit metadata columns to activity events."""
-    _add_column("activity_events", "actor", "ALTER TABLE activity_events ADD COLUMN actor VARCHAR(40)")
-    _add_column("activity_events", "action", "ALTER TABLE activity_events ADD COLUMN action VARCHAR(20)")
+    _add_column(
+        "activity_events",
+        "actor",
+        "ALTER TABLE activity_events ADD COLUMN actor VARCHAR(40)",
+    )
+    _add_column(
+        "activity_events",
+        "action",
+        "ALTER TABLE activity_events ADD COLUMN action VARCHAR(20)",
+    )
     _add_column(
         "activity_events",
         "entity_type",
         "ALTER TABLE activity_events ADD COLUMN entity_type VARCHAR(40)",
     )
-    _add_column("activity_events", "entity_id", "ALTER TABLE activity_events ADD COLUMN entity_id INTEGER")
+    _add_column(
+        "activity_events",
+        "entity_id",
+        "ALTER TABLE activity_events ADD COLUMN entity_id INTEGER",
+    )
     _add_column(
         "activity_events",
         "entity_name",
         "ALTER TABLE activity_events ADD COLUMN entity_name VARCHAR(160)",
     )
-    _add_column("activity_events", "source", "ALTER TABLE activity_events ADD COLUMN source VARCHAR(160)")
-    _add_column("activity_events", "payload", "ALTER TABLE activity_events ADD COLUMN payload TEXT")
+    _add_column(
+        "activity_events",
+        "source",
+        "ALTER TABLE activity_events ADD COLUMN source VARCHAR(160)",
+    )
+    _add_column(
+        "activity_events",
+        "payload",
+        "ALTER TABLE activity_events ADD COLUMN payload TEXT",
+    )
 
 
 def _schema_item_attachment_migrations() -> None:
@@ -227,7 +279,11 @@ def _schema_item_attachment_migrations() -> None:
 
 def _schema_item_variant_source_migrations() -> None:
     """Add variant source tracking."""
-    _add_column("item_variants", "source", "ALTER TABLE item_variants ADD COLUMN source VARCHAR(40)")
+    _add_column(
+        "item_variants",
+        "source",
+        "ALTER TABLE item_variants ADD COLUMN source VARCHAR(40)",
+    )
 
 
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
@@ -235,10 +291,14 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
     SchemaMigration(3, "set_member_snapshot", _schema_set_member_snapshot_migrations),
     SchemaMigration(4, "ownership_quantity_fields", lambda: None),
-    SchemaMigration(5, "repair_ownership_quantity_fields", _schema_repair_ownership_quantity_fields),
+    SchemaMigration(
+        5, "repair_ownership_quantity_fields", _schema_repair_ownership_quantity_fields
+    ),
     SchemaMigration(6, "item_alternate_skus", _schema_item_alternate_skus_migrations),
     SchemaMigration(7, "item_availability", _schema_item_availability_migrations),
-    SchemaMigration(8, "activity_event_audit_fields", _schema_activity_event_audit_migrations),
+    SchemaMigration(
+        8, "activity_event_audit_fields", _schema_activity_event_audit_migrations
+    ),
     SchemaMigration(9, "item_attachments", _schema_item_attachment_migrations),
     SchemaMigration(10, "item_variant_source", _schema_item_variant_source_migrations),
 )

@@ -5,14 +5,43 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import uuid4
 
-from flask import Blueprint, abort, current_app, flash, render_template, request, redirect, send_from_directory, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    render_template,
+    request,
+    redirect,
+    send_from_directory,
+    url_for,
+)
 
 from constants import COOKWARE_CATEGORIES, STATUS_RANK, UNKNOWN_COLOR
 from extensions import db
-from helpers import admin_required, db_commit, is_authenticated_user, user_required
-from helpers import (_collection_token, _gift_token,
-                     _verify_collection_token, _verify_gift_token)
-from models import Item, ItemAttachment, ItemVariant, KnifeTaskLog, Ownership, Person, Set, SharpeningLog
+from helpers import (
+    admin_required,
+    db_commit,
+    is_authenticated_user,
+    top_count_rows,
+    user_required,
+)
+from helpers import (
+    _collection_token,
+    _gift_token,
+    _verify_collection_token,
+    _verify_gift_token,
+)
+from models import (
+    Item,
+    ItemAttachment,
+    ItemVariant,
+    KnifeTaskLog,
+    Ownership,
+    Person,
+    Set,
+    SharpeningLog,
+)
 
 _ALLOWED_ATTACHMENT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
@@ -34,7 +63,9 @@ def _allowed_attachment(filename: str | None) -> bool:
     return Path(filename).suffix.lower() in _ALLOWED_ATTACHMENT_EXTENSIONS
 
 
-def _store_attachment(item: Item, uploaded_file, caption: str | None) -> ItemAttachment | None:
+def _store_attachment(
+    item: Item, uploaded_file, caption: str | None
+) -> ItemAttachment | None:
     """Persist an uploaded attachment and return the database row."""
     original_filename = Path(uploaded_file.filename or "").name
     if not _allowed_attachment(original_filename):
@@ -74,32 +105,26 @@ def _build_item_owners_context(item_id: int, *, private_view: bool) -> dict:
     people_without = []
     if private_view:
         entries = (
-            Ownership.query
-            .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
+            Ownership.query.join(ItemVariant, Ownership.variant_id == ItemVariant.id)
             .filter(ItemVariant.item_id == item_id)
             .order_by(Ownership.status)
             .all()
         )
         owner_ids = {entry.person_id for entry in entries}
         people_without = (
-            Person.query
-            .filter(~Person.id.in_(owner_ids))
-            .order_by(Person.name)
-            .all()
+            Person.query.filter(~Person.id.in_(owner_ids)).order_by(Person.name).all()
         )
 
     sharpening = []
     if private_view and item.category not in COOKWARE_CATEGORIES:
         sharpening = (
-            SharpeningLog.query
-            .filter_by(item_id=item_id)
+            SharpeningLog.query.filter_by(item_id=item_id)
             .order_by(SharpeningLog.sharpened_on.desc())
             .all()
         )
 
     task_log = (
-        KnifeTaskLog.query
-        .filter_by(item_id=item_id)
+        KnifeTaskLog.query.filter_by(item_id=item_id)
         .order_by(KnifeTaskLog.logged_on.desc())
         .all()
     )
@@ -117,10 +142,7 @@ def _build_item_owners_context(item_id: int, *, private_view: bool) -> dict:
         if color == UNKNOWN_COLOR:
             continue
         color_counts[color] = color_counts.get(color, 0) + 1
-    top_colors = [
-        {"color": color, "count": count}
-        for color, count in sorted(color_counts.items(), key=lambda kv: kv[1], reverse=True)[:8]
-    ]
+    top_colors = top_count_rows(color_counts)
     if not private_view:
         top_colors = []
 
@@ -157,7 +179,9 @@ def _build_matrix_context(sort_field: str, sort_dir: str) -> dict:
     for ownership in Ownership.query.all():
         key = (ownership.person_id, ownership.variant.item_id)
         current = item_lookup.get(key)
-        if current is None or STATUS_RANK.get(ownership.status, 9) < STATUS_RANK.get(current.status, 9):
+        if current is None or STATUS_RANK.get(ownership.status, 9) < STATUS_RANK.get(
+            current.status, 9
+        ):
             item_lookup[key] = ownership
 
     variant_lookup = {
@@ -165,7 +189,10 @@ def _build_matrix_context(sort_field: str, sort_dir: str) -> dict:
         for ownership in Ownership.query.all()
     }
     variants_by_item = {
-        item.id: [variant for variant in item.variants if variant.color != UNKNOWN_COLOR] or item.variants
+        item.id: [
+            variant for variant in item.variants if variant.color != UNKNOWN_COLOR
+        ]
+        or item.variants
         for item in items_list
     }
 
@@ -229,16 +256,24 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
     collector_rows = []
     if private_view:
         for person in people_list:
-            person_owned = Ownership.query.filter_by(person_id=person.id, status="Owned").all()
+            person_owned = Ownership.query.filter_by(
+                person_id=person.id, status="Owned"
+            ).all()
             person_item_ids = {ownership.variant.item_id for ownership in person_owned}
-            person_items = Item.query.filter(Item.id.in_(person_item_ids)).all() if person_item_ids else []
+            person_items = (
+                Item.query.filter(Item.id.in_(person_item_ids)).all()
+                if person_item_ids
+                else []
+            )
             person_value = sum(item.msrp for item in person_items if item.msrp)
-            collector_rows.append(dict(
-                id=person.id,
-                name=person.name,
-                count=len(person_item_ids),
-                value=person_value,
-            ))
+            collector_rows.append(
+                dict(
+                    id=person.id,
+                    name=person.name,
+                    count=len(person_item_ids),
+                    value=person_value,
+                )
+            )
         collector_rows.sort(key=lambda row: row["count"], reverse=True)
 
     total_value = sum(item.msrp for item in owned_items if item.msrp)
@@ -263,17 +298,16 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
         total_value=total_value,
         priced_count=priced_count,
         catalog_total=catalog_total,
-        coverage_pct=round(100 * len(owned_items) / catalog_total, 1) if catalog_total else 0,
+        coverage_pct=round(100 * len(owned_items) / catalog_total, 1)
+        if catalog_total
+        else 0,
     )
 
     cat_data = sorted(cat_counts.items(), key=lambda kv: kv[1], reverse=True)
     val_data = sorted(cat_values.items(), key=lambda kv: kv[1], reverse=True)
     color_data = sorted(color_counts.items(), key=lambda kv: kv[1], reverse=True)[:15]
     edge_data = sorted(edge_counts.items(), key=lambda kv: kv[1], reverse=True)
-    top_colors = [
-        {"color": color, "count": count}
-        for color, count in sorted(color_counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))[:8]
-    ]
+    top_colors = top_count_rows(color_counts, sort_by_name=True)
 
     cov_cats = sorted(cat_catalog.keys()) if private_view else []
     cov_owned = [cat_counts.get(cat, 0) for cat in cov_cats]
@@ -304,7 +338,9 @@ def _build_gift_list_context(set_id: int, person_id: int) -> dict | None:
 
     owned_item_ids = {
         ownership.variant.item_id
-        for ownership in Ownership.query.filter_by(person_id=person_id, status="Owned").all()
+        for ownership in Ownership.query.filter_by(
+            person_id=person_id, status="Owned"
+        ).all()
     }
     missing_items = sorted(
         [item for item in item_set.items if item.id not in owned_item_ids],
@@ -329,8 +365,7 @@ def _build_collection_card_context(person_id: int) -> dict | None:
     if not person:
         return None
     ownerships = (
-        Ownership.query
-        .filter_by(person_id=person_id, status="Owned")
+        Ownership.query.filter_by(person_id=person_id, status="Owned")
         .order_by(Ownership.id)
         .all()
     )
@@ -374,9 +409,7 @@ def _build_person_collection_context(person_id: int, *, session: dict) -> dict:
 
     session["last_person_id"] = person_id
     ownerships = (
-        Ownership.query.filter_by(person_id=person_id)
-        .order_by(Ownership.status)
-        .all()
+        Ownership.query.filter_by(person_id=person_id).order_by(Ownership.status).all()
     )
 
     owned_item_ids = {o.variant.item_id for o in ownerships if o.status == "Owned"}
@@ -385,7 +418,9 @@ def _build_person_collection_context(person_id: int, *, session: dict) -> dict:
 
     variant_gaps = []
     for item in all_items:
-        real_variants = [variant for variant in item.variants if variant.color != UNKNOWN_COLOR]
+        real_variants = [
+            variant for variant in item.variants if variant.color != UNKNOWN_COLOR
+        ]
         if not real_variants:
             continue
         owned_variant_ids = {
@@ -393,7 +428,9 @@ def _build_person_collection_context(person_id: int, *, session: dict) -> dict:
             for ownership in ownerships
             if ownership.variant.item_id == item.id and ownership.status == "Owned"
         }
-        missing = [variant for variant in real_variants if variant.id not in owned_variant_ids]
+        missing = [
+            variant for variant in real_variants if variant.id not in owned_variant_ids
+        ]
         if missing:
             variant_gaps.append((item, missing))
 
@@ -403,10 +440,7 @@ def _build_person_collection_context(person_id: int, *, session: dict) -> dict:
         if color == UNKNOWN_COLOR:
             continue
         color_counts[color] = color_counts.get(color, 0) + 1
-    top_colors = [
-        {"color": color, "count": count}
-        for color, count in sorted(color_counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))[:8]
-    ]
+    top_colors = top_count_rows(color_counts, sort_by_name=True)
 
     return {
         "person": person,
@@ -417,7 +451,9 @@ def _build_person_collection_context(person_id: int, *, session: dict) -> dict:
     }
 
 
-def _build_wishlist_rows(person_id: int | None, sort_field: str, sort_dir: str) -> tuple[list[dict], list[Person]]:
+def _build_wishlist_rows(
+    person_id: int | None, sort_field: str, sort_dir: str
+) -> tuple[list[dict], list[Person]]:
     """Build sorted wishlist rows for the wishlist page."""
     people_list = Person.query.order_by(Person.name).all()
 
@@ -470,6 +506,7 @@ def _build_wishlist_rows(person_id: int | None, sort_field: str, sort_dir: str) 
 
     return rows, people_list
 
+
 views_bp = Blueprint("views", __name__)
 
 
@@ -483,7 +520,9 @@ def attachment_file(attachment_id):
     file_path = storage_dir / attachment.stored_filename
     if not file_path.exists():
         abort(404)
-    return send_from_directory(storage_dir, attachment.stored_filename, as_attachment=False)
+    return send_from_directory(
+        storage_dir, attachment.stored_filename, as_attachment=False
+    )
 
 
 @views_bp.route("/views/item/<int:item_id>")
@@ -511,7 +550,10 @@ def item_attachment_upload(item_id):
 
     attachment = _store_attachment(item, uploaded_file, request.form.get("caption"))
     if attachment is None:
-        flash("That file type is not supported. Please upload a JPG, PNG, GIF, or WEBP image.", "error")
+        flash(
+            "That file type is not supported. Please upload a JPG, PNG, GIF, or WEBP image.",
+            "error",
+        )
         return redirect(url_for("views.item_owners", item_id=item_id))
 
     flash(f'Added attachment "{attachment.original_filename}".', "success")
@@ -541,29 +583,31 @@ def attachment_delete(attachment_id):
 @user_required
 def matrix():
     """Render the ownership matrix view."""
-    sort_field  = (request.args.get("sort", "name") or "name").strip().lower()
+    sort_field = (request.args.get("sort", "name") or "name").strip().lower()
     if sort_field not in {"name", "sku"}:
         sort_field = "name"
     sort_dir = (request.args.get("dir", "asc") or "asc").strip().lower()
     if sort_dir not in {"asc", "desc"}:
         sort_dir = "asc"
     context = _build_matrix_context(sort_field, sort_dir)
-    return render_template("matrix.html",
-                           people=context["people"],
-                           items=context["items"],
-                           sort_field=sort_field,
-                           sort_dir=sort_dir,
-                           item_lookup=context["item_lookup"],
-                           variant_lookup=context["variant_lookup"],
-                           variants_by_item=context["variants_by_item"],
-                           UNKNOWN_COLOR=UNKNOWN_COLOR)
+    return render_template(
+        "matrix.html",
+        people=context["people"],
+        items=context["items"],
+        sort_field=sort_field,
+        sort_dir=sort_dir,
+        item_lookup=context["item_lookup"],
+        variant_lookup=context["variant_lookup"],
+        variants_by_item=context["variants_by_item"],
+        UNKNOWN_COLOR=UNKNOWN_COLOR,
+    )
 
 
 @views_bp.route("/stats", strict_slashes=False)
 @user_required
 def stats():
     """Render collection summary statistics."""
-    person_id   = request.args.get("person", type=int)
+    person_id = request.args.get("person", type=int)
     private_view = is_authenticated_user()
     context = _build_stats_context(person_id, private_view=private_view)
     return render_template(
@@ -586,6 +630,7 @@ def stats():
 
 # ── Gift list ─────────────────────────────────────────────────────────────────
 
+
 @views_bp.route("/sets/<int:set_id>/gift-token")
 @views_bp.route("/sets/<int:sid>/gift-token")
 def gift_token(set_id=None, sid=None):
@@ -601,8 +646,9 @@ def gift_token(set_id=None, sid=None):
         abort(404)
     token = _gift_token(set_id, person_id)
     gift_url = request.host_url.rstrip("/") + f"/gifts/{token}"
-    return render_template("gift_share.html", gift_url=gift_url,
-                           set_id=set_id, person_id=person_id)
+    return render_template(
+        "gift_share.html", gift_url=gift_url, set_id=set_id, person_id=person_id
+    )
 
 
 @views_bp.route("/gifts/<token>")
@@ -615,13 +661,19 @@ def gift_list(token):
     context = _build_gift_list_context(set_id, person_id)
     if context is None:
         abort(404)
-    return render_template("gift_list.html",
-                           item_set=context["item_set"], person=context["person"],
-                           missing_items=context["missing_items"],
-                           owned_count=context["owned_count"], total=context["total"], pct=context["pct"])
+    return render_template(
+        "gift_list.html",
+        item_set=context["item_set"],
+        person=context["person"],
+        missing_items=context["missing_items"],
+        owned_count=context["owned_count"],
+        total=context["total"],
+        pct=context["pct"],
+    )
 
 
 # ── Collection card ───────────────────────────────────────────────────────────
+
 
 @views_bp.route("/people/<int:person_id>/collection-token")
 def collection_token(person_id):
@@ -629,10 +681,14 @@ def collection_token(person_id):
     person = db.session.get(Person, person_id)
     if not person:
         abort(404)
-    token  = _collection_token(person_id)
+    token = _collection_token(person_id)
     card_url = request.host_url.rstrip("/") + f"/collection-card/{token}"
-    return render_template("collection_card_share.html", person=person,
-                           card_url=card_url, person_id=person_id)
+    return render_template(
+        "collection_card_share.html",
+        person=person,
+        card_url=card_url,
+        person_id=person_id,
+    )
 
 
 @views_bp.route("/collection-card/<token>")
@@ -644,11 +700,13 @@ def collection_card(token):
     context = _build_collection_card_context(person_id)
     if context is None:
         abort(404)
-    return render_template("collection_card.html",
-                           person=context["person"],
-                           by_category=context["by_category"],
-                           owned_count=context["owned_count"],
-                           catalog_total=context["catalog_total"],
-                           coverage_pct=context["coverage_pct"],
-                           total_value=context["total_value"],
-                           priced=context["priced"])
+    return render_template(
+        "collection_card.html",
+        person=context["person"],
+        by_category=context["by_category"],
+        owned_count=context["owned_count"],
+        catalog_total=context["catalog_total"],
+        coverage_pct=context["coverage_pct"],
+        total_value=context["total_value"],
+        priced=context["priced"],
+    )

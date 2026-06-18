@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 
 
-def parse_nonnegative_whole_number(raw_value: str, label: str) -> tuple[int | None, str | None]:
+def parse_nonnegative_whole_number(
+    raw_value: str, label: str
+) -> tuple[int | None, str | None]:
     """Parse a non-negative whole number, treating blank/zero-like inputs as empty."""
     cleaned = (raw_value or "").strip()
     if not cleaned or cleaned.lower() in {"0", "none", "n/a", "-"}:

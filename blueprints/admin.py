@@ -9,7 +9,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
-from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
 from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION, get_git_sha_info
 from extensions import db
@@ -20,8 +31,13 @@ from schema_migrations import get_schema_history, get_schema_state, SCHEMA_VERSI
 from startup import BOOTSTRAP_VERSION, get_bootstrap_history, get_bootstrap_state
 from time_utils import format_container_time
 from msrp_jobs import (
-    _read_msrp_job, _reset_msrp_job, _run_msrp_diff_job, _write_msrp_job,
-    _read_specs_job, _run_specs_backfill_job, _write_specs_job,
+    _read_msrp_job,
+    _reset_msrp_job,
+    _run_msrp_diff_job,
+    _write_msrp_job,
+    _read_specs_job,
+    _run_specs_backfill_job,
+    _write_specs_job,
 )
 
 admin_bp = Blueprint("admin", __name__)
@@ -43,7 +59,9 @@ def _mask_database_uri(uri):
     host = parsed.hostname
     if parsed.port:
         host = f"{host}:{parsed.port}"
-    return urlunsplit((parsed.scheme, f"{auth}{host}", parsed.path, parsed.query, parsed.fragment))
+    return urlunsplit(
+        (parsed.scheme, f"{auth}{host}", parsed.path, parsed.query, parsed.fragment)
+    )
 
 
 def _read_pid1_cmdline():
@@ -68,7 +86,9 @@ def _path_status(path):
 def build_runtime_details() -> dict:
     """Build the runtime diagnostics payload."""
     db_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
-    sqlite_file = db_uri.removeprefix("sqlite:////") if db_uri.startswith("sqlite:////") else None
+    sqlite_file = (
+        db_uri.removeprefix("sqlite:////") if db_uri.startswith("sqlite:////") else None
+    )
     data_dir = os.environ.get("DATA_DIR", "/data")
     log_dir = os.environ.get("LOG_DIR", "/data/logs")
     git_sha, git_sha_source = get_git_sha_info()
@@ -94,20 +114,28 @@ def build_runtime_details() -> dict:
         "pid1_cmdline": _read_pid1_cmdline(),
         "schema_state": get_schema_state(),
         "schema_history": [
-            {**entry, "formatted_applied_at": format_container_time(entry.get("applied_at"))}
+            {
+                **entry,
+                "formatted_applied_at": format_container_time(entry.get("applied_at")),
+            }
             for entry in get_schema_history()
         ],
         "schema_version": SCHEMA_VERSION,
         "bootstrap_state": get_bootstrap_state(),
         "bootstrap_history": [
-            {**entry, "formatted_applied_at": format_container_time(entry.get("applied_at"))}
+            {
+                **entry,
+                "formatted_applied_at": format_container_time(entry.get("applied_at")),
+            }
             for entry in get_bootstrap_history()
         ],
         "bootstrap_version": BOOTSTRAP_VERSION,
         "path_checks": [
             {"label": "Data Directory", **_path_status(data_dir)},
             {"label": "Log Directory", **_path_status(log_dir)},
-            {"label": "SQLite File", **_path_status(sqlite_file)} if sqlite_file else None,
+            {"label": "SQLite File", **_path_status(sqlite_file)}
+            if sqlite_file
+            else None,
         ],
     }
 
@@ -136,13 +164,27 @@ def msrp_diff_run():
         flash("A diff is already running.", "warning")
         return redirect(url_for("admin.msrp_diff_page"))
     update_db = request.form.get("update_db") == "on"
-    _write_msrp_job({"status": "running", "progress": [], "results": None,
-                     "error": None, "update_db": update_db,
-                     "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                     "finished_at": None})
+    _write_msrp_job(
+        {
+            "status": "running",
+            "progress": [],
+            "results": None,
+            "error": None,
+            "update_db": update_db,
+            "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "finished_at": None,
+        }
+    )
     app = current_app._get_current_object()
     logger.info("MSRP diff job started (update_db=%s)", update_db)
-    threading.Thread(target=_run_msrp_diff_job, args=(app, update_db,), daemon=True).start()
+    threading.Thread(
+        target=_run_msrp_diff_job,
+        args=(
+            app,
+            update_db,
+        ),
+        daemon=True,
+    ).start()
     return redirect(url_for("admin.msrp_diff_page"))
 
 
@@ -188,8 +230,16 @@ def specs_backfill_run():
     if job["status"] == "running":
         flash("A backfill is already running.", "warning")
         return redirect(url_for("admin.specs_backfill_page"))
-    _write_specs_job({"status": "running", "progress": [], "results": None,
-                      "error": None, "started_at": None, "finished_at": None})
+    _write_specs_job(
+        {
+            "status": "running",
+            "progress": [],
+            "results": None,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
+        }
+    )
     app = current_app._get_current_object()
     logger.info("Specs backfill job started")
     threading.Thread(target=_run_specs_backfill_job, args=(app,), daemon=True).start()
@@ -238,14 +288,17 @@ def audit_page():
         for row in (
             db.session.execute(
                 db.select(ActivityEvent.entity_type)
-                .where(ActivityEvent.kind == "audit", ActivityEvent.entity_type.isnot(None))
+                .where(
+                    ActivityEvent.kind == "audit", ActivityEvent.entity_type.isnot(None)
+                )
                 .distinct()
                 .order_by(ActivityEvent.entity_type)
-            )
-            .all()
+            ).all()
         )
     ]
-    events = get_recent_audit_events(limit=limit, action=action, entity_type=entity_type)
+    events = get_recent_audit_events(
+        limit=limit, action=action, entity_type=entity_type
+    )
     return render_template(
         "admin_audit.html",
         events=events,
@@ -260,7 +313,11 @@ def audit_page():
 @admin_bp.context_processor
 def inject_admin_status_strip():
     """Expose the admin status strip to admin templates."""
-    if not is_admin() or not request.endpoint or not request.endpoint.startswith("admin."):
+    if (
+        not is_admin()
+        or not request.endpoint
+        or not request.endpoint.startswith("admin.")
+    ):
         return {}
     git_sha, git_sha_source = get_git_sha_info()
     return {

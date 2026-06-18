@@ -61,23 +61,27 @@ def is_trusted_proxy_admin() -> bool:
 
 def user_required(fn):
     """Require a private-user session or trusted auth proxy for a route."""
+
     @wraps(fn)
     def _wrapped(*args, **kwargs):
         if not is_authenticated_user():
             flash("Authentication required.", "error")
             return redirect(url_for("admin.admin_login"))
         return fn(*args, **kwargs)
+
     return _wrapped
 
 
 def admin_required(fn):
     """Require an admin session for a route."""
+
     @wraps(fn)
     def _wrapped(*args, **kwargs):
         if not is_admin():
             flash("Admin access required.", "error")
             return redirect(url_for("admin.admin_login"))
         return fn(*args, **kwargs)
+
     return _wrapped
 
 
@@ -87,7 +91,10 @@ is_authentik_authenticated = is_trusted_proxy_authenticated
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
-def db_commit(session, *, error_msg: str = "Could not save changes — please try again.") -> bool:
+
+def db_commit(
+    session, *, error_msg: str = "Could not save changes — please try again."
+) -> bool:
     """Commit the session. On failure, roll back and flash an error. Returns True on success."""
     try:
         session.commit()
@@ -100,6 +107,7 @@ def db_commit(session, *, error_msg: str = "Could not save changes — please tr
 
 
 # ── CSRF ──────────────────────────────────────────────────────────────────────
+
 
 def _csrf_token() -> str:
     """Return (and lazily create) a per-session CSRF token."""
@@ -116,13 +124,37 @@ def validate_csrf() -> None:
         abort(403)
 
 
+def top_count_rows(
+    counts: dict[str, int], *, limit: int = 8, sort_by_name: bool = False
+) -> list[dict[str, int | str]]:
+    """Return the most common counted values as ``{"color", "count"}`` rows."""
+    if sort_by_name:
+        ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))
+    else:
+        ordered = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+    return [{"color": color, "count": count} for color, count in ordered[:limit]]
+
+
 # ── Gift list tokens ──────────────────────────────────────────────────────────
+
+
+def _secret_key_bytes() -> bytes:
+    """Return the Flask secret key as bytes for HMAC signing."""
+    secret_key = current_app.secret_key
+    if secret_key is None:
+        raise RuntimeError("SECRET_KEY must be configured to use signed tokens.")
+    if isinstance(secret_key, str):
+        return secret_key.encode("utf-8")
+    return bytes(secret_key)
+
 
 def _gift_token(set_id: int, person_id: int) -> str:
     """Generate a signed URL-safe token encoding set_id and person_id."""
-    payload = base64.urlsafe_b64encode(f"{set_id}:{person_id}".encode()).decode().rstrip("=")
+    payload = (
+        base64.urlsafe_b64encode(f"{set_id}:{person_id}".encode()).decode().rstrip("=")
+    )
     sig = hmac.new(
-        current_app.secret_key.encode(),
+        _secret_key_bytes(),
         payload.encode(),
         hashlib.sha256,
     ).hexdigest()[:24]
@@ -134,7 +166,7 @@ def _verify_gift_token(token: str) -> tuple[int, int] | None:
     try:
         payload, sig = token.rsplit(".", 1)
         expected_sig = hmac.new(
-            current_app.secret_key.encode(),
+            _secret_key_bytes(),
             payload.encode(),
             hashlib.sha256,
         ).hexdigest()[:24]
@@ -150,11 +182,12 @@ def _verify_gift_token(token: str) -> tuple[int, int] | None:
 
 # ── Collection card tokens ────────────────────────────────────────────────────
 
+
 def _collection_token(person_id: int) -> str:
     """Generate a signed URL-safe token encoding person_id."""
     payload = base64.urlsafe_b64encode(f"c:{person_id}".encode()).decode().rstrip("=")
     sig = hmac.new(
-        current_app.secret_key.encode(),
+        _secret_key_bytes(),
         payload.encode(),
         hashlib.sha256,
     ).hexdigest()[:24]
@@ -166,7 +199,7 @@ def _verify_collection_token(token: str) -> int | None:
     try:
         payload, sig = token.rsplit(".", 1)
         expected_sig = hmac.new(
-            current_app.secret_key.encode(),
+            _secret_key_bytes(),
             payload.encode(),
             hashlib.sha256,
         ).hexdigest()[:24]
@@ -199,19 +232,22 @@ def _notify_discord(message: str) -> bool:
 def check_wishlist_targets() -> list[dict]:
     """Return wishlist entries where current MSRP is at or below the target price."""
     hits = []
-    entries = (Ownership.query
-               .filter_by(status="Wishlist")
-               .filter(Ownership.target_price.isnot(None))
-               .all())
+    entries = (
+        Ownership.query.filter_by(status="Wishlist")
+        .filter(Ownership.target_price.isnot(None))
+        .all()
+    )
     for entry in entries:
         msrp = entry.variant.item.msrp
         if msrp is not None and msrp <= entry.target_price:
-            hits.append(dict(
-                person  = entry.person.name,
-                item    = entry.variant.item.name,
-                sku     = entry.variant.item.sku,
-                target  = entry.target_price,
-                msrp    = msrp,
-                savings = entry.target_price - msrp,
-            ))
+            hits.append(
+                dict(
+                    person=entry.person.name,
+                    item=entry.variant.item.name,
+                    sku=entry.variant.item.sku,
+                    target=entry.target_price,
+                    msrp=msrp,
+                    savings=entry.target_price - msrp,
+                )
+            )
     return hits

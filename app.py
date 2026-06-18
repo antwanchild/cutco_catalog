@@ -93,7 +93,11 @@ def _register_blueprints(app: Flask) -> None:
 def _register_hooks(app: Flask) -> None:
     @app.before_request
     def csrf_protect():
-        if request.method == "POST" and not request.path.startswith("/api/") and request.path not in CSRF_EXEMPT:
+        if (
+            request.method == "POST"
+            and not request.path.startswith("/api/")
+            and request.path not in CSRF_EXEMPT
+        ):
             validate_csrf()
 
     @app.after_request
@@ -101,7 +105,9 @@ def _register_hooks(app: Flask) -> None:
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Referrer-Policy", "strict-origin-when-cross-origin"
+        )
         if app.config.get("SESSION_COOKIE_SECURE"):
             response.headers.setdefault(
                 "Strict-Transport-Security",
@@ -124,11 +130,15 @@ def _register_hooks(app: Flask) -> None:
 def _register_error_handlers(app: Flask) -> None:
     @app.errorhandler(403)
     def err_403(error):
-        return render_template("error.html", code=403, icon="🚫", message="Access denied."), 403
+        return render_template(
+            "error.html", code=403, icon="🚫", message="Access denied."
+        ), 403
 
     @app.errorhandler(404)
     def err_404(error):
-        return render_template("error.html", code=404, icon="🔍", message="Page not found."), 404
+        return render_template(
+            "error.html", code=404, icon="🔍", message="Page not found."
+        ), 404
 
     @app.errorhandler(429)
     def err_429(error):
@@ -192,44 +202,56 @@ def _register_routes(app: Flask) -> None:
             }
 
         activity_rows.append(_event_row("Last Import", "import", "No imports yet."))
-        activity_rows.append(_event_row("Last Catalog Sync", "sync", "No catalog sync yet."))
-        activity_rows.append(_event_row("Last MSRP Diff", "msrp_diff", "No MSRP diff yet."))
+        activity_rows.append(
+            _event_row("Last Catalog Sync", "sync", "No catalog sync yet.")
+        )
+        activity_rows.append(
+            _event_row("Last MSRP Diff", "msrp_diff", "No MSRP diff yet.")
+        )
 
         schema_history = get_schema_history(limit=1)
         schema_state = get_schema_state()
         if schema_history:
             latest_schema = schema_history[0]
-            activity_rows.append({
-                "label": "Schema Update",
-                "title": f"v{schema_state['version']}",
-                "details": latest_schema["name"],
-                "time": format_container_time(latest_schema["applied_at"]),
-            })
+            activity_rows.append(
+                {
+                    "label": "Schema Update",
+                    "title": f"v{schema_state['version']}",
+                    "details": latest_schema["name"],
+                    "time": format_container_time(latest_schema["applied_at"]),
+                }
+            )
         else:
-            activity_rows.append({
-                "label": "Schema Update",
-                "title": "No schema updates yet.",
-                "details": None,
-                "time": "—",
-            })
+            activity_rows.append(
+                {
+                    "label": "Schema Update",
+                    "title": "No schema updates yet.",
+                    "details": None,
+                    "time": "—",
+                }
+            )
 
         bootstrap_history = get_bootstrap_history(limit=1)
         bootstrap_state = get_bootstrap_state()
         if bootstrap_history:
             latest_bootstrap = bootstrap_history[0]
-            activity_rows.append({
-                "label": "Bootstrap Update",
-                "title": f"v{bootstrap_state['version']}",
-                "details": latest_bootstrap["name"],
-                "time": format_container_time(latest_bootstrap["applied_at"]),
-            })
+            activity_rows.append(
+                {
+                    "label": "Bootstrap Update",
+                    "title": f"v{bootstrap_state['version']}",
+                    "details": latest_bootstrap["name"],
+                    "time": format_container_time(latest_bootstrap["applied_at"]),
+                }
+            )
         else:
-            activity_rows.append({
-                "label": "Bootstrap Update",
-                "title": "No bootstrap updates yet.",
-                "details": None,
-                "time": "—",
-            })
+            activity_rows.append(
+                {
+                    "label": "Bootstrap Update",
+                    "title": "No bootstrap updates yet.",
+                    "details": None,
+                    "time": "—",
+                }
+            )
 
         return activity_rows
 
@@ -247,17 +269,13 @@ def _register_routes(app: Flask) -> None:
         return {
             "items": Item.query.order_by(Item.id.desc()).limit(5).all(),
             "people": Person.query.order_by(Person.id.desc()).limit(5).all(),
-            "entries": (
-                Ownership.query
-                .order_by(Ownership.id.desc())
-                .limit(5)
-                .all()
-            ),
+            "entries": (Ownership.query.order_by(Ownership.id.desc()).limit(5).all()),
         }
 
     @app.route("/")
     def index():
         from models import ItemVariant, Ownership, Person, Set
+
         private_view = is_authenticated_user()
 
         stats = dict(
@@ -272,11 +290,17 @@ def _register_routes(app: Flask) -> None:
             people=Person.query.count(),
             owned=Ownership.query.filter_by(status="Owned").count(),
             wishlist=Ownership.query.filter_by(status="Wishlist").count(),
-            variants=ItemVariant.query.filter(ItemVariant.color != UNKNOWN_COLOR).count(),
+            variants=ItemVariant.query.filter(
+                ItemVariant.color != UNKNOWN_COLOR
+            ).count(),
             sets=Set.query.count(),
         )
         people = Person.query.order_by(Person.name).all() if private_view else []
-        recent = Ownership.query.order_by(Ownership.id.desc()).limit(10).all() if private_view else []
+        recent = (
+            Ownership.query.order_by(Ownership.id.desc()).limit(10).all()
+            if private_view
+            else []
+        )
         top_colors = [
             {"color": color, "count": count}
             for color, count in (
@@ -289,7 +313,11 @@ def _register_routes(app: Flask) -> None:
             )
         ]
         recent_activity = _recent_activity() if private_view else []
-        recent_changes = _recent_changes() if private_view else {"items": [], "people": [], "entries": []}
+        recent_changes = (
+            _recent_changes()
+            if private_view
+            else {"items": [], "people": [], "entries": []}
+        )
         return render_template(
             "index.html",
             stats=stats,
@@ -316,16 +344,42 @@ def _register_routes(app: Flask) -> None:
         ]
         if not query:
             shortcuts = [
-                {"label": "Catalog", "url": url_for("catalog.catalog"), "description": "Browse and filter items."},
-                {"label": "Sets", "url": url_for("catalog.sets_list"), "description": "Browse product sets."},
-                {"label": "Stats", "url": url_for("views.stats"), "description": "View catalog summaries."},
+                {
+                    "label": "Catalog",
+                    "url": url_for("catalog.catalog"),
+                    "description": "Browse and filter items.",
+                },
+                {
+                    "label": "Sets",
+                    "url": url_for("catalog.sets_list"),
+                    "description": "Browse product sets.",
+                },
+                {
+                    "label": "Stats",
+                    "url": url_for("views.stats"),
+                    "description": "View catalog summaries.",
+                },
             ]
             if private_view:
-                shortcuts.extend([
-                    {"label": "People", "url": url_for("people.people"), "description": "Open collector records."},
-                    {"label": "Tasks", "url": url_for("logs.tasks_manage"), "description": "Manage knife tasks."},
-                    {"label": "Diagnostics", "url": url_for("admin.diagnostics_page"), "description": "Check runtime health."},
-                ])
+                shortcuts.extend(
+                    [
+                        {
+                            "label": "People",
+                            "url": url_for("people.people"),
+                            "description": "Open collector records.",
+                        },
+                        {
+                            "label": "Tasks",
+                            "url": url_for("logs.tasks_manage"),
+                            "description": "Manage knife tasks.",
+                        },
+                        {
+                            "label": "Diagnostics",
+                            "url": url_for("admin.diagnostics_page"),
+                            "description": "Check runtime health.",
+                        },
+                    ]
+                )
             return render_template(
                 "search.html",
                 query="",
@@ -346,32 +400,47 @@ def _register_routes(app: Flask) -> None:
             )
         )
         if cat_filter == "__uncategorized__":
-            item_query = item_query.filter(db.or_(Item.category.is_(None), Item.category == ""))
+            item_query = item_query.filter(
+                db.or_(Item.category.is_(None), Item.category == "")
+            )
         elif cat_filter:
             item_query = item_query.filter(Item.category == cat_filter)
         item_results = item_query.order_by(Item.name).limit(20).all()
 
-        set_results = Set.query.filter(
-            db.or_(
-                Set.name.ilike(like),
-                Set.sku.ilike(like),
-                Set.notes.ilike(like),
+        set_results = (
+            Set.query.filter(
+                db.or_(
+                    Set.name.ilike(like),
+                    Set.sku.ilike(like),
+                    Set.notes.ilike(like),
+                )
             )
-        ).order_by(Set.name).limit(20).all()
+            .order_by(Set.name)
+            .limit(20)
+            .all()
+        )
 
         person_results = []
         task_results = []
         if private_view:
-            person_results = Person.query.filter(
-                db.or_(
-                    Person.name.ilike(like),
-                    Person.notes.ilike(like),
+            person_results = (
+                Person.query.filter(
+                    db.or_(
+                        Person.name.ilike(like),
+                        Person.notes.ilike(like),
+                    )
                 )
-            ).order_by(Person.name).limit(20).all()
+                .order_by(Person.name)
+                .limit(20)
+                .all()
+            )
 
-            task_results = KnifeTask.query.filter(
-                KnifeTask.name.ilike(like)
-            ).order_by(KnifeTask.name).limit(20).all()
+            task_results = (
+                KnifeTask.query.filter(KnifeTask.name.ilike(like))
+                .order_by(KnifeTask.name)
+                .limit(20)
+                .all()
+            )
 
         return render_template(
             "search.html",
@@ -405,12 +474,15 @@ def _register_routes(app: Flask) -> None:
     def version():
         return jsonify(version=APP_VERSION, git_sha=GIT_SHA)
 
+
 def create_app(test_config: dict | None = None) -> Flask:
     """Build and configure the Flask application."""
     app = Flask(__name__)
     app.config.update(
         SECRET_KEY=os.environ.get("SECRET_KEY", "cutco-vault-dev-key"),
-        SQLALCHEMY_DATABASE_URI=os.environ.get("DATABASE_URL", "sqlite:////data/cutco.db"),
+        SQLALCHEMY_DATABASE_URI=os.environ.get(
+            "DATABASE_URL", "sqlite:////data/cutco.db"
+        ),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         MAX_CONTENT_LENGTH=10 * 1024 * 1024,
         SESSION_COOKIE_HTTPONLY=True,
@@ -418,7 +490,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         SESSION_COOKIE_SECURE=_env_flag("SESSION_COOKIE_SECURE"),
         SESSION_REFRESH_EACH_REQUEST=False,
         LOG_DIR=os.environ.get("LOG_DIR", "/data/logs"),
-        ATTACHMENTS_DIR=os.environ.get("ATTACHMENTS_DIR", os.path.join(DATA_DIR, "uploads", "items")),
+        ATTACHMENTS_DIR=os.environ.get(
+            "ATTACHMENTS_DIR", os.path.join(DATA_DIR, "uploads", "items")
+        ),
         LOG_LEVEL=os.environ.get("LOG_LEVEL", "INFO").upper(),
         TESTING=False,
     )

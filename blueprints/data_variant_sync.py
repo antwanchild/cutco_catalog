@@ -28,8 +28,15 @@ logger = logging.getLogger(__name__)
 @data_bp.route("/variant-sync", methods=["GET", "POST"])
 def variant_sync_page():
     """Render the variant sync preview page."""
-    sync_variant_sync_helpers(data_module.scrape_item_variant_colors, data_module.scrape_purple_campaign_variants)
-    all_items = Item.query.options(selectinload(Item.variants)).filter(Item.cutco_url.isnot(None)).all()
+    sync_variant_sync_helpers(
+        data_module.scrape_item_variant_colors,
+        data_module.scrape_purple_campaign_variants,
+    )
+    all_items = (
+        Item.query.options(selectinload(Item.variants))
+        .filter(Item.cutco_url.isnot(None))
+        .all()
+    )
     categories = sorted(
         {item.category for item in all_items if item.category},
         key=lambda value: value.lower(),
@@ -130,10 +137,15 @@ def variant_sync_confirm():
             if confirm_target == "promo":
                 return section == "promo"
             if confirm_target.startswith("category:"):
-                return section == "category" and confirm_target == f"category:{item_data.get('category', '')}"
+                return (
+                    section == "category"
+                    and confirm_target == f"category:{item_data.get('category', '')}"
+                )
             return True
 
-        def apply_item_preview(item_data: dict, *, allow_purple_unicorn: bool = False) -> None:
+        def apply_item_preview(
+            item_data: dict, *, allow_purple_unicorn: bool = False
+        ) -> None:
             nonlocal created_variants, retained_variants, skipped_items, touched_items
             item_id = item_data.get("item_id")
             if not item_id:
@@ -141,23 +153,32 @@ def variant_sync_confirm():
             item = db.session.get(Item, item_id)
             if not item:
                 skipped_items += 1
-                skipped_details.append({
-                    "item": item_data.get("item_name", "Unknown item"),
-                    "sku": item_data.get("sku", "—"),
-                    "reason": "Item was not found during confirmation.",
-                })
+                skipped_details.append(
+                    {
+                        "item": item_data.get("item_name", "Unknown item"),
+                        "sku": item_data.get("sku", "—"),
+                        "reason": "Item was not found during confirmation.",
+                    }
+                )
                 return
 
             if item_data.get("status") == "skipped":
                 skipped_items += 1
-                skipped_details.append({
-                    "item": item.name,
-                    "sku": item.sku or "—",
-                    "reason": item_data.get("skip_reason") or "No clear variants were detected.",
-                })
+                skipped_details.append(
+                    {
+                        "item": item.name,
+                        "sku": item.sku or "—",
+                        "reason": item_data.get("skip_reason")
+                        or "No clear variants were detected.",
+                    }
+                )
                 return
 
-            existing_real = {variant.color.lower() for variant in item.variants if variant.color != UNKNOWN_COLOR}
+            existing_real = {
+                variant.color.lower()
+                for variant in item.variants
+                if variant.color != UNKNOWN_COLOR
+            }
             create_colors = []
             for color in item_data.get("create_colors", []):
                 color_value = (color or "").strip()
@@ -166,8 +187,14 @@ def variant_sync_confirm():
                 if color_value.lower() in existing_real:
                     retained_variants += 1
                     continue
-                variant = ItemVariant(item=item, color=color_value, source="variant_sync")
-                if allow_purple_unicorn and mark_purple_as_unicorn and color_value.lower().startswith("purple"):
+                variant = ItemVariant(
+                    item=item, color=color_value, source="variant_sync"
+                )
+                if (
+                    allow_purple_unicorn
+                    and mark_purple_as_unicorn
+                    and color_value.lower().startswith("purple")
+                ):
                     variant.is_unicorn = True
                 db.session.add(variant)
                 create_colors.append(color_value)
@@ -199,8 +226,12 @@ def variant_sync_confirm():
             "items_with_no_clear_variants",
             "purple_variant_count",
         ):
-            combined_summary[key] = combined_summary.get(key, 0) + promo_summary.get(key, 0)
-        combined_summary["has_purple_variants"] = combined_summary.get("purple_variant_count", 0) > 0
+            combined_summary[key] = combined_summary.get(key, 0) + promo_summary.get(
+                key, 0
+            )
+        combined_summary["has_purple_variants"] = (
+            combined_summary.get("purple_variant_count", 0) > 0
+        )
 
         record_activity(
             "sync",

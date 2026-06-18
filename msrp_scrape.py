@@ -36,25 +36,37 @@ def _normalize_msrp_url(url: str, sku: str | None = None) -> str:
     return url
 
 
-def _line_matches_target(line: str, item_name: str | None, sku: str | None = None) -> bool:
+def _line_matches_target(
+    line: str, item_name: str | None, sku: str | None = None
+) -> bool:
     normalized_line = _normalize_price_text(line)
     if not normalized_line:
         return False
     if sku:
         normalized_sku = _normalize_price_text(sku)
-        if normalized_sku and re.search(rf"(?<![a-z0-9]){re.escape(normalized_sku)}(?![a-z0-9])", normalized_line):
+        if normalized_sku and re.search(
+            rf"(?<![a-z0-9]){re.escape(normalized_sku)}(?![a-z0-9])", normalized_line
+        ):
             return True
     normalized_item = _normalize_price_text(item_name)
     if not normalized_item:
         return False
-    return normalized_line == normalized_item or normalized_item in normalized_line or normalized_line in normalized_item
+    return (
+        normalized_line == normalized_item
+        or normalized_item in normalized_line
+        or normalized_line in normalized_item
+    )
 
 
-def _scrape_price_from_page(url: str, item_name: str | None = None, sku: str | None = None) -> float | None:
+def _scrape_price_from_page(
+    url: str, item_name: str | None = None, sku: str | None = None
+) -> float | None:
     """Return the visible MSRP from a single Cutco product page."""
     try:
         request_url = _normalize_msrp_url(url, sku)
-        resp = requests.get(request_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        resp = requests.get(
+            request_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+        )
         if resp.status_code != 200:
             return None
         page_url = resp.url or request_url
@@ -67,7 +79,11 @@ def _scrape_price_from_page(url: str, item_name: str | None = None, sku: str | N
 
         heading = soup.find("h1")
         heading_text = heading.get_text(" ", strip=True) if heading else None
-        lines = [line.strip() for line in soup.get_text("\n", strip=True).splitlines() if line.strip()]
+        lines = [
+            line.strip()
+            for line in soup.get_text("\n", strip=True).splitlines()
+            if line.strip()
+        ]
 
         candidates = [item_name, heading_text]
         start_index = 0
@@ -128,7 +144,9 @@ def _build_msrp_price_targets(live_items: list[dict]) -> dict[str, dict]:
     """Build a SKU map that prefers stored DB URLs for known items."""
     db_url_by_sku = {
         item.sku: item.cutco_url
-        for item in Item.query.filter(Item.sku.isnot(None), Item.cutco_url.isnot(None)).all()
+        for item in Item.query.filter(
+            Item.sku.isnot(None), Item.cutco_url.isnot(None)
+        ).all()
         if item.sku and item.cutco_url
     }
     by_sku: dict[str, dict] = {}
@@ -170,12 +188,16 @@ def _fetch_live_prices_by_sku(
     executor = ThreadPoolExecutor(max_workers=workers)
     try:
         future_map = {
-            executor.submit(_scrape_price_from_page, info["url"], info["name"], sku): sku
+            executor.submit(
+                _scrape_price_from_page, info["url"], info["name"], sku
+            ): sku
             for sku, info in by_sku.items()
             if info.get("url")
         }
         try:
-            for future in as_completed(future_map, timeout=_MSRP_PRICE_FETCH_TIMEOUT.total_seconds()):
+            for future in as_completed(
+                future_map, timeout=_MSRP_PRICE_FETCH_TIMEOUT.total_seconds()
+            ):
                 sku = future_map[future]
                 completed.add(future)
                 try:

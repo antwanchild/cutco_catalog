@@ -19,17 +19,27 @@ from msrp_scrape import (  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
-_MSRP_JOB_FILE   = os.path.join(DATA_DIR, "msrp_job.json")
-_msrp_write_lock  = threading.Lock()
+_MSRP_JOB_FILE = os.path.join(DATA_DIR, "msrp_job.json")
+_msrp_write_lock = threading.Lock()
 _MSRP_JOB_STALE_AFTER = timedelta(minutes=30)
 _SPECS_JOB_FILE = os.path.join(DATA_DIR, "specs_job.json")
 _specs_write_lock = threading.Lock()
 
 
 def _read_msrp_job() -> dict:
-    job = read_json_file(_MSRP_JOB_FILE, {"status": "idle", "progress": [], "results": None,
-                "error": None, "started_at": None, "finished_at": None,
-                "update_db": True, "heartbeat_at": None})
+    job = read_json_file(
+        _MSRP_JOB_FILE,
+        {
+            "status": "idle",
+            "progress": [],
+            "results": None,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
+            "update_db": True,
+            "heartbeat_at": None,
+        },
+    )
     if job.get("status") != "running":
         return job
     timestamp_text = job.get("heartbeat_at") or job.get("started_at")
@@ -61,21 +71,34 @@ def _write_msrp_job(data: dict) -> None:
 
 def _reset_msrp_job() -> None:
     """Clear the persisted MSRP job state back to idle."""
-    reset_json_file(_MSRP_JOB_FILE, {
-        "status": "idle",
-        "progress": [],
-        "results": None,
-        "error": None,
-        "started_at": None,
-        "finished_at": None,
-        "update_db": True,
-        "heartbeat_at": None,
-    }, lock=_msrp_write_lock)
+    reset_json_file(
+        _MSRP_JOB_FILE,
+        {
+            "status": "idle",
+            "progress": [],
+            "results": None,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
+            "update_db": True,
+            "heartbeat_at": None,
+        },
+        lock=_msrp_write_lock,
+    )
 
 
 def _read_specs_job() -> dict:
-    return read_json_file(_SPECS_JOB_FILE, {"status": "idle", "progress": [], "results": None, "error": None,
-                "started_at": None, "finished_at": None})
+    return read_json_file(
+        _SPECS_JOB_FILE,
+        {
+            "status": "idle",
+            "progress": [],
+            "results": None,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
+        },
+    )
 
 
 def _write_specs_job(data: dict) -> None:
@@ -93,9 +116,16 @@ def _run_specs_backfill_job(app) -> None:
 
         def _log(msg):
             progress.append(msg)
-            _write_specs_job({"status": "running", "progress": list(progress),
-                              "results": None, "error": None,
-                              "started_at": started_at, "finished_at": None})
+            _write_specs_job(
+                {
+                    "status": "running",
+                    "progress": list(progress),
+                    "results": None,
+                    "error": None,
+                    "started_at": started_at,
+                    "finished_at": None,
+                }
+            )
 
         started_at = datetime.now(UTC).isoformat(timespec="seconds")
         _log(f"Starting specs backfill for {total} items…")
@@ -103,8 +133,9 @@ def _run_specs_backfill_job(app) -> None:
         updated = skipped = errors = 0
 
         with ThreadPoolExecutor(max_workers=6) as pool:
-            future_map = {pool.submit(scrape_item_specs, item.cutco_url): item
-                          for item in items}
+            future_map = {
+                pool.submit(scrape_item_specs, item.cutco_url): item for item in items
+            }
             done = 0
             for future in as_completed(future_map):
                 item = future_map[future]
@@ -136,10 +167,23 @@ def _run_specs_backfill_job(app) -> None:
                     _log(f"[{done}/{total}] ✗ {item.name}: {exc}")
 
         finished_at = datetime.now(UTC).isoformat(timespec="seconds")
-        results = {"updated": updated, "skipped": skipped, "errors": errors, "total": total}
+        results = {
+            "updated": updated,
+            "skipped": skipped,
+            "errors": errors,
+            "total": total,
+        }
         _log(f"Done — {updated} updated, {skipped} already complete, {errors} errors.")
-        _write_specs_job({"status": "done", "progress": progress, "results": results,
-                          "error": None, "started_at": started_at, "finished_at": finished_at})
+        _write_specs_job(
+            {
+                "status": "done",
+                "progress": progress,
+                "results": results,
+                "error": None,
+                "started_at": started_at,
+                "finished_at": finished_at,
+            }
+        )
         record_activity(
             "specs_backfill",
             "Specs backfill complete",
@@ -162,7 +206,9 @@ def _fetch_live_prices_by_sku(
     executor = ThreadPoolExecutor(max_workers=workers)
     try:
         future_map = {
-            executor.submit(_scrape_price_from_page, info["url"], info["name"], sku): sku
+            executor.submit(
+                _scrape_price_from_page, info["url"], info["name"], sku
+            ): sku
             for sku, info in by_sku.items()
             if info.get("url")
         }
@@ -202,41 +248,82 @@ def _fetch_live_prices_by_sku(
 def _build_msrp_diff(db_items: list, live: dict) -> dict:
     """Diff DB MSRP prices against live scraped prices."""
     db_by_sku = {item.sku: item for item in db_items if item.sku}
-    live_skus  = set(live.keys())
-    db_skus    = set(db_by_sku.keys())
+    live_skus = set(live.keys())
+    db_skus = set(db_by_sku.keys())
     result: dict[str, list] = {
-        "new": [], "removed": [], "increased": [],
-        "decreased": [], "unchanged": [], "no_price": [],
+        "new": [],
+        "removed": [],
+        "increased": [],
+        "decreased": [],
+        "unchanged": [],
+        "no_price": [],
     }
     for sku in sorted(live_skus - db_skus):
         info = live[sku]
-        result["new"].append({"sku": sku, "name": info["name"],
-                               "db_price": None, "live_price": info["price"]})
+        result["new"].append(
+            {
+                "sku": sku,
+                "name": info["name"],
+                "db_price": None,
+                "live_price": info["price"],
+            }
+        )
     for sku in sorted(db_skus - live_skus):
         item = db_by_sku[sku]
-        result["removed"].append({"sku": sku, "name": item.name,
-                                   "db_price": item.msrp, "live_price": None})
+        result["removed"].append(
+            {"sku": sku, "name": item.name, "db_price": item.msrp, "live_price": None}
+        )
     for sku in sorted(db_skus & live_skus):
-        item       = db_by_sku[sku]
-        db_price   = item.msrp
+        item = db_by_sku[sku]
+        db_price = item.msrp
         live_price = live[sku]["price"]
         if live_price is None:
-            result["no_price"].append({"sku": sku, "name": item.name,
-                                        "db_price": db_price, "live_price": None})
+            result["no_price"].append(
+                {
+                    "sku": sku,
+                    "name": item.name,
+                    "db_price": db_price,
+                    "live_price": None,
+                }
+            )
         elif db_price is None:
-            result["unchanged"].append({"sku": sku, "name": item.name,
-                                         "db_price": None, "live_price": live_price})
+            result["unchanged"].append(
+                {
+                    "sku": sku,
+                    "name": item.name,
+                    "db_price": None,
+                    "live_price": live_price,
+                }
+            )
         elif live_price > db_price + 0.005:
-            result["increased"].append({"sku": sku, "name": item.name,
-                                         "db_price": db_price, "live_price": live_price,
-                                         "delta": live_price - db_price})
+            result["increased"].append(
+                {
+                    "sku": sku,
+                    "name": item.name,
+                    "db_price": db_price,
+                    "live_price": live_price,
+                    "delta": live_price - db_price,
+                }
+            )
         elif live_price < db_price - 0.005:
-            result["decreased"].append({"sku": sku, "name": item.name,
-                                         "db_price": db_price, "live_price": live_price,
-                                         "delta": live_price - db_price})
+            result["decreased"].append(
+                {
+                    "sku": sku,
+                    "name": item.name,
+                    "db_price": db_price,
+                    "live_price": live_price,
+                    "delta": live_price - db_price,
+                }
+            )
         else:
-            result["unchanged"].append({"sku": sku, "name": item.name,
-                                         "db_price": db_price, "live_price": live_price})
+            result["unchanged"].append(
+                {
+                    "sku": sku,
+                    "name": item.name,
+                    "db_price": db_price,
+                    "live_price": live_price,
+                }
+            )
     return result
 
 
@@ -271,8 +358,10 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
             diff = _build_msrp_diff(db_items, by_sku)
 
             changes = len(diff["increased"]) + len(diff["decreased"])
-            log(f"Done — {changes} price change(s), {len(diff['new'])} new, "
-                f"{len(diff['removed'])} removed")
+            log(
+                f"Done — {changes} price change(s), {len(diff['new'])} new, "
+                f"{len(diff['removed'])} removed"
+            )
 
             if update_db:
                 db_by_sku = {item.sku: item for item in db_items}
@@ -301,9 +390,14 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
                         _notify_discord("\n".join(lines))
 
             job = _read_msrp_job()
-            job.update({"status": "done", "results": diff,
-                        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
-                        "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds")})
+            job.update(
+                {
+                    "status": "done",
+                    "results": diff,
+                    "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                    "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                }
+            )
             _write_msrp_job(job)
             record_activity(
                 "msrp_diff",
@@ -316,9 +410,14 @@ def _run_msrp_diff_job(app, update_db: bool) -> None:
         except Exception as exc:
             logger.error("MSRP diff job failed: %s", exc)
             job = _read_msrp_job()
-            job.update({"status": "error", "error": str(exc),
-                        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
-                        "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds")})
+            job.update(
+                {
+                    "status": "error",
+                    "error": str(exc),
+                    "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                    "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                }
+            )
             _write_msrp_job(job)
             record_activity(
                 "msrp_diff",

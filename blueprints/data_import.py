@@ -171,7 +171,9 @@ def _completion_field_name(raw_name: str | None) -> str | None:
     return COMPLETION_COL_MAP.get(normalized, normalized)
 
 
-def _read_completion_rows(uploaded_file, paste_text: str) -> tuple[list[dict], str | None]:
+def _read_completion_rows(
+    uploaded_file, paste_text: str
+) -> tuple[list[dict], str | None]:
     """Read pasted or uploaded completion rows from CSV-like text."""
     content = (paste_text or "").strip()
     if content:
@@ -189,10 +191,18 @@ def _read_completion_rows(uploaded_file, paste_text: str) -> tuple[list[dict], s
     try:
         dialect = csv.Sniffer().sniff(sample, delimiters=",\t")
     except csv.Error:
-        dialect = csv.excel_tab if "\t" in content and content.count("\t") >= content.count(",") else csv.excel
+        dialect = (
+            csv.excel_tab
+            if "\t" in content and content.count("\t") >= content.count(",")
+            else csv.excel
+        )
 
     reader = csv.DictReader(io.StringIO(content), dialect=dialect)
-    raw_headers = [header.strip() for header in (reader.fieldnames or []) if header and header.strip()]
+    raw_headers = [
+        header.strip()
+        for header in (reader.fieldnames or [])
+        if header and header.strip()
+    ]
     mapped_headers = {_completion_field_name(header) for header in raw_headers}
     if "person" not in mapped_headers or "sku" not in mapped_headers:
         return [], "Please include a header row with person and sku."
@@ -206,7 +216,9 @@ def _read_completion_rows(uploaded_file, paste_text: str) -> tuple[list[dict], s
             field_name = _completion_field_name(orig_key)
             if not field_name:
                 continue
-            normalized[field_name] = cell_value.strip() if cell_value is not None else ""
+            normalized[field_name] = (
+                cell_value.strip() if cell_value is not None else ""
+            )
         normalized["source_label"] = source_label
         normalized["row_num"] = row_num
         parsed_rows.append(normalized)
@@ -223,7 +235,9 @@ def _safe_csv_filename(raw_name: str) -> str:
     return cleaned
 
 
-def _import_row_label(row_num: int | None, name: str | None = None, sku: str | None = None) -> str:
+def _import_row_label(
+    row_num: int | None, name: str | None = None, sku: str | None = None
+) -> str:
     """Build a compact human-readable row label for import summaries."""
     parts = []
     if row_num is not None:
@@ -243,7 +257,9 @@ def _build_import_header_report(uploaded_file, ext: str) -> dict:
     """Analyze import file headers and return a header summary."""
     raw_headers: list[str] = []
     if ext == "xlsx":
-        workbook = openpyxl.load_workbook(io.BytesIO(uploaded_file.stream.read()), data_only=True)
+        workbook = openpyxl.load_workbook(
+            io.BytesIO(uploaded_file.stream.read()), data_only=True
+        )
         worksheet = workbook.active
         for cell in worksheet[1]:
             if cell.value is None:
@@ -269,17 +285,24 @@ def _build_import_header_report(uploaded_file, ext: str) -> dict:
         missing_required.append("name")
 
     ownership_columns_found = bool({"owned_raw", "status", "person"} & mapped_headers)
-    unicorn_columns_found = bool({"is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn"} & mapped_headers)
+    unicorn_columns_found = bool(
+        {"is_sku_unicorn", "is_variant_unicorn", "is_edge_unicorn"} & mapped_headers
+    )
     unknown_headers = sorted(
-        header for header in raw_headers
+        header
+        for header in raw_headers
         if _normalized_header(header) not in XLSX_COL_MAP
     )
 
     warnings = []
     if not ownership_columns_found:
-        warnings.append("No ownership/status column found (owned / Owned? / status / person). Rows will default to Owned.")
+        warnings.append(
+            "No ownership/status column found (owned / Owned? / status / person). Rows will default to Owned."
+        )
     if not unicorn_columns_found:
-        warnings.append("No unicorn columns found. If needed, add is_sku_unicorn / is_variant_unicorn / is_edge_unicorn.")
+        warnings.append(
+            "No unicorn columns found. If needed, add is_sku_unicorn / is_variant_unicorn / is_edge_unicorn."
+        )
 
     return {
         "ok": not missing_required,

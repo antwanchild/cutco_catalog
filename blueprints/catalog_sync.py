@@ -13,7 +13,9 @@ from flask import Blueprint, current_app
 from sqlalchemy.orm import selectinload
 
 from constants import (
-    DATA_DIR, SYNC_BLOCKED_CATEGORIES, UNKNOWN_COLOR,
+    DATA_DIR,
+    SYNC_BLOCKED_CATEGORIES,
+    UNKNOWN_COLOR,
 )
 from extensions import db
 from job_state import read_json_file, reset_json_file, write_json_file
@@ -41,16 +43,19 @@ _catalog_sync_job_lock = threading.Lock()
 
 
 def _read_catalog_sync_job() -> dict:
-    return read_json_file(_CATALOG_SYNC_JOB_FILE, {
-        "status": "idle",
-        "progress": [],
-        "results": None,
-        "error": None,
-        "started_at": None,
-        "finished_at": None,
-        "preview": None,
-        "heartbeat_at": None,
-    })
+    return read_json_file(
+        _CATALOG_SYNC_JOB_FILE,
+        {
+            "status": "idle",
+            "progress": [],
+            "results": None,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
+            "preview": None,
+            "heartbeat_at": None,
+        },
+    )
 
 
 def _write_catalog_sync_job(data: dict) -> None:
@@ -58,21 +63,29 @@ def _write_catalog_sync_job(data: dict) -> None:
 
 
 def _reset_catalog_sync_job() -> None:
-    reset_json_file(_CATALOG_SYNC_JOB_FILE, {
-        "status": "idle",
-        "progress": [],
-        "results": None,
-        "error": None,
-        "started_at": None,
-        "finished_at": None,
-        "preview": None,
-        "heartbeat_at": None,
-    }, lock=_catalog_sync_job_lock)
+    reset_json_file(
+        _CATALOG_SYNC_JOB_FILE,
+        {
+            "status": "idle",
+            "progress": [],
+            "results": None,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
+            "preview": None,
+            "heartbeat_at": None,
+        },
+        lock=_catalog_sync_job_lock,
+    )
 
 
 def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -> dict:
     existing_skus = {item.sku for item in Item.query.filter(Item.sku.isnot(None)).all()}
-    new_items = [scraped_item for scraped_item in scraped if scraped_item["sku"] not in existing_skus]
+    new_items = [
+        scraped_item
+        for scraped_item in scraped
+        if scraped_item["sku"] not in existing_skus
+    ]
 
     _grouped_unsorted: dict = {}
     for item in new_items:
@@ -85,7 +98,9 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
 
     grouped = {
         cat: sorted(items, key=_sku_sort_key)
-        for cat, items in sorted(_grouped_unsorted.items(), key=lambda kv: kv[0].lower())
+        for cat, items in sorted(
+            _grouped_unsorted.items(), key=lambda kv: kv[0].lower()
+        )
     }
 
     if scraped:
@@ -94,13 +109,21 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
         _details_map: dict[str, dict] = {}
         with ThreadPoolExecutor(max_workers=8) as pool:
             _future_map = {
-                pool.submit(scrape_item_specs, item_data["url"]): ("specs", item_data["sku"])
+                pool.submit(scrape_item_specs, item_data["url"]): (
+                    "specs",
+                    item_data["sku"],
+                )
                 for item_data in new_items
             }
-            _future_map.update({
-                pool.submit(scrape_item_variant_colors, item_data["url"]): ("variant_colors", item_data["sku"])
-                for item_data in new_items
-            })
+            _future_map.update(
+                {
+                    pool.submit(scrape_item_variant_colors, item_data["url"]): (
+                        "variant_colors",
+                        item_data["sku"],
+                    )
+                    for item_data in new_items
+                }
+            )
             for future in _as_completed(_future_map):
                 kind, sku = _future_map[future]
                 _details_map.setdefault(sku, {})[kind] = future.result()
@@ -108,29 +131,39 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
             details = _details_map.get(item["sku"], {})
             raw_variant_colors = details.get("variant_colors", ())
             item["variant_colors"] = [
-                color for color in raw_variant_colors
+                color
+                for color in raw_variant_colors
                 if color and color != UNKNOWN_COLOR
             ]
         for item in new_items:
             details = _details_map.get(item["sku"], {})
             specs = details.get("specs", {})
-            item["edge_type"]      = specs.get("edge_type", "Unknown")
-            item["msrp"]           = specs.get("msrp")
-            item["blade_length"]   = specs.get("blade_length")
+            item["edge_type"] = specs.get("edge_type", "Unknown")
+            item["msrp"] = specs.get("msrp")
+            item["blade_length"] = specs.get("blade_length")
             item["overall_length"] = specs.get("overall_length")
-            item["weight"]         = specs.get("weight")
+            item["weight"] = specs.get("weight")
 
     existing_sets = {item_set.name.lower() for item_set in Set.query.all()}
     new_sets = sorted(
-        (scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() not in existing_sets),
+        (
+            scraped_set
+            for scraped_set in scraped_sets
+            if scraped_set["name"].lower() not in existing_sets
+        ),
         key=_sku_sort_key,
     )
-    existing_sets_data = [scraped_set for scraped_set in scraped_sets if scraped_set["name"].lower() in existing_sets]
-
+    existing_sets_data = [
+        scraped_set
+        for scraped_set in scraped_sets
+        if scraped_set["name"].lower() in existing_sets
+    ]
 
     existing_set_lookup = {
         item_set.name.lower(): item_set
-        for item_set in Set.query.options(selectinload(Set.members).selectinload(ItemSetMember.item)).all()
+        for item_set in Set.query.options(
+            selectinload(Set.members).selectinload(ItemSetMember.item)
+        ).all()
     }
 
     catalog_sku_lookup = {
@@ -138,10 +171,12 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
         for item in Item.query.filter(Item.sku.isnot(None)).all()
         if _normalize_member_sku(item.sku)
     }
-    preview_name_lookup = _build_member_name_lookup([
-        *Item.query.filter(Item.sku.isnot(None)).all(),
-        *new_items,
-    ])
+    preview_name_lookup = _build_member_name_lookup(
+        [
+            *Item.query.filter(Item.sku.isnot(None)).all(),
+            *new_items,
+        ]
+    )
     scraped_sku_lookup = {
         _normalize_member_sku(item["sku"])
         for item in new_items
@@ -161,23 +196,27 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
         item_set["member_data_json"] = json.dumps(member_entries, ensure_ascii=False)
         if item_set in existing_sets_data:
             current_set = existing_set_lookup.get(item_set["name"].lower())
-            item_set["membership_preview"] = _build_set_membership_preview(
-                current_set,
-                member_entries,
-                catalog_sku_lookup,
-                preview_name_lookup,
-            ) if current_set else {
-                "has_changes": False,
-                "summary": "Unable to load current set state.",
-                "current_rows": [],
-                "incoming_rows": member_snapshot_rows,
-                "change_rows": [],
-                "added": 0,
-                "removed": 0,
-                "quantity_changed": 0,
-                "current_count": 0,
-                "incoming_count": len(member_snapshot_rows),
-            }
+            item_set["membership_preview"] = (
+                _build_set_membership_preview(
+                    current_set,
+                    member_entries,
+                    catalog_sku_lookup,
+                    preview_name_lookup,
+                )
+                if current_set
+                else {
+                    "has_changes": False,
+                    "summary": "Unable to load current set state.",
+                    "current_rows": [],
+                    "incoming_rows": member_snapshot_rows,
+                    "change_rows": [],
+                    "added": 0,
+                    "removed": 0,
+                    "quantity_changed": 0,
+                    "current_count": 0,
+                    "incoming_count": len(member_snapshot_rows),
+                }
+            )
 
     changed_existing_sets_data = [
         item_set
@@ -210,16 +249,18 @@ def _run_catalog_sync_job(app) -> None:
 
         def log(message: str) -> None:
             progress.append(message)
-            _write_catalog_sync_job({
-                "status": "running",
-                "progress": list(progress),
-                "results": None,
-                "error": None,
-                "started_at": started_at,
-                "finished_at": None,
-                "preview": None,
-                "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
-            })
+            _write_catalog_sync_job(
+                {
+                    "status": "running",
+                    "progress": list(progress),
+                    "results": None,
+                    "error": None,
+                    "started_at": started_at,
+                    "finished_at": None,
+                    "preview": None,
+                    "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                }
+            )
 
         try:
             log("Scraping live catalog…")
@@ -240,16 +281,18 @@ def _run_catalog_sync_job(app) -> None:
                 "new_sets": len(preview["new_sets"]),
                 "existing_sets": len(preview["existing_sets_data"]),
             }
-            _write_catalog_sync_job({
-                "status": "done",
-                "progress": progress,
-                "results": results,
-                "error": None,
-                "started_at": started_at,
-                "finished_at": finished_at,
-                "preview": preview,
-                "heartbeat_at": finished_at,
-            })
+            _write_catalog_sync_job(
+                {
+                    "status": "done",
+                    "progress": progress,
+                    "results": results,
+                    "error": None,
+                    "started_at": started_at,
+                    "finished_at": finished_at,
+                    "preview": preview,
+                    "heartbeat_at": finished_at,
+                }
+            )
             record_activity(
                 "catalog_sync",
                 "Catalog sync complete",
@@ -259,16 +302,18 @@ def _run_catalog_sync_job(app) -> None:
         except Exception as exc:
             logger.exception("Catalog sync failed")
             finished_at = datetime.now(UTC).isoformat(timespec="seconds")
-            _write_catalog_sync_job({
-                "status": "error",
-                "progress": progress,
-                "results": None,
-                "error": str(exc),
-                "started_at": started_at,
-                "finished_at": finished_at,
-                "preview": None,
-                "heartbeat_at": finished_at,
-            })
+            _write_catalog_sync_job(
+                {
+                    "status": "error",
+                    "progress": progress,
+                    "results": None,
+                    "error": str(exc),
+                    "started_at": started_at,
+                    "finished_at": finished_at,
+                    "preview": None,
+                    "heartbeat_at": finished_at,
+                }
+            )
             record_activity(
                 "catalog_sync",
                 "Catalog sync failed",
@@ -311,7 +356,7 @@ def _item_alternate_skus_text(item: Item | None) -> str:
 
 
 def _normalize_member_sku(value: str | None) -> str | None:
-    sku = (str(value).strip().upper() if value is not None else "")
+    sku = str(value).strip().upper() if value is not None else ""
     return sku or None
 
 
@@ -432,7 +477,9 @@ def _load_member_snapshot(raw_member_data: str | None) -> list[dict]:
             if existing is None:
                 seen[sku] = {"sku": sku, "name": name, "quantity": quantity}
             else:
-                existing["quantity"] = max(1, int(existing.get("quantity") or 1)) + quantity
+                existing["quantity"] = (
+                    max(1, int(existing.get("quantity") or 1)) + quantity
+                )
                 if not existing.get("name") and name:
                     existing["name"] = name
             continue
@@ -455,7 +502,9 @@ def _build_member_status_rows(
     catalog_name_lookup = catalog_name_lookup or {}
     for index, entry in enumerate(member_entries, start=1):
         sku = _normalize_member_sku(entry.get("sku"))
-        item = _resolve_member_item(entry, catalog_sku_lookup, catalog_name_lookup, set_sku=set_sku)
+        item = _resolve_member_item(
+            entry, catalog_sku_lookup, catalog_name_lookup, set_sku=set_sku
+        )
         quantity = entry.get("quantity", 1)
         try:
             quantity = max(1, int(quantity))
@@ -478,20 +527,28 @@ def _build_member_status_rows(
             status = "no_sku"
             status_label = "No item number"
             resolution_note = "Will be skipped."
-        rows.append({
-            "index": index,
-            "sku": sku,
-            "name": entry.get("name") or None,
-            "hover_title": _member_hover_title(
-                _get_item_field(item, "name") if item is not None else entry.get("name")
-            ),
-            "quantity": quantity,
-            "status": status,
-            "status_label": status_label,
-            "resolution_note": resolution_note,
-            "matched_item_id": _get_item_field(item, "id") if item is not None else None,
-            "matched_item_name": _get_item_field(item, "name") if item is not None else None,
-        })
+        rows.append(
+            {
+                "index": index,
+                "sku": sku,
+                "name": entry.get("name") or None,
+                "hover_title": _member_hover_title(
+                    _get_item_field(item, "name")
+                    if item is not None
+                    else entry.get("name")
+                ),
+                "quantity": quantity,
+                "status": status,
+                "status_label": status_label,
+                "resolution_note": resolution_note,
+                "matched_item_id": _get_item_field(item, "id")
+                if item is not None
+                else None,
+                "matched_item_name": _get_item_field(item, "name")
+                if item is not None
+                else None,
+            }
+        )
     rows.sort(key=_member_preview_sort_key)
     return rows, missing_skus
 
@@ -534,8 +591,12 @@ def _aggregate_resolved_members(
     resolved_members: OrderedDict[int, dict[str, object]] = OrderedDict()
     created_missing_items = 0
     for member in member_entries:
-        resolved_item = _resolve_member_item(member, sku_to_item, name_to_item, set_sku=set_sku)
-        member_sku = _normalize_member_sku(getattr(resolved_item, "sku", None) if resolved_item else member.get("sku"))
+        resolved_item = _resolve_member_item(
+            member, sku_to_item, name_to_item, set_sku=set_sku
+        )
+        member_sku = _normalize_member_sku(
+            getattr(resolved_item, "sku", None) if resolved_item else member.get("sku")
+        )
         if not member_sku:
             continue
         item = sku_to_item.get(member_sku.upper())
@@ -556,7 +617,9 @@ def _aggregate_resolved_members(
         if aggregated is None:
             resolved_members[item.id] = {"item": item, "quantity": quantity}
         else:
-            aggregated["quantity"] = max(1, int(aggregated.get("quantity") or 1)) + quantity
+            aggregated["quantity"] = (
+                max(1, int(aggregated.get("quantity") or 1)) + quantity
+            )
     return resolved_members, created_missing_items
 
 
@@ -621,7 +684,9 @@ def _member_preview_sort_key(member: dict[str, object]) -> tuple[int, int, str]:
     return (1, 0, sku or name)
 
 
-def _aggregate_member_preview_rows(member_entries: list[dict]) -> OrderedDict[str, dict[str, object]]:
+def _aggregate_member_preview_rows(
+    member_entries: list[dict],
+) -> OrderedDict[str, dict[str, object]]:
     """Aggregate member rows by stable preview key."""
     rows: OrderedDict[str, dict[str, object]] = OrderedDict()
     for entry in member_entries:
@@ -695,12 +760,16 @@ def _build_set_membership_preview(
         compare_key = f"item:{resolved_item.id}" if resolved_item is not None else key
         incoming["item_id"] = resolved_item.id if resolved_item is not None else None
         incoming["source_sku"] = incoming.get("sku")
-        incoming["display_sku"] = _normalize_member_sku(getattr(resolved_item, "sku", None)) or incoming.get("sku")
+        incoming["display_sku"] = _normalize_member_sku(
+            getattr(resolved_item, "sku", None)
+        ) or incoming.get("sku")
         incoming_compare_rows[compare_key] = incoming
         if resolved_item is not None:
             incoming_row_notes[key] = "Will link to existing catalog item."
         elif incoming.get("sku"):
-            incoming_row_notes[key] = "Will create a placeholder if that option is enabled."
+            incoming_row_notes[key] = (
+                "Will create a placeholder if that option is enabled."
+            )
         else:
             incoming_row_notes[key] = "Will be skipped."
         incoming_row_notes_by_compare[compare_key] = incoming_row_notes[key]
@@ -718,42 +787,51 @@ def _build_set_membership_preview(
         current = current_compare_rows.get(key)
         if current is None:
             added += 1
-            change_rows.append({
-                "action": "added",
-                "sku": incoming.get("display_sku") or incoming.get("sku") or "—",
-                "name": incoming.get("name") or "—",
-                "current_quantity": None,
-                "incoming_quantity": incoming.get("quantity"),
-                "resolution_note": incoming_row_notes_by_compare.get(key),
-                "source_sku": incoming.get("source_sku"),
-            })
+            change_rows.append(
+                {
+                    "action": "added",
+                    "sku": incoming.get("display_sku") or incoming.get("sku") or "—",
+                    "name": incoming.get("name") or "—",
+                    "current_quantity": None,
+                    "incoming_quantity": incoming.get("quantity"),
+                    "resolution_note": incoming_row_notes_by_compare.get(key),
+                    "source_sku": incoming.get("source_sku"),
+                }
+            )
             continue
         current_qty = int(current.get("quantity") or 1)
         incoming_qty = int(incoming.get("quantity") or 1)
         if current_qty != incoming_qty:
             quantity_changed += 1
-            change_rows.append({
-                "action": "quantity",
-                "sku": incoming.get("display_sku") or incoming.get("sku") or current.get("sku") or "—",
-                "name": incoming.get("name") or current.get("name") or "—",
-                "current_quantity": current_qty,
-                "incoming_quantity": incoming_qty,
-                "resolution_note": "Will update the quantity on the linked item.",
-                "source_sku": incoming.get("source_sku"),
-            })
+            change_rows.append(
+                {
+                    "action": "quantity",
+                    "sku": incoming.get("display_sku")
+                    or incoming.get("sku")
+                    or current.get("sku")
+                    or "—",
+                    "name": incoming.get("name") or current.get("name") or "—",
+                    "current_quantity": current_qty,
+                    "incoming_quantity": incoming_qty,
+                    "resolution_note": "Will update the quantity on the linked item.",
+                    "source_sku": incoming.get("source_sku"),
+                }
+            )
 
     for key, current in current_compare_rows.items():
         if key in incoming_compare_rows:
             continue
         removed += 1
-        change_rows.append({
-            "action": "removed",
-            "sku": current.get("display_sku") or current.get("sku") or "—",
-            "name": current.get("name") or "—",
-            "current_quantity": current.get("quantity"),
-            "incoming_quantity": None,
-            "resolution_note": "Will be removed from the set.",
-        })
+        change_rows.append(
+            {
+                "action": "removed",
+                "sku": current.get("display_sku") or current.get("sku") or "—",
+                "name": current.get("name") or "—",
+                "current_quantity": current.get("quantity"),
+                "incoming_quantity": None,
+                "resolution_note": "Will be removed from the set.",
+            }
+        )
 
     summary_parts = []
     if added:
@@ -765,7 +843,9 @@ def _build_set_membership_preview(
 
     return {
         "has_changes": bool(change_rows),
-        "summary": ", ".join(summary_parts) if summary_parts else "No membership changes detected.",
+        "summary": ", ".join(summary_parts)
+        if summary_parts
+        else "No membership changes detected.",
         "current_rows": current_rows_list,
         "incoming_rows": incoming_rows_list,
         "change_rows": change_rows,
@@ -775,4 +855,3 @@ def _build_set_membership_preview(
         "current_count": len(current_rows),
         "incoming_count": len(incoming_rows),
     }
-

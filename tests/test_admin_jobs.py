@@ -35,7 +35,9 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def _login_as_admin(self):
-        self.client.post("/admin/login", data={"token": "test-admin-token"}, follow_redirects=False)
+        self.client.post(
+            "/admin/login", data={"token": "test-admin-token"}, follow_redirects=False
+        )
 
     def _set_csrf_token(self, value="test-csrf-token"):
         with self.client.session_transaction() as session:
@@ -72,8 +74,12 @@ class AdminJobSmokeTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 302)
         with self.app.app_context():
-            item = db.session.execute(db.select(Item).filter_by(sku="SYNC-1")).scalar_one()
-            item_set = db.session.execute(db.select(Set).filter_by(name="Sync Set")).scalar_one()
+            item = db.session.execute(
+                db.select(Item).filter_by(sku="SYNC-1")
+            ).scalar_one()
+            item_set = db.session.execute(
+                db.select(Set).filter_by(name="Sync Set")
+            ).scalar_one()
             membership = db.session.execute(
                 db.select(ItemSetMember).filter_by(item_id=item.id, set_id=item_set.id)
             ).scalar_one()
@@ -87,9 +93,13 @@ class AdminJobSmokeTests(unittest.TestCase):
         self._login_as_admin()
         self._set_csrf_token()
 
-        with mock.patch("blueprints.admin._read_specs_job", return_value={"status": "idle"}), \
-             mock.patch("blueprints.admin._write_specs_job") as write_mock, \
-             mock.patch("blueprints.admin.threading.Thread") as thread_mock:
+        with (
+            mock.patch(
+                "blueprints.admin._read_specs_job", return_value={"status": "idle"}
+            ),
+            mock.patch("blueprints.admin._write_specs_job") as write_mock,
+            mock.patch("blueprints.admin.threading.Thread") as thread_mock,
+        ):
             thread_instance = mock.Mock()
             thread_mock.return_value = thread_instance
 
@@ -108,9 +118,13 @@ class AdminJobSmokeTests(unittest.TestCase):
         self._login_as_admin()
         self._set_csrf_token()
 
-        with mock.patch("blueprints.admin._read_msrp_job", return_value={"status": "idle"}), \
-             mock.patch("blueprints.admin._write_msrp_job") as write_mock, \
-             mock.patch("blueprints.admin.threading.Thread") as thread_mock:
+        with (
+            mock.patch(
+                "blueprints.admin._read_msrp_job", return_value={"status": "idle"}
+            ),
+            mock.patch("blueprints.admin._write_msrp_job") as write_mock,
+            mock.patch("blueprints.admin.threading.Thread") as thread_mock,
+        ):
             thread_instance = mock.Mock()
             thread_mock.return_value = thread_instance
 
@@ -141,7 +155,9 @@ class AdminJobSmokeTests(unittest.TestCase):
         reset_mock.assert_called_once()
 
     def test_stale_msrp_job_is_recovered_on_read(self):
-        stale_started_at = (datetime.now(UTC) - timedelta(hours=2)).isoformat(timespec="seconds")
+        stale_started_at = (datetime.now(UTC) - timedelta(hours=2)).isoformat(
+            timespec="seconds"
+        )
         job_data = {
             "status": "running",
             "progress": ["Starting MSRP diff…"],
@@ -155,6 +171,7 @@ class AdminJobSmokeTests(unittest.TestCase):
         job_file = f"{self.temp_dir.name}/msrp_job.json"
         with open(job_file, "w", encoding="utf-8") as fh:
             import json
+
             json.dump(job_data, fh)
 
         with mock.patch.object(msrp_jobs, "_MSRP_JOB_FILE", job_file):
@@ -191,8 +208,10 @@ class AdminJobSmokeTests(unittest.TestCase):
 
         fake_executor = FakeExecutor()
 
-        with mock.patch("msrp_jobs.ThreadPoolExecutor", return_value=fake_executor), \
-             mock.patch("msrp_jobs.as_completed", new=fake_as_completed):
+        with (
+            mock.patch("msrp_jobs.ThreadPoolExecutor", return_value=fake_executor),
+            mock.patch("msrp_jobs.as_completed", new=fake_as_completed),
+        ):
             fetched, timed_out = msrp_jobs._fetch_live_prices_by_sku(
                 by_sku,
                 workers=2,
@@ -205,17 +224,29 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIsNone(by_sku["B-1"]["price"])
         first_future.result.assert_called_once()
         second_future.cancel.assert_called_once()
-        self.assertEqual(fake_executor.shutdown_args, {"wait": False, "cancel_futures": True})
+        self.assertEqual(
+            fake_executor.shutdown_args, {"wait": False, "cancel_futures": True}
+        )
 
     def test_msrp_diff_flags_cutco_outage_when_no_prices_return(self):
         job_file = f"{self.temp_dir.name}/msrp_job.json"
-        with mock.patch.object(msrp_jobs, "_MSRP_JOB_FILE", job_file), \
-             mock.patch.object(msrp_jobs, "_build_msrp_price_targets_from_db") as targets_mock, \
-             mock.patch.object(msrp_jobs, "_fetch_live_prices_by_sku", return_value=(0, 0)), \
-             mock.patch.object(msrp_jobs, "record_activity"), \
-             mock.patch.object(msrp_jobs, "check_wishlist_targets", return_value=[]):
+        with (
+            mock.patch.object(msrp_jobs, "_MSRP_JOB_FILE", job_file),
+            mock.patch.object(
+                msrp_jobs, "_build_msrp_price_targets_from_db"
+            ) as targets_mock,
+            mock.patch.object(
+                msrp_jobs, "_fetch_live_prices_by_sku", return_value=(0, 0)
+            ),
+            mock.patch.object(msrp_jobs, "record_activity"),
+            mock.patch.object(msrp_jobs, "check_wishlist_targets", return_value=[]),
+        ):
             targets_mock.return_value = {
-                "A-1": {"name": "Alpha", "url": "https://www.cutco.com/p/a", "price": None},
+                "A-1": {
+                    "name": "Alpha",
+                    "url": "https://www.cutco.com/p/a",
+                    "price": None,
+                },
             }
             msrp_jobs._run_msrp_diff_job(self.app, False)
 
@@ -227,31 +258,54 @@ class AdminJobSmokeTests(unittest.TestCase):
 
     def test_msrp_price_targets_prefer_db_urls_for_known_skus(self):
         live_items = [
-            {"sku": "125", "name": "Medium Cutting Board", "url": "https://www.cutco.com/shop/cutting-boards", "price": None},
-            {"sku": "999", "name": "New Thing", "url": "https://www.cutco.com/p/new-thing", "price": None},
+            {
+                "sku": "125",
+                "name": "Medium Cutting Board",
+                "url": "https://www.cutco.com/shop/cutting-boards",
+                "price": None,
+            },
+            {
+                "sku": "999",
+                "name": "New Thing",
+                "url": "https://www.cutco.com/p/new-thing",
+                "price": None,
+            },
         ]
 
         with self.app.app_context():
             with mock.patch.object(msrp_jobs.Item, "query") as query_mock:
                 query_mock.filter.return_value.all.return_value = [
-                    mock.Mock(sku="125", cutco_url="https://www.cutco.com/p/medium-cutting-board"),
+                    mock.Mock(
+                        sku="125",
+                        cutco_url="https://www.cutco.com/p/medium-cutting-board",
+                    ),
                 ]
                 targets = msrp_jobs._build_msrp_price_targets(live_items)
 
-        self.assertEqual(targets["125"]["url"], "https://www.cutco.com/p/medium-cutting-board")
+        self.assertEqual(
+            targets["125"]["url"], "https://www.cutco.com/p/medium-cutting-board"
+        )
         self.assertEqual(targets["999"]["url"], "https://www.cutco.com/p/new-thing")
 
     def test_msrp_price_targets_from_db_uses_stored_item_urls(self):
         with self.app.app_context():
-            item_a = Item(name="Knife A", sku="A-1", cutco_url="https://www.cutco.com/p/knife-a")
-            item_b = Item(name="Knife B", sku="125", cutco_url="https://www.cutco.com/p/cutting-boards/125")
+            item_a = Item(
+                name="Knife A", sku="A-1", cutco_url="https://www.cutco.com/p/knife-a"
+            )
+            item_b = Item(
+                name="Knife B",
+                sku="125",
+                cutco_url="https://www.cutco.com/p/cutting-boards/125",
+            )
             db.session.add_all([item_a, item_b])
             db.session.commit()
 
             targets = msrp_jobs._build_msrp_price_targets_from_db(Item.query.all())
 
         self.assertEqual(targets["A-1"]["url"], "https://www.cutco.com/p/knife-a")
-        self.assertEqual(targets["125"]["url"], "https://www.cutco.com/p/medium-cutting-board")
+        self.assertEqual(
+            targets["125"]["url"], "https://www.cutco.com/p/medium-cutting-board"
+        )
 
     def test_admin_diagnostics_shows_job_summaries(self):
         self._login_as_admin()
@@ -268,7 +322,10 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertIn(b"Storage &amp; Paths", response.data)
         self.assertIn(b"Bootstrap Version", response.data)
         self.assertIn(b"Recorded At", response.data)
-        self.assertIn(b"Older entries may reflect the time this database first recorded the migration.", response.data)
+        self.assertIn(
+            b"Older entries may reflect the time this database first recorded the migration.",
+            response.data,
+        )
         self.assertIn(b"from local repo", response.data)
         self.assertIn(b"UTC", response.data)
         self.assertIn(str(SCHEMA_VERSION).encode(), response.data)
@@ -288,8 +345,13 @@ class AdminJobSmokeTests(unittest.TestCase):
         constants.get_git_sha_info.cache_clear()
         self.addCleanup(constants.get_git_sha_info.cache_clear)
 
-        with mock.patch.dict(os.environ, {"GIT_SHA": ""}, clear=False), \
-             mock.patch("constants._read_git_sha_from_repo", return_value="0123456789abcdef0123456789abcdef01234567"):
+        with (
+            mock.patch.dict(os.environ, {"GIT_SHA": ""}, clear=False),
+            mock.patch(
+                "constants._read_git_sha_from_repo",
+                return_value="0123456789abcdef0123456789abcdef01234567",
+            ),
+        ):
             response = self.client.get("/admin/diagnostics")
 
         self.assertEqual(response.status_code, 200)
@@ -329,7 +391,8 @@ class AdminJobSmokeTests(unittest.TestCase):
             db.session.commit()
             item_id = item.id
 
-        with mock.patch(
+        with (
+            mock.patch(
                 "blueprints.admin._read_msrp_job",
                 return_value={
                     "status": "idle",
@@ -340,8 +403,8 @@ class AdminJobSmokeTests(unittest.TestCase):
                     "error": None,
                     "update_db": False,
                 },
-            ), \
-             mock.patch(
+            ),
+            mock.patch(
                 "blueprints.admin._read_specs_job",
                 return_value={
                     "status": "idle",
@@ -351,18 +414,21 @@ class AdminJobSmokeTests(unittest.TestCase):
                     "results": None,
                     "error": None,
                 },
-            ), \
-             mock.patch(
+            ),
+            mock.patch(
                 "time_utils.container_timezone",
                 return_value=(timezone(timedelta(hours=-6), "MDT"), "MDT"),
-            ), \
-             mock.patch.dict(
-                 os.environ,
-                 {"DATA_DIR": "", "LOG_DIR": "", "GIT_SHA": "abcdef1234567890"},
-                 clear=False,
-             ):
+            ),
+            mock.patch.dict(
+                os.environ,
+                {"DATA_DIR": "", "LOG_DIR": "", "GIT_SHA": "abcdef1234567890"},
+                clear=False,
+            ),
+        ):
             constants.get_git_sha_info.cache_clear()
-            self.app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://user:secret@db.example.com:5432/cutco"
+            self.app.config["SQLALCHEMY_DATABASE_URI"] = (
+                "postgresql://user:secret@db.example.com:5432/cutco"
+            )
 
             msrp_page = self.client.get("/admin/msrp-diff")
             specs_page = self.client.get("/admin/specs-backfill")
@@ -383,7 +449,9 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertEqual(diagnostics_page.status_code, 200)
         self.assertIn(b"Schema Migrations", diagnostics_page.data)
         self.assertIn(b"Bootstrap History", diagnostics_page.data)
-        self.assertIn(b"postgresql://user:***@db.example.com:5432/cutco", diagnostics_page.data)
+        self.assertIn(
+            b"postgresql://user:***@db.example.com:5432/cutco", diagnostics_page.data
+        )
         self.assertIn(b"from image build", diagnostics_page.data)
         self.assertEqual(msrp_status.status_code, 200)
         self.assertEqual(msrp_status.get_json()["status"], "idle")
@@ -401,7 +469,8 @@ class AdminJobSmokeTests(unittest.TestCase):
             self.assertIsNotNone(schema_state)
             self.assertEqual(schema_state.version, SCHEMA_VERSION)
             initial_task_names = {
-                task.name for task in db.session.execute(db.select(KnifeTask)).scalars().all()
+                task.name
+                for task in db.session.execute(db.select(KnifeTask)).scalars().all()
             }
             bootstrap_state = db.session.get(BootstrapState, "bootstrap")
             self.assertIsNotNone(bootstrap_state)
@@ -412,7 +481,8 @@ class AdminJobSmokeTests(unittest.TestCase):
             initialize_database()
             second_state = db.session.get(BootstrapState, "bootstrap")
             second_task_names = {
-                task.name for task in db.session.execute(db.select(KnifeTask)).scalars().all()
+                task.name
+                for task in db.session.execute(db.select(KnifeTask)).scalars().all()
             }
             self.assertEqual(initial_task_names, set(KNIFE_TASK_PRESETS))
             self.assertIsNotNone(second_state)

@@ -14,7 +14,14 @@ from app import create_app
 import blueprints.catalog as catalog_blueprint
 from constants import UNKNOWN_COLOR
 from extensions import db
-from helpers import _collection_token, _gift_token, _notify_discord, _verify_collection_token, _verify_gift_token, check_wishlist_targets
+from helpers import (
+    _collection_token,
+    _gift_token,
+    _notify_discord,
+    _verify_collection_token,
+    _verify_gift_token,
+    check_wishlist_targets,
+)
 from msrp_diff import find_stale_msrp_rows
 from msrp_scrape import _scrape_price_from_page
 from models import (
@@ -49,7 +56,11 @@ from scraping import (
     scrape_purple_campaign_variants,
     scrape_item_specs,
 )
-from blueprints.catalog import _build_member_name_lookup, _build_set_membership_preview, _load_member_snapshot
+from blueprints.catalog import (
+    _build_member_name_lookup,
+    _build_set_membership_preview,
+    _load_member_snapshot,
+)
 from time_utils import container_timezone, format_container_time
 
 
@@ -72,14 +83,23 @@ class SmokeBaseTest(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def _login_as_admin(self):
-        self.client.post("/admin/login", data={"token": "test-admin-token"}, follow_redirects=False)
+        self.client.post(
+            "/admin/login", data={"token": "test-admin-token"}, follow_redirects=False
+        )
 
     def _set_csrf_token(self, value="test-csrf-token"):
         with self.client.session_transaction() as session:
             session["csrf_token"] = value
         return value
 
-    def _add_catalog_item(self, *, name="Test Knife", sku="TK-1", category="Kitchen Knives", alternate_skus=""):
+    def _add_catalog_item(
+        self,
+        *,
+        name="Test Knife",
+        sku="TK-1",
+        category="Kitchen Knives",
+        alternate_skus="",
+    ):
         payload = {
             "csrf_token": "test-csrf-token",
             "name": name,
@@ -101,7 +121,9 @@ class SmokeBaseTest(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         with self.app.app_context():
             item = db.session.execute(db.select(Item).filter_by(sku=sku)).scalar_one()
-            variant = db.session.execute(db.select(ItemVariant).filter_by(item_id=item.id)).scalar_one()
+            variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=item.id)
+            ).scalar_one()
         return item.id, variant.id
 
     def _add_person(self, name="Anthony", notes="Primary collector"):
@@ -112,7 +134,9 @@ class SmokeBaseTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 302)
         with self.app.app_context():
-            person = db.session.execute(db.select(Person).filter_by(name=name)).scalar_one()
+            person = db.session.execute(
+                db.select(Person).filter_by(name=name)
+            ).scalar_one()
         return person.id
 
     def _add_task(self, name="Slice apples"):
@@ -123,7 +147,9 @@ class SmokeBaseTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 302)
         with self.app.app_context():
-            task = db.session.execute(db.select(KnifeTask).filter_by(name=name)).scalar_one()
+            task = db.session.execute(
+                db.select(KnifeTask).filter_by(name=name)
+            ).scalar_one()
         return task.id
 
     def _add_set(self, name="Sample Set", sku="SS-1", item_ids=()):
@@ -132,7 +158,9 @@ class SmokeBaseTest(unittest.TestCase):
             db.session.add(item_set)
             db.session.flush()
             for item_id in item_ids:
-                db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1))
+                db.session.add(
+                    ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1)
+                )
             db.session.commit()
             return item_set.id
 
@@ -151,7 +179,9 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertNotIn(b"Recently Changed", response.data)
         self.assertNotIn(b"Recent Activity", response.data)
         self.assertIn(b"\xc2\xa9", response.data)
-        self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
+        self.assertEqual(
+            response.headers["Referrer-Policy"], "strict-origin-when-cross-origin"
+        )
         self.assertNotIn("Strict-Transport-Security", response.headers)
         self.assertEqual(self.client.get("/robots.txt").status_code, 200)
 
@@ -195,7 +225,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Completion Gaps", response.data)
         self.assertIn(b"Export", response.data)
         self.assertIn(b"Variant Sync", response.data)
-        self.assertIn(b'/catalog?unicorn=1', response.data)
+        self.assertIn(b"/catalog?unicorn=1", response.data)
         self.assertIn(b"Admin", response.data)
         self.assertIn(b"Review", response.data)
         self.assertIn(b"Session", response.data)
@@ -206,8 +236,12 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        _red_item_id, red_variant_id = self._add_catalog_item(name="Dashboard Red Knife", sku="DR-1")
-        _purple_item_id, purple_variant_id = self._add_catalog_item(name="Dashboard Purple Knife", sku="DP-1")
+        _red_item_id, red_variant_id = self._add_catalog_item(
+            name="Dashboard Red Knife", sku="DR-1"
+        )
+        _purple_item_id, purple_variant_id = self._add_catalog_item(
+            name="Dashboard Purple Knife", sku="DP-1"
+        )
 
         with self.app.app_context():
             red_variant = db.session.get(ItemVariant, red_variant_id)
@@ -233,7 +267,10 @@ class PublicSmokeTests(SmokeBaseTest):
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["Strict-Transport-Security"], "max-age=31536000; includeSubDomains")
+        self.assertEqual(
+            response.headers["Strict-Transport-Security"],
+            "max-age=31536000; includeSubDomains",
+        )
 
     def test_msrp_diff_defaults_to_write_mode(self):
         self._login_as_admin()
@@ -251,7 +288,9 @@ class PublicSmokeTests(SmokeBaseTest):
             mocked_get.return_value.url = "https://www.cutco.com/p/1766C"
             mocked_get.return_value.text = html
 
-            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/1766C"), 184.0)
+            self.assertEqual(
+                _scrape_price_from_page("https://www.cutco.com/p/1766C"), 184.0
+            )
 
     def test_msrp_scraper_ignores_zero_price_noise(self):
         html = """
@@ -269,7 +308,10 @@ class PublicSmokeTests(SmokeBaseTest):
             mocked_get.return_value.url = "https://www.cutco.com/p/small-cutting-board"
             mocked_get.return_value.text = html
 
-            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/small-cutting-board"), 35.0)
+            self.assertEqual(
+                _scrape_price_from_page("https://www.cutco.com/p/small-cutting-board"),
+                35.0,
+            )
 
     def test_msrp_scraper_ignores_related_item_prices_after_purchase_area(self):
         html = """
@@ -293,13 +335,22 @@ class PublicSmokeTests(SmokeBaseTest):
             mocked_get.return_value.url = "https://www.cutco.com/p/medium-cutting-board"
             mocked_get.return_value.text = html
 
-            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/medium-cutting-board"), 38.0)
+            self.assertEqual(
+                _scrape_price_from_page("https://www.cutco.com/p/medium-cutting-board"),
+                38.0,
+            )
 
     def test_find_stale_msrp_rows_flags_zero_and_missing_prices(self):
         with self.app.app_context():
-            zero_item = Item(name="Zero Knife", sku="Z-1", category="Kitchen Knives", msrp=0.0)
-            missing_item = Item(name="Missing Knife", sku="M-1", category="Kitchen Knives", msrp=None)
-            priced_item = Item(name="Priced Knife", sku="P-1", category="Kitchen Knives", msrp=18.0)
+            zero_item = Item(
+                name="Zero Knife", sku="Z-1", category="Kitchen Knives", msrp=0.0
+            )
+            missing_item = Item(
+                name="Missing Knife", sku="M-1", category="Kitchen Knives", msrp=None
+            )
+            priced_item = Item(
+                name="Priced Knife", sku="P-1", category="Kitchen Knives", msrp=18.0
+            )
             db.session.add_all([zero_item, missing_item, priced_item])
             db.session.commit()
 
@@ -309,9 +360,24 @@ class PublicSmokeTests(SmokeBaseTest):
 
     def test_msrp_scraper_maps_cutting_board_family_urls_to_specific_products(self):
         cases = [
-            ("124", "https://www.cutco.com/p/cutting-boards/124", "https://www.cutco.com/p/small-cutting-board", 35.0),
-            ("125", "https://www.cutco.com/p/cutting-boards/125", "https://www.cutco.com/p/medium-cutting-board", 28.0),
-            ("126", "https://www.cutco.com/p/cutting-boards/126", "https://www.cutco.com/p/large-cutting-board", 42.0),
+            (
+                "124",
+                "https://www.cutco.com/p/cutting-boards/124",
+                "https://www.cutco.com/p/small-cutting-board",
+                35.0,
+            ),
+            (
+                "125",
+                "https://www.cutco.com/p/cutting-boards/125",
+                "https://www.cutco.com/p/medium-cutting-board",
+                28.0,
+            ),
+            (
+                "126",
+                "https://www.cutco.com/p/cutting-boards/126",
+                "https://www.cutco.com/p/large-cutting-board",
+                42.0,
+            ),
         ]
 
         for sku, family_url, product_url, expected_price in cases:
@@ -319,7 +385,7 @@ class PublicSmokeTests(SmokeBaseTest):
                 html = f"""
                     <html>
                       <body>
-                        <h1>{product_url.rsplit('/', 1)[-1].replace('-', ' ').title()}</h1>
+                        <h1>{product_url.rsplit("/", 1)[-1].replace("-", " ").title()}</h1>
                         <div class="price">${expected_price:.2f}</div>
                         <script>
                           window.__CUTCO__ = {{"fullRetail":198.00,"actualPrice":198.00}};
@@ -329,8 +395,12 @@ class PublicSmokeTests(SmokeBaseTest):
                 """
 
                 response = mock.Mock(status_code=200, url=product_url, text=html)
-                with mock.patch("scraping.requests.get", return_value=response) as mocked_get:
-                    self.assertEqual(_scrape_price_from_page(family_url, sku=sku), expected_price)
+                with mock.patch(
+                    "scraping.requests.get", return_value=response
+                ) as mocked_get:
+                    self.assertEqual(
+                        _scrape_price_from_page(family_url, sku=sku), expected_price
+                    )
                     mocked_get.assert_called_once()
                     self.assertEqual(mocked_get.call_args.args[0], product_url)
 
@@ -353,9 +423,15 @@ class PublicSmokeTests(SmokeBaseTest):
             </html>
         """
 
-        response = mock.Mock(status_code=200, url="https://www.cutco.com/shop/flatware", text=html)
+        response = mock.Mock(
+            status_code=200, url="https://www.cutco.com/shop/flatware", text=html
+        )
         with mock.patch("scraping.requests.get", return_value=response):
-            self.assertIsNone(_scrape_price_from_page("https://www.cutco.com/shop/flatware", "Stainless Dinner Fork"))
+            self.assertIsNone(
+                _scrape_price_from_page(
+                    "https://www.cutco.com/shop/flatware", "Stainless Dinner Fork"
+                )
+            )
 
     def test_msrp_scraper_rejects_family_page_item_hop_guessing(self):
         family_html = """
@@ -368,12 +444,21 @@ class PublicSmokeTests(SmokeBaseTest):
         """
 
         with mock.patch("scraping.requests.get") as mocked_get:
-            mocked_get.return_value = mock.Mock(status_code=200, url="https://www.cutco.com/shop/flatware", text=family_html)
+            mocked_get.return_value = mock.Mock(
+                status_code=200,
+                url="https://www.cutco.com/shop/flatware",
+                text=family_html,
+            )
 
             self.assertIsNone(
-                _scrape_price_from_page("https://www.cutco.com/shop/flatware", "Stainless Dinner Fork"),
+                _scrape_price_from_page(
+                    "https://www.cutco.com/shop/flatware", "Stainless Dinner Fork"
+                ),
             )
-            self.assertEqual(mocked_get.call_args_list[0].args[0], "https://www.cutco.com/shop/flatware")
+            self.assertEqual(
+                mocked_get.call_args_list[0].args[0],
+                "https://www.cutco.com/shop/flatware",
+            )
 
     def test_resolve_cutco_item_page_url_hops_to_matching_item_page(self):
         family_html = """
@@ -395,12 +480,23 @@ class PublicSmokeTests(SmokeBaseTest):
 
         with mock.patch("scraping.requests.get") as mocked_get:
             mocked_get.side_effect = [
-                mock.Mock(status_code=200, url="https://www.cutco.com/shop/flatware", text=family_html),
-                mock.Mock(status_code=200, url="https://www.cutco.com/p/stainless-dinner-fork", text=item_html),
+                mock.Mock(
+                    status_code=200,
+                    url="https://www.cutco.com/shop/flatware",
+                    text=family_html,
+                ),
+                mock.Mock(
+                    status_code=200,
+                    url="https://www.cutco.com/p/stainless-dinner-fork",
+                    text=item_html,
+                ),
             ]
 
             self.assertEqual(
-                _resolve_cutco_item_page_url("https://www.cutco.com/shop/flatware", item_name="Stainless Dinner Fork"),
+                _resolve_cutco_item_page_url(
+                    "https://www.cutco.com/shop/flatware",
+                    item_name="Stainless Dinner Fork",
+                ),
                 "https://www.cutco.com/p/stainless-dinner-fork",
             )
 
@@ -422,13 +518,24 @@ class PublicSmokeTests(SmokeBaseTest):
 
         with mock.patch("scraping.requests.get") as mocked_get:
             mocked_get.side_effect = [
-                mock.Mock(status_code=200, url="https://www.cutco.com/p/super-shears/677CD", text=html),
+                mock.Mock(
+                    status_code=200,
+                    url="https://www.cutco.com/p/super-shears/677CD",
+                    text=html,
+                ),
             ]
 
-            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/super-shears/677CD"), 149.0)
+            self.assertEqual(
+                _scrape_price_from_page("https://www.cutco.com/p/super-shears/677CD"),
+                149.0,
+            )
 
         with mock.patch("scraping.requests.get") as mocked_get:
-            mocked_get.return_value = mock.Mock(status_code=200, url="https://www.cutco.com/p/super-shears/677CD", text=html)
+            mocked_get.return_value = mock.Mock(
+                status_code=200,
+                url="https://www.cutco.com/p/super-shears/677CD",
+                text=html,
+            )
 
             self.assertEqual(
                 scrape_item_specs("https://www.cutco.com/p/super-shears/677CD")["msrp"],
@@ -454,7 +561,12 @@ class PublicSmokeTests(SmokeBaseTest):
                 text=html,
             )
 
-            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/super-shears/77CD", "Super Shears"), 149.0)
+            self.assertEqual(
+                _scrape_price_from_page(
+                    "https://www.cutco.com/p/super-shears/77CD", "Super Shears"
+                ),
+                149.0,
+            )
 
     def test_msrp_scraper_prefers_exact_item_title_over_variant_substring(self):
         html = """
@@ -475,7 +587,10 @@ class PublicSmokeTests(SmokeBaseTest):
                 text=html,
             )
 
-            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/1759C", "Table Knife"), 54.0)
+            self.assertEqual(
+                _scrape_price_from_page("https://www.cutco.com/p/1759C", "Table Knife"),
+                54.0,
+            )
 
     def test_msrp_scraper_ignores_late_related_item_price_on_exact_page(self):
         html = """
@@ -500,7 +615,12 @@ class PublicSmokeTests(SmokeBaseTest):
                 text=html,
             )
 
-            self.assertEqual(_scrape_price_from_page("https://www.cutco.com/p/cheese-knife", "Cheese Knife"), 98.0)
+            self.assertEqual(
+                _scrape_price_from_page(
+                    "https://www.cutco.com/p/cheese-knife", "Cheese Knife"
+                ),
+                98.0,
+            )
 
     def test_msrp_scraper_anchors_on_sku_when_title_has_extra_descriptor(self):
         html = """
@@ -537,8 +657,14 @@ class PublicSmokeTests(SmokeBaseTest):
             </html>
         """
 
-        self.assertEqual(_find_cutco_item_link(html, "Super Shears"), "https://www.cutco.com/p/super-shears")
-        self.assertEqual(_find_cutco_item_link(html, "Super Shears with Sheath"), "https://www.cutco.com/p/super-shears-with-sheath")
+        self.assertEqual(
+            _find_cutco_item_link(html, "Super Shears"),
+            "https://www.cutco.com/p/super-shears",
+        )
+        self.assertEqual(
+            _find_cutco_item_link(html, "Super Shears with Sheath"),
+            "https://www.cutco.com/p/super-shears-with-sheath",
+        )
 
     def test_health_endpoint_reports_ok(self):
         response = self.client.get("/health")
@@ -559,7 +685,9 @@ class PublicSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         item_id, _variant_id = self._add_catalog_item(name="Search Knife", sku="SRCH-1")
-        _uncategorized_item_id, _uncategorized_variant_id = self._add_catalog_item(name="Search Uncat", sku="SRCH-2", category=None)
+        _uncategorized_item_id, _uncategorized_variant_id = self._add_catalog_item(
+            name="Search Uncat", sku="SRCH-2", category=None
+        )
         _person_id = self._add_person(name="Search Collector", notes="Search note")
         _set_id = self._add_set(name="Search Set", sku="SET-S", item_ids=(item_id,))
         self._add_task(name="Slice tomatoes")
@@ -575,7 +703,9 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Search Set", response.data)
         self.assertIn(b"Catalog Items", response.data)
 
-        uncategorized_response = self.client.get("/search?q=Search&category=__uncategorized__")
+        uncategorized_response = self.client.get(
+            "/search?q=Search&category=__uncategorized__"
+        )
         self.assertEqual(uncategorized_response.status_code, 200)
         self.assertIn(b"Search Uncat", uncategorized_response.data)
         self.assertIn(b"Uncategorized", uncategorized_response.data)
@@ -585,9 +715,15 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        _red_item_id, red_variant_id = self._add_catalog_item(name="Red Knife", sku="R-1")
-        _purple_item_id, purple_variant_id = self._add_catalog_item(name="Purple Knife", sku="P-1")
-        _unknown_item_id, unknown_variant_id = self._add_catalog_item(name="Unknown Knife", sku="U-1")
+        _red_item_id, red_variant_id = self._add_catalog_item(
+            name="Red Knife", sku="R-1"
+        )
+        _purple_item_id, purple_variant_id = self._add_catalog_item(
+            name="Purple Knife", sku="P-1"
+        )
+        _unknown_item_id, unknown_variant_id = self._add_catalog_item(
+            name="Unknown Knife", sku="U-1"
+        )
 
         with self.app.app_context():
             red_variant = db.session.get(ItemVariant, red_variant_id)
@@ -640,7 +776,7 @@ class PublicSmokeTests(SmokeBaseTest):
                     "X-Forwarded-Groups": "admins,users",
                 },
                 follow_redirects=False,
-        )
+            )
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/diagnostics", response.headers["Location"])
@@ -690,9 +826,13 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 302)
 
         with self.app.app_context():
-            audit_events = db.session.execute(
-                db.select(ActivityEvent).where(ActivityEvent.kind == "audit")
-            ).scalars().all()
+            audit_events = (
+                db.session.execute(
+                    db.select(ActivityEvent).where(ActivityEvent.kind == "audit")
+                )
+                .scalars()
+                .all()
+            )
         self.assertGreaterEqual(len(audit_events), 3)
 
         audit_page = self.client.get("/admin/audit")
@@ -706,10 +846,16 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        owned_item_id, owned_variant_id = self._add_catalog_item(name="Gift Knife Owned", sku="GL-1")
-        missing_item_id, _missing_variant_id = self._add_catalog_item(name="Gift Knife Missing", sku="GL-2")
+        owned_item_id, owned_variant_id = self._add_catalog_item(
+            name="Gift Knife Owned", sku="GL-1"
+        )
+        missing_item_id, _missing_variant_id = self._add_catalog_item(
+            name="Gift Knife Missing", sku="GL-2"
+        )
         person_id = self._add_person(name="Gift Recipient", notes="")
-        set_id = self._add_set(name="Gift Set", sku="GS-1", item_ids=(owned_item_id, missing_item_id))
+        set_id = self._add_set(
+            name="Gift Set", sku="GS-1", item_ids=(owned_item_id, missing_item_id)
+        )
 
         ownership_response = self.client.post(
             "/ownership/add",
@@ -725,7 +871,9 @@ class PublicSmokeTests(SmokeBaseTest):
         )
         self.assertEqual(ownership_response.status_code, 302)
 
-        gift_share_response = self.client.get(f"/sets/{set_id}/gift-token?person={person_id}")
+        gift_share_response = self.client.get(
+            f"/sets/{set_id}/gift-token?person={person_id}"
+        )
         self.assertEqual(gift_share_response.status_code, 200)
         self.assertIn(b"Share Gift List", gift_share_response.data)
 
@@ -776,14 +924,22 @@ class PublicSmokeTests(SmokeBaseTest):
             item.msrp = 49.99
             db.session.commit()
 
-        wishlist_response = self.client.get(f"/wishlist?person={person_id}&sort=name&dir=desc")
+        wishlist_response = self.client.get(
+            f"/wishlist?person={person_id}&sort=name&dir=desc"
+        )
         self.assertEqual(wishlist_response.status_code, 200)
         self.assertIn(b"Wishlist Knife", wishlist_response.data)
         self.assertIn(b"target met", wishlist_response.data)
         self.assertIn(b"?sort=name&amp;dir=asc", wishlist_response.data)
 
-        with mock.patch("blueprints.people.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
-             mock.patch("blueprints.people._notify_discord", return_value=True) as notify_mock:
+        with (
+            mock.patch(
+                "blueprints.people.DISCORD_WEBHOOK_URL", "https://discord.invalid"
+            ),
+            mock.patch(
+                "blueprints.people._notify_discord", return_value=True
+            ) as notify_mock,
+        ):
             check_response = self.client.post(
                 "/wishlist/check",
                 data={"csrf_token": "test-csrf-token"},
@@ -803,9 +959,15 @@ class PublicSmokeTests(SmokeBaseTest):
             sku="VW-1",
             alternate_skus="VW-ALT1, VW-ALT2",
         )
-        red_item_id, red_variant_id = self._add_catalog_item(name="Stats Red Knife", sku="SR-1")
-        purple_item_id, purple_variant_id = self._add_catalog_item(name="Stats Purple Knife", sku="SP-1")
-        _matrix_sort_item_id, _ = self._add_catalog_item(name="A Matrix Knife", sku="AA-1")
+        red_item_id, red_variant_id = self._add_catalog_item(
+            name="Stats Red Knife", sku="SR-1"
+        )
+        purple_item_id, purple_variant_id = self._add_catalog_item(
+            name="Stats Purple Knife", sku="SP-1"
+        )
+        _matrix_sort_item_id, _ = self._add_catalog_item(
+            name="A Matrix Knife", sku="AA-1"
+        )
         person_id = self._add_person(name="Viewer", notes="")
         set_id = self._add_set(name="View Set", sku="VS-1", item_ids=(item_id,))
 
@@ -861,8 +1023,12 @@ class PublicSmokeTests(SmokeBaseTest):
         item_response = self.client.get(f"/views/item/{item_id}")
         matrix_response = self.client.get("/views/matrix?sort=sku&dir=desc")
         stats_response = self.client.get("/stats")
-        gift_share_response = self.client.get(f"/sets/{set_id}/gift-token?person={person_id}")
-        collection_share_response = self.client.get(f"/people/{person_id}/collection-token")
+        gift_share_response = self.client.get(
+            f"/sets/{set_id}/gift-token?person={person_id}"
+        )
+        collection_share_response = self.client.get(
+            f"/people/{person_id}/collection-token"
+        )
 
         self.assertEqual(item_response.status_code, 200)
         self.assertIn(b"View Knife", item_response.data)
@@ -879,14 +1045,19 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Name", matrix_response.data)
         self.assertIn(b"SKU \xe2\x96\xbc", matrix_response.data)
         self.assertIn(b"#AA-1", matrix_response.data)
-        self.assertGreater(matrix_response.data.index(b"#AA-1"), matrix_response.data.index(b"#VW-1"))
+        self.assertGreater(
+            matrix_response.data.index(b"#AA-1"), matrix_response.data.index(b"#VW-1")
+        )
         self.assertEqual(stats_response.status_code, 200)
         self.assertIn(b"Coverage", stats_response.data)
         self.assertIn(b"Top Colors", stats_response.data)
         self.assertIn(b'href="/variants"', stats_response.data)
         self.assertIn(b"/variants?color=Red", stats_response.data)
         self.assertIn(b"/variants?color=Purple", stats_response.data)
-        self.assertIn(b"Includes public items plus unicorn, rep only, Costco, and non-catalog items that are marked Owned.", stats_response.data)
+        self.assertIn(
+            b"Includes public items plus unicorn, rep only, Costco, and non-catalog items that are marked Owned.",
+            stats_response.data,
+        )
         diagnostics_response = self.client.get("/admin/diagnostics")
         self.assertEqual(diagnostics_response.status_code, 200)
         self.assertIn(b"Diagnostics Overview", diagnostics_response.data)
@@ -905,7 +1076,9 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _variant_id = self._add_catalog_item(name="Attachment Knife", sku="AT-1")
+        item_id, _variant_id = self._add_catalog_item(
+            name="Attachment Knife", sku="AT-1"
+        )
         image_bytes = (
             b"\x89PNG\r\n\x1a\n"
             b"\x00\x00\x00\rIHDR"
@@ -957,9 +1130,11 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(delete_response.status_code, 302)
 
         with self.app.app_context():
-            remaining = db.session.execute(
-                db.select(ItemAttachment).filter_by(item_id=item_id)
-            ).scalars().all()
+            remaining = (
+                db.session.execute(db.select(ItemAttachment).filter_by(item_id=item_id))
+                .scalars()
+                .all()
+            )
         self.assertEqual(remaining, [])
 
     def test_item_attachment_file_cleanup_on_item_delete(self):
@@ -1021,7 +1196,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Browse Controls", catalog_response.data)
         self.assertIn(b"Catalog Knife", catalog_response.data)
         self.assertIn(b'data-clamp-rows="2"', catalog_response.data)
-        self.assertIn(b"data-confirm-title=\"Delete item\"", catalog_response.data)
+        self.assertIn(b'data-confirm-title="Delete item"', catalog_response.data)
         self.assertEqual(variants_response.status_code, 200)
         self.assertIn(b"Variants", variants_response.data)
         self.assertEqual(sets_response.status_code, 200)
@@ -1031,7 +1206,11 @@ class PublicSmokeTests(SmokeBaseTest):
 
         add_variant_response = self.client.post(
             f"/catalog/{item_id}/variants/add",
-            data={"csrf_token": "test-csrf-token", "color": "Pearl White", "notes": "Alt color"},
+            data={
+                "csrf_token": "test-csrf-token",
+                "color": "Pearl White",
+                "notes": "Alt color",
+            },
             follow_redirects=False,
         )
         self.assertEqual(add_variant_response.status_code, 302)
@@ -1042,7 +1221,11 @@ class PublicSmokeTests(SmokeBaseTest):
 
         edit_variant_response = self.client.post(
             f"/variants/{added_variant.id}/edit",
-            data={"csrf_token": "test-csrf-token", "color": "Pearl Ivory", "notes": "Updated color"},
+            data={
+                "csrf_token": "test-csrf-token",
+                "color": "Pearl Ivory",
+                "notes": "Updated color",
+            },
             follow_redirects=False,
         )
         self.assertEqual(edit_variant_response.status_code, 302)
@@ -1053,8 +1236,12 @@ class PublicSmokeTests(SmokeBaseTest):
 
         item_id, variant_id = self._add_catalog_item(name="People Knife", sku="PL-1")
         person_id = self._add_person(name="People Viewer", notes="")
-        _wishlist_low_item_id, wishlist_low_variant_id = self._add_catalog_item(name="Alpha Wishlist Knife", sku="AA-2")
-        _wishlist_high_item_id, wishlist_high_variant_id = self._add_catalog_item(name="Zulu Wishlist Knife", sku="ZZ-2")
+        _wishlist_low_item_id, wishlist_low_variant_id = self._add_catalog_item(
+            name="Alpha Wishlist Knife", sku="AA-2"
+        )
+        _wishlist_high_item_id, wishlist_high_variant_id = self._add_catalog_item(
+            name="Zulu Wishlist Knife", sku="ZZ-2"
+        )
 
         add_ownership_response = self.client.post(
             "/ownership/add",
@@ -1106,7 +1293,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Owned", collection_response.data)
         self.assertIn(b'id="bulk-form"', collection_response.data)
         self.assertIn(b'form="bulk-form"', collection_response.data)
-        self.assertIn(b'/ownership/', collection_response.data)
+        self.assertIn(b"/ownership/", collection_response.data)
         self.assertEqual(edit_page_response.status_code, 200)
         self.assertIn(b"People Viewer", edit_page_response.data)
         self.assertEqual(wishlist_response.status_code, 200)
@@ -1116,7 +1303,10 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"SKU", wishlist_response.data)
         self.assertIn(b"#AA-2", wishlist_response.data)
         self.assertIn(b"#ZZ-2", wishlist_response.data)
-        self.assertLess(wishlist_response.data.index(b"#AA-2"), wishlist_response.data.index(b"#ZZ-2"))
+        self.assertLess(
+            wishlist_response.data.index(b"#AA-2"),
+            wishlist_response.data.index(b"#ZZ-2"),
+        )
 
     def test_empty_collection_page_renders_shell(self):
         self._login_as_admin()
@@ -1127,7 +1317,7 @@ class PublicSmokeTests(SmokeBaseTest):
 
         self.assertEqual(collection_response.status_code, 200)
         self.assertIn(b"No entries yet", collection_response.data)
-        self.assertIn(b'collection-empty-state', collection_response.data)
+        self.assertIn(b"collection-empty-state", collection_response.data)
         self.assertIn(b"Browse Catalog", collection_response.data)
 
     def test_collection_missing_items_show_skus(self):
@@ -1148,12 +1338,16 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, owned_variant_id = self._add_catalog_item(name="Variant Gap Knife", sku="VG-1")
+        item_id, owned_variant_id = self._add_catalog_item(
+            name="Variant Gap Knife", sku="VG-1"
+        )
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             db.session.add(ItemVariant(item_id=item_id, color="Pearl White"))
             db.session.commit()
-            missing_variant = next(variant for variant in item.variants if variant.color == "Pearl White")
+            missing_variant = next(
+                variant for variant in item.variants if variant.color == "Pearl White"
+            )
         person_id = self._add_person(name="Variant Gap Collector", notes="")
         self.client.post(
             "/ownership/add",
@@ -1205,7 +1399,9 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Export", export_page_response.data)
         self.assertEqual(export_csv_response.status_code, 200)
         self.assertEqual(export_csv_response.mimetype, "text/csv")
-        self.assertIn("my_export.csv", export_csv_response.headers["Content-Disposition"])
+        self.assertIn(
+            "my_export.csv", export_csv_response.headers["Content-Disposition"]
+        )
         self.assertIn(b"Exporter", export_csv_response.data)
         self.assertIn(b"quantity_purchased", export_csv_response.data)
         self.assertIn(b"quantity_given_away", export_csv_response.data)
@@ -1225,15 +1421,33 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        sharpening_item_id, _ = self._add_catalog_item(name="Sharpen View Knife", sku="SV-1")
-        giftbox_item_id, _ = self._add_catalog_item(name="Gift Box Sharpener", sku="GB-1")
-        accessory_item_id, _ = self._add_catalog_item(name="Accessory Sharpener", sku="AC-1", category="Accessories")
-        shears_item_id, _ = self._add_catalog_item(name="Super Shears", sku="SS-1", category="Accessories")
-        gadget_item_id, _ = self._add_catalog_item(name="Gadget Sharpener", sku="GD-1", category="Gadgets")
-        sheath_item_id, _ = self._add_catalog_item(name="Sheath Sharpener", sku="SH-1", category="Sheaths")
-        storage_item_id, _ = self._add_catalog_item(name="Storage Sharpener", sku="ST-1", category="Storage")
-        cutting_board_item_id, _ = self._add_catalog_item(name="Cutting Board Sharpener", sku="CB-1", category="Cutting Boards")
-        cookware_item_id, _ = self._add_catalog_item(name="Cook View Piece", sku="CV-1", category="Cookware")
+        sharpening_item_id, _ = self._add_catalog_item(
+            name="Sharpen View Knife", sku="SV-1"
+        )
+        giftbox_item_id, _ = self._add_catalog_item(
+            name="Gift Box Sharpener", sku="GB-1"
+        )
+        accessory_item_id, _ = self._add_catalog_item(
+            name="Accessory Sharpener", sku="AC-1", category="Accessories"
+        )
+        shears_item_id, _ = self._add_catalog_item(
+            name="Super Shears", sku="SS-1", category="Accessories"
+        )
+        gadget_item_id, _ = self._add_catalog_item(
+            name="Gadget Sharpener", sku="GD-1", category="Gadgets"
+        )
+        sheath_item_id, _ = self._add_catalog_item(
+            name="Sheath Sharpener", sku="SH-1", category="Sheaths"
+        )
+        storage_item_id, _ = self._add_catalog_item(
+            name="Storage Sharpener", sku="ST-1", category="Storage"
+        )
+        cutting_board_item_id, _ = self._add_catalog_item(
+            name="Cutting Board Sharpener", sku="CB-1", category="Cutting Boards"
+        )
+        cookware_item_id, _ = self._add_catalog_item(
+            name="Cook View Piece", sku="CV-1", category="Cookware"
+        )
         task_item_id, _ = self._add_catalog_item(name="Task View Knife", sku="TV-1")
         task_id = self._add_task(name="Slice onions")
 
@@ -1365,9 +1579,13 @@ class PublicSmokeTests(SmokeBaseTest):
         tasks_response = self.client.get("/tasks")
         tasks_manage_response = self.client.get("/tasks/manage")
         task_detail_response = self.client.get(f"/tasks/manage/{task_id}")
-        sharpening_select = sharpening_response.data.decode("utf-8").split(
-            '<select name="item_id" required class="select-sm" style="min-width:200px">'
-        )[1].split("</select>")[0]
+        sharpening_select = (
+            sharpening_response.data.decode("utf-8")
+            .split(
+                '<select name="item_id" required class="select-sm" style="min-width:200px">'
+            )[1]
+            .split("</select>")[0]
+        )
 
         self.assertEqual(sharpening_response.status_code, 200)
         self.assertIn(b"Sharpening", sharpening_response.data)
@@ -1414,10 +1632,16 @@ class PublicSmokeTests(SmokeBaseTest):
             ).all()
             self.assertEqual(len(storage_logs), 1)
 
-        with mock.patch("blueprints.logs._notify_discord", return_value=True) as notify_mock, \
-             mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
-             mock.patch("blueprints.logs.SHARPEN_THRESHOLD_DAYS", 1), \
-             mock.patch("blueprints.logs.COOKWARE_THRESHOLD_DAYS", 1):
+        with (
+            mock.patch(
+                "blueprints.logs._notify_discord", return_value=True
+            ) as notify_mock,
+            mock.patch(
+                "blueprints.logs.DISCORD_WEBHOOK_URL", "https://discord.invalid"
+            ),
+            mock.patch("blueprints.logs.SHARPEN_THRESHOLD_DAYS", 1),
+            mock.patch("blueprints.logs.COOKWARE_THRESHOLD_DAYS", 1),
+        ):
             sharpening_notify_response = self.client.post(
                 "/sharpening/notify",
                 data={"csrf_token": "test-csrf-token"},
@@ -1506,13 +1730,17 @@ class UtilitySmokeTests(SmokeBaseTest):
 
         response = mock.Mock()
         response.raise_for_status.return_value = None
-        with mock.patch("helpers.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
-             mock.patch("helpers.requests.post", return_value=response) as post_mock:
+        with (
+            mock.patch("helpers.DISCORD_WEBHOOK_URL", "https://discord.invalid"),
+            mock.patch("helpers.requests.post", return_value=response) as post_mock,
+        ):
             self.assertTrue(_notify_discord("Webhook works"))
             post_mock.assert_called_once()
 
-        with mock.patch("helpers.DISCORD_WEBHOOK_URL", "https://discord.invalid"), \
-             mock.patch("helpers.requests.post", side_effect=RuntimeError("boom")):
+        with (
+            mock.patch("helpers.DISCORD_WEBHOOK_URL", "https://discord.invalid"),
+            mock.patch("helpers.requests.post", side_effect=RuntimeError("boom")),
+        ):
             self.assertFalse(_notify_discord("Webhook fails"))
 
     def test_set_member_entries_preserve_structured_skus(self):
@@ -1559,7 +1787,9 @@ class UtilitySmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual([entry["sku"] for entry in member_entries], ["1708", "1707"])
-        self.assertEqual([entry["name"] for entry in member_entries], ["Salad Tongs", "Salad Fork"])
+        self.assertEqual(
+            [entry["name"] for entry in member_entries], ["Salad Tongs", "Salad Fork"]
+        )
 
     def test_load_member_snapshot_dedupes_duplicate_skus(self):
         rows = _load_member_snapshot(
@@ -1594,15 +1824,21 @@ class UtilitySmokeTests(SmokeBaseTest):
     def test_extract_sku_from_href_can_preserve_lettered_code(self):
         self.assertEqual(_extract_sku_from_href("https://www.cutco.com/p/990c"), "990")
         self.assertEqual(
-            _extract_sku_from_href("https://www.cutco.com/p/990c", preserve_lettered_code=True),
+            _extract_sku_from_href(
+                "https://www.cutco.com/p/990c", preserve_lettered_code=True
+            ),
             "990C",
         )
         self.assertEqual(
-            _extract_sku_from_href("https://www.cutco.com/p/4135-2", preserve_lettered_code=True),
+            _extract_sku_from_href(
+                "https://www.cutco.com/p/4135-2", preserve_lettered_code=True
+            ),
             "4135-2",
         )
         self.assertEqual(
-            _extract_sku_from_href("https://www.cutco.com/p/2135-2", preserve_lettered_code=True),
+            _extract_sku_from_href(
+                "https://www.cutco.com/p/2135-2", preserve_lettered_code=True
+            ),
             "2135-2",
         )
 
@@ -1624,7 +1860,9 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic",),
             )
 
-    def test_extract_product_variant_colors_ignores_attribute_sources_without_swatch_group(self):
+    def test_extract_product_variant_colors_ignores_attribute_sources_without_swatch_group(
+        self,
+    ):
         response = mock.Mock()
         response.status_code = 200
         response.text = """
@@ -1724,7 +1962,9 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic Brown", "Pearl"),
             )
 
-    def test_extract_product_variant_colors_prefers_color_swatches_over_generic_option_copy(self):
+    def test_extract_product_variant_colors_prefers_color_swatches_over_generic_option_copy(
+        self,
+    ):
         response = mock.Mock()
         response.status_code = 200
         response.text = """
@@ -1755,7 +1995,9 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Gray",),
             )
 
-    def test_extract_product_variant_colors_keeps_generic_color_labels_when_no_color_swatch_class_exists(self):
+    def test_extract_product_variant_colors_keeps_generic_color_labels_when_no_color_swatch_class_exists(
+        self,
+    ):
         response = mock.Mock()
         response.status_code = 200
         response.text = """
@@ -1781,7 +2023,9 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic Brown", "Pearl"),
             )
 
-    def test_extract_product_variant_colors_rejects_non_color_labels_in_generic_swatch_groups(self):
+    def test_extract_product_variant_colors_rejects_non_color_labels_in_generic_swatch_groups(
+        self,
+    ):
         response = mock.Mock()
         response.status_code = 200
         response.text = """
@@ -1817,7 +2061,9 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Gray",),
             )
 
-    def test_extract_product_variant_colors_uses_page_color_when_no_swatch_group_exists(self):
+    def test_extract_product_variant_colors_uses_page_color_when_no_swatch_group_exists(
+        self,
+    ):
         response = mock.Mock()
         response.status_code = 200
         response.text = """
@@ -1858,7 +2104,9 @@ class UtilitySmokeTests(SmokeBaseTest):
         with mock.patch("scraping.requests.get", return_value=response):
             _extract_product_variant_colors.cache_clear()
             self.assertEqual(
-                _extract_product_variant_colors("https://www.cutco.com/p/cutco-cares-alzheimers/"),
+                _extract_product_variant_colors(
+                    "https://www.cutco.com/p/cutco-cares-alzheimers/"
+                ),
                 ("Purple",),
             )
 
@@ -1910,7 +2158,9 @@ class UtilitySmokeTests(SmokeBaseTest):
         with mock.patch("scraping.requests.get", return_value=response):
             _extract_product_variant_colors.cache_clear()
             self.assertEqual(
-                _extract_product_variant_colors("https://www.cutco.com/p/cutting-boards"),
+                _extract_product_variant_colors(
+                    "https://www.cutco.com/p/cutting-boards"
+                ),
                 ("Gray",),
             )
 
@@ -1930,7 +2180,7 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(len(deduped), 1)
         _anchor, href, name = deduped[0]
         self.assertEqual(href, "/p/4135-2&view=product")
-        self.assertEqual(name, "Cutco 4\" Vegetable Knife Sheath")
+        self.assertEqual(name, 'Cutco 4" Vegetable Knife Sheath')
 
     def test_product_link_name_prefers_title_over_full_text(self):
         soup = BeautifulSoup(
@@ -1943,15 +2193,21 @@ class UtilitySmokeTests(SmokeBaseTest):
             "html.parser",
         )
         anchor = soup.find("a")
-        self.assertEqual(_product_link_name(anchor), "5-Pc. Garden Tool Set w/FREE Garden Bag")
+        self.assertEqual(
+            _product_link_name(anchor), "5-Pc. Garden Tool Set w/FREE Garden Bag"
+        )
 
     def test_should_queue_slug_allows_sheaths_to_override_seen_urls(self):
         seen = {"https://www.cutco.com/p/4135-2&view=product"}
         self.assertTrue(
-            _should_queue_slug("https://www.cutco.com/p/4135-2&view=product", "Sheaths", seen),
+            _should_queue_slug(
+                "https://www.cutco.com/p/4135-2&view=product", "Sheaths", seen
+            ),
         )
         self.assertFalse(
-            _should_queue_slug("https://www.cutco.com/p/4135-2&view=product", "Storage", seen),
+            _should_queue_slug(
+                "https://www.cutco.com/p/4135-2&view=product", "Storage", seen
+            ),
         )
 
     def test_member_hover_titles_trim_set_lists(self):
@@ -1964,7 +2220,9 @@ class UtilitySmokeTests(SmokeBaseTest):
             "Super Shears",
         )
         self.assertEqual(
-            _member_hover_title("Basting Spoon Slotted Spoon Ladle Mix-Stir Kitchen Tool Holder"),
+            _member_hover_title(
+                "Basting Spoon Slotted Spoon Ladle Mix-Stir Kitchen Tool Holder"
+            ),
             "Basting Spoon",
         )
         self.assertEqual(_member_hover_title("Super Shears"), "Super Shears")
@@ -1977,7 +2235,9 @@ class UtilitySmokeTests(SmokeBaseTest):
             <html><body><h1>#2026D</h1><h1>Gift Box for Super Shears</h1></body></html>
         """
         with mock.patch("scraping.requests.get", return_value=response):
-            self.assertEqual(_infer_visible_member_sku("Gift Box for Super Shears"), "2026D")
+            self.assertEqual(
+                _infer_visible_member_sku("Gift Box for Super Shears"), "2026D"
+            )
             self.assertIsNone(_infer_visible_member_sku("Super Shears"))
 
     def test_infer_visible_member_sku_supports_sheath_pages(self):
@@ -1987,7 +2247,9 @@ class UtilitySmokeTests(SmokeBaseTest):
             <html><body><h1>#2120-2</h1><h1>4\" Paring Knife Sheath</h1></body></html>
         """
         with mock.patch("scraping.requests.get", return_value=response):
-            self.assertEqual(_infer_visible_member_sku('4" Paring Knife Sheath'), "2120-2")
+            self.assertEqual(
+                _infer_visible_member_sku('4" Paring Knife Sheath'), "2120-2"
+            )
 
     def test_infer_visible_member_sku_supports_generic_box_rows(self):
         response = mock.Mock()
@@ -1997,7 +2259,10 @@ class UtilitySmokeTests(SmokeBaseTest):
         """
         with mock.patch("scraping.requests.get", return_value=response):
             self.assertEqual(
-                _infer_visible_member_sku("Gift Box", context_url="https://www.cutco.com/p/wine-cheese-gift-set"),
+                _infer_visible_member_sku(
+                    "Gift Box",
+                    context_url="https://www.cutco.com/p/wine-cheese-gift-set",
+                ),
                 "2130CD",
             )
 
@@ -2015,14 +2280,16 @@ class UtilitySmokeTests(SmokeBaseTest):
         child_response.text = """
             <html><body><h1>#1720C</h1><h1>2-3/4&quot; Paring Knife</h1></body></html>
         """
-        with mock.patch("scraping.requests.get", side_effect=[parent_response, child_response]):
+        with mock.patch(
+            "scraping.requests.get", side_effect=[parent_response, child_response]
+        ):
             self.assertEqual(
                 _resolve_visible_member_sku(
                     [
                         "https://www.cutco.com/p/salad-mates",
                         "https://www.cutco.com/p/paring-knife",
                     ],
-                    "2-3/4\" Paring Knife",
+                    '2-3/4" Paring Knife',
                     context_url="https://www.cutco.com/p/salad-mates",
                     set_sku="1820",
                 ),
@@ -2053,9 +2320,13 @@ class UtilitySmokeTests(SmokeBaseTest):
             """,
             "html.parser",
         )
-        rows = _collect_visible_set_piece_rows(soup.ul, context_url="https://www.cutco.com/p/salad-mates", set_sku="1820CD")
+        rows = _collect_visible_set_piece_rows(
+            soup.ul, context_url="https://www.cutco.com/p/salad-mates", set_sku="1820CD"
+        )
         self.assertEqual([row["sku"] for row in rows[:2]], ["1720", "1721"])
-        self.assertEqual([row["name"] for row in rows[:2]], ['2-3/4" Paring Knife', "Trimmer"])
+        self.assertEqual(
+            [row["name"] for row in rows[:2]], ['2-3/4" Paring Knife', "Trimmer"]
+        )
         self.assertEqual(rows[2]["sku"], "2111D")
 
     def test_build_set_member_entries_uses_visible_row_skus(self):
@@ -2144,7 +2415,10 @@ class UtilitySmokeTests(SmokeBaseTest):
         with mock.patch.dict(os.environ, {"TZ": "Not/AZone"}, clear=False):
             tz, tz_name = container_timezone()
             self.assertEqual(tz_name, "UTC")
-            self.assertEqual(format_container_time("2026-04-20T19:18:00+00:00"), "Apr 20, 2026, 7:18 PM UTC")
+            self.assertEqual(
+                format_container_time("2026-04-20T19:18:00+00:00"),
+                "Apr 20, 2026, 7:18 PM UTC",
+            )
 
 
 class ImportSmokeTests(SmokeBaseTest):
@@ -2154,7 +2428,9 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "text/csv")
-        self.assertIn("cutco_import_starter.csv", response.headers["Content-Disposition"])
+        self.assertIn(
+            "cutco_import_starter.csv", response.headers["Content-Disposition"]
+        )
 
     def test_import_check_accepts_basic_csv(self):
         self._login_as_admin()
@@ -2166,7 +2442,9 @@ class ImportSmokeTests(SmokeBaseTest):
                 "mode": "check",
                 "csrf_token": "test-csrf-token",
                 "csvfile": (
-                    BytesIO(b"name,sku,owned,color\nParing Knife,1720,yes,Classic Brown\n"),
+                    BytesIO(
+                        b"name,sku,owned,color\nParing Knife,1720,yes,Classic Brown\n"
+                    ),
                     "import.csv",
                 ),
             },
@@ -2211,12 +2489,16 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Import complete", response.data)
         with self.app.app_context():
-            person = db.session.execute(db.select(Person).filter_by(name="Importer")).scalar_one()
+            person = db.session.execute(
+                db.select(Person).filter_by(name="Importer")
+            ).scalar_one()
             variant = db.session.execute(
                 db.select(ItemVariant).filter_by(item_id=item_id, color="Classic Brown")
             ).scalar_one()
             ownership = db.session.execute(
-                db.select(Ownership).filter_by(person_id=person.id, variant_id=variant.id)
+                db.select(Ownership).filter_by(
+                    person_id=person.id, variant_id=variant.id
+                )
             ).scalar_one()
             self.assertEqual(ownership.status, "Owned")
             self.assertEqual(ownership.notes, "Imported ownership")
@@ -2258,13 +2540,19 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Import complete", response.data)
         with self.app.app_context():
-            item = db.session.execute(db.select(Item).filter_by(sku="IM-2")).scalar_one()
+            item = db.session.execute(
+                db.select(Item).filter_by(sku="IM-2")
+            ).scalar_one()
             variant = db.session.execute(
                 db.select(ItemVariant).filter_by(item_id=item.id, color="Pearl White")
             ).scalar_one()
-            person = db.session.execute(db.select(Person).filter_by(name="Importer")).scalar_one()
+            person = db.session.execute(
+                db.select(Person).filter_by(name="Importer")
+            ).scalar_one()
             ownership = db.session.execute(
-                db.select(Ownership).filter_by(person_id=person.id, variant_id=variant.id)
+                db.select(Ownership).filter_by(
+                    person_id=person.id, variant_id=variant.id
+                )
             ).scalar_one()
 
             self.assertEqual(item.notes, "Imported note")
@@ -2335,13 +2623,19 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(second_response.status_code, 200)
         with self.app.app_context():
-            item = db.session.execute(db.select(Item).filter_by(sku="UP-1")).scalar_one()
+            item = db.session.execute(
+                db.select(Item).filter_by(sku="UP-1")
+            ).scalar_one()
             variant = db.session.execute(
                 db.select(ItemVariant).filter_by(item_id=item.id, color="Classic Brown")
             ).scalar_one()
-            ownerships = db.session.execute(
-                db.select(Ownership).filter_by(variant_id=variant.id)
-            ).scalars().all()
+            ownerships = (
+                db.session.execute(
+                    db.select(Ownership).filter_by(variant_id=variant.id)
+                )
+                .scalars()
+                .all()
+            )
             self.assertEqual(len(ownerships), 1)
             ownership = ownerships[0]
             self.assertEqual(ownership.quantity_purchased, 7)
@@ -2380,10 +2674,14 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         with self.app.app_context():
-            item = db.session.execute(db.select(Item).filter_by(sku="RO-1")).scalar_one()
+            item = db.session.execute(
+                db.select(Item).filter_by(sku="RO-1")
+            ).scalar_one()
             self.assertFalse(item.in_catalog)
             self.assertEqual(item.availability, "non-catalog")
-            self.assertEqual([variant.color for variant in item.variants], [UNKNOWN_COLOR])
+            self.assertEqual(
+                [variant.color for variant in item.variants], [UNKNOWN_COLOR]
+            )
 
     def test_import_confirm_normalizes_stainless_title_to_unknown_variant(self):
         self._login_as_admin()
@@ -2417,9 +2715,13 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         with self.app.app_context():
-            item = db.session.execute(db.select(Item).filter_by(sku="1952")).scalar_one()
+            item = db.session.execute(
+                db.select(Item).filter_by(sku="1952")
+            ).scalar_one()
             self.assertEqual(item.name, "1952 Stainless Salad Fork")
-            self.assertEqual([variant.color for variant in item.variants], [UNKNOWN_COLOR])
+            self.assertEqual(
+                [variant.color for variant in item.variants], [UNKNOWN_COLOR]
+            )
 
     def test_import_confirm_adds_duplicate_same_variant_quantities_together(self):
         self._login_as_admin()
@@ -2471,7 +2773,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         with self.app.app_context():
             item = db.session.get(Item, item_id)
-            classic_variant = next(variant for variant in item.variants if variant.color == "Classic Brown")
+            classic_variant = next(
+                variant for variant in item.variants if variant.color == "Classic Brown"
+            )
             ownership = Ownership.query.filter_by(variant_id=classic_variant.id).one()
             self.assertEqual(ownership.quantity_purchased, 5)
             self.assertEqual(ownership.person.name, "Collector One")
@@ -2480,7 +2784,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        existing_item_id, _existing_variant_id = self._add_catalog_item(name="Original Knife", sku="IM-KEEP-1")
+        existing_item_id, _existing_variant_id = self._add_catalog_item(
+            name="Original Knife", sku="IM-KEEP-1"
+        )
 
         response = self.client.post(
             "/import/confirm",
@@ -2634,8 +2940,12 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(confirm_response.status_code, 200)
         self.assertIn(b"Import complete", confirm_response.data)
         with self.app.app_context():
-            first_item = db.session.execute(db.select(Item).filter_by(sku="DN-1")).scalar_one()
-            second_item = db.session.execute(db.select(Item).filter_by(sku="DN-2")).scalar_one()
+            first_item = db.session.execute(
+                db.select(Item).filter_by(sku="DN-1")
+            ).scalar_one()
+            second_item = db.session.execute(
+                db.select(Item).filter_by(sku="DN-2")
+            ).scalar_one()
             self.assertEqual(first_item.name, "Duplicate Knife")
             self.assertEqual(second_item.name, "Duplicate Knife")
             self.assertNotEqual(first_item.id, second_item.id)
@@ -2737,48 +3047,54 @@ class ImportSmokeTests(SmokeBaseTest):
 
         workbook = Workbook()
         sheet = workbook.active
-        sheet.append([
-            "Name",
-            "Model #",
-            "COLOR",
-            "Owned?",
-            "availability",
-            "person",
-            "Price",
-            "Gift Box",
-            "Sheath",
-            "Quantity Purchased",
-            "Given Away",
-            "Beast",
-        ])
-        sheet.append([
-            "Preview Knife",
-            "PR-1",
-            "Classic Brown",
-            "Anthony",
-            "rep",
-            "",
-            "12.50",
-            "yes",
-            "Leather",
-            "2",
-            "1",
-            "",
-        ])
-        sheet.append([
-            "Preview New Knife",
-            "PN-1",
-            "Pearl White",
-            "Wishlist",
-            "non-catalog",
-            "Collector Two",
-            "34.00",
-            "",
-            "",
-            "4",
-            "2",
-            "",
-        ])
+        sheet.append(
+            [
+                "Name",
+                "Model #",
+                "COLOR",
+                "Owned?",
+                "availability",
+                "person",
+                "Price",
+                "Gift Box",
+                "Sheath",
+                "Quantity Purchased",
+                "Given Away",
+                "Beast",
+            ]
+        )
+        sheet.append(
+            [
+                "Preview Knife",
+                "PR-1",
+                "Classic Brown",
+                "Anthony",
+                "rep",
+                "",
+                "12.50",
+                "yes",
+                "Leather",
+                "2",
+                "1",
+                "",
+            ]
+        )
+        sheet.append(
+            [
+                "Preview New Knife",
+                "PN-1",
+                "Pearl White",
+                "Wishlist",
+                "non-catalog",
+                "Collector Two",
+                "34.00",
+                "",
+                "",
+                "4",
+                "2",
+                "",
+            ]
+        )
         upload = BytesIO()
         workbook.save(upload)
         upload.seek(0)
@@ -2899,7 +3215,10 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Assign all rows to", response.data)
         self.assertIn(b"Import Column Mapping", response.data)
         self.assertIn(b"<code>availability</code>", response.data)
-        self.assertIn(b"<code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code>", response.data)
+        self.assertIn(
+            b"<code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code>",
+            response.data,
+        )
         self.assertIn(b"Rep only", response.data)
         self.assertIn(b"Costco", response.data)
 
@@ -2921,8 +3240,12 @@ class ImportSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        owned_item_id, owned_variant_id = self._add_catalog_item(name="Gap Owned", sku="GAP-1")
-        _missing_item_id, _missing_variant_id = self._add_catalog_item(name="Gap Missing", sku="GAP-2")
+        owned_item_id, owned_variant_id = self._add_catalog_item(
+            name="Gap Owned", sku="GAP-1"
+        )
+        _missing_item_id, _missing_variant_id = self._add_catalog_item(
+            name="Gap Missing", sku="GAP-2"
+        )
         second_missing_item_id, _second_missing_variant_id = self._add_catalog_item(
             name="Gap Missing Other",
             sku="A-GAP-3",
@@ -2933,17 +3256,23 @@ class ImportSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.get(Item, owned_item_id)
             variant = db.session.execute(
-                db.select(ItemVariant).filter_by(item_id=item.id, color="Unknown / Unspecified")
+                db.select(ItemVariant).filter_by(
+                    item_id=item.id, color="Unknown / Unspecified"
+                )
             ).scalar_one()
-            db.session.add(Ownership(
-                person_id=person_id,
-                variant_id=variant.id,
-                status="Owned",
-                quantity_purchased=1,
-            ))
+            db.session.add(
+                Ownership(
+                    person_id=person_id,
+                    variant_id=variant.id,
+                    status="Owned",
+                    quantity_purchased=1,
+                )
+            )
             db.session.commit()
 
-        self.assertEqual(self.client.get(f"/people/{person_id}/collection").status_code, 200)
+        self.assertEqual(
+            self.client.get(f"/people/{person_id}/collection").status_code, 200
+        )
         response = self.client.get("/completion-gaps")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Completion Gaps", response.data)
@@ -2951,7 +3280,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Download missing SKUs CSV", response.data)
         self.assertIn(f'<option value="{person_id}" selected>'.encode(), response.data)
 
-        screen_response = self.client.get(f"/completion-gaps?view=screen&person_id={person_id}")
+        screen_response = self.client.get(
+            f"/completion-gaps?view=screen&person_id={person_id}"
+        )
         self.assertEqual(screen_response.status_code, 200)
         self.assertIn(b"Screen View", screen_response.data)
         self.assertIn(b"Copy CSV", screen_response.data)
@@ -2959,7 +3290,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"GAP-2", screen_response.data)
         self.assertIn(b"A-GAP-3", screen_response.data)
         self.assertNotIn(b"GAP-1", screen_response.data)
-        self.assertLess(screen_response.data.index(b"A-GAP-3"), screen_response.data.index(b"GAP-2"))
+        self.assertLess(
+            screen_response.data.index(b"A-GAP-3"), screen_response.data.index(b"GAP-2")
+        )
 
         export_response = self.client.post(
             "/completion-gaps",
@@ -2972,11 +3305,17 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(export_response.mimetype, "text/csv")
-        self.assertIn("cutco_completion_gaps_", export_response.headers["Content-Disposition"])
+        self.assertIn(
+            "cutco_completion_gaps_", export_response.headers["Content-Disposition"]
+        )
         self.assertIn(b"person,missing_sku,item,category", export_response.data)
-        self.assertLess(export_response.data.index(b"A-GAP-3"), export_response.data.index(b"GAP-2"))
+        self.assertLess(
+            export_response.data.index(b"A-GAP-3"), export_response.data.index(b"GAP-2")
+        )
         self.assertIn(b"Gap Collector,GAP-2,Gap Missing", export_response.data)
-        self.assertIn(b"Gap Collector,A-GAP-3,Gap Missing Other,Accessories", export_response.data)
+        self.assertIn(
+            b"Gap Collector,A-GAP-3,Gap Missing Other,Accessories", export_response.data
+        )
         self.assertNotIn(b"GAP-1", export_response.data)
 
     def test_completion_import_rolls_up_set_members_and_updates_ownership(self):
@@ -3005,14 +3344,18 @@ class ImportSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.get(Item, member_item_id)
             variant = db.session.execute(
-                db.select(ItemVariant).filter_by(item_id=item.id, color="Unknown / Unspecified")
+                db.select(ItemVariant).filter_by(
+                    item_id=item.id, color="Unknown / Unspecified"
+                )
             ).scalar_one()
-            db.session.add(Ownership(
-                person_id=person_id,
-                variant_id=variant.id,
-                status="Owned",
-                quantity_purchased=1,
-            ))
+            db.session.add(
+                Ownership(
+                    person_id=person_id,
+                    variant_id=variant.id,
+                    status="Owned",
+                    quantity_purchased=1,
+                )
+            )
             db.session.commit()
 
         preview_response = self.client.post(
@@ -3069,7 +3412,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Completion Import Result", confirm_response.data)
         self.assertIn(b"Import Summary", confirm_response.data)
         self.assertIn(b"Rows processed", confirm_response.data)
-        self.assertIn(b"balanced mix of new and updated ownership entries", confirm_response.data)
+        self.assertIn(
+            b"balanced mix of new and updated ownership entries", confirm_response.data
+        )
         self.assertIn(b"Ownership entries updated", confirm_response.data)
         self.assertIn(b"Ownership entries created", confirm_response.data)
         self.assertIn(b"Download rolled-up CSV", confirm_response.data)
@@ -3078,7 +3423,9 @@ class ImportSmokeTests(SmokeBaseTest):
 
         confirm_soup = BeautifulSoup(confirm_response.data, "html.parser")
         missing_payload = {"csrf_token": "test-csrf-token"}
-        for inp in confirm_soup.select('form[action="/completion-import/missing-export"] input'):
+        for inp in confirm_soup.select(
+            'form[action="/completion-import/missing-export"] input'
+        ):
             name = inp.get("name")
             if not name:
                 continue
@@ -3092,9 +3439,18 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(export_response.mimetype, "text/csv")
-        self.assertIn("attachment; filename=cutco_completion_result_", export_response.headers["Content-Disposition"])
-        self.assertIn("person,sku,item,color,total_quantity,action,notes,source_rows", export_response.data.decode())
-        self.assertIn("Completion Collector,COMP-1,Completion Knife", export_response.data.decode())
+        self.assertIn(
+            "attachment; filename=cutco_completion_result_",
+            export_response.headers["Content-Disposition"],
+        )
+        self.assertIn(
+            "person,sku,item,color,total_quantity,action,notes,source_rows",
+            export_response.data.decode(),
+        )
+        self.assertIn(
+            "Completion Collector,COMP-1,Completion Knife",
+            export_response.data.decode(),
+        )
 
         missing_response = self.client.post(
             "/completion-import/missing-export",
@@ -3104,9 +3460,18 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(missing_response.status_code, 200)
         self.assertEqual(missing_response.mimetype, "text/csv")
-        self.assertIn("attachment; filename=cutco_completion_missing_", missing_response.headers["Content-Disposition"])
-        self.assertIn("person,missing_sku,item,category,availability", missing_response.data.decode())
-        self.assertIn("Completion Collector,COMP-MISS,Completion Missing", missing_response.data.decode())
+        self.assertIn(
+            "attachment; filename=cutco_completion_missing_",
+            missing_response.headers["Content-Disposition"],
+        )
+        self.assertIn(
+            "person,missing_sku,item,category,availability",
+            missing_response.data.decode(),
+        )
+        self.assertIn(
+            "Completion Collector,COMP-MISS,Completion Missing",
+            missing_response.data.decode(),
+        )
 
         history_response = self.client.get("/completion-import")
         self.assertEqual(history_response.status_code, 200)
@@ -3117,16 +3482,24 @@ class ImportSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.get(Item, member_item_id)
             variant = db.session.execute(
-                db.select(ItemVariant).filter_by(item_id=item.id, color="Unknown / Unspecified")
+                db.select(ItemVariant).filter_by(
+                    item_id=item.id, color="Unknown / Unspecified"
+                )
             ).scalar_one()
             ownership = db.session.execute(
-                db.select(Ownership).filter_by(person_id=person_id, variant_id=variant.id)
+                db.select(Ownership).filter_by(
+                    person_id=person_id, variant_id=variant.id
+                )
             ).scalar_one()
             other_variant = db.session.execute(
-                db.select(ItemVariant).filter_by(item_id=other_item_id, color="Unknown / Unspecified")
+                db.select(ItemVariant).filter_by(
+                    item_id=other_item_id, color="Unknown / Unspecified"
+                )
             ).scalar_one()
             other_ownership = db.session.execute(
-                db.select(Ownership).filter_by(person_id=person_id, variant_id=other_variant.id)
+                db.select(Ownership).filter_by(
+                    person_id=person_id, variant_id=other_variant.id
+                )
             ).scalar_one()
             no_item_count = Item.query.filter_by(sku="NOPE-1").count()
 
@@ -3210,7 +3583,10 @@ class ImportSmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"row(s) matched existing catalog items and will update ownership only", preview_response.data)
+        self.assertIn(
+            b"row(s) matched existing catalog items and will update ownership only",
+            preview_response.data,
+        )
         self.assertIn(b"SKU or alias already exists", preview_response.data)
         self.assertIn(b"Imported Pan", preview_response.data)
         self.assertIn(b"Existing Pan", preview_response.data)
@@ -3270,7 +3646,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"Black", preview_response.data)
         self.assertIn(b"Unknown", preview_response.data)
-        self.assertIn(b'name="item_color_1" value="Unknown / Unspecified"', preview_response.data)
+        self.assertIn(
+            b'name="item_color_1" value="Unknown / Unspecified"', preview_response.data
+        )
         self.assertNotIn(b"BLACK", preview_response.data)
 
     def test_import_preview_hides_cookware_unknown_color(self):
@@ -3296,14 +3674,20 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"Cookware Piece", preview_response.data)
         self.assertIn(b"\xe2\x80\x94", preview_response.data)
-        self.assertIn(b'name="item_color_0" value="Unknown / Unspecified"', preview_response.data)
-        self.assertNotIn(b'<td>\n          Unknown\n        </td>', preview_response.data)
+        self.assertIn(
+            b'name="item_color_0" value="Unknown / Unspecified"', preview_response.data
+        )
+        self.assertNotIn(
+            b"<td>\n          Unknown\n        </td>", preview_response.data
+        )
 
     def test_import_preview_csv_and_error_paths(self):
         self._login_as_admin()
         self._set_csrf_token()
 
-        existing_item_id, _existing_variant_id = self._add_catalog_item(name="Import Existing Knife", sku="IM-EX-1")
+        existing_item_id, _existing_variant_id = self._add_catalog_item(
+            name="Import Existing Knife", sku="IM-EX-1"
+        )
         self._add_person(name="Import Existing Collector", notes="")
 
         preview_response = self.client.post(
@@ -3346,7 +3730,9 @@ class ImportSmokeTests(SmokeBaseTest):
             content_type="multipart/form-data",
         )
         self.assertEqual(invalid_check_response.status_code, 200)
-        self.assertIn(b"Could not read headers from this file", invalid_check_response.data)
+        self.assertIn(
+            b"Could not read headers from this file", invalid_check_response.data
+        )
 
         empty_upload_response = self.client.post(
             "/import",
@@ -3431,7 +3817,9 @@ class PeopleSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 302)
         with self.app.app_context():
-            person = db.session.execute(db.select(Person).filter_by(name="Anthony")).scalar_one_or_none()
+            person = db.session.execute(
+                db.select(Person).filter_by(name="Anthony")
+            ).scalar_one_or_none()
             self.assertIsNotNone(person)
             self.assertEqual(person.notes, "Primary collector")
 
@@ -3439,7 +3827,9 @@ class PeopleSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
         _item_id, variant_id = self._add_catalog_item(name="Bulk Knife", sku="BL-1")
-        _second_item_id, second_variant_id = self._add_catalog_item(name="Bulk Knife Two", sku="BL-2")
+        _second_item_id, second_variant_id = self._add_catalog_item(
+            name="Bulk Knife Two", sku="BL-2"
+        )
         person_id = self._add_person(name="Bulk Collector", notes="")
 
         first_add_response = self.client.post(
@@ -3458,7 +3848,9 @@ class PeopleSmokeTests(SmokeBaseTest):
         self.assertEqual(first_add_response.status_code, 302)
         with self.app.app_context():
             ownership = db.session.execute(
-                db.select(Ownership).filter_by(person_id=person_id, variant_id=variant_id)
+                db.select(Ownership).filter_by(
+                    person_id=person_id, variant_id=variant_id
+                )
             ).scalar_one()
 
         second_add_response = self.client.post(
@@ -3477,7 +3869,9 @@ class PeopleSmokeTests(SmokeBaseTest):
         self.assertEqual(second_add_response.status_code, 302)
         with self.app.app_context():
             second_ownership = db.session.execute(
-                db.select(Ownership).filter_by(person_id=person_id, variant_id=second_variant_id)
+                db.select(Ownership).filter_by(
+                    person_id=person_id, variant_id=second_variant_id
+                )
             ).scalar_one()
 
         bulk_response = self.client.post(
@@ -3537,9 +3931,11 @@ class PeopleSmokeTests(SmokeBaseTest):
 
         self.assertEqual(purge_response.status_code, 302)
         with self.app.app_context():
-            remaining = db.session.execute(
-                db.select(Ownership).filter_by(person_id=person_id)
-            ).scalars().all()
+            remaining = (
+                db.session.execute(db.select(Ownership).filter_by(person_id=person_id))
+                .scalars()
+                .all()
+            )
             self.assertEqual(remaining, [])
 
     def test_people_delete_removes_a_record(self):
@@ -3563,17 +3959,39 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _variant_id = self._add_catalog_item(name="Filter Knife", sku="FL-1", category="Kitchen Knives")
+        item_id, _variant_id = self._add_catalog_item(
+            name="Filter Knife", sku="FL-1", category="Kitchen Knives"
+        )
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             item.is_unicorn = True
             item.availability = "rep only"
             db.session.add(Item(name="Uncategorized Knife", sku="UC-1", category=None))
-            db.session.add(Item(name="Set Only Knife", sku="SO-1", category="Kitchen Knives", set_only=True, in_catalog=False, availability="non-catalog"))
-            db.session.add(Item(name="Off Catalog Knife", sku="OC-1", category="Kitchen Knives", set_only=False, in_catalog=False, availability="non-catalog"))
+            db.session.add(
+                Item(
+                    name="Set Only Knife",
+                    sku="SO-1",
+                    category="Kitchen Knives",
+                    set_only=True,
+                    in_catalog=False,
+                    availability="non-catalog",
+                )
+            )
+            db.session.add(
+                Item(
+                    name="Off Catalog Knife",
+                    sku="OC-1",
+                    category="Kitchen Knives",
+                    set_only=False,
+                    in_catalog=False,
+                    availability="non-catalog",
+                )
+            )
             db.session.commit()
 
-        catalog_response = self.client.get("/catalog?q=Filter&category=Kitchen+Knives&unicorn=1&sort=sku&dir=desc")
+        catalog_response = self.client.get(
+            "/catalog?q=Filter&category=Kitchen+Knives&unicorn=1&sort=sku&dir=desc"
+        )
         availability_response = self.client.get("/catalog?availability=rep+only")
         uncategorized_response = self.client.get("/catalog?category=__uncategorized__")
         set_only_response = self.client.get("/catalog?status=set_only")
@@ -3616,26 +4034,39 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         with self.app.app_context():
-            db.session.add(Item(name="Beta Knife", sku="BT-1", category="Kitchen Knives"))
-            db.session.add(Item(name="Alpha Knife", sku="AL-1", category="Kitchen Knives"))
+            db.session.add(
+                Item(name="Beta Knife", sku="BT-1", category="Kitchen Knives")
+            )
+            db.session.add(
+                Item(name="Alpha Knife", sku="AL-1", category="Kitchen Knives")
+            )
             db.session.commit()
 
         response = self.client.get("/catalog?sort=category&dir=asc")
         self.assertEqual(response.status_code, 200)
-        self.assertLess(response.data.find(b"Alpha Knife"), response.data.find(b"Beta Knife"))
+        self.assertLess(
+            response.data.find(b"Alpha Knife"), response.data.find(b"Beta Knife")
+        )
 
     def test_catalog_edge_sort_uses_name_tiebreaker(self):
         self._login_as_admin()
         self._set_csrf_token()
 
         with self.app.app_context():
-            db.session.add(Item(name="Beta Edge Knife", sku="BE-1", edge_type="Straight"))
-            db.session.add(Item(name="Alpha Edge Knife", sku="AE-1", edge_type="Straight"))
+            db.session.add(
+                Item(name="Beta Edge Knife", sku="BE-1", edge_type="Straight")
+            )
+            db.session.add(
+                Item(name="Alpha Edge Knife", sku="AE-1", edge_type="Straight")
+            )
             db.session.commit()
 
         response = self.client.get("/catalog?sort=edge_type&dir=asc")
         self.assertEqual(response.status_code, 200)
-        self.assertLess(response.data.find(b"Alpha Edge Knife"), response.data.find(b"Beta Edge Knife"))
+        self.assertLess(
+            response.data.find(b"Alpha Edge Knife"),
+            response.data.find(b"Beta Edge Knife"),
+        )
 
     def test_catalog_variant_sort_uses_variant_count(self):
         self._login_as_admin()
@@ -3650,14 +4081,19 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         response = self.client.get("/catalog?sort=variants&dir=desc")
         self.assertEqual(response.status_code, 200)
-        self.assertLess(response.data.find(b"Beta Variant Knife"), response.data.find(b"Alpha Variant Knife"))
+        self.assertLess(
+            response.data.find(b"Beta Variant Knife"),
+            response.data.find(b"Alpha Variant Knife"),
+        )
 
     def test_catalog_validation_and_sort_fallbacks(self):
         self._login_as_admin()
         self._set_csrf_token()
 
         item_id, variant_id = self._add_catalog_item(name="Variant Knife", sku="VR-1")
-        cookware_item_id, cookware_variant_id = self._add_catalog_item(name="Cookware Variant", sku="CVR-1", category="Cookware")
+        cookware_item_id, cookware_variant_id = self._add_catalog_item(
+            name="Cookware Variant", sku="CVR-1", category="Cookware"
+        )
         set_id = self._add_set(name="Variant Set", sku="VS-1", item_ids=(item_id,))
 
         duplicate_set_response = self.client.post(
@@ -3679,7 +4115,11 @@ class CatalogSmokeTests(SmokeBaseTest):
         )
         duplicate_variant_response = self.client.post(
             f"/catalog/{item_id}/variants/add",
-            data={"csrf_token": "test-csrf-token", "color": "Classic Brown", "notes": ""},
+            data={
+                "csrf_token": "test-csrf-token",
+                "color": "Classic Brown",
+                "notes": "",
+            },
             follow_redirects=False,
         )
         cookware_color_response = self.client.post(
@@ -3701,7 +4141,11 @@ class CatalogSmokeTests(SmokeBaseTest):
         )
         cookware_edit_response = self.client.post(
             f"/variants/{cookware_variant.id}/edit",
-            data={"csrf_token": "test-csrf-token", "color": "Classic Brown", "notes": ""},
+            data={
+                "csrf_token": "test-csrf-token",
+                "color": "Classic Brown",
+                "notes": "",
+            },
             follow_redirects=False,
         )
         self.assertEqual(empty_edit_response.status_code, 302)
@@ -3721,7 +4165,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         )
         self.assertEqual(set_edit_response.status_code, 302)
 
-        set_detail_fallback = self.client.get(f"/sets/{set_id}?person=1&sort=bogus&dir=sideways")
+        set_detail_fallback = self.client.get(
+            f"/sets/{set_id}?person=1&sort=bogus&dir=sideways"
+        )
         self.assertEqual(set_detail_fallback.status_code, 200)
         self.assertIn(b"Variant Set Updated", set_detail_fallback.data)
 
@@ -3754,11 +4200,15 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Alternate SKUs", edit_page.data)
         self.assertNotIn(b'name="next"', edit_page.data)
 
-        filtered_edit_page = self.client.get(f"/catalog/{item_id}/edit?next=/catalog?category=Kitchen+Knives")
+        filtered_edit_page = self.client.get(
+            f"/catalog/{item_id}/edit?next=/catalog?category=Kitchen+Knives"
+        )
         self.assertEqual(filtered_edit_page.status_code, 200)
         self.assertIn(b'name="next"', filtered_edit_page.data)
-        self.assertIn(b'/catalog?category=Kitchen Knives', filtered_edit_page.data)
-        self.assertIn(b'href="/catalog?category=Kitchen Knives"', filtered_edit_page.data)
+        self.assertIn(b"/catalog?category=Kitchen Knives", filtered_edit_page.data)
+        self.assertIn(
+            b'href="/catalog?category=Kitchen Knives"', filtered_edit_page.data
+        )
 
         alias_item_id, _alias_variant_id = self._add_catalog_item(
             name="Alias Pan",
@@ -3781,7 +4231,11 @@ class CatalogSmokeTests(SmokeBaseTest):
         )
         self.assertEqual(set_edit_setup.status_code, 302)
         with self.app.app_context():
-            set_id = db.session.execute(db.select(Set).filter_by(name="Set Suggestions")).scalar_one().id
+            set_id = (
+                db.session.execute(db.select(Set).filter_by(name="Set Suggestions"))
+                .scalar_one()
+                .id
+            )
 
         set_edit_page = self.client.get(f"/sets/{set_id}/edit")
         self.assertEqual(set_edit_page.status_code, 200)
@@ -3789,10 +4243,12 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Update Set", set_edit_page.data)
         self.assertIn(b"Back to Sets", set_edit_page.data)
 
-        filtered_set_edit_page = self.client.get(f"/sets/{set_id}/edit?next=/sets?person=1")
+        filtered_set_edit_page = self.client.get(
+            f"/sets/{set_id}/edit?next=/sets?person=1"
+        )
         self.assertEqual(filtered_set_edit_page.status_code, 200)
         self.assertIn(b'name="next"', filtered_set_edit_page.data)
-        self.assertIn(b'/sets?person=1', filtered_set_edit_page.data)
+        self.assertIn(b"/sets?person=1", filtered_set_edit_page.data)
         self.assertIn(b'href="/sets?person=1"', filtered_set_edit_page.data)
 
         edit_response = self.client.post(
@@ -3830,7 +4286,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         item_id, variant_id = self._add_catalog_item(name="Set Knife", sku="1111")
-        incomplete_item_id, incomplete_variant_id = self._add_catalog_item(name="Incomplete Knife", sku="3333")
+        incomplete_item_id, incomplete_variant_id = self._add_catalog_item(
+            name="Incomplete Knife", sku="3333"
+        )
         person_id = self._add_person(name="Set Owner", notes="")
 
         ownership_response = self.client.post(
@@ -3859,13 +4317,22 @@ class CatalogSmokeTests(SmokeBaseTest):
         )
         self.assertEqual(set_add_response.status_code, 302)
         with self.app.app_context():
-            item_set = db.session.execute(db.select(Set).filter_by(name="Set Group")).scalar_one()
+            item_set = db.session.execute(
+                db.select(Set).filter_by(name="Set Group")
+            ).scalar_one()
             set_id = item_set.id
             item_set.member_data = json.dumps(
-                {"members": [{"sku": "9999", "quantity": 1}, {"sku": "9998", "quantity": 1}]}
+                {
+                    "members": [
+                        {"sku": "9999", "quantity": 1},
+                        {"sku": "9998", "quantity": 1},
+                    ]
+                }
             )
             item_set.members.append(ItemSetMember(item_id=item_id, quantity=1))
-            item_set.members.append(ItemSetMember(item_id=incomplete_item_id, quantity=1))
+            item_set.members.append(
+                ItemSetMember(item_id=incomplete_item_id, quantity=1)
+            )
             red_variant = db.session.get(ItemVariant, variant_id)
             if red_variant is not None:
                 red_variant.color = "Red"
@@ -3880,7 +4347,9 @@ class CatalogSmokeTests(SmokeBaseTest):
                 sku="IS-1",
                 member_data=json.dumps({"members": [{"sku": "3333", "quantity": 1}]}),
             )
-            incomplete_set.members.append(ItemSetMember(item_id=incomplete_item_id, quantity=1))
+            incomplete_set.members.append(
+                ItemSetMember(item_id=incomplete_item_id, quantity=1)
+            )
             db.session.add(clear_set)
             db.session.add(incomplete_set)
             db.session.commit()
@@ -3901,19 +4370,27 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Set Members", set_edit_page.data)
         self.assertIn("← Sets".encode(), set_detail_page.data)
 
-        filtered_set_edit_page = self.client.get(f"/sets/{set_id}/edit?next=/sets?person=1")
+        filtered_set_edit_page = self.client.get(
+            f"/sets/{set_id}/edit?next=/sets?person=1"
+        )
         self.assertEqual(filtered_set_edit_page.status_code, 200)
         self.assertIn(b'name="next"', filtered_set_edit_page.data)
-        self.assertIn(b'/sets?person=1', filtered_set_edit_page.data)
+        self.assertIn(b"/sets?person=1", filtered_set_edit_page.data)
         self.assertIn(b'href="/sets?person=1"', filtered_set_edit_page.data)
 
         filtered_sets_page = self.client.get("/sets?missing=1&incomplete=1")
         self.assertEqual(filtered_sets_page.status_code, 200)
-        self.assertIn(b'next=/sets?missing%3D1%26incomplete%3D1', filtered_sets_page.data)
+        self.assertIn(
+            b"next=/sets?missing%3D1%26incomplete%3D1", filtered_sets_page.data
+        )
 
-        filtered_set_detail_page = self.client.get(f"/sets/{set_id}?next=/sets?missing%3D1%26incomplete%3D1")
+        filtered_set_detail_page = self.client.get(
+            f"/sets/{set_id}?next=/sets?missing%3D1%26incomplete%3D1"
+        )
         self.assertEqual(filtered_set_detail_page.status_code, 200)
-        self.assertIn(b'href="/sets?missing=1&amp;incomplete=1"', filtered_set_detail_page.data)
+        self.assertIn(
+            b'href="/sets?missing=1&amp;incomplete=1"', filtered_set_detail_page.data
+        )
         self.assertIn(
             f'href="/sets/{set_id}/edit?next=/sets?missing%3D1%26incomplete%3D1"'.encode(),
             filtered_set_detail_page.data,
@@ -3956,7 +4433,11 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         add_variant_response = self.client.post(
             f"/catalog/{item_id}/variants/add",
-            data={"csrf_token": "test-csrf-token", "color": "Pearl White", "notes": "Alt color"},
+            data={
+                "csrf_token": "test-csrf-token",
+                "color": "Pearl White",
+                "notes": "Alt color",
+            },
             follow_redirects=False,
         )
         self.assertEqual(add_variant_response.status_code, 302)
@@ -3983,7 +4464,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             self.assertIsNone(db.session.get(Set, item_set.id))
 
-        single_item_id, single_variant_id = self._add_catalog_item(name="Single Variant Knife", sku="4444")
+        single_item_id, single_variant_id = self._add_catalog_item(
+            name="Single Variant Knife", sku="4444"
+        )
         with self.app.app_context():
             variant = db.session.get(ItemVariant, single_variant_id)
             self.assertIsNotNone(variant)
@@ -4019,7 +4502,9 @@ class CatalogSmokeTests(SmokeBaseTest):
             name="Existing Sync Set Knife",
             sku="EXS-KNIFE-1",
         )
-        self._add_set(name="Existing Sync Set", sku="EXS-1", item_ids=(existing_set_item_id,))
+        self._add_set(
+            name="Existing Sync Set", sku="EXS-1", item_ids=(existing_set_item_id,)
+        )
 
         scraped_items = [
             {
@@ -4043,7 +4528,11 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "member_skus": ["EXS-KNIFE-1"],
                 "member_quantities": {"EXS-KNIFE-1": 2},
                 "member_entries": [
-                    {"sku": "EXS-KNIFE-1", "name": "Existing Sync Set Knife", "quantity": 2},
+                    {
+                        "sku": "EXS-KNIFE-1",
+                        "name": "Existing Sync Set Knife",
+                        "quantity": 2,
+                    },
                 ],
             },
             {
@@ -4057,24 +4546,36 @@ class CatalogSmokeTests(SmokeBaseTest):
                     {"sku": "NS-1", "name": "Found Sync Knife", "quantity": 1},
                     {"sku": "NS-2", "name": "Missing Sync Knife", "quantity": 1},
                 ],
-            }
+            },
         ]
 
-        with mock.patch("blueprints.catalog._CATALOG_SYNC_JOB_FILE", f"{self.temp_dir.name}/catalog_sync_job.json"), \
-             mock.patch("blueprints.catalog.scrape_catalog", return_value=(scraped_items, [])), \
-             mock.patch("blueprints.catalog.scrape_sets", return_value=scraped_sets), \
-             mock.patch(
-                 "blueprints.catalog.scrape_item_specs",
-                 return_value={
-                     "edge_type": "Straight",
-                     "msrp": 49.99,
-                     "blade_length": "4 in",
+        with (
+            mock.patch(
+                "blueprints.catalog._CATALOG_SYNC_JOB_FILE",
+                f"{self.temp_dir.name}/catalog_sync_job.json",
+            ),
+            mock.patch(
+                "blueprints.catalog.scrape_catalog", return_value=(scraped_items, [])
+            ),
+            mock.patch("blueprints.catalog.scrape_sets", return_value=scraped_sets),
+            mock.patch(
+                "blueprints.catalog.scrape_item_specs",
+                return_value={
+                    "edge_type": "Straight",
+                    "msrp": 49.99,
+                    "blade_length": "4 in",
                     "overall_length": "8 in",
                     "weight": "1 lb",
                 },
-            ), \
-             mock.patch("blueprints.catalog.scrape_item_variant_colors", return_value=()), \
-             mock.patch("blueprints.catalog._start_catalog_sync_background_job", side_effect=catalog_blueprint._run_catalog_sync_job):
+            ),
+            mock.patch(
+                "blueprints.catalog.scrape_item_variant_colors", return_value=()
+            ),
+            mock.patch(
+                "blueprints.catalog._start_catalog_sync_background_job",
+                side_effect=catalog_blueprint._run_catalog_sync_job,
+            ),
+        ):
             response = self.client.get("/catalog/sync?run=1")
 
         self.assertEqual(response.status_code, 200)
@@ -4086,9 +4587,15 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Set Quantity Updates", response.data)
         self.assertIn(b"Existing Sync Set", response.data)
         self.assertIn(b"quantity changed", response.data)
-        self.assertIn(b"Create placeholder items for missing set members", response.data)
-        self.assertIn(b'name="create_missing_set_members" value="on" checked', response.data)
-        self.assertIn(b"Scrapes Cutco.com to discover new items and sets.", response.data)
+        self.assertIn(
+            b"Create placeholder items for missing set members", response.data
+        )
+        self.assertIn(
+            b'name="create_missing_set_members" value="on" checked', response.data
+        )
+        self.assertIn(
+            b"Scrapes Cutco.com to discover new items and sets.", response.data
+        )
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)
 
@@ -4102,14 +4609,18 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn("NS-2", members_row.get_text(" ", strip=True))
         self.assertIn(",", members_row.get_text(" ", strip=True))
         self.assertNotIn("Found in scrape", members_row.get_text(" ", strip=True))
-        self.assertNotIn("Will create a placeholder", members_row.get_text(" ", strip=True))
+        self.assertNotIn(
+            "Will create a placeholder", members_row.get_text(" ", strip=True)
+        )
         self.assertNotIn("Will be skipped", members_row.get_text(" ", strip=True))
 
     def test_catalog_sync_idle_page_does_not_scrape_inline(self):
         self._login_as_admin()
 
-        with mock.patch("blueprints.catalog.scrape_catalog") as scrape_catalog_mock, \
-             mock.patch("blueprints.catalog.scrape_sets") as scrape_sets_mock:
+        with (
+            mock.patch("blueprints.catalog.scrape_catalog") as scrape_catalog_mock,
+            mock.patch("blueprints.catalog.scrape_sets") as scrape_sets_mock,
+        ):
             response = self.client.get("/catalog/sync")
 
         self.assertEqual(response.status_code, 200)
@@ -4117,7 +4628,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         scrape_catalog_mock.assert_not_called()
         scrape_sets_mock.assert_not_called()
 
-    def test_catalog_sync_preview_hides_placeholder_option_when_nothing_is_missing(self):
+    def test_catalog_sync_preview_hides_placeholder_option_when_nothing_is_missing(
+        self,
+    ):
         self._login_as_admin()
         self._set_csrf_token()
 
@@ -4139,37 +4652,57 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "member_skus": ["EXS-KNIFE-1"],
                 "member_quantities": {"EXS-KNIFE-1": 1},
                 "member_entries": [
-                    {"sku": "EXS-KNIFE-1", "name": "Existing Sync Set Knife", "quantity": 1},
+                    {
+                        "sku": "EXS-KNIFE-1",
+                        "name": "Existing Sync Set Knife",
+                        "quantity": 1,
+                    },
                 ],
             }
         ]
 
-        with mock.patch("blueprints.catalog.scrape_catalog", return_value=(scraped_items, [])), \
-             mock.patch("blueprints.catalog.scrape_sets", return_value=scraped_sets), \
-             mock.patch(
-                 "blueprints.catalog.scrape_item_specs",
-                 return_value={
-                     "edge_type": "Straight",
-                     "msrp": 49.99,
-                     "blade_length": "4 in",
-                     "overall_length": "8 in",
-                     "weight": "1 lb",
-                 },
-             ):
+        with (
+            mock.patch(
+                "blueprints.catalog.scrape_catalog", return_value=(scraped_items, [])
+            ),
+            mock.patch("blueprints.catalog.scrape_sets", return_value=scraped_sets),
+            mock.patch(
+                "blueprints.catalog.scrape_item_specs",
+                return_value={
+                    "edge_type": "Straight",
+                    "msrp": 49.99,
+                    "blade_length": "4 in",
+                    "overall_length": "8 in",
+                    "weight": "1 lb",
+                },
+            ),
+        ):
             response = self.client.get("/catalog/sync")
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn(b"Create placeholder items for missing set members", response.data)
-        self.assertNotIn(b'name="create_missing_set_members" value="on" checked', response.data)
+        self.assertNotIn(
+            b"Create placeholder items for missing set members", response.data
+        )
+        self.assertNotIn(
+            b'name="create_missing_set_members" value="on" checked', response.data
+        )
 
     def test_catalog_sync_reports_cutco_outage_when_no_data_returns(self):
         self._login_as_admin()
         self._set_csrf_token()
 
-        with mock.patch("blueprints.catalog._CATALOG_SYNC_JOB_FILE", f"{self.temp_dir.name}/catalog_sync_job.json"), \
-             mock.patch("blueprints.catalog.scrape_catalog", return_value=([], [])), \
-             mock.patch("blueprints.catalog.scrape_sets", return_value=[]), \
-             mock.patch("blueprints.catalog._start_catalog_sync_background_job", side_effect=catalog_blueprint._run_catalog_sync_job):
+        with (
+            mock.patch(
+                "blueprints.catalog._CATALOG_SYNC_JOB_FILE",
+                f"{self.temp_dir.name}/catalog_sync_job.json",
+            ),
+            mock.patch("blueprints.catalog.scrape_catalog", return_value=([], [])),
+            mock.patch("blueprints.catalog.scrape_sets", return_value=[]),
+            mock.patch(
+                "blueprints.catalog._start_catalog_sync_background_job",
+                side_effect=catalog_blueprint._run_catalog_sync_job,
+            ),
+        ):
             response = self.client.get("/catalog/sync?run=1")
 
         self.assertEqual(response.status_code, 200)
@@ -4186,14 +4719,21 @@ class CatalogSmokeTests(SmokeBaseTest):
             item_set = Set(name="Gift Set", sku="GS-1")
             db.session.add(item_set)
             db.session.flush()
-            db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1))
+            db.session.add(
+                ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1)
+            )
             db.session.commit()
 
             preview = _build_set_membership_preview(
                 db.session.get(Set, item_set.id),
                 [{"sku": "2026D", "name": "Gift Box", "quantity": 1}],
-                {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()},
-                _build_member_name_lookup(Item.query.filter(Item.sku.isnot(None)).all()),
+                {
+                    item.sku.upper(): item
+                    for item in Item.query.filter(Item.sku.isnot(None)).all()
+                },
+                _build_member_name_lookup(
+                    Item.query.filter(Item.sku.isnot(None)).all()
+                ),
             )
 
         self.assertFalse(preview["has_changes"])
@@ -4203,19 +4743,29 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _variant_id = self._add_catalog_item(name="1952 Stainless Salad Fork", sku="1952")
+        item_id, _variant_id = self._add_catalog_item(
+            name="1952 Stainless Salad Fork", sku="1952"
+        )
 
         with self.app.app_context():
             item_set = Set(name="Salad Set", sku="SAL-1")
             db.session.add(item_set)
             db.session.flush()
-            db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=12))
+            db.session.add(
+                ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=12)
+            )
             db.session.commit()
 
             catalog_items = Item.query.filter(Item.sku.isnot(None)).all()
             preview = _build_set_membership_preview(
                 db.session.get(Set, item_set.id),
-                [{"sku": "1952", "name": "1952 Stainless Salad Fork (12)", "quantity": 12}],
+                [
+                    {
+                        "sku": "1952",
+                        "name": "1952 Stainless Salad Fork (12)",
+                        "quantity": 12,
+                    }
+                ],
                 {item.sku.upper(): item for item in catalog_items},
                 _build_member_name_lookup(catalog_items),
             )
@@ -4227,13 +4777,17 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _variant_id = self._add_catalog_item(name="1759 Table Knife", sku="1759")
+        item_id, _variant_id = self._add_catalog_item(
+            name="1759 Table Knife", sku="1759"
+        )
 
         with self.app.app_context():
             item_set = Set(name="Table Set", sku="TAB-1")
             db.session.add(item_set)
             db.session.flush()
-            db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=4))
+            db.session.add(
+                ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=4)
+            )
             db.session.commit()
 
             catalog_items = Item.query.filter(Item.sku.isnot(None)).all()
@@ -4258,8 +4812,12 @@ class CatalogSmokeTests(SmokeBaseTest):
             item_set = Set(name="Sorted Set", sku="SORT-1")
             db.session.add(item_set)
             db.session.flush()
-            db.session.add(ItemSetMember(item_id=second_item_id, set_id=item_set.id, quantity=1))
-            db.session.add(ItemSetMember(item_id=first_item_id, set_id=item_set.id, quantity=2))
+            db.session.add(
+                ItemSetMember(item_id=second_item_id, set_id=item_set.id, quantity=1)
+            )
+            db.session.add(
+                ItemSetMember(item_id=first_item_id, set_id=item_set.id, quantity=2)
+            )
             db.session.commit()
 
             preview = _build_set_membership_preview(
@@ -4270,8 +4828,12 @@ class CatalogSmokeTests(SmokeBaseTest):
                 ],
             )
 
-        self.assertEqual([member["sku"] for member in preview["current_rows"]], ["84", "1737"])
-        self.assertEqual([member["sku"] for member in preview["incoming_rows"]], ["84", "1737"])
+        self.assertEqual(
+            [member["sku"] for member in preview["current_rows"]], ["84", "1737"]
+        )
+        self.assertEqual(
+            [member["sku"] for member in preview["incoming_rows"]], ["84", "1737"]
+        )
 
     def test_set_membership_preview_includes_resolution_notes(self):
         self._login_as_admin()
@@ -4283,7 +4845,9 @@ class CatalogSmokeTests(SmokeBaseTest):
             item_set = Set(name="Resolution Set", sku="RES-1")
             db.session.add(item_set)
             db.session.flush()
-            db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1))
+            db.session.add(
+                ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1)
+            )
             db.session.commit()
 
             preview = _build_set_membership_preview(
@@ -4292,11 +4856,18 @@ class CatalogSmokeTests(SmokeBaseTest):
                     {"sku": "1737", "name": "1737 Cleaver Only", "quantity": 1},
                     {"sku": "990C", "name": "990C", "quantity": 1},
                 ],
-                {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()},
+                {
+                    item.sku.upper(): item
+                    for item in Item.query.filter(Item.sku.isnot(None)).all()
+                },
                 {},
             )
 
-        added_notes = {row["sku"]: row.get("resolution_note") for row in preview["change_rows"] if row["action"] == "added"}
+        added_notes = {
+            row["sku"]: row.get("resolution_note")
+            for row in preview["change_rows"]
+            if row["action"] == "added"
+        }
         self.assertIn("990C", added_notes)
         self.assertIn("placeholder", added_notes["990C"].lower())
         self.assertNotIn("1737", added_notes)
@@ -4312,13 +4883,18 @@ class CatalogSmokeTests(SmokeBaseTest):
             item_set = Set(name="Shear Set", sku="SHEAR-1")
             db.session.add(item_set)
             db.session.flush()
-            db.session.add(ItemSetMember(item_id=current_item_id, set_id=item_set.id, quantity=1))
+            db.session.add(
+                ItemSetMember(item_id=current_item_id, set_id=item_set.id, quantity=1)
+            )
             db.session.commit()
 
             preview = _build_set_membership_preview(
                 db.session.get(Set, item_set.id),
                 [{"sku": "2117D", "name": "Shear Utility", "quantity": 1}],
-                {item.sku.upper(): item for item in Item.query.filter(Item.sku.isnot(None)).all()},
+                {
+                    item.sku.upper(): item
+                    for item in Item.query.filter(Item.sku.isnot(None)).all()
+                },
                 {},
             )
 
@@ -4326,7 +4902,11 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(preview["added"], 1)
         self.assertEqual(preview["removed"], 1)
         self.assertEqual(
-            sorted(row["sku"] for row in preview["change_rows"] if row["action"] in {"added", "removed"}),
+            sorted(
+                row["sku"]
+                for row in preview["change_rows"]
+                if row["action"] in {"added", "removed"}
+            ),
             ["1705D", "2117D"],
         )
 
@@ -4340,7 +4920,9 @@ class CatalogSmokeTests(SmokeBaseTest):
             item_set = Set(name="Shear Set", sku="SHEAR-1")
             db.session.add(item_set)
             db.session.flush()
-            db.session.add(ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1))
+            db.session.add(
+                ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1)
+            )
             db.session.commit()
 
             catalog_items = Item.query.filter(Item.sku.isnot(None)).all()
@@ -4359,7 +4941,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _unknown_variant_id = self._add_catalog_item(name="Variant Sync Knife", sku="VS-1")
+        item_id, _unknown_variant_id = self._add_catalog_item(
+            name="Variant Sync Knife", sku="VS-1"
+        )
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             db.session.add(ItemVariant(item_id=item.id, color="Classic Brown"))
@@ -4419,7 +5003,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _unknown_variant_id = self._add_catalog_item(name="Handle Mitt", sku="HM-2")
+        item_id, _unknown_variant_id = self._add_catalog_item(
+            name="Handle Mitt", sku="HM-2"
+        )
 
         with mock.patch(
             "blueprints.data.scrape_item_variant_colors",
@@ -4455,38 +5041,45 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             self.assertEqual([variant.color for variant in item.variants], ["Blue"])
-            self.assertEqual([variant.source for variant in item.variants], ["variant_sync"])
+            self.assertEqual(
+                [variant.source for variant in item.variants], ["variant_sync"]
+            )
 
     def test_variant_sync_can_mark_purple_campaign_variants_as_unicorns(self):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _unknown_variant_id = self._add_catalog_item(name="Super Shears", sku="77")
+        item_id, _unknown_variant_id = self._add_catalog_item(
+            name="Super Shears", sku="77"
+        )
 
-        with mock.patch(
-            "blueprints.data.scrape_item_variant_colors",
-            return_value=(),
-        ), mock.patch(
-            "blueprints.data.scrape_purple_campaign_variants",
-            return_value=(
-                {
-                    "name": "Super Shears",
-                    "promo_code": "77L",
-                    "sku_hint": "77",
-                    "color": "Purple",
-                },
-                {
-                    "name": "Gift Set",
-                    "promo_code": "1836LD",
-                    "sku_hint": "1836",
-                    "color": "Purple",
-                },
-                {
-                    "name": "Package",
-                    "promo_code": "3840LD",
-                    "sku_hint": "3840",
-                    "color": "Purple",
-                },
+        with (
+            mock.patch(
+                "blueprints.data.scrape_item_variant_colors",
+                return_value=(),
+            ),
+            mock.patch(
+                "blueprints.data.scrape_purple_campaign_variants",
+                return_value=(
+                    {
+                        "name": "Super Shears",
+                        "promo_code": "77L",
+                        "sku_hint": "77",
+                        "color": "Purple",
+                    },
+                    {
+                        "name": "Gift Set",
+                        "promo_code": "1836LD",
+                        "sku_hint": "1836",
+                        "color": "Purple",
+                    },
+                    {
+                        "name": "Package",
+                        "promo_code": "3840LD",
+                        "sku_hint": "3840",
+                        "color": "Purple",
+                    },
+                ),
             ),
         ):
             preview_response = self.client.post(
@@ -4502,7 +5095,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"Promo Variants", preview_response.data)
         self.assertIn(b"Mark purple promo variants as unicorns", preview_response.data)
-        self.assertIn(b"Suppressed because this is a campaign bundle item", preview_response.data)
+        self.assertIn(
+            b"Suppressed because this is a campaign bundle item", preview_response.data
+        )
         self.assertIn(b"suppressed", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
@@ -4523,7 +5118,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             self.assertEqual([variant.color for variant in item.variants], ["Purple"])
-            self.assertEqual([variant.source for variant in item.variants], ["variant_sync"])
+            self.assertEqual(
+                [variant.source for variant in item.variants], ["variant_sync"]
+            )
             self.assertEqual([variant.is_unicorn for variant in item.variants], [True])
 
     def test_variant_sync_creates_purple_sheath_variants(self):
@@ -4531,15 +5128,23 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         santoku_item_id, _ = self._add_catalog_item(name='7" Santoku', sku="1766")
-        santoku_sheath_item_id, _ = self._add_catalog_item(name='7" Santoku Sheath', sku="1766-2", category="Sheaths")
-        trimmer_item_id, _ = self._add_catalog_item(name="Santoku-Style Trimmer", sku="3721")
-        trimmer_sheath_item_id, _ = self._add_catalog_item(name="Santoku-Style Trimmer Sheath", sku="3721-2", category="Sheaths")
+        santoku_sheath_item_id, _ = self._add_catalog_item(
+            name='7" Santoku Sheath', sku="1766-2", category="Sheaths"
+        )
+        trimmer_item_id, _ = self._add_catalog_item(
+            name="Santoku-Style Trimmer", sku="3721"
+        )
+        trimmer_sheath_item_id, _ = self._add_catalog_item(
+            name="Santoku-Style Trimmer Sheath", sku="3721-2", category="Sheaths"
+        )
 
-        with mock.patch(
-            "blueprints.data.scrape_item_variant_colors",
-            return_value=(),
-        ), mock.patch(
-            "blueprints.data.scrape_purple_campaign_variants",
+        with (
+            mock.patch(
+                "blueprints.data.scrape_item_variant_colors",
+                return_value=(),
+            ),
+            mock.patch(
+                "blueprints.data.scrape_purple_campaign_variants",
                 return_value=(
                     {
                         "name": '7" Santoku with Sheath',
@@ -4554,6 +5159,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                         "color": "Purple",
                     },
                 ),
+            ),
         ):
             preview_response = self.client.post(
                 "/variant-sync",
@@ -4566,7 +5172,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b'7&#34; Santoku Sheath', preview_response.data)
+        self.assertIn(b"7&#34; Santoku Sheath", preview_response.data)
         self.assertIn(b"Santoku-Style Trimmer Sheath", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
@@ -4588,41 +5194,66 @@ class CatalogSmokeTests(SmokeBaseTest):
             santoku_sheath_item = db.session.get(Item, santoku_sheath_item_id)
             trimmer_item = db.session.get(Item, trimmer_item_id)
             trimmer_sheath_item = db.session.get(Item, trimmer_sheath_item_id)
-            self.assertEqual([variant.color for variant in santoku_item.variants], ["Purple"])
-            self.assertEqual([variant.source for variant in santoku_item.variants], ["variant_sync"])
-            self.assertEqual([variant.color for variant in santoku_sheath_item.variants], ["Purple"])
-            self.assertEqual([variant.source for variant in santoku_sheath_item.variants], ["variant_sync"])
-            self.assertEqual([variant.color for variant in trimmer_item.variants], ["Purple"])
-            self.assertEqual([variant.source for variant in trimmer_item.variants], ["variant_sync"])
-            self.assertEqual([variant.color for variant in trimmer_sheath_item.variants], ["Purple"])
-            self.assertEqual([variant.source for variant in trimmer_sheath_item.variants], ["variant_sync"])
+            self.assertEqual(
+                [variant.color for variant in santoku_item.variants], ["Purple"]
+            )
+            self.assertEqual(
+                [variant.source for variant in santoku_item.variants], ["variant_sync"]
+            )
+            self.assertEqual(
+                [variant.color for variant in santoku_sheath_item.variants], ["Purple"]
+            )
+            self.assertEqual(
+                [variant.source for variant in santoku_sheath_item.variants],
+                ["variant_sync"],
+            )
+            self.assertEqual(
+                [variant.color for variant in trimmer_item.variants], ["Purple"]
+            )
+            self.assertEqual(
+                [variant.source for variant in trimmer_item.variants], ["variant_sync"]
+            )
+            self.assertEqual(
+                [variant.color for variant in trimmer_sheath_item.variants], ["Purple"]
+            )
+            self.assertEqual(
+                [variant.source for variant in trimmer_sheath_item.variants],
+                ["variant_sync"],
+            )
 
     def test_variant_sync_can_confirm_purple_section_only(self):
         self._login_as_admin()
         self._set_csrf_token()
 
-        normal_item_id, _ = self._add_catalog_item(name="Normal Variant Knife", sku="NV-1")
+        normal_item_id, _ = self._add_catalog_item(
+            name="Normal Variant Knife", sku="NV-1"
+        )
         promo_item_id, _ = self._add_catalog_item(name="Super Shears", sku="77")
-        promo_sheath_item_id, _ = self._add_catalog_item(name="Super Shears Sheath", sku="77-2", category="Sheaths")
+        promo_sheath_item_id, _ = self._add_catalog_item(
+            name="Super Shears Sheath", sku="77-2", category="Sheaths"
+        )
 
-        with mock.patch(
-            "blueprints.data.scrape_item_variant_colors",
-            return_value=("Blue",),
-        ), mock.patch(
-            "blueprints.data.scrape_purple_campaign_variants",
-            return_value=(
-                {
-                    "name": "Super Shears",
-                    "promo_code": "77L",
-                    "sku_hint": "77",
-                    "color": "Purple",
-                },
-                {
-                    "name": "Super Shears with Sheath",
-                    "promo_code": "77LSH",
-                    "sku_hint": "77",
-                    "color": "Purple",
-                },
+        with (
+            mock.patch(
+                "blueprints.data.scrape_item_variant_colors",
+                return_value=("Blue",),
+            ),
+            mock.patch(
+                "blueprints.data.scrape_purple_campaign_variants",
+                return_value=(
+                    {
+                        "name": "Super Shears",
+                        "promo_code": "77L",
+                        "sku_hint": "77",
+                        "color": "Purple",
+                    },
+                    {
+                        "name": "Super Shears with Sheath",
+                        "promo_code": "77LSH",
+                        "sku_hint": "77",
+                        "color": "Purple",
+                    },
+                ),
             ),
         ):
             preview_response = self.client.post(
@@ -4657,9 +5288,15 @@ class CatalogSmokeTests(SmokeBaseTest):
             normal_item = db.session.get(Item, normal_item_id)
             promo_item = db.session.get(Item, promo_item_id)
             promo_sheath_item = db.session.get(Item, promo_sheath_item_id)
-            self.assertEqual([variant.color for variant in normal_item.variants], [UNKNOWN_COLOR])
-            self.assertEqual([variant.color for variant in promo_item.variants], ["Purple"])
-            self.assertEqual([variant.color for variant in promo_sheath_item.variants], ["Purple"])
+            self.assertEqual(
+                [variant.color for variant in normal_item.variants], [UNKNOWN_COLOR]
+            )
+            self.assertEqual(
+                [variant.color for variant in promo_item.variants], ["Purple"]
+            )
+            self.assertEqual(
+                [variant.color for variant in promo_sheath_item.variants], ["Purple"]
+            )
 
     def test_variant_sync_skips_cutting_boards(self):
         self._login_as_admin()
@@ -4684,7 +5321,10 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
 
         self.assertEqual(page_response.status_code, 200)
-        self.assertIn(b"Cutting board items are treated as a single fallback variant.", page_response.data)
+        self.assertIn(
+            b"Cutting board items are treated as a single fallback variant.",
+            page_response.data,
+        )
         scrape_mock.assert_not_called()
         with self.app.app_context():
             item = db.session.get(Item, item_id)
@@ -4694,7 +5334,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _unknown_variant_id = self._add_catalog_item(name="Fallback Variant Knife", sku="FV-1")
+        item_id, _unknown_variant_id = self._add_catalog_item(
+            name="Fallback Variant Knife", sku="FV-1"
+        )
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             db.session.add(ItemVariant(item_id=item.id, color="Classic"))
@@ -4729,7 +5371,10 @@ class CatalogSmokeTests(SmokeBaseTest):
             item.cutco_url = "https://example.com/use-sync"
             db.session.commit()
 
-        with mock.patch("blueprints.catalog.scrape_item_uses", return_value=["Slice onions", "Peel potatoes"]):
+        with mock.patch(
+            "blueprints.catalog.scrape_item_uses",
+            return_value=["Slice onions", "Peel potatoes"],
+        ):
             response = self.client.post(
                 "/catalog/sync-uses",
                 data={"csrf_token": "test-csrf-token"},
@@ -4748,9 +5393,17 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        existing_item_id, _existing_variant_id = self._add_catalog_item(name="Sync Existing Knife", sku="SX-EX-1")
-        stale_item_id, _stale_variant_id = self._add_catalog_item(name="Sync Stale Knife", sku="SX-STALE-1")
-        existing_set_id = self._add_set(name="Sync Existing Set", sku="SX-SET-1", item_ids=(existing_item_id, stale_item_id))
+        existing_item_id, _existing_variant_id = self._add_catalog_item(
+            name="Sync Existing Knife", sku="SX-EX-1"
+        )
+        stale_item_id, _stale_variant_id = self._add_catalog_item(
+            name="Sync Stale Knife", sku="SX-STALE-1"
+        )
+        existing_set_id = self._add_set(
+            name="Sync Existing Set",
+            sku="SX-SET-1",
+            item_ids=(existing_item_id, stale_item_id),
+        )
 
         response = self.client.post(
             "/catalog/sync/confirm",
@@ -4774,7 +5427,11 @@ class CatalogSmokeTests(SmokeBaseTest):
                     [
                         {"sku": "SX-NEW-1", "name": "Sync New Knife", "quantity": 2},
                         {"sku": "SX-NEW-1", "name": "Sync New Knife", "quantity": 1},
-                        {"sku": "SX-MISS-1", "name": "Sync Missing Knife", "quantity": 1},
+                        {
+                            "sku": "SX-MISS-1",
+                            "name": "Sync Missing Knife",
+                            "quantity": 1,
+                        },
                     ]
                 ),
                 "create_missing_set_members": "on",
@@ -4782,9 +5439,21 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "existing_set_name_0": "Sync Existing Set",
                 "existing_set_member_entries_0": json.dumps(
                     [
-                        {"sku": "SX-EX-1", "name": "Sync Existing Knife", "quantity": 3},
-                        {"sku": "SX-EX-1", "name": "Sync Existing Knife", "quantity": 2},
-                        {"sku": "SX-EX-MISS-1", "name": "Sync Existing Missing Knife", "quantity": 1},
+                        {
+                            "sku": "SX-EX-1",
+                            "name": "Sync Existing Knife",
+                            "quantity": 3,
+                        },
+                        {
+                            "sku": "SX-EX-1",
+                            "name": "Sync Existing Knife",
+                            "quantity": 2,
+                        },
+                        {
+                            "sku": "SX-EX-MISS-1",
+                            "name": "Sync Existing Missing Knife",
+                            "quantity": 1,
+                        },
                     ]
                 ),
             },
@@ -4793,28 +5462,49 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 302)
         with self.app.app_context():
-            new_item = db.session.execute(db.select(Item).filter_by(sku="SX-NEW-1")).scalar_one()
+            new_item = db.session.execute(
+                db.select(Item).filter_by(sku="SX-NEW-1")
+            ).scalar_one()
             self.assertIsNone(new_item.msrp)
-            self.assertEqual([variant.color for variant in new_item.variants], ["Classic Blue"])
-            self.assertEqual([variant.source for variant in new_item.variants], ["catalog_sync"])
-            new_set = db.session.execute(db.select(Set).filter_by(name="Sync New Set")).scalar_one()
+            self.assertEqual(
+                [variant.color for variant in new_item.variants], ["Classic Blue"]
+            )
+            self.assertEqual(
+                [variant.source for variant in new_item.variants], ["catalog_sync"]
+            )
+            new_set = db.session.execute(
+                db.select(Set).filter_by(name="Sync New Set")
+            ).scalar_one()
             self.assertEqual(len(new_set.members), 2)
-            new_member_quantities = {db.session.get(Item, membership.item_id).sku: membership.quantity for membership in new_set.members}
+            new_member_quantities = {
+                db.session.get(Item, membership.item_id).sku: membership.quantity
+                for membership in new_set.members
+            }
             self.assertEqual(new_member_quantities["SX-NEW-1"], 3)
-            created_member = db.session.execute(db.select(Item).filter_by(sku="SX-MISS-1")).scalar_one()
+            created_member = db.session.execute(
+                db.select(Item).filter_by(sku="SX-MISS-1")
+            ).scalar_one()
             self.assertFalse(created_member.in_catalog)
             self.assertTrue(created_member.set_only)
             self.assertIsNotNone(new_set.member_data)
             self.assertIn("SX-MISS-1", new_set.member_data)
             existing_set = db.session.get(Set, existing_set_id)
             self.assertEqual(len(existing_set.members), 2)
-            existing_member_quantities = {db.session.get(Item, membership.item_id).sku: membership.quantity for membership in existing_set.members}
+            existing_member_quantities = {
+                db.session.get(Item, membership.item_id).sku: membership.quantity
+                for membership in existing_set.members
+            }
             self.assertEqual(existing_member_quantities["SX-EX-1"], 5)
-            created_existing_member = db.session.execute(db.select(Item).filter_by(sku="SX-EX-MISS-1")).scalar_one()
+            created_existing_member = db.session.execute(
+                db.select(Item).filter_by(sku="SX-EX-MISS-1")
+            ).scalar_one()
             self.assertFalse(created_existing_member.in_catalog)
             self.assertTrue(created_existing_member.set_only)
             self.assertIsNotNone(existing_set.member_data)
-            existing_member_skus = {db.session.get(Item, membership.item_id).sku for membership in existing_set.members}
+            existing_member_skus = {
+                db.session.get(Item, membership.item_id).sku
+                for membership in existing_set.members
+            }
             self.assertNotIn("SX-STALE-1", existing_member_skus)
             self.assertIn("SX-EX-1", existing_member_skus)
             self.assertIn("SX-EX-MISS-1", existing_member_skus)
@@ -4823,7 +5513,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, _unknown_variant_id = self._add_catalog_item(name="Handle Mitt", sku="HM-1", category="Kitchen Helpers")
+        item_id, _unknown_variant_id = self._add_catalog_item(
+            name="Handle Mitt", sku="HM-1", category="Kitchen Helpers"
+        )
 
         response = self.client.post(
             "/catalog/sync/confirm",
@@ -4839,7 +5531,9 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = db.session.get(Item, item_id)
             self.assertEqual([variant.color for variant in item.variants], ["Blue"])
-            self.assertEqual([variant.source for variant in item.variants], ["catalog_sync"])
+            self.assertEqual(
+                [variant.source for variant in item.variants], ["catalog_sync"]
+            )
 
     def test_catalog_sync_confirm_reconciles_existing_set_members(self):
         self._login_as_admin()
@@ -4848,7 +5542,11 @@ class CatalogSmokeTests(SmokeBaseTest):
         keep_item_id, _ = self._add_catalog_item(name="Keep Knife", sku="K-1")
         drop_item_id, _ = self._add_catalog_item(name="Drop Knife", sku="D-1")
         new_item_id, _ = self._add_catalog_item(name="New Knife", sku="N-1")
-        existing_set_id = self._add_set(name="Sync Existing Set", sku="SX-SET-1", item_ids=(keep_item_id, drop_item_id))
+        existing_set_id = self._add_set(
+            name="Sync Existing Set",
+            sku="SX-SET-1",
+            item_ids=(keep_item_id, drop_item_id),
+        )
 
         response = self.client.post(
             "/catalog/sync/confirm",
@@ -4871,19 +5569,32 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 302)
         with self.app.app_context():
             existing_set = db.session.get(Set, existing_set_id)
-            member_qtys = {db.session.get(Item, member.item_id).sku: member.quantity for member in existing_set.members}
+            member_qtys = {
+                db.session.get(Item, member.item_id).sku: member.quantity
+                for member in existing_set.members
+            }
             self.assertEqual(member_qtys, {"K-1": 2, "N-1": 1})
             self.assertNotIn("D-1", member_qtys)
             self.assertIsNotNone(existing_set.member_data)
             self.assertIn("N-1", existing_set.member_data)
 
-    def test_catalog_sync_confirm_preserves_existing_set_members_when_snapshot_is_empty(self):
+    def test_catalog_sync_confirm_preserves_existing_set_members_when_snapshot_is_empty(
+        self,
+    ):
         self._login_as_admin()
         self._set_csrf_token()
 
-        existing_item_id, _existing_variant_id = self._add_catalog_item(name="Sync Existing Knife", sku="SX-EX-1")
-        stale_item_id, _stale_variant_id = self._add_catalog_item(name="Sync Stale Knife", sku="SX-STALE-1")
-        existing_set_id = self._add_set(name="Sync Existing Set", sku="SX-SET-1", item_ids=(existing_item_id, stale_item_id))
+        existing_item_id, _existing_variant_id = self._add_catalog_item(
+            name="Sync Existing Knife", sku="SX-EX-1"
+        )
+        stale_item_id, _stale_variant_id = self._add_catalog_item(
+            name="Sync Stale Knife", sku="SX-STALE-1"
+        )
+        existing_set_id = self._add_set(
+            name="Sync Existing Set",
+            sku="SX-SET-1",
+            item_ids=(existing_item_id, stale_item_id),
+        )
 
         response = self.client.post(
             "/catalog/sync/confirm",
@@ -4902,7 +5613,10 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             existing_set = db.session.get(Set, existing_set_id)
             self.assertEqual(len(existing_set.members), 2)
-            existing_member_skus = {db.session.get(Item, membership.item_id).sku for membership in existing_set.members}
+            existing_member_skus = {
+                db.session.get(Item, membership.item_id).sku
+                for membership in existing_set.members
+            }
             self.assertIn("SX-EX-1", existing_member_skus)
             self.assertIn("SX-STALE-1", existing_member_skus)
             self.assertEqual(json.loads(existing_set.member_data), [])
@@ -4911,9 +5625,15 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        first_item_id, _first_variant_id = self._add_catalog_item(name="Restore Knife One", sku="RS-1")
-        second_item_id, _second_variant_id = self._add_catalog_item(name="Restore Knife Two", sku="RS-2")
-        set_id = self._add_set(name="Restore Set", sku="RS-SET", item_ids=(first_item_id, second_item_id))
+        first_item_id, _first_variant_id = self._add_catalog_item(
+            name="Restore Knife One", sku="RS-1"
+        )
+        second_item_id, _second_variant_id = self._add_catalog_item(
+            name="Restore Knife Two", sku="RS-2"
+        )
+        set_id = self._add_set(
+            name="Restore Set", sku="RS-SET", item_ids=(first_item_id, second_item_id)
+        )
 
         with self.app.app_context():
             item_set = db.session.get(Set, set_id)
@@ -4939,7 +5659,10 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item_set = db.session.get(Set, set_id)
             self.assertEqual(len(item_set.members), 2)
-            qty_map = {db.session.get(Item, member.item_id).sku: member.quantity for member in item_set.members}
+            qty_map = {
+                db.session.get(Item, member.item_id).sku: member.quantity
+                for member in item_set.members
+            }
             self.assertEqual(qty_map["RS-1"], 2)
             self.assertEqual(qty_map["RS-2"], 1)
             self.assertIn("RS-1", item_set.member_data)
@@ -4949,16 +5672,36 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        first_item_id, _first_variant_id = self._add_catalog_item(name="Bulk Restore Knife One", sku="BR-1")
-        second_item_id, _second_variant_id = self._add_catalog_item(name="Bulk Restore Knife Two", sku="BR-2")
-        first_set_id = self._add_set(name="Bulk Restore Set One", sku="BR-SET-1", item_ids=(first_item_id,))
-        second_set_id = self._add_set(name="Bulk Restore Set Two", sku="BR-SET-2", item_ids=(second_item_id,))
+        first_item_id, _first_variant_id = self._add_catalog_item(
+            name="Bulk Restore Knife One", sku="BR-1"
+        )
+        second_item_id, _second_variant_id = self._add_catalog_item(
+            name="Bulk Restore Knife Two", sku="BR-2"
+        )
+        first_set_id = self._add_set(
+            name="Bulk Restore Set One", sku="BR-SET-1", item_ids=(first_item_id,)
+        )
+        second_set_id = self._add_set(
+            name="Bulk Restore Set Two", sku="BR-SET-2", item_ids=(second_item_id,)
+        )
 
         with self.app.app_context():
             first_set = db.session.get(Set, first_set_id)
             second_set = db.session.get(Set, second_set_id)
-            first_set.member_data = json.dumps({"members": [{"sku": "BR-1", "name": "Bulk Restore Knife One", "quantity": 1}]})
-            second_set.member_data = json.dumps({"members": [{"sku": "BR-2", "name": "Bulk Restore Knife Two", "quantity": 2}]})
+            first_set.member_data = json.dumps(
+                {
+                    "members": [
+                        {"sku": "BR-1", "name": "Bulk Restore Knife One", "quantity": 1}
+                    ]
+                }
+            )
+            second_set.member_data = json.dumps(
+                {
+                    "members": [
+                        {"sku": "BR-2", "name": "Bulk Restore Knife Two", "quantity": 2}
+                    ]
+                }
+            )
             for item_set in (first_set, second_set):
                 for membership in list(item_set.members):
                     db.session.delete(membership)
@@ -4981,23 +5724,47 @@ class CatalogSmokeTests(SmokeBaseTest):
             second_set = db.session.get(Set, second_set_id)
             self.assertEqual(len(first_set.members), 1)
             self.assertEqual(len(second_set.members), 1)
-            self.assertEqual(db.session.get(Item, first_set.members[0].item_id).sku, "BR-1")
-            self.assertEqual(db.session.get(Item, second_set.members[0].item_id).sku, "BR-2")
+            self.assertEqual(
+                db.session.get(Item, first_set.members[0].item_id).sku, "BR-1"
+            )
+            self.assertEqual(
+                db.session.get(Item, second_set.members[0].item_id).sku, "BR-2"
+            )
 
     def test_bulk_resync_set_memberships_relinks_selected_sets_from_scrape(self):
         self._login_as_admin()
         self._set_csrf_token()
 
-        first_item_id, _first_variant_id = self._add_catalog_item(name="Bulk Resync Knife One", sku="BS-1")
-        second_item_id, _second_variant_id = self._add_catalog_item(name="Bulk Resync Knife Two", sku="BS-2")
-        first_set_id = self._add_set(name="Bulk Resync Set One", sku="BS-SET-1", item_ids=(first_item_id,))
-        second_set_id = self._add_set(name="Bulk Resync Set Two", sku="BS-SET-2", item_ids=(second_item_id,))
+        first_item_id, _first_variant_id = self._add_catalog_item(
+            name="Bulk Resync Knife One", sku="BS-1"
+        )
+        second_item_id, _second_variant_id = self._add_catalog_item(
+            name="Bulk Resync Knife Two", sku="BS-2"
+        )
+        first_set_id = self._add_set(
+            name="Bulk Resync Set One", sku="BS-SET-1", item_ids=(first_item_id,)
+        )
+        second_set_id = self._add_set(
+            name="Bulk Resync Set Two", sku="BS-SET-2", item_ids=(second_item_id,)
+        )
 
         with self.app.app_context():
             first_set = db.session.get(Set, first_set_id)
             second_set = db.session.get(Set, second_set_id)
-            first_set.member_data = json.dumps({"members": [{"sku": "BS-1", "name": "Bulk Resync Knife One", "quantity": 1}]})
-            second_set.member_data = json.dumps({"members": [{"sku": "BS-2", "name": "Bulk Resync Knife Two", "quantity": 1}]})
+            first_set.member_data = json.dumps(
+                {
+                    "members": [
+                        {"sku": "BS-1", "name": "Bulk Resync Knife One", "quantity": 1}
+                    ]
+                }
+            )
+            second_set.member_data = json.dumps(
+                {
+                    "members": [
+                        {"sku": "BS-2", "name": "Bulk Resync Knife Two", "quantity": 1}
+                    ]
+                }
+            )
             for item_set in (first_set, second_set):
                 for membership in list(item_set.members):
                     db.session.delete(membership)
@@ -5040,8 +5807,12 @@ class CatalogSmokeTests(SmokeBaseTest):
             second_set = db.session.get(Set, second_set_id)
             self.assertEqual(len(first_set.members), 1)
             self.assertEqual(len(second_set.members), 1)
-            self.assertEqual(db.session.get(Item, first_set.members[0].item_id).sku, "BS-1")
-            self.assertEqual(db.session.get(Item, second_set.members[0].item_id).sku, "BS-2")
+            self.assertEqual(
+                db.session.get(Item, first_set.members[0].item_id).sku, "BS-1"
+            )
+            self.assertEqual(
+                db.session.get(Item, second_set.members[0].item_id).sku, "BS-2"
+            )
             self.assertEqual(first_set.members[0].quantity, 2)
             self.assertEqual(second_set.members[0].quantity, 3)
             self.assertIn("BS-1", first_set.member_data)
@@ -5051,8 +5822,12 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        keep_item_id, keep_variant_id = self._add_catalog_item(name="Keep Knife", sku="KP-1")
-        drop_item_id, _drop_variant_id = self._add_catalog_item(name="Drop Knife", sku="DR-1")
+        keep_item_id, keep_variant_id = self._add_catalog_item(
+            name="Keep Knife", sku="KP-1"
+        )
+        drop_item_id, _drop_variant_id = self._add_catalog_item(
+            name="Drop Knife", sku="DR-1"
+        )
         person_id = self._add_person(name="Catalog Keeper", notes="")
         self._add_set(name="Catalog Set", sku="CS-1", item_ids=(keep_item_id,))
 
@@ -5108,7 +5883,9 @@ class OwnershipSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        _item_id, variant_id = self._add_catalog_item(name="Ownership Knife", sku="OK-1")
+        _item_id, variant_id = self._add_catalog_item(
+            name="Ownership Knife", sku="OK-1"
+        )
         person_id = self._add_person(name="Collector One", notes="")
 
         add_response = self.client.post(
@@ -5129,7 +5906,9 @@ class OwnershipSmokeTests(SmokeBaseTest):
         self.assertEqual(add_response.status_code, 302)
         with self.app.app_context():
             ownership = db.session.execute(
-                db.select(Ownership).filter_by(person_id=person_id, variant_id=variant_id)
+                db.select(Ownership).filter_by(
+                    person_id=person_id, variant_id=variant_id
+                )
             ).scalar_one()
             self.assertEqual(ownership.status, "Owned")
             self.assertEqual(ownership.notes, "First ownership")
@@ -5175,8 +5954,12 @@ class LogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        sharpening_item_id, _ = self._add_catalog_item(name="Sharpen Page Knife", sku="SR-1")
-        cookware_item_id, _ = self._add_catalog_item(name="Cookware Page Knife", sku="CW-1", category="Cookware")
+        sharpening_item_id, _ = self._add_catalog_item(
+            name="Sharpen Page Knife", sku="SR-1"
+        )
+        cookware_item_id, _ = self._add_catalog_item(
+            name="Cookware Page Knife", sku="CW-1", category="Cookware"
+        )
         task_item_id, _ = self._add_catalog_item(name="Task Page Knife", sku="TP-1")
         task_id = self._add_task(name="Slice onions")
 
@@ -5232,10 +6015,14 @@ class LogSmokeTests(SmokeBaseTest):
         self.assertEqual(task_detail_page.status_code, 200)
         self.assertIn(b"Slice onions", task_detail_page.data)
 
-        with mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", "https://example.com/webhook"), \
-             mock.patch("blueprints.logs.SHARPEN_THRESHOLD_DAYS", 1), \
-             mock.patch("blueprints.logs.COOKWARE_THRESHOLD_DAYS", 1), \
-             mock.patch("blueprints.logs._notify_discord") as notify_mock:
+        with (
+            mock.patch(
+                "blueprints.logs.DISCORD_WEBHOOK_URL", "https://example.com/webhook"
+            ),
+            mock.patch("blueprints.logs.SHARPEN_THRESHOLD_DAYS", 1),
+            mock.patch("blueprints.logs.COOKWARE_THRESHOLD_DAYS", 1),
+            mock.patch("blueprints.logs._notify_discord") as notify_mock,
+        ):
             sharpen_notify_response = self.client.post(
                 "/sharpening/notify",
                 data={"csrf_token": "test-csrf-token"},
@@ -5255,9 +6042,15 @@ class LogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        sharpening_item_id, _ = self._add_catalog_item(name="Validation Sharpen Knife", sku="VL-1")
-        cookware_item_id, _ = self._add_catalog_item(name="Validation Cookware Knife", sku="VC-1", category="Cookware")
-        task_item_id, _ = self._add_catalog_item(name="Validation Task Knife", sku="VT-1")
+        sharpening_item_id, _ = self._add_catalog_item(
+            name="Validation Sharpen Knife", sku="VL-1"
+        )
+        cookware_item_id, _ = self._add_catalog_item(
+            name="Validation Cookware Knife", sku="VC-1", category="Cookware"
+        )
+        task_item_id, _ = self._add_catalog_item(
+            name="Validation Task Knife", sku="VT-1"
+        )
         task_id = self._add_task(name="Slice carrots")
 
         sharpen_edit = self.client.get("/sharpening")
@@ -5343,9 +6136,15 @@ class LogSmokeTests(SmokeBaseTest):
         self.assertEqual(invalid_task_date.status_code, 302)
 
         with self.app.app_context():
-            sharpen_entry = db.session.execute(db.select(SharpeningLog).filter_by(item_id=sharpening_item_id)).first()
-            cookware_entry = db.session.execute(db.select(CookwareSession).filter_by(item_id=cookware_item_id)).first()
-            task_entry = db.session.execute(db.select(KnifeTaskLog).filter_by(item_id=task_item_id)).first()
+            sharpen_entry = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=sharpening_item_id)
+            ).first()
+            cookware_entry = db.session.execute(
+                db.select(CookwareSession).filter_by(item_id=cookware_item_id)
+            ).first()
+            task_entry = db.session.execute(
+                db.select(KnifeTaskLog).filter_by(item_id=task_item_id)
+            ).first()
 
         self.assertIsNone(sharpen_entry)
         self.assertIsNone(cookware_entry)
@@ -5376,9 +6175,11 @@ class LogSmokeTests(SmokeBaseTest):
                 follow_redirects=False,
             )
 
-        with mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", None), \
-             mock.patch("blueprints.logs.SHARPEN_THRESHOLD_DAYS", 999), \
-             mock.patch("blueprints.logs.COOKWARE_THRESHOLD_DAYS", 999):
+        with (
+            mock.patch("blueprints.logs.DISCORD_WEBHOOK_URL", None),
+            mock.patch("blueprints.logs.SHARPEN_THRESHOLD_DAYS", 999),
+            mock.patch("blueprints.logs.COOKWARE_THRESHOLD_DAYS", 999),
+        ):
             no_sharpen_notify = self.client.post(
                 "/sharpening/notify",
                 data={"csrf_token": "test-csrf-token"},
@@ -5397,8 +6198,12 @@ class LogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        sharpening_item_id, _ = self._add_catalog_item(name="Edit Sharpen Knife", sku="ED-1")
-        cookware_item_id, _ = self._add_catalog_item(name="Edit Cookware Knife", sku="ED-2", category="Cookware")
+        sharpening_item_id, _ = self._add_catalog_item(
+            name="Edit Sharpen Knife", sku="ED-1"
+        )
+        cookware_item_id, _ = self._add_catalog_item(
+            name="Edit Cookware Knife", sku="ED-2", category="Cookware"
+        )
         task_item_id, _ = self._add_catalog_item(name="Edit Task Knife", sku="ED-3")
         task_id = self._add_task(name="Slice onions")
 
@@ -5427,8 +6232,12 @@ class LogSmokeTests(SmokeBaseTest):
         )
 
         with self.app.app_context():
-            sharpen_entry = db.session.execute(db.select(SharpeningLog).filter_by(item_id=sharpening_item_id)).scalar_one()
-            cookware_entry = db.session.execute(db.select(CookwareSession).filter_by(item_id=cookware_item_id)).scalar_one()
+            sharpen_entry = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=sharpening_item_id)
+            ).scalar_one()
+            cookware_entry = db.session.execute(
+                db.select(CookwareSession).filter_by(item_id=cookware_item_id)
+            ).scalar_one()
 
         bad_sharpen_edit = self.client.post(
             f"/sharpening/{sharpen_entry.id}/edit",
@@ -5531,7 +6340,9 @@ class LogSmokeTests(SmokeBaseTest):
     def test_sharpening_add_edit_and_delete(self):
         self._login_as_admin()
         self._set_csrf_token()
-        item_id, _variant_id = self._add_catalog_item(name="Sharpening Knife", sku="SH-1")
+        item_id, _variant_id = self._add_catalog_item(
+            name="Sharpening Knife", sku="SH-1"
+        )
 
         add_response = self.client.post(
             "/sharpening/add",
@@ -5547,7 +6358,9 @@ class LogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(add_response.status_code, 302)
         with self.app.app_context():
-            entry = db.session.execute(db.select(SharpeningLog).filter_by(item_id=item_id)).scalar_one()
+            entry = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=item_id)
+            ).scalar_one()
             self.assertEqual(entry.method, "Whetstone")
             self.assertEqual(entry.notes, "First sharpen")
 
@@ -5583,7 +6396,9 @@ class LogSmokeTests(SmokeBaseTest):
     def test_sharpening_purge_routes(self):
         self._login_as_admin()
         self._set_csrf_token()
-        item_id, _variant_id = self._add_catalog_item(name="Sharpen Purge Knife", sku="SP-1")
+        item_id, _variant_id = self._add_catalog_item(
+            name="Sharpen Purge Knife", sku="SP-1"
+        )
 
         self.client.post(
             "/sharpening/add",
@@ -5597,7 +6412,9 @@ class LogSmokeTests(SmokeBaseTest):
             follow_redirects=False,
         )
         with self.app.app_context():
-            entry = db.session.execute(db.select(SharpeningLog).filter_by(item_id=item_id)).scalar_one()
+            entry = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=item_id)
+            ).scalar_one()
             self.assertEqual(entry.method, "Home Sharpener")
 
         purge_item_response = self.client.post(
@@ -5607,9 +6424,11 @@ class LogSmokeTests(SmokeBaseTest):
         )
         self.assertEqual(purge_item_response.status_code, 302)
         with self.app.app_context():
-            remaining = db.session.execute(
-                db.select(SharpeningLog).filter_by(item_id=item_id)
-            ).scalars().all()
+            remaining = (
+                db.session.execute(db.select(SharpeningLog).filter_by(item_id=item_id))
+                .scalars()
+                .all()
+            )
             self.assertEqual(remaining, [])
 
         self.client.post(
@@ -5624,7 +6443,9 @@ class LogSmokeTests(SmokeBaseTest):
             follow_redirects=False,
         )
         with self.app.app_context():
-            delete_entry = db.session.execute(db.select(SharpeningLog).filter_by(item_id=item_id)).scalar_one()
+            delete_entry = db.session.execute(
+                db.select(SharpeningLog).filter_by(item_id=item_id)
+            ).scalar_one()
 
         delete_response = self.client.post(
             f"/sharpening/{delete_entry.id}/delete",
@@ -5638,7 +6459,9 @@ class LogSmokeTests(SmokeBaseTest):
     def test_cookware_add_edit_and_delete(self):
         self._login_as_admin()
         self._set_csrf_token()
-        item_id, _variant_id = self._add_catalog_item(name="Cookware Piece", sku="CK-1", category="Cookware")
+        item_id, _variant_id = self._add_catalog_item(
+            name="Cookware Piece", sku="CK-1", category="Cookware"
+        )
 
         add_response = self.client.post(
             "/cookware/add",
@@ -5695,7 +6518,9 @@ class LogSmokeTests(SmokeBaseTest):
     def test_cookware_purge_routes(self):
         self._login_as_admin()
         self._set_csrf_token()
-        item_id, _variant_id = self._add_catalog_item(name="Cookware Purge", sku="CP-1", category="Cookware")
+        item_id, _variant_id = self._add_catalog_item(
+            name="Cookware Purge", sku="CP-1", category="Cookware"
+        )
 
         self.client.post(
             "/cookware/add",
@@ -5710,7 +6535,9 @@ class LogSmokeTests(SmokeBaseTest):
             follow_redirects=False,
         )
         with self.app.app_context():
-            session = db.session.execute(db.select(CookwareSession).filter_by(item_id=item_id)).scalar_one()
+            session = db.session.execute(
+                db.select(CookwareSession).filter_by(item_id=item_id)
+            ).scalar_one()
             self.assertEqual(session.made_item, "Soup")
             self.assertEqual(session.rating, 4)
 
@@ -5721,9 +6548,13 @@ class LogSmokeTests(SmokeBaseTest):
         )
         self.assertEqual(purge_item_response.status_code, 302)
         with self.app.app_context():
-            remaining = db.session.execute(
-                db.select(CookwareSession).filter_by(item_id=item_id)
-            ).scalars().all()
+            remaining = (
+                db.session.execute(
+                    db.select(CookwareSession).filter_by(item_id=item_id)
+                )
+                .scalars()
+                .all()
+            )
             self.assertEqual(remaining, [])
 
         self.client.post(
@@ -5739,7 +6570,9 @@ class LogSmokeTests(SmokeBaseTest):
             follow_redirects=False,
         )
         with self.app.app_context():
-            delete_session = db.session.execute(db.select(CookwareSession).filter_by(item_id=item_id)).scalar_one()
+            delete_session = db.session.execute(
+                db.select(CookwareSession).filter_by(item_id=item_id)
+            ).scalar_one()
 
         delete_response = self.client.post(
             f"/cookware/{delete_session.id}/delete",

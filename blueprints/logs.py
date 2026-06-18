@@ -7,9 +7,13 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from sqlalchemy.orm import selectinload
 
 from constants import (
-    COOKWARE_CATEGORIES, COOKWARE_THRESHOLD_DAYS,
-    DISCORD_WEBHOOK_URL, SHARPEN_METHODS, SHARPEN_THRESHOLD_DAYS,
-    SHARPENING_PAGE_EXCLUDED_CATEGORIES, SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS,
+    COOKWARE_CATEGORIES,
+    COOKWARE_THRESHOLD_DAYS,
+    DISCORD_WEBHOOK_URL,
+    SHARPEN_METHODS,
+    SHARPEN_THRESHOLD_DAYS,
+    SHARPENING_PAGE_EXCLUDED_CATEGORIES,
+    SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS,
     SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS,
 )
 from extensions import db
@@ -42,9 +46,14 @@ def _is_sharpening_page_item(item: Item) -> bool:
     name = (item.name or "").lower()
     if any(keyword in name for keyword in SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS):
         return True
-    if category in COOKWARE_CATEGORIES or category in SHARPENING_PAGE_EXCLUDED_CATEGORIES:
+    if (
+        category in COOKWARE_CATEGORIES
+        or category in SHARPENING_PAGE_EXCLUDED_CATEGORIES
+    ):
         return False
-    return not any(keyword in name for keyword in SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS)
+    return not any(
+        keyword in name for keyword in SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS
+    )
 
 
 def _build_sharpening_rows(
@@ -67,13 +76,15 @@ def _build_sharpening_rows(
         if not parsed_last:
             continue
         days_since = (today - parsed_last).days
-        tracked.append(dict(
-            item_id=item_id,
-            last_date=last_str,
-            days_since=days_since,
-            overdue=days_since > threshold_days,
-            event_count=count_by_item[item_id],
-        ))
+        tracked.append(
+            dict(
+                item_id=item_id,
+                last_date=last_str,
+                days_since=days_since,
+                overdue=days_since > threshold_days,
+                event_count=count_by_item[item_id],
+            )
+        )
 
     tracked.sort(key=lambda row: (0 if row["overdue"] else 1, -row["days_since"]))
     return tracked, count_by_item
@@ -104,14 +115,16 @@ def _build_cookware_rows(
             continue
         days_since = (today - parsed_last).days
         ratings = rating_by_item.get(item_id, [])
-        tracked.append(dict(
-            item_id=item_id,
-            last_date=last_str,
-            days_since=days_since,
-            stale=days_since > threshold_days,
-            session_count=count_by_item[item_id],
-            avg_rating=round(sum(ratings) / len(ratings), 1) if ratings else None,
-        ))
+        tracked.append(
+            dict(
+                item_id=item_id,
+                last_date=last_str,
+                days_since=days_since,
+                stale=days_since > threshold_days,
+                session_count=count_by_item[item_id],
+                avg_rating=round(sum(ratings) / len(ratings), 1) if ratings else None,
+            )
+        )
 
     tracked.sort(key=lambda row: (0 if row["stale"] else 1, -row["days_since"]))
     return tracked, count_by_item, rating_by_item, set(last_by_item)
@@ -119,16 +132,22 @@ def _build_cookware_rows(
 
 # ── Sharpening Log ────────────────────────────────────────────────────────────
 
+
 @logs_bp.route("/sharpening")
 @user_required
 def sharpening():
     """Render the sharpening log page."""
-    today       = date.today()
-    all_entries = (SharpeningLog.query
-                   .options(selectinload(SharpeningLog.item))
-                   .order_by(SharpeningLog.sharpened_on.desc())
-                   .all())
-    all_entries = [entry for entry in all_entries if entry.item and _is_sharpening_page_item(entry.item)]
+    today = date.today()
+    all_entries = (
+        SharpeningLog.query.options(selectinload(SharpeningLog.item))
+        .order_by(SharpeningLog.sharpened_on.desc())
+        .all()
+    )
+    all_entries = [
+        entry
+        for entry in all_entries
+        if entry.item and _is_sharpening_page_item(entry.item)
+    ]
     tracked, count_by_item = _build_sharpening_rows(
         all_entries,
         today=today,
@@ -143,14 +162,18 @@ def sharpening():
 
     return render_template(
         "sharpening.html",
-        tracked         = tracked_items,
-        recent_entries  = all_entries[:25],
-        overdue_count   = sum(1 for row in tracked_items if row["overdue"]),
-        threshold_days  = SHARPEN_THRESHOLD_DAYS,
-        today           = today.isoformat(),
-        items_list      = [item for item in Item.query.order_by(Item.name).all() if _is_sharpening_page_item(item)],
-        methods         = SHARPEN_METHODS,
-        has_discord     = bool(DISCORD_WEBHOOK_URL),
+        tracked=tracked_items,
+        recent_entries=all_entries[:25],
+        overdue_count=sum(1 for row in tracked_items if row["overdue"]),
+        threshold_days=SHARPEN_THRESHOLD_DAYS,
+        today=today.isoformat(),
+        items_list=[
+            item
+            for item in Item.query.order_by(Item.name).all()
+            if _is_sharpening_page_item(item)
+        ],
+        methods=SHARPEN_METHODS,
+        has_discord=bool(DISCORD_WEBHOOK_URL),
     )
 
 
@@ -158,10 +181,10 @@ def sharpening():
 @user_required
 def sharpening_add():
     """Add a sharpening log entry."""
-    item_id      = request.form.get("item_id", type=int)
+    item_id = request.form.get("item_id", type=int)
     sharpened_on = request.form.get("sharpened_on", "").strip()
-    method       = request.form.get("method", "Home Sharpener").strip()
-    notes        = request.form.get("notes", "").strip() or None
+    method = request.form.get("method", "Home Sharpener").strip()
+    notes = request.form.get("notes", "").strip() or None
 
     if not item_id or not sharpened_on:
         flash("Item and date are required.", "error")
@@ -175,14 +198,18 @@ def sharpening_add():
         flash("Item not found.", "error")
         return redirect(url_for("logs.sharpening"))
 
-    db.session.add(SharpeningLog(
-        item_id      = item_id,
-        sharpened_on = sharpened_on,
-        method       = method,
-        notes        = notes,
-    ))
+    db.session.add(
+        SharpeningLog(
+            item_id=item_id,
+            sharpened_on=sharpened_on,
+            method=method,
+            notes=notes,
+        )
+    )
     if db_commit(db.session):
-        logger.info("Sharpening logged: item %d on %s (%s)", item_id, sharpened_on, method)
+        logger.info(
+            "Sharpening logged: item %d on %s (%s)", item_id, sharpened_on, method
+        )
         flash("Sharpening event logged.", "success")
     return redirect(url_for("logs.sharpening"))
 
@@ -200,8 +227,8 @@ def sharpening_edit(lid):
             flash("Date must be valid YYYY-MM-DD.", "error")
             return redirect(url_for("logs.sharpening"))
         entry.sharpened_on = new_date
-        entry.method       = request.form.get("method", entry.method).strip()
-        entry.notes        = request.form.get("notes", "").strip() or None
+        entry.method = request.form.get("method", entry.method).strip()
+        entry.notes = request.form.get("notes", "").strip() or None
         if db_commit(db.session):
             logger.info("Sharpening entry %d updated", lid)
             flash("Event updated.", "success")
@@ -255,7 +282,10 @@ def sharpening_purge_item(item_id):
             entity_name=item.name,
             payload={"item": item.name, "entries_deleted": count},
         )
-        flash(f"Removed all {count} sharpening event{'s' if count != 1 else ''} for {item.name}.", "info")
+        flash(
+            f"Removed all {count} sharpening event{'s' if count != 1 else ''} for {item.name}.",
+            "info",
+        )
     return redirect(url_for("logs.sharpening"))
 
 
@@ -275,7 +305,9 @@ def sharpening_purge_all():
             entity_name="All sharpening logs",
             payload={"entries_deleted": count},
         )
-        flash(f"Removed all {count} sharpening event{'s' if count != 1 else ''}.", "info")
+        flash(
+            f"Removed all {count} sharpening event{'s' if count != 1 else ''}.", "info"
+        )
     return redirect(url_for("logs.sharpening"))
 
 
@@ -283,11 +315,12 @@ def sharpening_purge_all():
 @user_required
 def sharpening_notify():
     """Send sharpening notifications to Discord."""
-    today       = date.today()
-    all_entries = (SharpeningLog.query
-                   .options(selectinload(SharpeningLog.item))
-                   .order_by(SharpeningLog.sharpened_on.desc())
-                   .all())
+    today = date.today()
+    all_entries = (
+        SharpeningLog.query.options(selectinload(SharpeningLog.item))
+        .order_by(SharpeningLog.sharpened_on.desc())
+        .all()
+    )
     tracked, _count_by_item = _build_sharpening_rows(
         all_entries,
         today=today,
@@ -302,7 +335,10 @@ def sharpening_notify():
     overdue.sort(key=lambda pair: pair[1], reverse=True)
 
     if not overdue:
-        flash(f"No knives overdue for sharpening (threshold: {SHARPEN_THRESHOLD_DAYS} days).", "info")
+        flash(
+            f"No knives overdue for sharpening (threshold: {SHARPEN_THRESHOLD_DAYS} days).",
+            "info",
+        )
         return redirect(url_for("logs.sharpening"))
 
     if DISCORD_WEBHOOK_URL:
@@ -310,7 +346,9 @@ def sharpening_notify():
         for item, days in overdue:
             lines.append(f"• {item.name} — {days} days since last sharpening")
         _notify_discord("\n".join(lines))
-        flash(f"Sent reminder for {len(overdue)} overdue knife(s) to Discord.", "success")
+        flash(
+            f"Sent reminder for {len(overdue)} overdue knife(s) to Discord.", "success"
+        )
     else:
         flash(
             f"{len(overdue)} overdue — set DISCORD_WEBHOOK_URL to enable notifications.",
@@ -321,14 +359,13 @@ def sharpening_notify():
 
 # ── Cookware ──────────────────────────────────────────────────────────────────
 
+
 @logs_bp.route("/cookware", endpoint="cookware")
 @user_required
 def cookware():
     """Render the cookware usage log page."""
-    today       = date.today()
-    sessions = (CookwareSession.query
-                .order_by(CookwareSession.used_on.desc())
-                .all())
+    today = date.today()
+    sessions = CookwareSession.query.order_by(CookwareSession.used_on.desc()).all()
     tracked, count_by_item, rating_by_item, used_ids = _build_cookware_rows(
         sessions,
         today=today,
@@ -340,30 +377,47 @@ def cookware():
         if item:
             tracked_items.append({**row, "item": item})
 
-    never_used = (Item.query
-                  .filter(Item.category.in_(COOKWARE_CATEGORIES))
-                  .filter(Item.id.notin_(used_ids))
-                  .order_by(Item.name)
-                  .all()) if COOKWARE_CATEGORIES else []
+    never_used = (
+        (
+            Item.query.filter(Item.category.in_(COOKWARE_CATEGORIES))
+            .filter(Item.id.notin_(used_ids))
+            .order_by(Item.name)
+            .all()
+        )
+        if COOKWARE_CATEGORIES
+        else []
+    )
 
-    cookware_items = (Item.query
-                      .filter(Item.category.in_(COOKWARE_CATEGORIES))
-                      .order_by(Item.name).all()) if COOKWARE_CATEGORIES else []
-    other_items    = (Item.query
-                      .filter(Item.category.notin_(COOKWARE_CATEGORIES))
-                      .order_by(Item.name).all()) if COOKWARE_CATEGORIES else Item.query.order_by(Item.name).all()
+    cookware_items = (
+        (
+            Item.query.filter(Item.category.in_(COOKWARE_CATEGORIES))
+            .order_by(Item.name)
+            .all()
+        )
+        if COOKWARE_CATEGORIES
+        else []
+    )
+    other_items = (
+        (
+            Item.query.filter(Item.category.notin_(COOKWARE_CATEGORIES))
+            .order_by(Item.name)
+            .all()
+        )
+        if COOKWARE_CATEGORIES
+        else Item.query.order_by(Item.name).all()
+    )
 
     return render_template(
         "cookware.html",
-        tracked          = tracked_items,
-        recent_sessions  = sessions[:25],
-        stale_count      = sum(1 for row in tracked_items if row["stale"]),
-        never_used       = never_used,
-        threshold_days   = COOKWARE_THRESHOLD_DAYS,
-        today            = today.isoformat(),
-        cookware_items   = cookware_items,
-        other_items      = other_items,
-        has_discord      = bool(DISCORD_WEBHOOK_URL),
+        tracked=tracked_items,
+        recent_sessions=sessions[:25],
+        stale_count=sum(1 for row in tracked_items if row["stale"]),
+        never_used=never_used,
+        threshold_days=COOKWARE_THRESHOLD_DAYS,
+        today=today.isoformat(),
+        cookware_items=cookware_items,
+        other_items=other_items,
+        has_discord=bool(DISCORD_WEBHOOK_URL),
     )
 
 
@@ -371,11 +425,11 @@ def cookware():
 @user_required
 def cookware_add():
     """Add a cookware session entry."""
-    item_id   = request.form.get("item_id", type=int)
-    used_on  = request.form.get("used_on", "").strip()
+    item_id = request.form.get("item_id", type=int)
+    used_on = request.form.get("used_on", "").strip()
     made_item = request.form.get("made_item", "").strip()
     raw_rating = request.form.get("rating", "").strip()
-    notes     = request.form.get("notes", "").strip() or None
+    notes = request.form.get("notes", "").strip() or None
 
     if not item_id or not used_on or not made_item:
         flash("Item, date, and what you made are required.", "error")
@@ -394,20 +448,26 @@ def cookware_add():
     except ValueError:
         rating = None
 
-    db.session.add(CookwareSession(
-        item_id  = item_id,
-        used_on = used_on,
-        made_item = made_item,
-        rating   = rating,
-        notes    = notes,
-    ))
+    db.session.add(
+        CookwareSession(
+            item_id=item_id,
+            used_on=used_on,
+            made_item=made_item,
+            rating=rating,
+            notes=notes,
+        )
+    )
     if db_commit(db.session):
-        logger.info("Cookware session logged: item %d on %s — %s", item_id, used_on, made_item)
+        logger.info(
+            "Cookware session logged: item %d on %s — %s", item_id, used_on, made_item
+        )
         flash("Cookware session logged.", "success")
     return redirect(url_for("logs.cookware"))
 
 
-@logs_bp.route("/cookware/<int:session_id>/edit", methods=["GET", "POST"], endpoint="cookware_edit")
+@logs_bp.route(
+    "/cookware/<int:session_id>/edit", methods=["GET", "POST"], endpoint="cookware_edit"
+)
 @user_required
 def cookware_edit(session_id):
     """Edit a cookware session entry."""
@@ -419,13 +479,19 @@ def cookware_edit(session_id):
         if not _safe_parse_iso_date(new_date):
             flash("Date must be valid YYYY-MM-DD.", "error")
             return redirect(url_for("logs.cookware"))
-        cookware_session.used_on  = new_date
-        cookware_session.made_item = request.form.get("made_item", "").strip() or cookware_session.made_item
-        cookware_session.notes     = request.form.get("notes", "").strip() or None
+        cookware_session.used_on = new_date
+        cookware_session.made_item = (
+            request.form.get("made_item", "").strip() or cookware_session.made_item
+        )
+        cookware_session.notes = request.form.get("notes", "").strip() or None
         raw_rating = request.form.get("rating", "").strip()
         try:
             rating = int(raw_rating) if raw_rating else None
-            cookware_session.rating = rating if (rating is None or 1 <= rating <= 5) else cookware_session.rating
+            cookware_session.rating = (
+                rating
+                if (rating is None or 1 <= rating <= 5)
+                else cookware_session.rating
+            )
         except ValueError:
             pass
         if db_commit(db.session):
@@ -435,7 +501,9 @@ def cookware_edit(session_id):
     return render_template("cookware_edit.html", session=cookware_session)
 
 
-@logs_bp.route("/cookware/<int:session_id>/delete", methods=["POST"], endpoint="cookware_delete")
+@logs_bp.route(
+    "/cookware/<int:session_id>/delete", methods=["POST"], endpoint="cookware_delete"
+)
 @user_required
 def cookware_delete(session_id):
     """Delete a cookware session entry."""
@@ -461,7 +529,11 @@ def cookware_delete(session_id):
     return redirect(url_for("logs.cookware"))
 
 
-@logs_bp.route("/cookware/item/<int:item_id>/purge", methods=["POST"], endpoint="cookware_purge_item")
+@logs_bp.route(
+    "/cookware/item/<int:item_id>/purge",
+    methods=["POST"],
+    endpoint="cookware_purge_item",
+)
 @user_required
 def cookware_purge_item(item_id):
     """Delete all cookware entries for one item."""
@@ -481,7 +553,10 @@ def cookware_purge_item(item_id):
             entity_name=item.name,
             payload={"item": item.name, "entries_deleted": count},
         )
-        flash(f"Removed all {count} cookware session{'s' if count != 1 else ''} for {item.name}.", "info")
+        flash(
+            f"Removed all {count} cookware session{'s' if count != 1 else ''} for {item.name}.",
+            "info",
+        )
     return redirect(url_for("logs.cookware"))
 
 
@@ -501,7 +576,9 @@ def cookware_purge_all():
             entity_name="All cookware sessions",
             payload={"entries_deleted": count},
         )
-        flash(f"Removed all {count} cookware session{'s' if count != 1 else ''}.", "info")
+        flash(
+            f"Removed all {count} cookware session{'s' if count != 1 else ''}.", "info"
+        )
     return redirect(url_for("logs.cookware"))
 
 
@@ -509,7 +586,7 @@ def cookware_purge_all():
 @user_required
 def cookware_notify():
     """Send cookware notifications to Discord."""
-    today        = date.today()
+    today = date.today()
     all_sessions = CookwareSession.query.order_by(CookwareSession.used_on.desc()).all()
     tracked, _count_by_item, _rating_by_item, _used_ids = _build_cookware_rows(
         all_sessions,
@@ -533,7 +610,10 @@ def cookware_notify():
         for item, days in stale:
             lines.append(f"• {item.name} — {days} days since last use")
         _notify_discord("\n".join(lines))
-        flash(f"Sent reminder for {len(stale)} idle cookware item(s) to Discord.", "success")
+        flash(
+            f"Sent reminder for {len(stale)} idle cookware item(s) to Discord.",
+            "success",
+        )
     else:
         flash(
             f"{len(stale)} item(s) idle — set DISCORD_WEBHOOK_URL to enable notifications.",
@@ -544,6 +624,7 @@ def cookware_notify():
 
 # ── Knife Task Pairing ────────────────────────────────────────────────────────
 
+
 @logs_bp.route("/tasks")
 @user_required
 def tasks():
@@ -552,24 +633,31 @@ def tasks():
 
     # Only items that are owned by anyone
     owned_item_ids = {
-        o.variant.item_id
-        for o in Ownership.query.filter_by(status="Owned").all()
+        o.variant.item_id for o in Ownership.query.filter_by(status="Owned").all()
     }
-    owned_items = (Item.query
-                   .filter(Item.id.in_(owned_item_ids))
-                   .order_by(Item.name).all()) if owned_item_ids else []
+    owned_items = (
+        (Item.query.filter(Item.id.in_(owned_item_ids)).order_by(Item.name).all())
+        if owned_item_ids
+        else []
+    )
 
     all_tasks = KnifeTask.query.order_by(KnifeTask.name).all()
-    recent_entries = (KnifeTaskLog.query
-                      .order_by(KnifeTaskLog.logged_on.desc(), KnifeTaskLog.id.desc())
-                      .limit(50).all())
+    recent_entries = (
+        KnifeTaskLog.query.order_by(
+            KnifeTaskLog.logged_on.desc(), KnifeTaskLog.id.desc()
+        )
+        .limit(50)
+        .all()
+    )
 
     # Build per-item task usage summary: item_id → task_id → count
     all_log = KnifeTaskLog.query.all()
     usage: dict[int, dict[int, int]] = {}
     for entry in all_log:
         usage.setdefault(entry.item_id, {})
-        usage[entry.item_id][entry.task_id] = usage[entry.item_id].get(entry.task_id, 0) + 1
+        usage[entry.item_id][entry.task_id] = (
+            usage[entry.item_id].get(entry.task_id, 0) + 1
+        )
 
     # Top task per owned item
     item_top_task: dict[int, str] = {}
@@ -588,12 +676,12 @@ def tasks():
 
     return render_template(
         "tasks.html",
-        owned_items    = owned_items,
-        all_tasks      = all_tasks,
-        recent_entries = recent_entries,
-        item_top_task  = item_top_task,
-        item_tasks_map = item_tasks_map,
-        today          = today.isoformat(),
+        owned_items=owned_items,
+        all_tasks=all_tasks,
+        recent_entries=recent_entries,
+        item_top_task=item_top_task,
+        item_tasks_map=item_tasks_map,
+        today=today.isoformat(),
     )
 
 
@@ -601,10 +689,10 @@ def tasks():
 @user_required
 def task_log_add():
     """Add a task log entry."""
-    item_id   = request.form.get("item_id", type=int)
-    task_id   = request.form.get("task_id", type=int)
+    item_id = request.form.get("item_id", type=int)
+    task_id = request.form.get("task_id", type=int)
     logged_on = request.form.get("logged_on", "").strip()
-    notes     = request.form.get("notes", "").strip() or None
+    notes = request.form.get("notes", "").strip() or None
 
     if not item_id or not task_id or not logged_on:
         flash("Item, task, and date are required.", "error")
@@ -619,12 +707,14 @@ def task_log_add():
         flash("Task not found.", "error")
         return redirect(url_for("logs.tasks"))
 
-    db.session.add(KnifeTaskLog(
-        item_id   = item_id,
-        task_id   = task_id,
-        logged_on = logged_on,
-        notes     = notes,
-    ))
+    db.session.add(
+        KnifeTaskLog(
+            item_id=item_id,
+            task_id=task_id,
+            logged_on=logged_on,
+            notes=notes,
+        )
+    )
     if db_commit(db.session):
         item = db.session.get(Item, item_id)
         task = db.session.get(KnifeTask, task_id)
@@ -643,7 +733,11 @@ def task_log_delete(lid):
     entry_id = entry.id
     entry_item_name = entry.item.name if entry.item else None
     entry_task_name = entry.task.name if entry.task else None
-    entry_payload = {"item": entry_item_name, "task": entry_task_name, "logged_on": entry.logged_on}
+    entry_payload = {
+        "item": entry_item_name,
+        "task": entry_task_name,
+        "logged_on": entry.logged_on,
+    }
     db.session.delete(entry)
     if db_commit(db.session):
         logger.info("Task log entry %d deleted", lid)
@@ -680,7 +774,10 @@ def task_log_purge_item(item_id):
             entity_name=item.name,
             payload={"item": item.name, "entries_deleted": count},
         )
-        flash(f"Removed all {count} task log entr{'ies' if count != 1 else 'y'} for {item.name}.", "info")
+        flash(
+            f"Removed all {count} task log entr{'ies' if count != 1 else 'y'} for {item.name}.",
+            "info",
+        )
     return redirect(url_for("logs.tasks"))
 
 
@@ -700,7 +797,9 @@ def task_log_purge_all():
             entity_name="All task logs",
             payload={"entries_deleted": count},
         )
-        flash(f"Removed all {count} task log entr{'ies' if count != 1 else 'y'}.", "info")
+        flash(
+            f"Removed all {count} task log entr{'ies' if count != 1 else 'y'}.", "info"
+        )
     return redirect(url_for("logs.tasks"))
 
 
@@ -708,7 +807,9 @@ def task_log_purge_all():
 @user_required
 def tasks_manage():
     """Render the task management page."""
-    all_tasks = KnifeTask.query.order_by(KnifeTask.is_preset.desc(), KnifeTask.name).all()
+    all_tasks = KnifeTask.query.order_by(
+        KnifeTask.is_preset.desc(), KnifeTask.name
+    ).all()
     return render_template("tasks_manage.html", all_tasks=all_tasks)
 
 
@@ -727,10 +828,10 @@ def task_detail(tid):
         log_counts[entry.item_id] = log_counts.get(entry.item_id, 0) + 1
     return render_template(
         "task_detail.html",
-        task            = task,
-        suggested_items = suggested_items,
-        log_counts      = log_counts,
-        total_logs      = len(task.log_entries),
+        task=task,
+        suggested_items=suggested_items,
+        log_counts=log_counts,
+        total_logs=len(task.log_entries),
     )
 
 
@@ -760,7 +861,10 @@ def task_delete(tid):
     if not task:
         abort(404)
     if task.log_entries:
-        flash(f'Cannot delete "{task.name}" — it has logged usage. Remove logs first.', "error")
+        flash(
+            f'Cannot delete "{task.name}" — it has logged usage. Remove logs first.',
+            "error",
+        )
         return redirect(url_for("logs.tasks_manage"))
     name = task.name
     db.session.delete(task)
