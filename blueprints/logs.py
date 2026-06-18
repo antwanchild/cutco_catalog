@@ -8,12 +8,16 @@ from sqlalchemy.orm import selectinload
 
 from constants import (
     COOKWARE_CATEGORIES, COOKWARE_THRESHOLD_DAYS,
-    DISCORD_WEBHOOK_URL, SHARPEN_METHODS, SHARPENING_PAGE_EXCLUDED_CATEGORIES,
-    SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS, SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS,
-    SHARPEN_THRESHOLD_DAYS,
+    DISCORD_WEBHOOK_URL, SHARPEN_METHODS, SHARPEN_THRESHOLD_DAYS,
 )
 from extensions import db
 from helpers import _notify_discord, db_commit, user_required
+from blueprints.logs_helpers import (
+    _build_cookware_rows,
+    _build_sharpening_rows,
+    _is_sharpening_page_item,
+    _safe_parse_iso_date,
+)
 from models import (
     CookwareSession,
     Item,
@@ -28,24 +32,6 @@ logs_bp = Blueprint("logs", __name__)
 logger = logging.getLogger(__name__)
 
 
-def _safe_parse_iso_date(raw: str) -> date | None:
-    """Return parsed ISO date or None when invalid."""
-    try:
-        return date.fromisoformat(raw)
-    except (TypeError, ValueError):
-        return None
-
-
-def _is_sharpening_page_item(item: Item) -> bool:
-    category = item.category or ""
-    name = (item.name or "").lower()
-    if any(keyword in name for keyword in SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS):
-        return True
-    if category in COOKWARE_CATEGORIES or category in SHARPENING_PAGE_EXCLUDED_CATEGORIES:
-        return False
-    return not any(keyword in name for keyword in SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS)
-
-
 # ── Sharpening Log ────────────────────────────────────────────────────────────
 
 @logs_bp.route("/sharpening")
@@ -58,39 +44,23 @@ def sharpening():
                    .order_by(SharpeningLog.sharpened_on.desc())
                    .all())
     all_entries = [entry for entry in all_entries if entry.item and _is_sharpening_page_item(entry.item)]
-
-    last_by_item: dict[int, str] = {}
-    count_by_item: dict[int, int] = {}
-    for entry in all_entries:
-        count_by_item[entry.item_id] = count_by_item.get(entry.item_id, 0) + 1
-        if entry.item_id not in last_by_item:
-            last_by_item[entry.item_id] = entry.sharpened_on
-
-    tracked: list[dict] = []
-    for item_id, last_str in last_by_item.items():
-        item = db.session.get(Item, item_id)
+    tracked, count_by_item = _build_sharpening_rows(
+        all_entries,
+        today=today,
+        threshold_days=SHARPEN_THRESHOLD_DAYS,
+    )
+    tracked_items = []
+    for row in tracked:
+        item = db.session.get(Item, row["item_id"])
         if not item or not _is_sharpening_page_item(item):
             continue
-        parsed_last = _safe_parse_iso_date(last_str)
-        if not parsed_last:
-            logger.warning("Skipping invalid sharpening date for item_id=%s: %r", item_id, last_str)
-            continue
-        days_since = (today - parsed_last).days
-        tracked.append(dict(
-            item       = item,
-            last_date  = last_str,
-            days_since = days_since,
-            overdue    = days_since > SHARPEN_THRESHOLD_DAYS,
-            event_count= count_by_item[item_id],
-        ))
-
-    tracked.sort(key=lambda row: (0 if row["overdue"] else 1, -row["days_since"]))
+        tracked_items.append({**row, "item": item})
 
     return render_template(
         "sharpening.html",
-        tracked         = tracked,
+        tracked         = tracked_items,
         recent_entries  = all_entries[:25],
-        overdue_count   = sum(1 for row in tracked if row["overdue"]),
+        overdue_count   = sum(1 for row in tracked_items if row["overdue"]),
         threshold_days  = SHARPEN_THRESHOLD_DAYS,
         today           = today.isoformat(),
         items_list      = [item for item in Item.query.order_by(Item.name).all() if _is_sharpening_page_item(item)],
@@ -233,22 +203,17 @@ def sharpening_notify():
                    .options(selectinload(SharpeningLog.item))
                    .order_by(SharpeningLog.sharpened_on.desc())
                    .all())
-    last_by_item: dict[int, str] = {}
-    for entry in all_entries:
-        if entry.item_id not in last_by_item:
-            last_by_item[entry.item_id] = entry.sharpened_on
-
+    tracked, _count_by_item = _build_sharpening_rows(
+        all_entries,
+        today=today,
+        threshold_days=SHARPEN_THRESHOLD_DAYS,
+    )
     overdue = []
-    for item_id, last_str in last_by_item.items():
-        parsed_last = _safe_parse_iso_date(last_str)
-        if not parsed_last:
-            logger.warning("Skipping invalid sharpening date for item_id=%s: %r", item_id, last_str)
-            continue
-        days_since = (today - parsed_last).days
-        if days_since > SHARPEN_THRESHOLD_DAYS:
-            item = db.session.get(Item, item_id)
+    for row in tracked:
+        if row["overdue"]:
+            item = db.session.get(Item, row["item_id"])
             if item:
-                overdue.append((item, days_since))
+                overdue.append((item, row["days_since"]))
     overdue.sort(key=lambda pair: pair[1], reverse=True)
 
     if not overdue:
@@ -279,41 +244,17 @@ def cookware():
     sessions = (CookwareSession.query
                 .order_by(CookwareSession.used_on.desc())
                 .all())
+    tracked, count_by_item, rating_by_item, used_ids = _build_cookware_rows(
+        sessions,
+        today=today,
+        threshold_days=COOKWARE_THRESHOLD_DAYS,
+    )
+    tracked_items = []
+    for row in tracked:
+        item = db.session.get(Item, row["item_id"])
+        if item:
+            tracked_items.append({**row, "item": item})
 
-    last_by_item:   dict[int, str]   = {}
-    count_by_item:  dict[int, int]   = {}
-    rating_by_item: dict[int, list]  = {}
-    for cookware_session in sessions:
-        item_id = cookware_session.item_id
-        count_by_item[item_id] = count_by_item.get(item_id, 0) + 1
-        if item_id not in last_by_item:
-            last_by_item[item_id] = cookware_session.used_on
-        if cookware_session.rating is not None:
-            rating_by_item.setdefault(item_id, []).append(cookware_session.rating)
-
-    tracked: list[dict] = []
-    for item_id, last_str in last_by_item.items():
-        item = db.session.get(Item, item_id)
-        if not item:
-            continue
-        parsed_last = _safe_parse_iso_date(last_str)
-        if not parsed_last:
-            logger.warning("Skipping invalid cookware date for item_id=%s: %r", item_id, last_str)
-            continue
-        days_since = (today - parsed_last).days
-        ratings    = rating_by_item.get(item_id, [])
-        tracked.append(dict(
-            item       = item,
-            last_date  = last_str,
-            days_since = days_since,
-            stale      = days_since > COOKWARE_THRESHOLD_DAYS,
-            session_count = count_by_item[item_id],
-            avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None,
-        ))
-
-    tracked.sort(key=lambda row: (0 if row["stale"] else 1, -row["days_since"]))
-
-    used_ids = set(last_by_item.keys())
     never_used = (Item.query
                   .filter(Item.category.in_(COOKWARE_CATEGORIES))
                   .filter(Item.id.notin_(used_ids))
@@ -329,9 +270,9 @@ def cookware():
 
     return render_template(
         "cookware.html",
-        tracked          = tracked,
+        tracked          = tracked_items,
         recent_sessions  = sessions[:25],
-        stale_count      = sum(1 for row in tracked if row["stale"]),
+        stale_count      = sum(1 for row in tracked_items if row["stale"]),
         never_used       = never_used,
         threshold_days   = COOKWARE_THRESHOLD_DAYS,
         today            = today.isoformat(),
@@ -485,22 +426,17 @@ def cookware_notify():
     """Send cookware notifications to Discord."""
     today        = date.today()
     all_sessions = CookwareSession.query.order_by(CookwareSession.used_on.desc()).all()
-    last_by_item: dict[int, str] = {}
-    for session in all_sessions:
-        if session.item_id not in last_by_item:
-            last_by_item[session.item_id] = session.used_on
-
+    tracked, _count_by_item, _rating_by_item, _used_ids = _build_cookware_rows(
+        all_sessions,
+        today=today,
+        threshold_days=COOKWARE_THRESHOLD_DAYS,
+    )
     stale = []
-    for item_id, last_str in last_by_item.items():
-        parsed_last = _safe_parse_iso_date(last_str)
-        if not parsed_last:
-            logger.warning("Skipping invalid cookware date for item_id=%s: %r", item_id, last_str)
-            continue
-        days_since = (today - parsed_last).days
-        if days_since > COOKWARE_THRESHOLD_DAYS:
-            item = db.session.get(Item, item_id)
+    for row in tracked:
+        if row["stale"]:
+            item = db.session.get(Item, row["item_id"])
             if item:
-                stale.append((item, days_since))
+                stale.append((item, row["days_since"]))
     stale.sort(key=lambda pair: pair[1], reverse=True)
 
     if not stale:
