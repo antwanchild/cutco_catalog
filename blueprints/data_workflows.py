@@ -33,6 +33,13 @@ from scraping import scrape_item_variant_colors, scrape_purple_campaign_variants
 logger = logging.getLogger(__name__)
 
 
+def sync_variant_sync_helpers(scrape_item_variant_colors_fn, scrape_purple_campaign_variants_fn) -> None:
+    """Keep the workflow helpers pointed at the patchable route-level scrapers."""
+    global scrape_item_variant_colors, scrape_purple_campaign_variants
+    scrape_item_variant_colors = scrape_item_variant_colors_fn
+    scrape_purple_campaign_variants = scrape_purple_campaign_variants_fn
+
+
 def _parse_quantity_fields(row: dict) -> tuple[int | None, int | None, list[str]]:
     """Parse ownership quantity fields as whole numbers."""
     errors: list[str] = []

@@ -71,12 +71,6 @@ data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
 
 
-def _sync_variant_sync_helpers() -> None:
-    """Keep the workflow helpers pointed at the patchable route-level scrapers."""
-    data_workflows.scrape_item_variant_colors = scrape_item_variant_colors
-    data_workflows.scrape_purple_campaign_variants = scrape_purple_campaign_variants
-
-
 @data_bp.route("/export")
 @admin_required
 def export_page():
@@ -189,7 +183,7 @@ def completion_gaps_page():
 @admin_required
 def variant_sync_page():
     """Render the variant sync preview page."""
-    _sync_variant_sync_helpers()
+    data_workflows.sync_variant_sync_helpers(scrape_item_variant_colors, scrape_purple_campaign_variants)
     all_items = Item.query.options(selectinload(Item.variants)).filter(Item.cutco_url.isnot(None)).all()
     categories = sorted(
         {item.category for item in all_items if item.category},
