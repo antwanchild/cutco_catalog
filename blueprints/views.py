@@ -9,11 +9,9 @@ from helpers import (_collection_token, _gift_token,
                      _verify_collection_token, _verify_gift_token)
 from models import Item, ItemAttachment, Person, Set
 from blueprints.views_attachment_helpers import _attachment_dir, _store_attachment
-from blueprints.views_item_helpers import (
+from blueprints.views_helpers import (
     _build_item_owners_context,
     _build_matrix_context,
-)
-from blueprints.views_summary_helpers import (
     _build_collection_card_context,
     _build_gift_list_context,
     _build_stats_context,
