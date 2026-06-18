@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from extensions import db
 from models import Item, Ownership, Person
 from constants import UNKNOWN_COLOR
 
 
 def _build_person_collection_context(person_id: int, *, session: dict) -> dict:
     """Build the collection page context for a person."""
-    person = Person.query.get(person_id)
+    person = db.session.get(Person, person_id)
     if not person:
         return {"person": None}
 
