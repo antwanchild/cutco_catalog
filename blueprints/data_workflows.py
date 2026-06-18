@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 import logging
 import re
-from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import openpyxl
@@ -15,32 +13,17 @@ from flask import flash
 from sqlalchemy.orm import selectinload
 
 from blueprints.data_helpers import (
-    _availability_preview_fields,
     _build_item_name_lookup,
     _build_item_sku_lookup,
-    _build_notes,
     _build_set_sku_lookup,
-    _match_import_item,
-    _merge_note_text,
-    _normalize_import_color,
     _normalize_variant_lookup_name,
-    _parse_owned_raw,
-    _parse_truthy_field,
-    _preview_import_color,
-    _resolve_import_variant_color,
-    _safe_csv_filename,
-    _import_row_label,
     _normalized_header,
 )
 from constants import (
     COOKWARE_CATEGORIES,
-    STATUS_OPTIONS,
-    TRUTHY,
     UNKNOWN_COLOR,
     VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
     XLSX_COL_MAP,
-    canonicalize_availability,
-    canonicalize_category,
 )
 from extensions import db
 from models import Item, ItemSetMember, ItemVariant, Ownership, Person, Set, normalize_sku_value

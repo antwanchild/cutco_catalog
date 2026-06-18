@@ -9,7 +9,7 @@ import re
 import openpyxl
 
 from constants import COOKWARE_CATEGORIES, UNKNOWN_COLOR, XLSX_COL_MAP
-from models import Item, ItemVariant, Set, normalize_sku_value, parse_alternate_skus
+from models import Item, Set, normalize_sku_value, parse_alternate_skus
 
 
 def _parse_owned_raw(owned_raw: str, default_person: str | None):

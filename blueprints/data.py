@@ -4,9 +4,7 @@ import json
 import csv
 import io
 import logging
-import re
 from datetime import date
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import openpyxl
 from flask import Blueprint, Response, flash, redirect, render_template, request, session, url_for
@@ -15,20 +13,18 @@ from sqlalchemy import desc
 
 from constants import (
     COOKWARE_CATEGORIES, EDGE_TYPES, STATUS_OPTIONS, TRUTHY, UNKNOWN_COLOR,
-    VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
     XLSX_COL_MAP, canonicalize_availability, canonicalize_category,
 )
 from extensions import db
+from number_utils import parse_positive_whole_number
 from blueprints.data_helpers import (
     _availability_preview_fields,
-    _build_item_name_lookup,
     _build_item_sku_lookup,
     _build_notes,
     _build_set_sku_lookup,
     _match_import_item,
     _merge_note_text,
     _normalize_import_color,
-    _normalize_variant_lookup_name,
     _parse_owned_raw,
     _parse_truthy_field,
     _preview_import_color,
@@ -58,13 +54,11 @@ from helpers import admin_required, db_commit
 from models import (
     Item,
     ItemVariant,
-    ItemSetMember,
     Ownership,
     ActivityEvent,
     Person,
     Set,
     normalize_sku_value,
-    parse_alternate_skus,
     record_activity,
     reconcile_unknown_variant,
 )
