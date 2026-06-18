@@ -14,12 +14,12 @@ from models import Item, Set, normalize_sku_value, parse_alternate_skus
 
 def _parse_owned_raw(owned_raw: str, default_person: str | None):
     """Parse 'Owned?' cell. Returns (status, person_name)."""
-    val = owned_raw.strip()
-    if val.lower() in {"yes", "y", "true", "1"}:
+    raw_value = owned_raw.strip()
+    if raw_value.lower() in {"yes", "y", "true", "1"}:
         return "Owned", default_person
-    if val.lower() in {"no", "n", "false", "0", ""}:
+    if raw_value.lower() in {"no", "n", "false", "0", ""}:
         return "Wishlist", default_person
-    return "Owned", val or default_person
+    return "Owned", raw_value or default_person
 
 
 def _build_notes(row: dict) -> tuple[str | None, list[str]]:
@@ -202,11 +202,11 @@ def _read_completion_rows(uploaded_file, paste_text: str) -> tuple[list[dict], s
         if not any((cell or "").strip() for cell in row.values() if cell is not None):
             continue
         normalized: dict[str, str] = {}
-        for orig_key, val in row.items():
+        for orig_key, cell_value in row.items():
             field_name = _completion_field_name(orig_key)
             if not field_name:
                 continue
-            normalized[field_name] = val.strip() if val is not None else ""
+            normalized[field_name] = cell_value.strip() if cell_value is not None else ""
         normalized["source_label"] = source_label
         normalized["row_num"] = row_num
         parsed_rows.append(normalized)

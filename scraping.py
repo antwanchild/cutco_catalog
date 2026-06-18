@@ -874,10 +874,10 @@ def scrape_item_specs(url: str) -> dict:
         if not raw_html:
             return result
         # ── Edge type ────────────────────────────────────────────────────────
-        item_class_m    = re.search(r'"itemClass"\s*:\s*"([^"]+)"', raw_html)
-        item_subclass_m = re.search(r'"itemSubclass"\s*:\s*"([^"]+)"', raw_html)
-        if (item_class_m and item_class_m.group(1) == "FLA"
-                and item_subclass_m and item_subclass_m.group(1) == "STL"):
+        item_class_match = re.search(r'"itemClass"\s*:\s*"([^"]+)"', raw_html)
+        item_subclass_match = re.search(r'"itemSubclass"\s*:\s*"([^"]+)"', raw_html)
+        if (item_class_match and item_class_match.group(1) == "FLA"
+                and item_subclass_match and item_subclass_match.group(1) == "STL"):
             result["edge_type"] = "N/A"
         else:
             edge_match = re.search(r'"specName"\s*:\s*"Edge"\s*,\s*"specValue"\s*:\s*"([^"]+)"', raw_html)
@@ -895,18 +895,18 @@ def scrape_item_specs(url: str) -> dict:
             "weight - knife only": "weight",
             "weight":           "weight",
         }
-        for spec in re.finditer(
+        for spec_match in re.finditer(
                 r'"specName"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"specValue"\s*:\s*"((?:\\.|[^"\\])*)"',
                 raw_html):
             try:
-                key = json.loads(f'"{spec.group(1)}"').strip().lower()
-                val = json.loads(f'"{spec.group(2)}"').strip()
+                spec_name = json.loads(f'"{spec_match.group(1)}"').strip().lower()
+                spec_value = json.loads(f'"{spec_match.group(2)}"').strip()
             except json.JSONDecodeError:
-                key = spec.group(1).strip().lower()
-                val = spec.group(2).strip()
-            field = spec_map.get(key)
+                spec_name = spec_match.group(1).strip().lower()
+                spec_value = spec_match.group(2).strip()
+            field = spec_map.get(spec_name)
             if field and result[field] is None:
-                result[field] = val
+                result[field] = spec_value
 
         # ── MSRP ─────────────────────────────────────────────────────────────
         result["msrp"] = _extract_cutco_price(raw_html, page_url=resolved_url or clean_url)

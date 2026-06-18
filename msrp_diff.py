@@ -155,17 +155,17 @@ def find_stale_msrp_rows(db_items: list[Item]) -> list[dict]:
 
 # ── Output helpers ─────────────────────────────────────────────────────────────
 
-def _fmt_price(val: float | None) -> str:
+def _fmt_price(price: float | None) -> str:
     """Format a price for display."""
-    return f"${val:,.2f}" if val is not None else "—"
+    return f"${price:,.2f}" if price is not None else "—"
 
 
-def _fmt_delta(val: float | None) -> str:
+def _fmt_delta(delta: float | None) -> str:
     """Format a price delta for display."""
-    if val is None:
+    if delta is None:
         return ""
-    sign = "+" if val > 0 else ""
-    return f"{sign}${val:,.2f}"
+    sign = "+" if delta > 0 else ""
+    return f"{sign}${delta:,.2f}"
 
 
 def print_report(diff: dict) -> None:
@@ -244,8 +244,8 @@ def write_csv(diff: dict, path: str) -> None:
                 "delta":      row.get("delta", ""),
             })
     all_rows.sort(key=lambda report_row: (report_row["category"], report_row["sku"]))
-    with open(path, "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["category", "sku", "name",
+    with open(path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["category", "sku", "name",
                                                   "db_price", "live_price", "delta"])
         writer.writeheader()
         writer.writerows(all_rows)

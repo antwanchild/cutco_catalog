@@ -10,8 +10,8 @@ from threading import Lock
 def read_json_file(path: str, default: dict) -> dict:
     """Read a JSON file, returning `default` if it is missing or invalid."""
     try:
-        with open(path) as fh:
-            return json.load(fh)
+        with open(path) as handle:
+            return json.load(handle)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return dict(default)
 
@@ -21,10 +21,10 @@ def write_json_file(path: str, data: dict, *, lock: Lock | None = None) -> None:
 
     def _write() -> None:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        tmp = path + ".tmp"
-        with open(tmp, "w") as fh:
-            json.dump(data, fh)
-        os.replace(tmp, path)
+        tmp_path = path + ".tmp"
+        with open(tmp_path, "w") as handle:
+            json.dump(data, handle)
+        os.replace(tmp_path, path)
 
     if lock is None:
         _write()
