@@ -1,26 +1,17 @@
 """People, ownership, and wishlist routes."""
 
 import logging
-import re
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 
 from constants import DISCORD_WEBHOOK_URL, STATUS_OPTIONS, UNKNOWN_COLOR
 from extensions import db
+from number_utils import parse_nonnegative_whole_number
 from helpers import _notify_discord, check_wishlist_targets, db_commit, user_required
 from models import Item, Ownership, Person, record_audit_event
 
 people_bp = Blueprint("people", __name__)
 logger = logging.getLogger(__name__)
-
-
-def _parse_optional_whole_number(raw_value: str, label: str) -> tuple[int | None, str | None]:
-    cleaned = (raw_value or "").strip()
-    if not cleaned or cleaned.lower() in {"0", "none", "n/a", "-"}:
-        return None, None
-    if re.fullmatch(r"\d+", cleaned):
-        return int(cleaned), None
-    return None, f"{label} must be a whole number."
 
 
 @people_bp.route("/people")
@@ -172,7 +163,7 @@ def ownership_add():
             target_price = float(raw_target) if raw_target else None
         except ValueError:
             target_price = None
-        quantity_purchased, qty_error = _parse_optional_whole_number(
+        quantity_purchased, qty_error = parse_nonnegative_whole_number(
             request.form.get("quantity_purchased", ""),
             "Quantity Purchased",
         )
@@ -185,7 +176,7 @@ def ownership_add():
                 variant_id=variant_id,
                 status=request.form.get("status", "Owned"),
             ))
-        quantity_given_away, qty_error = _parse_optional_whole_number(
+        quantity_given_away, qty_error = parse_nonnegative_whole_number(
             request.form.get("quantity_given_away", ""),
             "Quantity Given Away",
         )
@@ -241,14 +232,14 @@ def ownership_edit(ownership_id):
         except ValueError:
             ownership.target_price = None
         ownership.notes  = request.form.get("notes", "").strip() or None
-        quantity_purchased, qty_error = _parse_optional_whole_number(
+        quantity_purchased, qty_error = parse_nonnegative_whole_number(
             request.form.get("quantity_purchased", ""),
             "Quantity Purchased",
         )
         if qty_error:
             flash(qty_error, "error")
             return redirect(url_for("people.ownership_edit", ownership_id=ownership_id))
-        quantity_given_away, qty_error = _parse_optional_whole_number(
+        quantity_given_away, qty_error = parse_nonnegative_whole_number(
             request.form.get("quantity_given_away", ""),
             "Quantity Given Away",
         )

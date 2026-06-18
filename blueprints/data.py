@@ -19,6 +19,23 @@ from constants import (
     XLSX_COL_MAP, canonicalize_availability, canonicalize_category,
 )
 from extensions import db
+from number_utils import parse_nonnegative_whole_number, parse_positive_whole_number
+from blueprints.data_helpers import (
+    _availability_preview_fields,
+    _build_item_name_lookup,
+    _build_item_sku_lookup,
+    _build_notes,
+    _build_set_sku_lookup,
+    _match_import_item,
+    _merge_note_text,
+    _normalize_import_color,
+    _normalize_variant_lookup_name,
+    _parse_owned_raw,
+    _parse_truthy_field,
+    _preview_import_color,
+    _read_completion_rows,
+    _resolve_import_variant_color,
+)
 from helpers import admin_required, db_commit
 from models import (
     Item,
@@ -39,251 +56,6 @@ from time_utils import format_container_time
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
-
-
-def _parse_owned_raw(owned_raw: str, default_person: str | None):
-    """Parse 'Owned?' cell. Returns (status, person_name)."""
-    val = owned_raw.strip()
-    if val.lower() in TRUTHY:
-        return "Owned", default_person
-    if val.lower() in {"no", "n", "false", "0", ""}:
-        return "Wishlist", default_person
-    return "Owned", val or default_person
-
-
-def _parse_whole_number(value: str, label: str) -> tuple[int | None, str | None]:
-    """Parse a spreadsheet cell into a non-negative whole number."""
-    cleaned = value.strip()
-    if not cleaned or cleaned.lower() in {"0", "none", "n/a", "-"}:
-        return None, None
-    if re.fullmatch(r"\d+", cleaned):
-        return int(cleaned), None
-    return None, f"{label} must be a whole number."
-
-
-def _build_notes(row: dict) -> tuple[str | None, list[str]]:
-    """Combine spreadsheet auxiliary columns into a single notes string."""
-    parts = []
-    for key, label in [("_notes_price", "Price")]:
-        value = row.get(key, "").strip()
-        if value and value not in ("0", "none", "n/a", "-"):
-            parts.append(f"{label}: {value}")
-    return ("; ".join(parts) or None), []
-
-
-def _normalize_import_color(value: str) -> str:
-    """Normalize imported color text into a consistent display/storage form."""
-    cleaned = (value or "").strip()
-    if not cleaned:
-        return UNKNOWN_COLOR
-    lowered = cleaned.lower()
-    if lowered in {"unknown", "unknown / unspecified", "unknown/unspecified"}:
-        return UNKNOWN_COLOR
-    return cleaned.title()
-
-
-def _display_import_color(color: str) -> str:
-    """Shorten the long unknown color label in import previews."""
-    return "Unknown" if color == UNKNOWN_COLOR else color
-
-
-def _preview_import_color(color: str, is_cookware: bool = False) -> str:
-    """Return a preview color, hiding meaningless cookware color labels."""
-    if is_cookware:
-        return "—"
-    return _display_import_color(color)
-
-
-def _resolve_import_variant_color(name: str, category: str, color: str) -> str:
-    """Return the stored variant color to use for import rows."""
-    resolved_color = _normalize_import_color(color)
-    if category in COOKWARE_CATEGORIES:
-        return UNKNOWN_COLOR
-    if resolved_color.lower() == "stainless" and "stainless" in (name or "").lower():
-        return UNKNOWN_COLOR
-    return resolved_color
-
-
-def _build_item_sku_lookup(items: list[Item]) -> dict[str, Item]:
-    lookup: dict[str, Item] = {}
-    for item in items:
-        primary_sku = normalize_sku_value(item.sku)
-        if primary_sku and primary_sku not in lookup:
-            lookup[primary_sku] = item
-    for item in items:
-        for alias_sku in parse_alternate_skus(item.alternate_skus):
-            if alias_sku and alias_sku not in lookup:
-                lookup[alias_sku] = item
-    return lookup
-
-
-def _match_import_item(
-    *,
-    existing_items: dict[str, Item],
-    existing_names: dict[str, Item],
-    sku: str,
-    name: str,
-) -> Item | None:
-    """Match an import row to an existing item, preferring SKU over name."""
-    if sku:
-        return existing_items.get(sku)
-    if name:
-        return existing_names.get(name.lower())
-    return None
-
-
-def _normalize_variant_lookup_name(value: str | None) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
-
-
-def _build_item_name_lookup(items: list[Item]) -> dict[str, Item]:
-    lookup: dict[str, Item] = {}
-    ambiguous: set[str] = set()
-    for item in items:
-        key = _normalize_variant_lookup_name(item.name)
-        if not key:
-            continue
-        if key in ambiguous:
-            continue
-        if key in lookup:
-            lookup.pop(key, None)
-            ambiguous.add(key)
-            continue
-        lookup[key] = item
-    return lookup
-
-
-def _build_set_sku_lookup(sets: list[Set]) -> dict[str, Set]:
-    lookup: dict[str, Set] = {}
-    for item_set in sets:
-        set_sku = normalize_sku_value(item_set.sku)
-        if set_sku and set_sku not in lookup:
-            lookup[set_sku] = item_set
-    return lookup
-
-
-def _parse_quantity_fields(row: dict) -> tuple[int | None, int | None, list[str]]:
-    """Parse ownership quantity fields as whole numbers."""
-    errors: list[str] = []
-    quantity_purchased = None
-    quantity_given_away = None
-    for key, label in [
-        ("quantity_purchased", "Quantity Purchased"),
-        ("quantity_given_away", "Quantity Given Away"),
-    ]:
-        value = row.get(key, "").strip()
-        if not value or value.lower() in {"0", "none", "n/a", "-"}:
-            continue
-        parsed_value, error = _parse_whole_number(value, label)
-        if error:
-            errors.append(error)
-            continue
-        if parsed_value is not None:
-            if key == "quantity_purchased":
-                quantity_purchased = parsed_value
-            else:
-                quantity_given_away = parsed_value
-    return quantity_purchased, quantity_given_away, errors
-
-
-def _parse_truthy_field(value: str) -> bool:
-    """Interpret a spreadsheet cell as a yes/no flag."""
-    return (value or "").strip().lower() in TRUTHY
-
-
-def _availability_preview_fields(availability: str) -> tuple[str, str | None]:
-    """Return preview-friendly availability label and badge class."""
-    labels = {
-        "rep only": ("Rep only", "badge-warning"),
-        "Costco": ("Costco", "badge-info"),
-        "non-catalog": ("Non-catalog", "badge-off-catalog"),
-    }
-    return labels.get(availability, ("", None))
-
-
-COMPLETION_COL_MAP = {
-    "person": "person",
-    "collector": "person",
-    "owner": "person",
-    "sku": "sku",
-    "item_sku": "sku",
-    "model #": "sku",
-    "model#": "sku",
-    "quantity": "quantity",
-    "qty": "quantity",
-    "note": "note",
-    "notes": "note",
-}
-
-
-def _parse_completion_quantity(raw_value: str) -> tuple[int | None, str | None]:
-    """Parse a completion quantity as a positive whole number."""
-    cleaned = (raw_value or "").strip()
-    if not cleaned:
-        return 1, None
-    if re.fullmatch(r"[1-9]\d*", cleaned):
-        return int(cleaned), None
-    return None, "Quantity must be a positive whole number."
-
-
-def _merge_note_text(existing: str | None, incoming: str | None) -> str | None:
-    """Merge two free-text notes while keeping duplicates out."""
-    existing_value = (existing or "").strip()
-    incoming_value = (incoming or "").strip()
-    if existing_value and incoming_value:
-        if incoming_value.lower() in existing_value.lower():
-            return existing_value
-        return f"{existing_value}; {incoming_value}"
-    return incoming_value or existing_value or None
-
-
-def _completion_field_name(raw_name: str | None) -> str | None:
-    if not raw_name:
-        return None
-    normalized = _normalized_header(raw_name)
-    return COMPLETION_COL_MAP.get(normalized, normalized)
-
-
-def _read_completion_rows(uploaded_file, paste_text: str) -> tuple[list[dict], str | None]:
-    """Read pasted or uploaded completion rows from CSV-like text."""
-    content = (paste_text or "").strip()
-    if content:
-        source_label = "paste"
-    elif uploaded_file and uploaded_file.filename:
-        content = uploaded_file.stream.read().decode("utf-8-sig")
-        source_label = "csv"
-    else:
-        return [], "Paste rows or choose a CSV file."
-
-    if not content.strip():
-        return [], "We couldn't read any rows from this file."
-
-    sample = content[:4096]
-    try:
-        dialect = csv.Sniffer().sniff(sample, delimiters=",\t")
-    except csv.Error:
-        dialect = csv.excel_tab if "\t" in content and content.count("\t") >= content.count(",") else csv.excel
-
-    reader = csv.DictReader(io.StringIO(content), dialect=dialect)
-    raw_headers = [header.strip() for header in (reader.fieldnames or []) if header and header.strip()]
-    mapped_headers = {_completion_field_name(header) for header in raw_headers}
-    if "person" not in mapped_headers or "sku" not in mapped_headers:
-        return [], "Please include a header row with person and sku."
-
-    parsed_rows: list[dict] = []
-    for row_num, row in enumerate(reader, start=2):
-        if not any((cell or "").strip() for cell in row.values() if cell is not None):
-            continue
-        normalized: dict[str, str] = {}
-        for orig_key, val in row.items():
-            field_name = _completion_field_name(orig_key)
-            if not field_name:
-                continue
-            normalized[field_name] = val.strip() if val is not None else ""
-        normalized["source_label"] = source_label
-        normalized["row_num"] = row_num
-        parsed_rows.append(normalized)
-    return parsed_rows, None
 
 
 def _build_completion_preview(
@@ -315,7 +87,7 @@ def _build_completion_preview(
         person = (person_override or row.get("person", "") or "").strip()
         sku = normalize_sku_value(row.get("sku", ""))
         note = row.get("note", "").strip() or None
-        quantity, qty_error = _parse_completion_quantity(row.get("quantity", ""))
+        quantity, qty_error = parse_positive_whole_number(row.get("quantity", ""))
 
         if qty_error:
             unresolved_rows.append({
@@ -1917,7 +1689,7 @@ def completion_import_confirm():
                 })
                 continue
 
-            quantity, qty_error = _parse_completion_quantity(request.form.get(f"row_quantity_{row_index}", ""))
+            quantity, qty_error = parse_positive_whole_number(request.form.get(f"row_quantity_{row_index}", ""))
             if qty_error:
                 skipped_details.append({
                     "row": row_num,

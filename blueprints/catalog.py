@@ -19,6 +19,7 @@ from constants import (
     canonicalize_availability,
 )
 from extensions import db
+from job_state import read_json_file, reset_json_file, write_json_file
 from helpers import admin_required, db_commit, is_admin, is_authenticated_user
 from models import (
     Item,
@@ -52,33 +53,7 @@ _catalog_sync_job_lock = threading.Lock()
 
 
 def _read_catalog_sync_job() -> dict:
-    try:
-        with open(_CATALOG_SYNC_JOB_FILE) as fh:
-            return json.load(fh)
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return {
-            "status": "idle",
-            "progress": [],
-            "results": None,
-            "error": None,
-            "started_at": None,
-            "finished_at": None,
-            "preview": None,
-            "heartbeat_at": None,
-        }
-
-
-def _write_catalog_sync_job(data: dict) -> None:
-    with _catalog_sync_job_lock:
-        os.makedirs(os.path.dirname(_CATALOG_SYNC_JOB_FILE) or DATA_DIR, exist_ok=True)
-        tmp = _CATALOG_SYNC_JOB_FILE + ".tmp"
-        with open(tmp, "w") as fh:
-            json.dump(data, fh)
-        os.replace(tmp, _CATALOG_SYNC_JOB_FILE)
-
-
-def _reset_catalog_sync_job() -> None:
-    _write_catalog_sync_job({
+    return read_json_file(_CATALOG_SYNC_JOB_FILE, {
         "status": "idle",
         "progress": [],
         "results": None,
@@ -88,6 +63,23 @@ def _reset_catalog_sync_job() -> None:
         "preview": None,
         "heartbeat_at": None,
     })
+
+
+def _write_catalog_sync_job(data: dict) -> None:
+    write_json_file(_CATALOG_SYNC_JOB_FILE, data, lock=_catalog_sync_job_lock)
+
+
+def _reset_catalog_sync_job() -> None:
+    reset_json_file(_CATALOG_SYNC_JOB_FILE, {
+        "status": "idle",
+        "progress": [],
+        "results": None,
+        "error": None,
+        "started_at": None,
+        "finished_at": None,
+        "preview": None,
+        "heartbeat_at": None,
+    }, lock=_catalog_sync_job_lock)
 
 
 def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -> dict:

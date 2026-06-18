@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from constants import DATA_DIR, DISCORD_WEBHOOK_URL, REQUEST_TIMEOUT, SCRAPE_HEADERS
 from extensions import db
 from helpers import _notify_discord, check_wishlist_targets
+from job_state import read_json_file, reset_json_file, write_json_file
 from models import Item, record_activity
 
 logger = logging.getLogger(__name__)
@@ -35,20 +36,12 @@ _specs_write_lock = threading.Lock()
 
 
 def _read_specs_job() -> dict:
-    try:
-        with open(_SPECS_JOB_FILE) as fh:
-            return json.load(fh)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {"status": "idle", "progress": [], "results": None, "error": None,
-                "started_at": None, "finished_at": None}
+    return read_json_file(_SPECS_JOB_FILE, {"status": "idle", "progress": [], "results": None, "error": None,
+                "started_at": None, "finished_at": None})
 
 
 def _write_specs_job(data: dict) -> None:
-    with _specs_write_lock:
-        tmp = _SPECS_JOB_FILE + ".tmp"
-        with open(tmp, "w") as fh:
-            json.dump(data, fh)
-        os.replace(tmp, _SPECS_JOB_FILE)
+    write_json_file(_SPECS_JOB_FILE, data, lock=_specs_write_lock)
 
 
 def _run_specs_backfill_job(app) -> None:
@@ -123,13 +116,9 @@ def _run_specs_backfill_job(app) -> None:
 
 
 def _read_msrp_job() -> dict:
-    try:
-        with open(_MSRP_JOB_FILE) as fh:
-            job = json.load(fh)
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return {"status": "idle", "progress": [], "results": None,
+    job = read_json_file(_MSRP_JOB_FILE, {"status": "idle", "progress": [], "results": None,
                 "error": None, "started_at": None, "finished_at": None,
-                "update_db": True, "heartbeat_at": None}
+                "update_db": True, "heartbeat_at": None})
     if job.get("status") != "running":
         return job
     timestamp_text = job.get("heartbeat_at") or job.get("started_at")
@@ -156,17 +145,12 @@ def _read_msrp_job() -> dict:
 
 
 def _write_msrp_job(data: dict) -> None:
-    with _msrp_write_lock:
-        os.makedirs(os.path.dirname(_MSRP_JOB_FILE) or DATA_DIR, exist_ok=True)
-        tmp = _MSRP_JOB_FILE + ".tmp"
-        with open(tmp, "w") as fh:
-            json.dump(data, fh)
-        os.replace(tmp, _MSRP_JOB_FILE)
+    write_json_file(_MSRP_JOB_FILE, data, lock=_msrp_write_lock)
 
 
 def _reset_msrp_job() -> None:
     """Clear the persisted MSRP job state back to idle."""
-    _write_msrp_job({
+    reset_json_file(_MSRP_JOB_FILE, {
         "status": "idle",
         "progress": [],
         "results": None,
@@ -175,7 +159,7 @@ def _reset_msrp_job() -> None:
         "finished_at": None,
         "update_db": True,
         "heartbeat_at": None,
-    })
+    }, lock=_msrp_write_lock)
 
 
 def _normalize_price_text(value: str | None) -> str:
