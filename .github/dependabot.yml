@@ -7,6 +7,8 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     rebase-strategy: auto
+    assignees:
+      - antwanchild
     labels:
       - dependencies
       - python
@@ -25,6 +27,8 @@ updates:
       day: monday
     open-pull-requests-limit: 3
     rebase-strategy: auto
+    assignees:
+      - antwanchild
     labels:
       - dependencies
       - docker
@@ -36,6 +40,8 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     rebase-strategy: auto
+    assignees:
+      - antwanchild
     labels:
       - dependencies
       - github-actions
