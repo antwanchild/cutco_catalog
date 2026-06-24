@@ -1005,7 +1005,9 @@ def bulk_resync_set_memberships():
             skipped_sets += 1
             continue
         raw_member_entries = scraped_set.get("member_entries")
-        member_entries = raw_member_entries if isinstance(raw_member_entries, list) else []
+        member_entries = (
+            raw_member_entries if isinstance(raw_member_entries, list) else []
+        )
         if member_entries:
             item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
         restored, updated, matched = _reconcile_set_memberships_from_entries(

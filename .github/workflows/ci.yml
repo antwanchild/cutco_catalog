@@ -27,11 +27,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install ruff
-        run: python -m pip install --upgrade pip ruff
+      - name: Install lint tools
+        run: python -m pip install --upgrade pip ruff black pyright
 
       - name: Ruff check
         run: ruff check .
+
+      - name: Black check
+        run: black --check .
+
+      - name: Pyright
+        run: pyright
 
   # ── Tests ────────────────────────────────────────────────────────────────
   tests:

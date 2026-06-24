@@ -55,9 +55,7 @@ def _preview_import_color(color: str, is_cookware: bool = False) -> str:
     return _display_import_color(color)
 
 
-def _resolve_import_variant_color(
-    name: str, category: str | None, color: str
-) -> str:
+def _resolve_import_variant_color(name: str, category: str | None, color: str) -> str:
     """Return the stored variant color to use for import rows."""
     resolved_color = _normalize_import_color(color)
     if category in COOKWARE_CATEGORIES:

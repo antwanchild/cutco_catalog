@@ -548,12 +548,12 @@ def _build_member_status_rows(
                 "status": status,
                 "status_label": status_label,
                 "resolution_note": resolution_note,
-                "matched_item_id": _get_item_field(item, "id")
-                if item is not None
-                else None,
-                "matched_item_name": _get_item_field(item, "name")
-                if item is not None
-                else None,
+                "matched_item_id": (
+                    _get_item_field(item, "id") if item is not None else None
+                ),
+                "matched_item_name": (
+                    _get_item_field(item, "name") if item is not None else None
+                ),
             }
         )
     rows.sort(key=_member_preview_sort_key)
@@ -847,9 +847,11 @@ def _build_set_membership_preview(
 
     return {
         "has_changes": bool(change_rows),
-        "summary": ", ".join(summary_parts)
-        if summary_parts
-        else "No membership changes detected.",
+        "summary": (
+            ", ".join(summary_parts)
+            if summary_parts
+            else "No membership changes detected."
+        ),
         "current_rows": current_rows_list,
         "incoming_rows": incoming_rows_list,
         "change_rows": change_rows,

@@ -135,9 +135,11 @@ def build_runtime_details() -> dict:
         "path_checks": [
             {"label": "Data Directory", **_path_status(data_dir)},
             {"label": "Log Directory", **_path_status(log_dir)},
-            {"label": "SQLite File", **_path_status(sqlite_file)}
-            if sqlite_file
-            else None,
+            (
+                {"label": "SQLite File", **_path_status(sqlite_file)}
+                if sqlite_file
+                else None
+            ),
         ],
     }
 

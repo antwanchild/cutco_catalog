@@ -87,7 +87,12 @@ Lint the repo with:
 
 ```bash
 ruff check .
+black --check .
+pyright
+pre-commit run --all-files
 ```
+
+To enable the local hooks, install the tooling once and run `pre-commit install`.
 
 ---
 
