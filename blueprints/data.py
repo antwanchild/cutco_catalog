@@ -132,12 +132,16 @@ def export_csv():
                 "yes" if item.is_unicorn else "no",
                 "yes" if variant.is_unicorn else "no",
                 "yes" if item.edge_is_unicorn else "no",
-                ownership.quantity_purchased
-                if ownership.quantity_purchased is not None
-                else "",
-                ownership.quantity_given_away
-                if ownership.quantity_given_away is not None
-                else "",
+                (
+                    ownership.quantity_purchased
+                    if ownership.quantity_purchased is not None
+                    else ""
+                ),
+                (
+                    ownership.quantity_given_away
+                    if ownership.quantity_given_away is not None
+                    else ""
+                ),
                 ownership.notes or "",
             ]
         )
@@ -366,9 +370,9 @@ def import_page():
                     continue
                 norm_rows.append(
                     {
-                        raw_headers[col_idx]: str(cell_value).strip()
-                        if cell_value is not None
-                        else ""
+                        raw_headers[col_idx]: (
+                            str(cell_value).strip() if cell_value is not None else ""
+                        )
                         for col_idx, cell_value in enumerate(row)
                     }
                 )
@@ -582,9 +586,9 @@ def import_page():
                     "status": status,
                     "row": row_num,
                     "matches_set_sku": matches_set_sku,
-                    "matched_set_name": matched_set.name
-                    if matched_set is not None
-                    else None,
+                    "matched_set_name": (
+                        matched_set.name if matched_set is not None else None
+                    ),
                 }
             )
 
@@ -978,9 +982,9 @@ def completion_import_confirm():
                     "person": person.name,
                     "sku": item.sku or sku,
                     "item": item.name,
-                    "display_color": "—"
-                    if target_color == UNKNOWN_COLOR
-                    else target_color,
+                    "display_color": (
+                        "—" if target_color == UNKNOWN_COLOR else target_color
+                    ),
                     "quantity": quantity,
                     "action": action,
                     "notes": notes or "",

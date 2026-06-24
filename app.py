@@ -130,44 +130,59 @@ def _register_hooks(app: Flask) -> None:
 def _register_error_handlers(app: Flask) -> None:
     @app.errorhandler(403)
     def err_403(error):
-        return render_template(
-            "error.html", code=403, icon="🚫", message="Access denied."
-        ), 403
+        return (
+            render_template(
+                "error.html", code=403, icon="🚫", message="Access denied."
+            ),
+            403,
+        )
 
     @app.errorhandler(404)
     def err_404(error):
-        return render_template(
-            "error.html", code=404, icon="🔍", message="Page not found."
-        ), 404
+        return (
+            render_template(
+                "error.html", code=404, icon="🔍", message="Page not found."
+            ),
+            404,
+        )
 
     @app.errorhandler(429)
     def err_429(error):
-        return render_template(
-            "error.html",
-            code=429,
-            icon="⏱️",
-            message="Too many requests - slow down and try again shortly.",
-        ), 429
+        return (
+            render_template(
+                "error.html",
+                code=429,
+                icon="⏱️",
+                message="Too many requests - slow down and try again shortly.",
+            ),
+            429,
+        )
 
     @app.errorhandler(413)
     def err_413(error):
-        return render_template(
-            "error.html",
-            code=413,
-            icon="📦",
-            message="File too large - maximum upload size is 10 MB.",
-        ), 413
+        return (
+            render_template(
+                "error.html",
+                code=413,
+                icon="📦",
+                message="File too large - maximum upload size is 10 MB.",
+            ),
+            413,
+        )
 
     @app.errorhandler(500)
     def err_500(error):
         db.session.rollback()
         logger.error("Unhandled 500: %s", error)
-        return render_template(
-            "error.html",
-            code=500,
-            icon="💥",
-            message="Something went wrong on our end. Try again or check the logs.",
-        ), 500
+        return (
+            render_template(
+                "error.html",
+                code=500,
+                icon="💥",
+                message="Something went wrong on our end. Try again or check the logs.",
+            ),
+            500,
+        )
 
 
 def _register_routes(app: Flask) -> None:

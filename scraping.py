@@ -626,9 +626,11 @@ def _build_set_member_entries(
             )
             structured_sku = _normalize_set_member_sku(structured.get("sku"))
             fallback_sku = _normalize_set_member_sku(
-                member_skus[matched_index]
-                if matched_index is not None and matched_index < len(member_skus)
-                else structured.get("sku"),
+                (
+                    member_skus[matched_index]
+                    if matched_index is not None and matched_index < len(member_skus)
+                    else structured.get("sku")
+                ),
             )
             chosen_sku = visible_sku or structured_sku or fallback_sku
             entry_name_value = (
@@ -673,9 +675,11 @@ def _build_set_member_entries(
             member_entries.append(
                 {
                     "sku": chosen_sku,
-                    "name": str(visible_row.get("name"))
-                    if visible_row.get("name")
-                    else None,
+                    "name": (
+                        str(visible_row.get("name"))
+                        if visible_row.get("name")
+                        else None
+                    ),
                     "quantity": member_quantities.get(chosen_sku, 1),
                     "is_set_only": bool(visible_row.get("is_set_only")),
                 }
@@ -1032,7 +1036,9 @@ def scrape_item_uses(url: str) -> list[str]:
         uses_ul = uses_heading.find_next_sibling("ul")
         if not uses_ul:
             parent = uses_heading.parent
-            uses_ul = parent.find_next_sibling("ul") if isinstance(parent, Tag) else None
+            uses_ul = (
+                parent.find_next_sibling("ul") if isinstance(parent, Tag) else None
+            )
         if not uses_ul:
             uses_ul = uses_heading.find_next("ul")
         if not isinstance(uses_ul, Tag):
@@ -1591,7 +1597,9 @@ def scrape_catalog(
                             element.get_text(strip=True),
                         )
                         break
-                if element.name == "a" and "/p/" in (_tag_attr_text(element, "href") or ""):
+                if element.name == "a" and "/p/" in (
+                    _tag_attr_text(element, "href") or ""
+                ):
                     product_links.append(element)
 
             logger.debug(
@@ -1915,9 +1923,7 @@ def scrape_sets(
                     )
                     quantity_sku = visible_sku or structured_sku or fallback_sku
                     fallback_qty = (
-                        member_quantities.get(quantity_sku, 1)
-                        if quantity_sku
-                        else 1
+                        member_quantities.get(quantity_sku, 1) if quantity_sku else 1
                     )
                     chosen_sku = visible_sku or structured_sku or fallback_sku
                     if chosen_sku and set_sku and chosen_sku == set_sku:
@@ -1926,12 +1932,16 @@ def scrape_sets(
                         {
                             "sku": chosen_sku,
                             "name": visible_name,
-                            "quantity": matched_structured["quantity"]
-                            if matched_structured
-                            else fallback_qty,
-                            "is_set_only": visible_row["is_set_only"]
-                            if matched_structured is None
-                            else False,
+                            "quantity": (
+                                matched_structured["quantity"]
+                                if matched_structured
+                                else fallback_qty
+                            ),
+                            "is_set_only": (
+                                visible_row["is_set_only"]
+                                if matched_structured is None
+                                else False
+                            ),
                         }
                     )
             else:
@@ -1939,13 +1949,17 @@ def scrape_sets(
                     member_entries.append(
                         {
                             "sku": sku,
-                            "name": member_names[idx]
-                            if idx < len(member_names) and member_names[idx]
-                            else None,
+                            "name": (
+                                member_names[idx]
+                                if idx < len(member_names) and member_names[idx]
+                                else None
+                            ),
                             "quantity": member_quantities.get(sku, 1),
-                            "is_set_only": member_is_set_only[idx]
-                            if idx < len(member_is_set_only)
-                            else False,
+                            "is_set_only": (
+                                member_is_set_only[idx]
+                                if idx < len(member_is_set_only)
+                                else False
+                            ),
                         }
                     )
 

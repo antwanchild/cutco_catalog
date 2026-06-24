@@ -335,9 +335,11 @@ def _build_completion_preview(
                 "sku": sku,
                 "quantity": quantity,
                 "note": note or "—",
-                "reason": "Item SKU not found."
-                if sku not in existing_sets
-                else "Set SKU not found.",
+                "reason": (
+                    "Item SKU not found."
+                    if sku not in existing_sets
+                    else "Set SKU not found."
+                ),
             }
         )
 
@@ -376,9 +378,9 @@ def _build_completion_preview(
         if not item:
             unresolved_rows.append(
                 {
-                    "row": min(bucket["source_rows"])
-                    if bucket["source_rows"]
-                    else None,
+                    "row": (
+                        min(bucket["source_rows"]) if bucket["source_rows"] else None
+                    ),
                     "person": bucket["person"],
                     "sku": bucket["sku"],
                     "quantity": bucket["quantity"],
@@ -525,14 +527,17 @@ def _resolve_variant_sync_items(
         .all()
     )
     if scope == "all":
-        return sorted(
-            items,
-            key=lambda item: (
-                (item.category or "").lower(),
-                (item.sku or "").lower(),
-                (item.name or "").lower(),
+        return (
+            sorted(
+                items,
+                key=lambda item: (
+                    (item.category or "").lower(),
+                    (item.sku or "").lower(),
+                    (item.name or "").lower(),
+                ),
             ),
-        ), None
+            None,
+        )
 
     if scope == "category":
         if not category:
@@ -540,10 +545,13 @@ def _resolve_variant_sync_items(
         filtered = [item for item in items if (item.category or "") == category]
         if not filtered:
             return [], f'No items with URLs were found in "{category}".'
-        return sorted(
-            filtered,
-            key=lambda item: ((item.sku or "").lower(), (item.name or "").lower()),
-        ), None
+        return (
+            sorted(
+                filtered,
+                key=lambda item: ((item.sku or "").lower(), (item.name or "").lower()),
+            ),
+            None,
+        )
 
     if scope == "selected":
         if not selected_skus:
@@ -708,9 +716,9 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
                 "sku": item.sku or "—",
                 "category": item.category or "—",
                 "status": "ready" if scraped_colors else "skipped",
-                "skip_reason": None
-                if scraped_colors
-                else "No clear color variants were detected.",
+                "skip_reason": (
+                    None if scraped_colors else "No clear color variants were detected."
+                ),
                 "variant_rows": variant_rows,
                 "create_colors": create_colors,
                 "retained_colors": retained_colors,

@@ -302,9 +302,9 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
         total_value=total_value,
         priced_count=priced_count,
         catalog_total=catalog_total,
-        coverage_pct=round(100 * len(owned_items) / catalog_total, 1)
-        if catalog_total
-        else 0,
+        coverage_pct=(
+            round(100 * len(owned_items) / catalog_total, 1) if catalog_total else 0
+        ),
     )
 
     cat_data = sorted(cat_counts.items(), key=lambda kv: kv[1], reverse=True)

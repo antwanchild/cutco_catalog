@@ -22,6 +22,7 @@ class BaseModel(db.Model):
     __allow_unmapped__ = True
 
     if TYPE_CHECKING:
+
         def __init__(self, **kwargs: Any) -> None:
             """Pylance-only constructor signature."""
 
@@ -281,9 +282,7 @@ class Ownership(BaseModel):
     variant: Mapped[ItemVariant | None] = relationship(
         "ItemVariant", back_populates="ownerships"
     )
-    person: Mapped[Person | None] = relationship(
-        "Person", back_populates="ownerships"
-    )
+    person: Mapped[Person | None] = relationship("Person", back_populates="ownerships")
 
     __table_args__ = (
         db.UniqueConstraint("variant_id", "person_id", name="uq_variant_person"),
@@ -324,9 +323,7 @@ class CookwareSession(BaseModel):
     rating = db.Column(db.Integer, nullable=True)  # 1–5
     notes = db.Column(db.Text, nullable=True)
 
-    item: Mapped[Item | None] = relationship(
-        "Item", back_populates="cookware_sessions"
-    )
+    item: Mapped[Item | None] = relationship("Item", back_populates="cookware_sessions")
 
 
 class SharpeningLog(BaseModel):
@@ -343,9 +340,7 @@ class SharpeningLog(BaseModel):
     method = db.Column(db.String(60), nullable=False, default="Home Sharpener")
     notes = db.Column(db.Text, nullable=True)
 
-    item: Mapped[Item | None] = relationship(
-        "Item", back_populates="sharpening_log"
-    )
+    item: Mapped[Item | None] = relationship("Item", back_populates="sharpening_log")
 
 
 class KnifeTask(BaseModel):
