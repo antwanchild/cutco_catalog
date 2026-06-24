@@ -1,0 +1,7 @@
+-r requirements.txt
+
+black
+coverage
+pre-commit
+pyright
+ruff

@@ -86,6 +86,7 @@ The smoke suite is grouped by feature area: public, import, catalog, people, own
 Lint the repo with:
 
 ```bash
+pip install -r requirements-dev.txt
 ruff check .
 black --check .
 pyright
