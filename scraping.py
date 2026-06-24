@@ -451,7 +451,7 @@ def _extract_cutco_price(
         if price is not None:
             return price
 
-    price_el = soup.find(attrs={"itemprop": "price"})
+    price_el = soup.select_one('meta[itemprop="price"]')
     if price_el:
         raw = _tag_attr_text(price_el, "content") or price_el.get_text(strip=True)
         price_match = re.search(r"[\d,]+\.?\d*", raw or "")
