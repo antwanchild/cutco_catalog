@@ -40,7 +40,12 @@ def _trusted_header_debug_names() -> list[str]:
         lowered = key.casefold()
         if any(
             token in lowered
-            for token in ("authentik", "forwarded-user", "forwarded-groups", "remote-user")
+            for token in (
+                "authentik",
+                "forwarded-user",
+                "forwarded-groups",
+                "remote-user",
+            )
         ):
             interesting.append(key)
     return sorted(set(interesting), key=str.casefold)
