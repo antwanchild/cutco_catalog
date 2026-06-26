@@ -808,6 +808,35 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Diagnostics", response.data)
 
+    def test_proxy_auth_honors_mixed_case_configured_header_names(self):
+        with mock.patch("helpers.TRUSTED_AUTH_USERNAME_HEADER", "X-Authentik-Username"):
+            response = self.client.get(
+                "/people",
+                headers={"x-authentik-username": "proxy-user"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Collectors", response.data)
+
+    def test_proxy_auth_debug_log_names_present_headers_without_values(self):
+        with (
+            mock.patch("helpers.TRUSTED_AUTH_USERNAME_HEADER", "X-Authentik-Username"),
+            self.assertLogs("helpers", level="DEBUG") as captured,
+        ):
+            response = self.client.get(
+                "/people",
+                headers={"X-Forwarded-User": "proxy-user"},
+                follow_redirects=False,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login", response.headers["Location"])
+        joined = "\n".join(captured.output)
+        self.assertIn("configured='X-Authentik-Username'", joined)
+        self.assertIn("X-Forwarded-User", joined)
+        self.assertNotIn("proxy-user", joined)
+
     def test_audit_trail_records_and_lists_changes(self):
         self._login_as_admin()
         self._set_csrf_token()

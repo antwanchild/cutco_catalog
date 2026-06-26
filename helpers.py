@@ -22,15 +22,46 @@ from models import Ownership
 logger = logging.getLogger(__name__)
 
 
+def _request_header_value(header_name: str) -> str:
+    """Return a request header value using a case-insensitive name match."""
+    target = header_name.strip().casefold()
+    if not target:
+        return ""
+    for key, value in request.headers.items():
+        if key.casefold() == target:
+            return value.strip()
+    return ""
+
+
+def _trusted_header_debug_names() -> list[str]:
+    """Return auth-related header names present on the current request."""
+    interesting = []
+    for key, _value in request.headers.items():
+        lowered = key.casefold()
+        if any(
+            token in lowered
+            for token in ("authentik", "forwarded-user", "forwarded-groups", "remote-user")
+        ):
+            interesting.append(key)
+    return sorted(set(interesting), key=str.casefold)
+
+
 def is_trusted_proxy_authenticated() -> bool:
     """Return whether the current request came through a trusted auth proxy."""
-    header_value = request.headers.get(TRUSTED_AUTH_USERNAME_HEADER, "").strip()
-    return bool(header_value)
+    header_value = _request_header_value(TRUSTED_AUTH_USERNAME_HEADER)
+    authenticated = bool(header_value)
+    if not authenticated and logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Trusted proxy auth header missing or empty (configured=%r, present=%s)",
+            TRUSTED_AUTH_USERNAME_HEADER,
+            _trusted_header_debug_names(),
+        )
+    return authenticated
 
 
 def _trusted_proxy_groups() -> set[str]:
     """Return normalized group names reported by the trusted auth proxy."""
-    raw_groups = request.headers.get(TRUSTED_AUTH_GROUPS_HEADER, "").strip()
+    raw_groups = _request_header_value(TRUSTED_AUTH_GROUPS_HEADER)
     if not raw_groups:
         return set()
     groups = set()
