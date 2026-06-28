@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.13.14-slim-bookworm
 
 LABEL org.opencontainers.image.title="cutco-vault"
 LABEL org.opencontainers.image.description="Cutco Collection Tracker"
