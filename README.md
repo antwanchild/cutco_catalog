@@ -196,7 +196,7 @@ services:
       - traefik.http.services.cutco.loadbalancer.server.port=8095
 
       # Public pages: catalog browsing, sets, product views, health/version
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.rule=Host(`cutco.${DOMAIN}`)
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.rule=Host(`cutco.anthonychild.com`)
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.priority=1
@@ -204,7 +204,7 @@ services:
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.service=cutco
 
       # Private collector pages
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.rule=Host(`cutco.${DOMAIN}`) && (PathPrefix(`/people`) || PathPrefix(`/wishlist`) || PathPrefix(`/sharpening`) || PathPrefix(`/cookware`) || PathPrefix(`/tasks`) || Path(`/stats`) || PathPrefix(`/views/matrix`))
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.rule=Host(`cutco.anthonychild.com`) && (PathPrefix(`/people`) || PathPrefix(`/wishlist`) || PathPrefix(`/sharpening`) || PathPrefix(`/cookware`) || PathPrefix(`/tasks`) || Path(`/stats`) || PathPrefix(`/views/matrix`))
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.priority=100
@@ -212,13 +212,15 @@ services:
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.service=cutco
 
       # Admin pages and mutating routes
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.rule=Host(`cutco.${DOMAIN}`) && (PathPrefix(`/admin`) || PathPrefix(`/data/import`) || PathPrefix(`/data/export`) || PathPrefix(`/data/completion-gaps`) || PathPrefix(`/data/completion-import`) || PathPrefix(`/data/variant-sync`) || PathPrefix(`/catalog/add`) || PathPrefix(`/catalog/`) || PathPrefix(`/sets/add`) || PathPrefix(`/sets/`) || PathPrefix(`/views/item/`) || PathPrefix(`/attachments/`))
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.rule=Host(`cutco.anthonychild.com`) && (PathPrefix(`/admin`) || PathPrefix(`/data/import`) || PathPrefix(`/data/export`) || PathPrefix(`/data/completion-gaps`) || PathPrefix(`/data/completion-import`) || PathPrefix(`/data/variant-sync`) || PathPrefix(`/catalog/add`) || PathPrefix(`/catalog/`) || PathPrefix(`/sets/add`) || PathPrefix(`/sets/`) || PathPrefix(`/views/item/`) || PathPrefix(`/attachments/`))
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.priority=200
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.middlewares=chain-auth-shit-NOerrors@file
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.service=cutco
 ```
+
+Hardcode the public hostname in the Traefik `Host(...)` labels unless `DOMAIN` is defined in the compose project `.env` file or shell environment. A `DOMAIN` value under the service's `environment:` block is only passed into the Cutco container; Docker Compose does not use it to render labels before Traefik reads them.
 
 If you want Authentik to recognize proxy-authenticated users inside the app, make sure your forwardAuth middleware passes these headers through:
 
