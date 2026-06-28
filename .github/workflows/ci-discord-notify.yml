@@ -2,7 +2,7 @@ name: CI Discord Notifications
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["CI", "Release"]
     types: [completed]
 
 permissions:
