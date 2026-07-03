@@ -17,10 +17,10 @@ concurrency:
 
 jobs:
   validate:
-    name: Preview Image Opt-In
+    name: Validate Pull Request
     runs-on: ubuntu-latest
     steps:
-      - name: Summarize preview image opt-in
+      - name: Summarize PR preview status
         uses: actions/github-script@v7
         with:
           script: |
@@ -29,13 +29,13 @@ jobs:
             const hasLabel = labels.includes(requiredLabel);
 
             if (hasLabel) {
-              core.notice(`PR #${context.payload.pull_request.number} is labeled '${requiredLabel}'. Preview image builds are enabled.`);
+              core.notice(`PR #${context.payload.pull_request.number} is labeled '${requiredLabel}'. The preview image will build after CI passes.`);
             } else {
-              core.notice(`PR #${context.payload.pull_request.number} does not yet have the '${requiredLabel}' label. Add it to enable preview image builds.`);
+              core.notice(`PR #${context.payload.pull_request.number} does not yet have the '${requiredLabel}' label. Add it to enable the preview image.`);
             }
 
             await core.summary
-              .addHeading("Preview Image Opt-In")
+              .addHeading("PR Preview Status")
               .addRaw(
                 hasLabel
                   ? "This pull request is opted in for preview image builds."
