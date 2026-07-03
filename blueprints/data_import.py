@@ -21,6 +21,7 @@ from blueprints.import_shared import (
 )
 from models import Item
 
+
 def _parse_owned_raw(owned_raw: str, default_person: str | None):
     """Parse 'Owned?' cell. Returns (status, person_name)."""
     raw_value = owned_raw.strip()
