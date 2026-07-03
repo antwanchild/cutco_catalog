@@ -1,4 +1,4 @@
-name: PR Docker Image
+name: PR Docker Preview
 
 on:
   pull_request:
@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   prepare:
-    name: Preview Build Gate
+    name: Preview Gate
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -33,7 +33,7 @@ jobs:
       head_sha: ${{ steps.decide.outputs.head_sha }}
       version: ${{ steps.decide.outputs.version }}
     steps:
-      - name: Decide whether to build
+      - name: Check preview eligibility
         id: decide
         uses: actions/github-script@v7
         with:
@@ -129,7 +129,7 @@ jobs:
             }
 
   build:
-    name: Build PR Image
+    name: Build Preview Image
     runs-on: ubuntu-latest
     needs: prepare
     if: needs.prepare.outputs.should_build == 'true'
@@ -143,7 +143,7 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.head_sha }}
 
-      - name: Compute PR tags
+      - name: Compute preview tags
         id: meta
         run: |
           echo "pr_tag=pr-${{ needs.prepare.outputs.pr_number }}" >> "$GITHUB_OUTPUT"
@@ -158,7 +158,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build PR image
+      - name: Build preview image
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -175,14 +175,14 @@ jobs:
             GIT_SHA=${{ needs.prepare.outputs.head_sha }}
 
   cleanup:
-    name: Remove PR Image
+    name: Remove Preview Image
     runs-on: ubuntu-latest
     if: github.event.action == 'closed' && github.event.pull_request.merged == true
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Delete GHCR version for this PR tag
+      - name: Delete preview image tag
         uses: actions/github-script@v7
         with:
           script: |
