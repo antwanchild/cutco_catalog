@@ -2,7 +2,7 @@ name: PR Docker Preview
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   pull_request_target:
     types: [closed]
 
@@ -95,7 +95,9 @@ jobs:
   cleanup:
     name: Remove Preview Image
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    if: >
+      github.event_name == 'pull_request_target' && github.event.action == 'closed' && github.event.pull_request.merged == true
+      || github.event_name == 'pull_request' && github.event.action == 'unlabeled'
     permissions:
       contents: read
       packages: write

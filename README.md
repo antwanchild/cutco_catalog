@@ -81,7 +81,7 @@ If you want to test a branch before merging, add the `docker` label to the pull 
 - If you add the label after the PR already exists, the next PR update or label event will build the preview image.
 - Each PR update refreshes the same `pr-123` tag, so you can keep testing the latest branch state without re-labeling the PR.
 - Same-repo PRs can publish that tag to GHCR so you can `docker pull ghcr.io/antwanchild/cutco_catalog:pr-123`.
-- When the PR is merged, the matching preview tag is cleaned up automatically.
+- When the PR is merged, or when you remove the `docker` label, the matching preview tag is cleaned up automatically.
 - Forked PRs can still run the build check safely, but they do not publish a registry image.
 
 ---
