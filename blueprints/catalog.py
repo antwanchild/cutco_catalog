@@ -157,8 +157,6 @@ def catalog():
     if availability_f:
         query = query.filter(Item.availability == availability_f)
 
-    from sqlalchemy.orm import selectinload
-
     sort_cols = {
         "name": Item.name,
         "sku": Item.sku,
