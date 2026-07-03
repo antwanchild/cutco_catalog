@@ -472,15 +472,12 @@ def _extract_sku_from_href(
     if not slug:
         return None
     if preserve_lettered_code:
-        lead = re.match(r"^(\d{3,}(?:[A-Z]{0,3}(?:-\d+)?)?)", slug)
+        match = re.fullmatch(r"\d{3,}(?:[A-Z]{0,3}(?:-\d+)?)?", slug)
     else:
-        lead = re.match(r"^(\d{3,}[A-Z]{0,3})", slug)
-    if lead:
-        candidate = lead.group(1)
-    elif any(char.isdigit() for char in slug) and len(slug) <= 12:
-        candidate = slug
-    else:
+        match = re.fullmatch(r"\d{3,}[A-Z]{0,3}", slug)
+    if not match:
         return None
+    candidate = match.group(0)
     if not preserve_lettered_code:
         if candidate.endswith("SH"):
             candidate = candidate[:-2]

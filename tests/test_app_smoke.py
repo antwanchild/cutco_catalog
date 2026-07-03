@@ -1872,6 +1872,34 @@ class UtilitySmokeTests(SmokeBaseTest):
             ),
             "2135-2",
         )
+        self.assertIsNone(
+            _extract_sku_from_href(
+                "https://www.cutco.com/p/250th-celebration-knife-with-sheath&view=product"
+            )
+        )
+
+    def test_fetch_sku_from_page_ignores_descriptive_slug_digits(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html>
+              <head>
+                <meta property="product:sku" content="2135">
+              </head>
+              <body>
+                <h1>The 250th Celebration Knife with Sheath</h1>
+              </body>
+            </html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            from scraping import _fetch_sku_from_page
+
+            _fetch_sku_from_page.cache_clear()
+            sku, name = _fetch_sku_from_page(
+                "https://www.cutco.com/p/250th-celebration-knife-with-sheath&view=product"
+            )
+        self.assertEqual(sku, "2135")
+        self.assertEqual(name, "The 250th Celebration Knife with Sheath")
 
     def test_extract_product_variant_colors_uses_page_color_without_swatch_group(self):
         response = mock.Mock()
