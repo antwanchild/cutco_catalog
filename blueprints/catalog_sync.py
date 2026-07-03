@@ -6,7 +6,7 @@ import os
 import re
 import threading
 from collections import OrderedDict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 UNCATEGORIZED_FILTER = "__uncategorized__"
 _CATALOG_SYNC_JOB_FILE = os.path.join(DATA_DIR, "catalog_sync_job.json")
 _catalog_sync_job_lock = threading.Lock()
+_CATALOG_SYNC_JOB_STALE_AFTER = timedelta(minutes=30)
 
 
 class ResolvedMember(TypedDict):
@@ -51,7 +52,7 @@ class ResolvedMember(TypedDict):
 
 
 def _read_catalog_sync_job() -> dict:
-    return read_json_file(
+    job = read_json_file(
         _CATALOG_SYNC_JOB_FILE,
         {
             "status": "idle",
@@ -64,6 +65,32 @@ def _read_catalog_sync_job() -> dict:
             "heartbeat_at": None,
         },
     )
+    if job.get("status") != "running":
+        return job
+
+    timestamp_text = job.get("heartbeat_at") or job.get("started_at")
+    stale = not timestamp_text
+    if not stale:
+        try:
+            timestamp = datetime.fromisoformat(str(timestamp_text))
+        except ValueError:
+            stale = True
+        else:
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=UTC)
+            stale = datetime.now(UTC) - timestamp > _CATALOG_SYNC_JOB_STALE_AFTER
+    if not stale:
+        return job
+
+    recovered = dict(job)
+    recovered["status"] = "error"
+    recovered["error"] = (
+        "Previous catalog sync job became stale. Please rerun the sync."
+    )
+    recovered["finished_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+    recovered["heartbeat_at"] = recovered["finished_at"]
+    _write_catalog_sync_job(recovered)
+    return recovered
 
 
 def _write_catalog_sync_job(data: dict) -> None:

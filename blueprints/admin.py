@@ -7,7 +7,7 @@ import threading
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from flask import (
@@ -44,6 +44,11 @@ from msrp_jobs import (
 
 admin_bp = Blueprint("admin", __name__)
 logger = logging.getLogger(__name__)
+
+
+def _current_flask_app() -> Flask:
+    """Return the real Flask app object instead of the request-local proxy."""
+    return cast(Flask, cast(Any, current_app)._get_current_object())
 
 
 def _mask_database_uri(uri):
@@ -179,7 +184,7 @@ def msrp_diff_run():
             "finished_at": None,
         }
     )
-    app = cast(Flask, current_app)
+    app = _current_flask_app()
     logger.info("MSRP diff job started (update_db=%s)", update_db)
     threading.Thread(
         target=_run_msrp_diff_job,
@@ -244,7 +249,7 @@ def specs_backfill_run():
             "finished_at": None,
         }
     )
-    app = cast(Flask, current_app)
+    app = _current_flask_app()
     logger.info("Specs backfill job started")
     threading.Thread(target=_run_specs_backfill_job, args=(app,), daemon=True).start()
     return redirect(url_for("admin.specs_backfill_page"))

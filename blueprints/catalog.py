@@ -76,6 +76,11 @@ UNCATEGORIZED_FILTER = "__uncategorized__"
 _CATALOG_SYNC_JOB_FILE = catalog_sync_module._CATALOG_SYNC_JOB_FILE
 
 
+def _current_flask_app() -> Flask:
+    """Return the real Flask app object instead of the request-local proxy."""
+    return cast(Flask, cast(Any, current_app)._get_current_object())
+
+
 def _sync_catalog_sync_helpers() -> None:
     """Keep the helper module pointed at the patchable route-level scrapers."""
     catalog_sync_module._CATALOG_SYNC_JOB_FILE = _CATALOG_SYNC_JOB_FILE
@@ -1352,7 +1357,7 @@ def catalog_sync():
                     "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
                 }
             )
-            _start_catalog_sync_background_job(cast(Flask, current_app))
+            _start_catalog_sync_background_job(_current_flask_app())
         job = _read_catalog_sync_job()
         if job.get("status") == "done" and job.get("preview"):
             preview = job["preview"]
