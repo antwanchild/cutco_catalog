@@ -16,7 +16,7 @@ env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 concurrency:
-  group: pr-docker-${{ github.event.pull_request.number }}
+  group: pr-docker-${{ github.event.pull_request.number || github.event.workflow_run.head_sha || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -39,9 +39,8 @@ jobs:
         with:
           script: |
             const requiredLabel = "docker";
-            const eventName = context.eventName;
-
-            const setSkip = async (reason) => {
+            const workflowName = "CI";
+            const skip = (reason) => {
               core.notice(reason);
               core.setOutput("should_build", "false");
               core.setOutput("pr_number", "");
@@ -49,95 +48,85 @@ jobs:
               core.setOutput("version", "");
             };
 
-            let prNumber = null;
-            let headSha = null;
-            let hasLabel = false;
-            let ciGreen = false;
-
-            if (eventName === "workflow_run") {
+            if (context.eventName === "workflow_run") {
               const workflowRun = context.payload.workflow_run;
 
-              if (workflowRun.name !== "CI") {
-                await setSkip(`Skipping because workflow '${workflowRun.name}' is not CI.`);
+              if (workflowRun.name !== workflowName) {
+                skip(`Skipping because workflow '${workflowRun.name}' is not ${workflowName}.`);
                 return;
               }
 
               if (workflowRun.event !== "pull_request") {
-                await setSkip(`Skipping because CI run #${workflowRun.id} was not triggered by a pull request.`);
+                skip(`Skipping because ${workflowName} run #${workflowRun.id} was not triggered by a pull request.`);
                 return;
               }
 
               if (workflowRun.conclusion !== "success") {
-                await setSkip(`Skipping because CI for PR preview build finished with conclusion '${workflowRun.conclusion}'.`);
+                skip(`Skipping because ${workflowName} finished with conclusion '${workflowRun.conclusion}'.`);
                 return;
               }
 
               const associatedPr = workflowRun.pull_requests?.[0];
               if (!associatedPr) {
-                await setSkip(`Skipping because CI run #${workflowRun.id} is not associated with a pull request.`);
+                skip(`Skipping because ${workflowName} run #${workflowRun.id} is not associated with a pull request.`);
                 return;
               }
-
-              prNumber = associatedPr.number;
-              headSha = workflowRun.head_sha;
-              ciGreen = true;
 
               const labelsResponse = await github.rest.issues.listLabelsOnIssue({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: prNumber,
+                issue_number: associatedPr.number,
                 per_page: 100,
               });
 
-              hasLabel = labelsResponse.data.some((label) => label.name === requiredLabel);
-              if (!hasLabel) {
-                await setSkip(`Skipping PR #${prNumber} because it does not have the '${requiredLabel}' label.`);
+              if (!labelsResponse.data.some((label) => label.name === requiredLabel)) {
+                skip(`Skipping PR #${associatedPr.number} because it does not have the '${requiredLabel}' label.`);
                 return;
               }
-            } else if (eventName === "pull_request") {
+
+              core.notice(`Building preview image for PR #${associatedPr.number} at ${workflowRun.head_sha}.`);
+              core.setOutput("should_build", "true");
+              core.setOutput("pr_number", String(associatedPr.number));
+              core.setOutput("head_sha", String(workflowRun.head_sha));
+              core.setOutput("version", `pr-${associatedPr.number}`);
+              return;
+            } else {
               const pullRequest = context.payload.pull_request;
               const action = context.payload.action;
 
               if (action === "closed") {
-                await setSkip(`Skipping because PR #${pullRequest.number} is closed.`);
+                skip(`Skipping because PR #${pullRequest.number} is closed.`);
                 return;
               }
 
-              prNumber = pullRequest.number;
-              headSha = pullRequest.head.sha;
-              hasLabel = pullRequest.labels.some((label) => label.name === requiredLabel);
-
-              if (!hasLabel) {
-                await setSkip(`Skipping PR #${prNumber} because it does not have the '${requiredLabel}' label yet.`);
+              if (!pullRequest.labels.some((label) => label.name === requiredLabel)) {
+                skip(`Skipping PR #${pullRequest.number} because it does not have the '${requiredLabel}' label yet.`);
                 return;
               }
 
               const workflowRuns = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                head_sha: headSha,
+                head_sha: pullRequest.head.sha,
                 event: "pull_request",
                 per_page: 100,
               });
 
-              ciGreen = workflowRuns.some(
-                (run) => run.name === "CI" && run.conclusion === "success"
+              const ciFinished = workflowRuns.some(
+                (run) => run.name === workflowName && run.conclusion === "success"
               );
 
-              if (!ciGreen) {
-                await setSkip(`Skipping PR #${prNumber} until CI finishes successfully for ${headSha}.`);
+              if (!ciFinished) {
+                skip(`Skipping PR #${pullRequest.number} until ${workflowName} finishes successfully for ${pullRequest.head.sha}.`);
                 return;
               }
-            } else {
-              await setSkip(`Skipping unsupported event '${eventName}'.`);
-              return;
-            }
 
-            core.notice(`Building preview image for PR #${prNumber} at ${headSha}.`);
-            core.setOutput("should_build", "true");
-            core.setOutput("pr_number", String(prNumber));
-            core.setOutput("head_sha", String(headSha));
-            core.setOutput("version", `pr-${prNumber}`);
+              core.notice(`Building preview image for PR #${pullRequest.number} at ${pullRequest.head.sha}.`);
+              core.setOutput("should_build", "true");
+              core.setOutput("pr_number", String(pullRequest.number));
+              core.setOutput("head_sha", String(pullRequest.head.sha));
+              core.setOutput("version", `pr-${pullRequest.number}`);
+            }
 
   build:
     name: Build PR Image
