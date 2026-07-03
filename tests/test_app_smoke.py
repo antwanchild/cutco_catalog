@@ -8,6 +8,7 @@ from unittest import mock
 
 from openpyxl import Workbook
 from bs4 import BeautifulSoup
+from flask import Flask
 
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
@@ -4657,6 +4658,25 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Catalog sync hasn't been started yet", response.data)
         scrape_catalog_mock.assert_not_called()
         scrape_sets_mock.assert_not_called()
+
+    def test_catalog_sync_run_uses_real_flask_app_for_background_job(self):
+        self._login_as_admin()
+
+        with (
+            mock.patch(
+                "blueprints.catalog._CATALOG_SYNC_JOB_FILE",
+                f"{self.temp_dir.name}/catalog_sync_job.json",
+            ),
+            mock.patch("blueprints.catalog._start_catalog_sync_background_job") as start_mock,
+        ):
+            response = self.client.get("/catalog/sync?run=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Catalog sync is running in the background", response.data)
+        self.assertTrue(start_mock.called)
+        app_arg = start_mock.call_args.args[0]
+        self.assertIsInstance(app_arg, Flask)
+        self.assertIs(app_arg, self.app)
 
     def test_catalog_sync_preview_hides_placeholder_option_when_nothing_is_missing(
         self,

@@ -7,6 +7,8 @@ from unittest import mock
 
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
+from flask import Flask
+
 from app import create_app
 import constants
 from constants import KNIFE_TASK_PRESETS
@@ -112,6 +114,8 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         write_mock.assert_called_once()
         self.assertEqual(write_mock.call_args.args[0]["status"], "running")
+        self.assertIs(thread_mock.call_args.kwargs["args"][0], self.app)
+        self.assertIsInstance(thread_mock.call_args.kwargs["args"][0], Flask)
         thread_instance.start.assert_called_once()
 
     def test_msrp_diff_run_starts_background_job(self):
@@ -138,6 +142,8 @@ class AdminJobSmokeTests(unittest.TestCase):
         write_mock.assert_called_once()
         self.assertEqual(write_mock.call_args.args[0]["status"], "running")
         self.assertTrue(write_mock.call_args.args[0]["update_db"])
+        self.assertIs(thread_mock.call_args.kwargs["args"][0], self.app)
+        self.assertIsInstance(thread_mock.call_args.kwargs["args"][0], Flask)
         thread_instance.start.assert_called_once()
 
     def test_msrp_diff_reset_clears_job_state(self):
@@ -180,6 +186,32 @@ class AdminJobSmokeTests(unittest.TestCase):
         self.assertEqual(recovered["status"], "error")
         self.assertIn("stale", recovered["error"].lower())
         self.assertIsNotNone(recovered["finished_at"])
+
+    def test_stale_catalog_sync_job_is_recovered_on_read(self):
+        stale_started_at = (datetime.now(UTC) - timedelta(hours=2)).isoformat(
+            timespec="seconds"
+        )
+        job_data = {
+            "status": "running",
+            "progress": ["Scraping live catalog…"],
+            "results": None,
+            "error": None,
+            "started_at": stale_started_at,
+            "finished_at": None,
+            "preview": None,
+            "heartbeat_at": stale_started_at,
+        }
+        job_file = f"{self.temp_dir.name}/catalog_sync_job.json"
+        with open(job_file, "w", encoding="utf-8") as fh:
+            json.dump(job_data, fh)
+
+        self._login_as_admin()
+        with mock.patch("blueprints.catalog._CATALOG_SYNC_JOB_FILE", job_file):
+            response = self.client.get("/catalog/sync")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Catalog sync failed", response.data)
+        self.assertIn(b"stale", response.data.lower())
 
     def test_msrp_price_fetch_timeout_finishes_without_blocking(self):
         by_sku = {
