@@ -267,6 +267,10 @@ class Ownership(BaseModel):
     if TYPE_CHECKING:
         variant: Mapped[ItemVariant | None]
         person: Mapped[Person | None]
+        copy_type: Mapped[str]
+        engraving_text: Mapped[str | None]
+        engraving_notes: Mapped[str | None]
+        engraving_signature: Mapped[str]
 
     id = db.Column(db.Integer, primary_key=True)
     variant_id = db.Column(
