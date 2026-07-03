@@ -38,7 +38,6 @@ from blueprints.data_import import (
     _match_import_item,
     _merge_note_text,
     _normalize_import_color,
-    _normalize_variant_lookup_name,
     _parse_owned_raw,
     _parse_truthy_field,
     _preview_import_color,

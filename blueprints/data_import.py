@@ -1,25 +1,25 @@
 """Shared import and completion parsing for the data blueprint."""
 
 from blueprints.import_shared import (
-    _availability_preview_fields,
-    _build_import_header_report,
-    _build_item_name_lookup,
-    _build_item_sku_lookup,
-    _build_notes,
-    _build_set_sku_lookup,
-    _completion_field_name,
-    _display_import_color,
-    _import_row_label,
-    _normalize_import_color,
-    _normalize_variant_lookup_name,
-    _normalized_header,
-    _parse_truthy_field,
-    _preview_import_color,
-    _read_completion_rows,
-    _resolve_import_variant_color,
-    _safe_csv_filename,
+    _availability_preview_fields,  # noqa: F401
+    _build_import_header_report,  # noqa: F401
+    _build_item_name_lookup,  # noqa: F401
+    _build_item_sku_lookup,  # noqa: F401
+    _build_notes,  # noqa: F401
+    _build_set_sku_lookup,  # noqa: F401
+    _completion_field_name,  # noqa: F401
+    _display_import_color,  # noqa: F401
+    _import_row_label,  # noqa: F401
+    _normalize_import_color,  # noqa: F401
+    _normalize_variant_lookup_name,  # noqa: F401
+    _normalized_header,  # noqa: F401
+    _parse_truthy_field,  # noqa: F401
+    _preview_import_color,  # noqa: F401
+    _read_completion_rows,  # noqa: F401
+    _resolve_import_variant_color,  # noqa: F401
+    _safe_csv_filename,  # noqa: F401
 )
-from models import Item, Set
+from models import Item
 
 def _parse_owned_raw(owned_raw: str, default_person: str | None):
     """Parse 'Owned?' cell. Returns (status, person_name)."""
