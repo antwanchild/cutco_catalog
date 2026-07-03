@@ -5,6 +5,8 @@ on:
     workflows: ["CI"]
     types: [completed]
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  pull_request_target:
     types: [closed]
 
 permissions:
@@ -23,7 +25,7 @@ jobs:
   build:
     name: Build Preview Image
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_run' || github.event_name == 'pull_request'
     permissions:
       actions: read
       contents: read
@@ -36,11 +38,14 @@ jobs:
         with:
           script: |
             const requiredLabel = "docker";
-            const workflowRun = context.payload.workflow_run;
-            const pullRequest = workflowRun.pull_requests?.[0];
+            const isWorkflowRun = context.eventName === "workflow_run";
+            const workflowRun = isWorkflowRun ? context.payload.workflow_run : null;
+            const pullRequest = isWorkflowRun
+              ? workflowRun.pull_requests?.[0]
+              : context.payload.pull_request;
 
             if (!pullRequest) {
-              core.setFailed("This CI run is not associated with a pull request.");
+              core.setFailed("This preview event is not associated with a pull request.");
               return;
             }
 
@@ -56,13 +61,44 @@ jobs:
               return;
             }
 
+            if (!isWorkflowRun) {
+              const { data: workflows } = await github.rest.actions.listRepoWorkflows({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+
+              const ciWorkflow = workflows.workflows.find((workflow) => workflow.name === "CI");
+
+              if (!ciWorkflow) {
+                core.setFailed("Could not find the CI workflow.");
+                return;
+              }
+
+              const { data: runs } = await github.rest.actions.listWorkflowRunsForWorkflow({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: ciWorkflow.id,
+                head_sha: pullRequest.head.sha,
+                per_page: 1,
+              });
+
+              const latestRun = runs.workflow_runs[0];
+
+              if (!latestRun || latestRun.status !== "completed" || latestRun.conclusion !== "success") {
+                core.info(`Latest CI run for PR #${pullRequest.number} at ${pullRequest.head.sha} is not successful yet. Skipping the image build.`);
+                core.setOutput("ready", "false");
+                return;
+              }
+            }
+
             const canPush = pullRequest.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
 
             core.setOutput("ready", "true");
             core.setOutput("pr_number", String(pullRequest.number));
-            core.setOutput("head_sha", workflowRun.head_sha);
+            core.setOutput("head_sha", pullRequest.head.sha);
             core.setOutput("version", `pr-${pullRequest.number}`);
             core.setOutput("can_push", String(canPush));
+            core.setOutput("preview_source", isWorkflowRun ? "workflow_run" : "pull_request");
 
       - name: Checkout PR head
         if: steps.meta.outputs.ready == 'true'
