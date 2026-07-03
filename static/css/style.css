@@ -557,14 +557,24 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
 }
 .import-item-table th:nth-child(1), .import-item-table td:nth-child(1) { width: 4%; }
+.import-item-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+}
 .import-item-table th:nth-child(2), .import-item-table td:nth-child(2) { width: 6%; }
 .import-item-table th:nth-child(3), .import-item-table td:nth-child(3) { width: 7%; }
 .import-item-table th:nth-child(4), .import-item-table td:nth-child(4) { width: 7%; }
 .import-item-table th:nth-child(5), .import-item-table td:nth-child(5) { width: 8%; }
 .import-item-table th:nth-child(6), .import-item-table td:nth-child(6) { width: 8%; }
-.import-item-table th:nth-child(7), .import-item-table td:nth-child(7) { width: 6%; }
-.import-item-table th:nth-child(8), .import-item-table td:nth-child(8) { width: 7%; }
-.import-item-table th:nth-child(9), .import-item-table td:nth-child(9) { width: 6%; }
+.import-item-table th:nth-child(7),
+.import-item-table td:nth-child(7),
+.import-item-table th:nth-child(8),
+.import-item-table td:nth-child(8),
+.import-item-table th:nth-child(9),
+.import-item-table td:nth-child(9) {
+  width: auto;
+}
 .import-item-table th:nth-child(10), .import-item-table td:nth-child(10) { width: 7%; }
 .import-item-table th:nth-child(11), .import-item-table td:nth-child(11) { width: 8%; }
 .import-item-table th:nth-child(12), .import-item-table td:nth-child(12) { width: 10%; }
@@ -589,7 +599,24 @@ a:hover { text-decoration: underline; }
 .import-item-table th:nth-child(7) > .stacked-head,
 .import-item-table th:nth-child(8) > .stacked-head,
 .import-item-table th:nth-child(9) > .stacked-head {
-  min-width: 3.25rem;
+  min-width: 2.2rem;
+}
+.import-item-table th:nth-child(7),
+.import-item-table td:nth-child(7),
+.import-item-table th:nth-child(8),
+.import-item-table td:nth-child(8),
+.import-item-table th:nth-child(9),
+.import-item-table td:nth-child(9) {
+  text-align: center;
+}
+.import-item-table th:nth-child(7) > input[type="checkbox"],
+.import-item-table td:nth-child(7) > input[type="checkbox"],
+.import-item-table th:nth-child(8) > input[type="checkbox"],
+.import-item-table td:nth-child(8) > input[type="checkbox"],
+.import-item-table th:nth-child(9) > input[type="checkbox"],
+.import-item-table td:nth-child(9) > input[type="checkbox"] {
+  display: block;
+  margin: 0 auto;
 }
 .import-accept-cell {
   text-align: center;
