@@ -74,13 +74,16 @@ jobs:
                 return;
               }
 
-              const { data: runs } = await github.rest.actions.listWorkflowRunsForWorkflow({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: ciWorkflow.id,
-                head_sha: pullRequest.head.sha,
-                per_page: 1,
-              });
+              const { data: runs } = await github.request(
+                "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs",
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: ciWorkflow.id,
+                  head_sha: pullRequest.head.sha,
+                  per_page: 1,
+                }
+              );
 
               const latestRun = runs.workflow_runs[0];
 
