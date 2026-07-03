@@ -4667,7 +4667,9 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "blueprints.catalog._CATALOG_SYNC_JOB_FILE",
                 f"{self.temp_dir.name}/catalog_sync_job.json",
             ),
-            mock.patch("blueprints.catalog._start_catalog_sync_background_job") as start_mock,
+            mock.patch(
+                "blueprints.catalog._start_catalog_sync_background_job"
+            ) as start_mock,
         ):
             response = self.client.get("/catalog/sync?run=1")
 
