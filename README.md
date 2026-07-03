@@ -71,6 +71,16 @@ Notes:
 - The image defaults to `TZ=UTC`, so diagnostics timestamps and job history show UTC unless you override `TZ` in the container environment.
 - After changing the Dockerfile or image tag, rebuild and recreate the container so the running container picks up the new startup command.
 
+### PR Preview Images
+
+If you want to test a branch before merging, add the `docker` label to the pull request.
+
+- The PR workflow builds a preview image tagged like `pr-123`.
+- Every new push to that PR rebuilds and refreshes the same `pr-123` tag, so you can keep testing the latest branch state.
+- Same-repo PRs can publish that tag to GHCR so you can `docker pull ghcr.io/antwanchild/cutco_catalog:pr-123`.
+- When the PR is merged, the matching preview tag is cleaned up automatically.
+- Forked PRs can still run the build check safely, but they do not publish a registry image.
+
 ---
 
 ## 🧪 Testing
