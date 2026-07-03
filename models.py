@@ -277,6 +277,12 @@ class Ownership(BaseModel):
     target_price = db.Column(db.Float, nullable=True)
     quantity_purchased = db.Column(db.Integer, nullable=True)
     quantity_given_away = db.Column(db.Integer, nullable=True)
+    copy_type = db.Column(db.String(20), nullable=False, default="plain")
+    engraving_text = db.Column(db.String(255), nullable=True)
+    engraving_notes = db.Column(db.Text, nullable=True)
+    engraving_signature = db.Column(
+        db.String(255), nullable=False, default="plain", index=True
+    )
     notes = db.Column(db.Text, nullable=True)
 
     variant: Mapped[ItemVariant | None] = relationship(
@@ -285,8 +291,33 @@ class Ownership(BaseModel):
     person: Mapped[Person | None] = relationship("Person", back_populates="ownerships")
 
     __table_args__ = (
-        db.UniqueConstraint("variant_id", "person_id", name="uq_variant_person"),
+        db.UniqueConstraint(
+            "variant_id",
+            "person_id",
+            "copy_type",
+            "engraving_signature",
+            name="uq_variant_person_copy",
+        ),
     )
+
+    @property
+    def is_engraved(self) -> bool:
+        """True when this ownership row represents an engraved copy."""
+        return self.copy_type == "engraved"
+
+    @property
+    def engraving_label(self) -> str:
+        """Return a compact display label for the copy type."""
+        if self.is_engraved:
+            return self.engraving_text or "Engraved"
+        return "Plain"
+
+    def sync_engraving_signature(self) -> None:
+        """Keep the stored copy type and uniqueness signature aligned."""
+        self.copy_type = normalize_engraving_copy_type(self.copy_type)
+        self.engraving_signature = normalize_engraving_signature(
+            self.copy_type, self.engraving_text
+        )
 
 
 class ActivityEvent(BaseModel):
@@ -500,6 +531,23 @@ def parse_alternate_skus(raw_value: str | None) -> list[str]:
         seen.add(sku)
         values.append(sku)
     return values
+
+
+def normalize_engraving_copy_type(value: str | None) -> str:
+    """Normalize an ownership copy type."""
+    cleaned = (value or "").strip().lower()
+    return "engraved" if cleaned == "engraved" else "plain"
+
+
+def normalize_engraving_signature(
+    copy_type: str | None, engraving_text: str | None
+) -> str:
+    """Build a stable uniqueness signature for a physical copy."""
+    normalized_copy_type = normalize_engraving_copy_type(copy_type)
+    if normalized_copy_type != "engraved":
+        return "plain"
+    cleaned_text = re.sub(r"\s+", " ", (engraving_text or "").strip()).lower()
+    return f"engraved:{cleaned_text}" if cleaned_text else "engraved"
 
 
 def _now_utc() -> str:

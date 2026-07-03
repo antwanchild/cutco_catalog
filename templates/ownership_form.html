@@ -91,6 +91,24 @@
     </label>
   </div>
 
+  <div class="form-row">
+    <label>Copy Type
+      <select name="copy_type" class="input-full">
+        <option value="plain" {% if (ownership and ownership.copy_type == 'plain') or (not ownership and (selected_copy_type or 'plain') == 'plain') %}selected{% endif %}>Plain</option>
+        <option value="engraved" {% if (ownership and ownership.copy_type == 'engraved') or (not ownership and selected_copy_type == 'engraved') %}selected{% endif %}>Engraved</option>
+      </select>
+    </label>
+    <label>Engraving Text
+      <input type="text" name="engraving_text" class="input-full"
+             placeholder="Optional engraved text"
+             value="{{ ownership.engraving_text if ownership and ownership.engraving_text else '' }}">
+    </label>
+  </div>
+
+  <label>Engraving Notes
+    <textarea name="engraving_notes" rows="2" class="input-full" placeholder="Optional engraving details">{{ ownership.engraving_notes if ownership and ownership.engraving_notes else '' }}</textarea>
+  </label>
+
   <label>Notes
     <textarea name="notes" rows="2" class="input-full">{{ ownership.notes if ownership and ownership.notes else '' }}</textarea>
   </label>

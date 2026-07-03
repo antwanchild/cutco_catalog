@@ -67,6 +67,8 @@ from models import (
     ActivityEvent,
     Person,
     Set,
+    normalize_engraving_copy_type,
+    normalize_engraving_signature,
     normalize_sku_value,
     record_activity,
     reconcile_unknown_variant,
@@ -77,6 +79,19 @@ from time_utils import format_container_time
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
+
+
+def _read_engraving_fields(
+    row: dict, prefix: str = ""
+) -> tuple[str, str | None, str | None, str]:
+    """Normalize engraving fields from import rows or form posts."""
+    copy_type = normalize_engraving_copy_type(row.get(f"{prefix}copy_type", "plain"))
+    if row.get(f"{prefix}engraved", "").strip().lower() in TRUTHY:
+        copy_type = "engraved"
+    engraving_text = row.get(f"{prefix}engraving_text", "").strip() or None
+    engraving_notes = row.get(f"{prefix}engraving_notes", "").strip() or None
+    engraving_signature = normalize_engraving_signature(copy_type, engraving_text)
+    return copy_type, engraving_text, engraving_notes, engraving_signature
 
 
 @data_bp.route("/export")
@@ -96,7 +111,7 @@ def export_csv():
         .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
         .join(Item, ItemVariant.item_id == Item.id)
         .join(Person, Ownership.person_id == Person.id)
-        .order_by(Person.name, Item.name, ItemVariant.color)
+        .order_by(Person.name, Item.name, ItemVariant.color, Ownership.copy_type)
         .all()
     )
 
@@ -116,6 +131,9 @@ def export_csv():
             "is_edge_unicorn",
             "quantity_purchased",
             "quantity_given_away",
+            "copy_type",
+            "engraving_text",
+            "engraving_notes",
             "notes",
         ]
     )
@@ -142,6 +160,9 @@ def export_csv():
                     if ownership.quantity_given_away is not None
                     else ""
                 ),
+                ownership.copy_type,
+                ownership.engraving_text or "",
+                ownership.engraving_notes or "",
                 ownership.notes or "",
             ]
         )
@@ -250,6 +271,10 @@ def import_template():
             "quantity given away",
             "category",
             "edge",
+            "copy_type",
+            "engraved",
+            "engraving_text",
+            "engraving_notes",
             "is_sku_unicorn",
             "is_variant_unicorn",
             "is_edge_unicorn",
@@ -267,6 +292,10 @@ def import_template():
             "0",
             "Kitchen Knives",
             "Double-D",
+            "plain",
+            "",
+            "",
+            "",
             "no",
             "no",
             "no",
@@ -284,6 +313,10 @@ def import_template():
             "",
             "Kitchen Knives",
             "Straight",
+            "engraved",
+            "yes",
+            "250th Anniversary",
+            "Limited edition engraving",
             "no",
             "no",
             "no",
@@ -462,6 +495,9 @@ def import_page():
             _parse_quantity_fields(row)
         )
         note_errors.extend(quantity_errors)
+        copy_type, engraving_text, engraving_notes, engraving_signature = (
+            _read_engraving_fields(row)
+        )
         if note_errors:
             errors.append(
                 {
@@ -531,6 +567,10 @@ def import_page():
                     )[1],
                     "person": person_name,
                     "status": status,
+                    "copy_type": copy_type,
+                    "engraving_text": engraving_text,
+                    "engraving_notes": engraving_notes,
+                    "engraving_signature": engraving_signature,
                 }
             )
             already_in_catalog[-1]["row"] = row_num
@@ -580,6 +620,10 @@ def import_page():
                     "is_edge_unicorn": is_edge_unicorn,
                     "quantity_purchased": quantity_purchased,
                     "quantity_given_away": quantity_given_away,
+                    "copy_type": copy_type,
+                    "engraving_text": engraving_text,
+                    "engraving_notes": engraving_notes,
+                    "engraving_signature": engraving_signature,
                     "category": category,
                     "notes": notes,
                     "person": person_name,
@@ -632,6 +676,10 @@ def import_page():
                     "is_edge_unicorn": is_edge_unicorn,
                     "quantity_purchased": quantity_purchased,
                     "quantity_given_away": quantity_given_away,
+                    "copy_type": copy_type,
+                    "engraving_text": engraving_text,
+                    "engraving_notes": engraving_notes,
+                    "engraving_signature": engraving_signature,
                     "is_new_variant": existing_variant is None,
                     "is_new_person": person_name.lower() not in existing_persons,
                 }
@@ -1165,6 +1213,9 @@ def import_confirm():
             notes = request.form.get(f"item_notes_{row_index}", "").strip() or None
             person_name = request.form.get(f"item_person_{row_index}", "").strip()
             status = request.form.get(f"item_status_{row_index}", "Owned")
+            copy_type, engraving_text, engraving_notes, engraving_signature = (
+                _read_engraving_fields(request.form, prefix="item_")
+            )
 
             if not name:
                 skipped_details.append(
@@ -1238,7 +1289,10 @@ def import_confirm():
                     existing_persons[person_name.lower()] = person
                     added_persons += 1
                 existing_o = Ownership.query.filter_by(
-                    person_id=person.id, variant_id=variant.id
+                    person_id=person.id,
+                    variant_id=variant.id,
+                    copy_type=copy_type,
+                    engraving_signature=engraving_signature,
                 ).first()
                 if existing_o:
                     if existing_o.status != status:
@@ -1249,6 +1303,10 @@ def import_confirm():
                         notes=existing_o.notes,
                         quantity_purchased=quantity_purchased,
                         quantity_given_away=quantity_given_away,
+                        copy_type=copy_type,
+                        engraving_text=engraving_text,
+                        engraving_notes=engraving_notes,
+                        engraving_signature=engraving_signature,
                     )
                 else:
                     db.session.add(
@@ -1258,6 +1316,10 @@ def import_confirm():
                             status=status,
                             quantity_purchased=quantity_purchased,
                             quantity_given_away=quantity_given_away,
+                            copy_type=copy_type,
+                            engraving_text=engraving_text,
+                            engraving_notes=engraving_notes,
+                            engraving_signature=engraving_signature,
                         )
                     )
                     added_ownership += 1
@@ -1293,6 +1355,9 @@ def import_confirm():
             )
             status = request.form.get(f"own_status_{row_index}", "Owned")
             notes = request.form.get(f"own_notes_{row_index}", "").strip() or None
+            copy_type, engraving_text, engraving_notes, engraving_signature = (
+                _read_engraving_fields(request.form, prefix="own_")
+            )
             quantity_purchased, qty_error = _read_confirm_quantity_field(
                 request.form.get(f"own_quantity_purchased_{row_index}", ""),
                 "Quantity Purchased",
@@ -1374,7 +1439,10 @@ def import_confirm():
                 variant.is_unicorn = True
 
             existing_o = Ownership.query.filter_by(
-                person_id=person.id, variant_id=variant.id
+                person_id=person.id,
+                variant_id=variant.id,
+                copy_type=copy_type,
+                engraving_signature=engraving_signature,
             ).first()
             if existing_o:
                 if existing_o.status != status:
@@ -1385,6 +1453,10 @@ def import_confirm():
                     notes=notes,
                     quantity_purchased=quantity_purchased,
                     quantity_given_away=quantity_given_away,
+                    copy_type=copy_type,
+                    engraving_text=engraving_text,
+                    engraving_notes=engraving_notes,
+                    engraving_signature=engraving_signature,
                 )
             else:
                 db.session.add(
@@ -1395,6 +1467,10 @@ def import_confirm():
                         notes=notes,
                         quantity_purchased=quantity_purchased,
                         quantity_given_away=quantity_given_away,
+                        copy_type=copy_type,
+                        engraving_text=engraving_text,
+                        engraving_notes=engraving_notes,
+                        engraving_signature=engraving_signature,
                     )
                 )
                 added_ownership += 1

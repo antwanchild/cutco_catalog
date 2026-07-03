@@ -903,6 +903,10 @@ def _merge_import_ownership(
     notes: str | None = None,
     quantity_purchased: int | None = None,
     quantity_given_away: int | None = None,
+    copy_type: str | None = None,
+    engraving_text: str | None = None,
+    engraving_notes: str | None = None,
+    engraving_signature: str | None = None,
 ) -> None:
     """Update an existing ownership row from an import row."""
     ownership.status = status
@@ -912,6 +916,14 @@ def _merge_import_ownership(
         ownership.quantity_purchased = quantity_purchased
     if quantity_given_away is not None:
         ownership.quantity_given_away = quantity_given_away
+    if copy_type is not None:
+        ownership.copy_type = copy_type
+    if engraving_text is not None:
+        ownership.engraving_text = engraving_text
+    if engraving_notes is not None:
+        ownership.engraving_notes = engraving_notes
+    if engraving_signature is not None:
+        ownership.engraving_signature = engraving_signature
 
 
 def _add_import_ownership_quantities(
@@ -921,6 +933,10 @@ def _add_import_ownership_quantities(
     notes: str | None = None,
     quantity_purchased: int | None = None,
     quantity_given_away: int | None = None,
+    copy_type: str | None = None,
+    engraving_text: str | None = None,
+    engraving_notes: str | None = None,
+    engraving_signature: str | None = None,
 ) -> None:
     """Add imported quantities onto an existing ownership row."""
     ownership.status = status
@@ -934,6 +950,14 @@ def _add_import_ownership_quantities(
         ownership.quantity_given_away = (
             ownership.quantity_given_away or 0
         ) + quantity_given_away
+    if copy_type is not None:
+        ownership.copy_type = copy_type
+    if engraving_text is not None:
+        ownership.engraving_text = engraving_text
+    if engraving_notes is not None:
+        ownership.engraving_notes = engraving_notes
+    if engraving_signature is not None:
+        ownership.engraving_signature = engraving_signature
 
 
 def _find_import_variant(item: Item, color: str) -> ItemVariant | None:

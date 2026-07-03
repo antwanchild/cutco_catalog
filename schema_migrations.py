@@ -214,6 +214,108 @@ def _schema_repair_ownership_quantity_fields() -> None:
     )
 
 
+def _schema_ownership_engraving_migrations() -> None:
+    """Add engraving metadata to ownership rows."""
+    _add_column(
+        "ownership",
+        "copy_type",
+        "ALTER TABLE ownership ADD COLUMN copy_type VARCHAR(20) NOT NULL DEFAULT 'plain'",
+    )
+    _add_column(
+        "ownership",
+        "engraving_text",
+        "ALTER TABLE ownership ADD COLUMN engraving_text VARCHAR(255)",
+    )
+    _add_column(
+        "ownership",
+        "engraving_notes",
+        "ALTER TABLE ownership ADD COLUMN engraving_notes TEXT",
+    )
+    _add_column(
+        "ownership",
+        "engraving_signature",
+        "ALTER TABLE ownership ADD COLUMN engraving_signature VARCHAR(255) NOT NULL DEFAULT 'plain'",
+    )
+
+    inspector = sa_inspect(db.engine)
+    unique_constraints = inspector.get_unique_constraints("ownership")
+    desired_columns = {"variant_id", "person_id", "copy_type", "engraving_signature"}
+    if any(
+        set(constraint.get("column_names", [])) == desired_columns
+        for constraint in unique_constraints
+    ):
+        return
+
+    if db.engine.dialect.name == "sqlite":
+        with db.engine.begin() as conn:
+            conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            conn.exec_driver_sql("ALTER TABLE ownership RENAME TO ownership_legacy")
+            conn.exec_driver_sql("""
+                CREATE TABLE ownership (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    variant_id INTEGER NOT NULL REFERENCES item_variants (id),
+                    person_id INTEGER NOT NULL REFERENCES people (id),
+                    status VARCHAR(20) NOT NULL,
+                    target_price REAL,
+                    quantity_purchased INTEGER,
+                    quantity_given_away INTEGER,
+                    copy_type VARCHAR(20) NOT NULL DEFAULT 'plain',
+                    engraving_text VARCHAR(255),
+                    engraving_notes TEXT,
+                    engraving_signature VARCHAR(255) NOT NULL DEFAULT 'plain',
+                    notes TEXT,
+                    CONSTRAINT uq_variant_person_copy UNIQUE (
+                        variant_id, person_id, copy_type, engraving_signature
+                    )
+                )
+                """)
+            conn.exec_driver_sql("""
+                INSERT INTO ownership (
+                    id,
+                    variant_id,
+                    person_id,
+                    status,
+                    target_price,
+                    quantity_purchased,
+                    quantity_given_away,
+                    copy_type,
+                    engraving_text,
+                    engraving_notes,
+                    engraving_signature,
+                    notes
+                )
+                SELECT
+                    id,
+                    variant_id,
+                    person_id,
+                    status,
+                    target_price,
+                    quantity_purchased,
+                    quantity_given_away,
+                    COALESCE(copy_type, 'plain'),
+                    engraving_text,
+                    engraving_notes,
+                    COALESCE(engraving_signature, 'plain'),
+                    notes
+                FROM ownership_legacy
+                """)
+            conn.exec_driver_sql("DROP TABLE ownership_legacy")
+            conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+        logger.info("Schema migration: rebuilt ownership table for engraving support")
+        return
+
+    with db.engine.begin() as conn:
+        conn.exec_driver_sql(
+            "ALTER TABLE ownership DROP CONSTRAINT IF EXISTS uq_variant_person"
+        )
+        conn.exec_driver_sql("""
+            ALTER TABLE ownership
+            ADD CONSTRAINT uq_variant_person_copy
+            UNIQUE (variant_id, person_id, copy_type, engraving_signature)
+            """)
+    logger.info("Schema migration: updated ownership uniqueness for engraving support")
+
+
 def _schema_item_alternate_skus_migrations() -> None:
     """Add alternate SKU storage to items."""
     _add_column(
@@ -302,6 +404,7 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     ),
     SchemaMigration(9, "item_attachments", _schema_item_attachment_migrations),
     SchemaMigration(10, "item_variant_source", _schema_item_variant_source_migrations),
+    SchemaMigration(11, "ownership_engraving", _schema_ownership_engraving_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

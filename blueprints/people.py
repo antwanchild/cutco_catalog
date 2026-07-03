@@ -25,7 +25,14 @@ from helpers import (
     top_count_rows,
     user_required,
 )
-from models import Item, Ownership, Person, record_audit_event
+from models import (
+    Item,
+    Ownership,
+    Person,
+    normalize_engraving_copy_type,
+    normalize_engraving_signature,
+    record_audit_event,
+)
 
 people_bp = Blueprint("people", __name__)
 logger = logging.getLogger(__name__)
@@ -41,7 +48,9 @@ def _build_person_collection_context(
 
     session["last_person_id"] = person_id
     ownerships = (
-        Ownership.query.filter_by(person_id=person_id).order_by(Ownership.status).all()
+        Ownership.query.filter_by(person_id=person_id)
+        .order_by(Ownership.status, Ownership.copy_type, Ownership.engraving_text)
+        .all()
     )
 
     owned_item_ids = {
@@ -85,6 +94,15 @@ def _build_person_collection_context(
         "variant_gaps": variant_gaps,
         "top_colors": top_colors,
     }
+
+
+def _read_engraving_fields(form) -> tuple[str, str | None, str | None, str]:
+    """Parse engraving-related form fields into normalized values."""
+    copy_type = normalize_engraving_copy_type(form.get("copy_type"))
+    engraving_text = form.get("engraving_text", "").strip() or None
+    engraving_notes = form.get("engraving_notes", "").strip() or None
+    engraving_signature = normalize_engraving_signature(copy_type, engraving_text)
+    return copy_type, engraving_text, engraving_notes, engraving_signature
 
 
 def _build_wishlist_rows(
@@ -268,10 +286,16 @@ def ownership_add():
     if request.method == "POST":
         person_id = int(request.form["person_id"])
         variant_id = int(request.form["variant_id"])
+        copy_type, engraving_text, engraving_notes, engraving_signature = (
+            _read_engraving_fields(request.form)
+        )
         if Ownership.query.filter_by(
-            person_id=person_id, variant_id=variant_id
+            person_id=person_id,
+            variant_id=variant_id,
+            copy_type=copy_type,
+            engraving_signature=engraving_signature,
         ).first():
-            flash("That person already has an entry for that variant.", "error")
+            flash("That person already has an entry for that copy type.", "error")
             return redirect(url_for("people.person_collection", person_id=person_id))
         raw_target = request.form.get("target_price", "").strip()
         try:
@@ -317,6 +341,10 @@ def ownership_add():
                 notes=request.form.get("notes", "").strip() or None,
                 quantity_purchased=quantity_purchased,
                 quantity_given_away=quantity_given_away,
+                copy_type=copy_type,
+                engraving_text=engraving_text,
+                engraving_notes=engraving_notes,
+                engraving_signature=engraving_signature,
             )
         )
         if db_commit(db.session):
@@ -338,6 +366,7 @@ def ownership_add():
         sel_status=sel_status,
         action="Add",
         UNKNOWN_COLOR=UNKNOWN_COLOR,
+        selected_copy_type="plain",
     )
 
 
@@ -350,6 +379,9 @@ def ownership_edit(ownership_id):
         abort(404)
     if request.method == "POST":
         ownership.status = request.form.get("status", "Owned")
+        copy_type, engraving_text, engraving_notes, engraving_signature = (
+            _read_engraving_fields(request.form)
+        )
         raw_target = request.form.get("target_price", "").strip()
         try:
             ownership.target_price = float(raw_target) if raw_target else None
@@ -363,6 +395,16 @@ def ownership_edit(ownership_id):
         if qty_error:
             flash(qty_error, "error")
             return redirect(url_for("people.ownership_edit", ownership_id=ownership_id))
+        duplicate = Ownership.query.filter(
+            Ownership.id != ownership.id,
+            Ownership.person_id == ownership.person_id,
+            Ownership.variant_id == ownership.variant_id,
+            Ownership.copy_type == copy_type,
+            Ownership.engraving_signature == engraving_signature,
+        ).first()
+        if duplicate:
+            flash("That person already has an entry for that copy type.", "error")
+            return redirect(url_for("people.ownership_edit", ownership_id=ownership_id))
         quantity_given_away, qty_error = parse_nonnegative_whole_number(
             request.form.get("quantity_given_away", ""),
             "Quantity Given Away",
@@ -372,6 +414,10 @@ def ownership_edit(ownership_id):
             return redirect(url_for("people.ownership_edit", ownership_id=ownership_id))
         ownership.quantity_purchased = quantity_purchased
         ownership.quantity_given_away = quantity_given_away
+        ownership.copy_type = copy_type
+        ownership.engraving_text = engraving_text
+        ownership.engraving_notes = engraving_notes
+        ownership.engraving_signature = engraving_signature
         if db_commit(db.session):
             logger.info("Ownership updated: id %d → %s", ownership_id, ownership.status)
             flash("Updated.", "success")
@@ -391,6 +437,7 @@ def ownership_edit(ownership_id):
         sel_item=ownership.variant.item if ownership.variant else None,
         action="Edit",
         UNKNOWN_COLOR=UNKNOWN_COLOR,
+        selected_copy_type=ownership.copy_type,
     )
 
 
