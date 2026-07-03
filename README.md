@@ -4,7 +4,7 @@ A self-hosted web application for Cutco collectors to catalog, track, and manage
 
 ![Version](https://img.shields.io/github/v/release/antwanchild/cutco_catalog)
 ![CI](https://github.com/antwanchild/cutco_catalog/actions/workflows/ci.yml/badge.svg)
-![Python](https://img.shields.io/badge/python-3.14-blue)
+![Python](https://img.shields.io/badge/python-3.13-blue)
 ![Flask](https://img.shields.io/badge/flask-3.1-lightgrey)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED)
 
@@ -474,13 +474,13 @@ Restore by replacing the file and restarting the container.
 
 | Layer | Technology |
 |---|---|
-| 🐍 Backend | Python 3.14, Flask 3.1 |
+| 🐍 Backend | Python 3.13, Flask 3.1 |
 | 🗄️ Database | SQLite (via SQLAlchemy) |
 | 🚀 App Server | Gunicorn (4 workers) |
 | 🕷️ Scraping | Requests, BeautifulSoup4, lxml |
 | 📊 Charts | Chart.js (CDN, no extra dependency) |
 | 📥 Excel Import | openpyxl |
-| 🐳 Container | Docker (`python:3.14-slim`) |
+| 🐳 Container | Docker (`python:3.13-slim`) |
 | 🎨 Frontend | Jinja2 templates, vanilla CSS/JS |
 
 ---
