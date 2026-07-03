@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import MutableMapping
-from typing import Any
+from typing import Any, cast
 
 from flask import (
     Blueprint,
@@ -96,11 +96,13 @@ def _build_person_collection_context(
     }
 
 
-def _read_engraving_fields(form) -> tuple[str, str | None, str | None, str]:
+def _read_engraving_fields(
+    form: MutableMapping[str, Any],
+) -> tuple[str, str | None, str | None, str]:
     """Parse engraving-related form fields into normalized values."""
-    copy_type = normalize_engraving_copy_type(form.get("copy_type"))
-    engraving_text = form.get("engraving_text", "").strip() or None
-    engraving_notes = form.get("engraving_notes", "").strip() or None
+    copy_type = normalize_engraving_copy_type(cast(str | None, form.get("copy_type")))
+    engraving_text = cast(str, form.get("engraving_text", "")).strip() or None
+    engraving_notes = cast(str, form.get("engraving_notes", "")).strip() or None
     engraving_signature = normalize_engraving_signature(copy_type, engraving_text)
     return copy_type, engraving_text, engraving_notes, engraving_signature
 
