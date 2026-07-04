@@ -1,0 +1,72 @@
+name: Release Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List matching draft releases without deleting them"
+        required: false
+        type: boolean
+        default: true
+  schedule:
+    - cron: "0 3 1 * *"
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DRAFT_RELEASE_MAX_AGE_DAYS: "30"
+
+jobs:
+  cleanup:
+    name: Remove Stale Draft Releases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete stale draft releases
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const dryRun =
+              context.eventName === "workflow_dispatch"
+                ? String(context.payload.inputs?.dry_run ?? "true") === "true"
+                : false;
+            const maxAgeDays = Number(process.env.DRAFT_RELEASE_MAX_AGE_DAYS || "30");
+            const cutoffMs = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            const staleDrafts = releases
+              .filter((release) => release.draft)
+              .filter((release) => new Date(release.created_at).getTime() < cutoffMs)
+              .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+            if (!staleDrafts.length) {
+              core.info(`No draft releases older than ${maxAgeDays} day(s) were found.`);
+              return;
+            }
+
+            core.info(
+              `${dryRun ? "Would delete" : "Deleting"} ${staleDrafts.length} draft release(s) older than ${maxAgeDays} day(s).`
+            );
+
+            for (const release of staleDrafts) {
+              const title = release.name || release.tag_name || `release #${release.id}`;
+              core.info(
+                `${dryRun ? "[dry-run] " : ""}${title} created ${release.created_at}`
+              );
+
+              if (dryRun) {
+                continue;
+              }
+
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id,
+              });
+            }

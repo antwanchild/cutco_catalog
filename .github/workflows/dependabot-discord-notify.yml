@@ -1,4 +1,4 @@
-name: Dependabot Discord Notifications
+name: Dependabot Notifications
 
 on:
   pull_request_target:
