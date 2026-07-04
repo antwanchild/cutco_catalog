@@ -213,11 +213,16 @@ def canonicalize_availability(availability: str | None) -> str:
     return "public"
 
 
+def is_edgeless_category(category: str | None) -> bool:
+    """Return True when a category should never display or store an edge."""
+    return (category or "") in EDGELESS_CATEGORIES
+
+
 def normalize_edge_for_category(
     category: str | None, edge_type: str | None, edge_is_unicorn: bool = False
 ) -> tuple[str, bool]:
     """Normalize edge data for categories that do not have edges."""
-    if (category or "") in EDGELESS_CATEGORIES:
+    if is_edgeless_category(category):
         return "N/A", False
     normalized_edge = (edge_type or "").strip() or "Unknown"
     return normalized_edge, edge_is_unicorn

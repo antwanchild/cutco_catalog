@@ -14,6 +14,7 @@ from blueprints.import_shared import (
     _build_item_sku_lookup,
     _build_import_header_report,  # noqa: F401
     _build_set_sku_lookup,
+    _group_import_rows,
     _import_row_label,  # noqa: F401
     _normalize_variant_lookup_name,
     _read_completion_rows,  # noqa: F401
@@ -895,6 +896,25 @@ def _read_confirm_quantity_field(
     return None, f"{label} must be a whole number."
 
 
+def _apply_import_ownership_copy_details(
+    ownership: Ownership,
+    *,
+    copy_type: str | None = None,
+    engraving_text: str | None = None,
+    engraving_notes: str | None = None,
+    engraving_signature: str | None = None,
+) -> None:
+    """Apply copy-level metadata to an ownership row."""
+    if copy_type is not None:
+        ownership.copy_type = copy_type
+    if engraving_text is not None:
+        ownership.engraving_text = engraving_text
+    if engraving_notes is not None:
+        ownership.engraving_notes = engraving_notes
+    if engraving_signature is not None:
+        ownership.engraving_signature = engraving_signature
+
+
 def _merge_import_ownership(
     ownership: Ownership,
     *,
@@ -915,14 +935,13 @@ def _merge_import_ownership(
         ownership.quantity_purchased = quantity_purchased
     if quantity_given_away is not None:
         ownership.quantity_given_away = quantity_given_away
-    if copy_type is not None:
-        ownership.copy_type = copy_type
-    if engraving_text is not None:
-        ownership.engraving_text = engraving_text
-    if engraving_notes is not None:
-        ownership.engraving_notes = engraving_notes
-    if engraving_signature is not None:
-        ownership.engraving_signature = engraving_signature
+    _apply_import_ownership_copy_details(
+        ownership,
+        copy_type=copy_type,
+        engraving_text=engraving_text,
+        engraving_notes=engraving_notes,
+        engraving_signature=engraving_signature,
+    )
 
 
 def _add_import_ownership_quantities(
@@ -949,14 +968,13 @@ def _add_import_ownership_quantities(
         ownership.quantity_given_away = (
             ownership.quantity_given_away or 0
         ) + quantity_given_away
-    if copy_type is not None:
-        ownership.copy_type = copy_type
-    if engraving_text is not None:
-        ownership.engraving_text = engraving_text
-    if engraving_notes is not None:
-        ownership.engraving_notes = engraving_notes
-    if engraving_signature is not None:
-        ownership.engraving_signature = engraving_signature
+    _apply_import_ownership_copy_details(
+        ownership,
+        copy_type=copy_type,
+        engraving_text=engraving_text,
+        engraving_notes=engraving_notes,
+        engraving_signature=engraving_signature,
+    )
 
 
 def _find_import_variant(item: Item, color: str) -> ItemVariant | None:
@@ -969,33 +987,3 @@ def _find_import_variant(item: Item, color: str) -> ItemVariant | None:
         .filter(db.func.lower(ItemVariant.color) == normalized_color)
         .first()
     )
-
-
-def _group_import_rows(rows: list[dict], *, base_index: int = 0) -> list[dict]:
-    """Group import preview rows by SKU while preserving row-level data."""
-    grouped: list[dict] = []
-    group_map: dict[str, dict] = {}
-    for idx, row in enumerate(rows):
-        row_copy = dict(row)
-        row_copy["form_index"] = base_index + idx
-        sku_key = (
-            normalize_sku_value(row_copy.get("sku"))
-            or f"__row_{row_copy['form_index']}"
-        )
-        group = group_map.get(sku_key)
-        if not group:
-            group = {
-                "sku": row_copy.get("sku") or None,
-                "name": row_copy.get("name") or row_copy.get("item_name") or "—",
-                "rows": [],
-                "row_count": 0,
-                "variant_colors": [],
-            }
-            group_map[sku_key] = group
-            grouped.append(group)
-        group["rows"].append(row_copy)
-        group["row_count"] += 1
-        display_color = row_copy.get("display_color") or row_copy.get("color") or "—"
-        if display_color not in group["variant_colors"]:
-            group["variant_colors"].append(display_color)
-    return grouped

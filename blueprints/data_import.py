@@ -15,6 +15,7 @@ from blueprints.import_shared import (
     _normalized_header,  # noqa: F401
     _parse_truthy_field,  # noqa: F401
     _preview_import_color,  # noqa: F401
+    _read_engraving_fields,  # noqa: F401
     _read_completion_rows,  # noqa: F401
     _resolve_import_variant_color,  # noqa: F401
     _safe_csv_filename,  # noqa: F401
