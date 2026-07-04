@@ -118,7 +118,7 @@
         <li>Filter to a specific <strong>person</strong> to see their individual stats.</li>
         <li>Stats include public items plus unicorn, rep only, Costco, and non-catalog items marked Owned.</li>
         <li>Engraved copies are tracked separately from plain copies when a collector owns both.</li>
-        <li>Charts show owned items by category, handle color distribution, edge type breakdown, catalog coverage, and estimated collection value.</li>
+        <li>Charts show owned items by category, handle color distribution, edge type breakdown for edged items, catalog coverage, and estimated collection value.</li>
         <li>The <strong>Collectors</strong> table ranks people by item count and estimated value.</li>
       </ul>
 
@@ -151,9 +151,9 @@
     {% elif page in ['import', 'import_page'] %}
       <p>Bulk-import ownership data from a CSV or XLSX file.</p>
       <ul>
-        <li>Recommended header order: <code>name, sku, owned, color, availability, quantity purchased, quantity given away, category, edge, copy_type, engraved, engraving_text, engraving_notes, is_sku_unicorn, is_variant_unicorn, is_edge_unicorn, price</code>.</li>
+        <li>Recommended header order: <code>name, sku, owned, color, availability, quantity purchased, quantity given away, category, edge, copy_type, engraved, engraving_text, engraving_notes, is_sku_unicorn, is_variant_unicorn, is_edge_unicorn, price</code>. Use <code>edge</code> only for items that actually have an edge.</li>
         <li>Core columns: <code>name</code>, <code>sku</code>, <code>owned</code>.</li>
-        <li>Optional columns: <code>color</code>, <code>quantity_purchased</code>, <code>quantity_given_away</code>, <code>category</code>, <code>edge</code>, <code>copy_type</code>, <code>engraved</code>, <code>engraving_text</code>, <code>engraving_notes</code>, <code>is_sku_unicorn</code>, <code>is_variant_unicorn</code>, <code>is_edge_unicorn</code>, <code>price</code>.</li>
+        <li>Optional columns: <code>color</code>, <code>quantity_purchased</code>, <code>quantity_given_away</code>, <code>category</code>, <code>edge</code>, <code>copy_type</code>, <code>engraved</code>, <code>engraving_text</code>, <code>engraving_notes</code>, <code>is_sku_unicorn</code>, <code>is_variant_unicorn</code>, <code>is_edge_unicorn</code>, <code>price</code>. Leave <code>edge</code> blank for edgeless categories like cookware and bakeware.</li>
         <li>Unicorn flags accept truthy values like <code>yes</code>, <code>x</code>, <code>true</code>, and <code>1</code>.</li>
         <li><code>copy_type</code> defaults to <code>plain</code>; use <code>engraved</code> when the collector has a personalized or special-edition copy.</li>
         <li>Items can also store <strong>Alternate SKUs</strong> on the edit form so imports can match legacy or vendor-specific model numbers.</li>
