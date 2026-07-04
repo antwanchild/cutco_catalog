@@ -44,7 +44,7 @@ def _match_import_item(
     if sku:
         return existing_items.get(sku)
     if name:
-        return existing_names.get(name.lower())
+        return existing_names.get(_normalize_variant_lookup_name(name))
     return None
 
 

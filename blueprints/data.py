@@ -37,12 +37,14 @@ from extensions import db
 from number_utils import parse_positive_whole_number
 from blueprints.data_import import (
     _availability_preview_fields,
+    _build_item_name_lookup,
     _build_item_sku_lookup,
     _build_notes,
     _build_set_sku_lookup,
     _match_import_item,
     _merge_note_text,
     _normalize_import_color,
+    _normalize_variant_lookup_name,
     _parse_owned_raw,
     _parse_truthy_field,
     _preview_import_color,
@@ -497,7 +499,9 @@ def import_page():
 
     existing_items = _build_item_sku_lookup(Item.query.all())
     existing_set_skus = _build_set_sku_lookup(Set.query.all())
-    existing_names = {item.name.lower(): item for item in Item.query.all()}
+    existing_names = _build_item_name_lookup(
+        [item for item in Item.query.all() if not normalize_sku_value(item.sku)]
+    )
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
 
     already_in_catalog = []
@@ -1215,7 +1219,9 @@ def import_confirm():
     existing_items = _build_item_sku_lookup(Item.query.all())
     existing_set_skus = _build_set_sku_lookup(Set.query.all())
     existing_set_ids = {item_set.id for item_set in Set.query.all()}
-    existing_names = {item.name.lower(): item for item in Item.query.all()}
+    existing_names = _build_item_name_lookup(
+        [item for item in Item.query.all() if not normalize_sku_value(item.sku)]
+    )
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
 
     item_count = int(request.form.get("item_count", 0) or 0)
@@ -1338,7 +1344,10 @@ def import_confirm():
                 db.session.flush()
                 if sku:
                     existing_items[sku] = item
-                existing_names[name.lower()] = item
+                if not sku:
+                    existing_names.setdefault(
+                        _normalize_variant_lookup_name(name), item
+                    )
                 added_items += 1
             else:
                 if availability_specified or non_catalog:
