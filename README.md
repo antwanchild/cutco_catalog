@@ -85,6 +85,15 @@ If you want to test a branch before merging, add the `docker` label to the pull 
 - When the PR is merged, or when you remove the `docker` label, the matching preview tag is cleaned up automatically.
 - Forked PRs can still run the build check safely, but they do not publish a registry image.
 
+### Draft Release Cleanup
+
+The repo also includes a workflow that can remove stale **GitHub draft releases** after they age out.
+
+- It defaults to a 30-day threshold
+- It can be run manually in dry-run mode to preview matches
+- It does **not** delete real published release tags like `v1.102.0`
+- It only touches draft GitHub Release records, not git tags
+
 ---
 
 ## 🧪 Testing
