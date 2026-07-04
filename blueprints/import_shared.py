@@ -5,11 +5,20 @@ from __future__ import annotations
 import csv
 import io
 import re
+from collections.abc import Mapping
+from typing import cast
 
 import openpyxl
 
-from constants import COOKWARE_CATEGORIES, UNKNOWN_COLOR, XLSX_COL_MAP
-from models import Item, Set, normalize_sku_value, parse_alternate_skus
+from constants import COOKWARE_CATEGORIES, TRUTHY, UNKNOWN_COLOR, XLSX_COL_MAP
+from models import (
+    Item,
+    Set,
+    normalize_engraving_copy_type,
+    normalize_engraving_signature,
+    normalize_sku_value,
+    parse_alternate_skus,
+)
 
 COMPLETION_COL_MAP = {
     "person": "person",
@@ -222,6 +231,36 @@ def _build_set_sku_lookup(sets: list[Set]) -> dict[str, Set]:
     return lookup
 
 
+def _group_import_rows(rows: list[dict], *, base_index: int = 0) -> list[dict]:
+    """Group import preview rows by SKU while preserving row-level data."""
+    grouped: list[dict] = []
+    group_map: dict[str, dict] = {}
+    for idx, row in enumerate(rows):
+        row_copy = dict(row)
+        row_copy["form_index"] = base_index + idx
+        sku_key = (
+            normalize_sku_value(row_copy.get("sku"))
+            or f"__row_{row_copy['form_index']}"
+        )
+        group = group_map.get(sku_key)
+        if not group:
+            group = {
+                "sku": row_copy.get("sku") or None,
+                "name": row_copy.get("name") or row_copy.get("item_name") or "—",
+                "rows": [],
+                "row_count": 0,
+                "variant_colors": [],
+            }
+            group_map[sku_key] = group
+            grouped.append(group)
+        group["rows"].append(row_copy)
+        group["row_count"] += 1
+        display_color = row_copy.get("display_color") or row_copy.get("color") or "—"
+        if display_color not in group["variant_colors"]:
+            group["variant_colors"].append(display_color)
+    return grouped
+
+
 def _parse_truthy_field(value: str) -> bool:
     """Interpret a spreadsheet cell as a yes/no flag."""
     return (value or "").strip().lower() in {"yes", "y", "true", "1"}
@@ -235,6 +274,21 @@ def _availability_preview_fields(availability: str) -> tuple[str, str | None]:
         "non-catalog": ("Non-catalog", "badge-off-catalog"),
     }
     return labels.get(availability, ("", None))
+
+
+def _read_engraving_fields(
+    row: Mapping[str, object], prefix: str = ""
+) -> tuple[str, str | None, str | None, str]:
+    """Normalize engraving fields from import rows or form posts."""
+    copy_type = normalize_engraving_copy_type(
+        cast(str | None, row.get(f"{prefix}copy_type", "plain"))
+    )
+    if cast(str, row.get(f"{prefix}engraved", "")).strip().lower() in TRUTHY:
+        copy_type = "engraved"
+    engraving_text = cast(str, row.get(f"{prefix}engraving_text", "")).strip() or None
+    engraving_notes = cast(str, row.get(f"{prefix}engraving_notes", "")).strip() or None
+    engraving_signature = normalize_engraving_signature(copy_type, engraving_text)
+    return copy_type, engraving_text, engraving_notes, engraving_signature
 
 
 def _build_notes(row: dict) -> tuple[str | None, list[str]]:

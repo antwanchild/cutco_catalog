@@ -7,6 +7,7 @@ from blueprints.import_shared import (
     _build_item_sku_lookup,  # noqa: F401
     _build_notes,  # noqa: F401
     _build_set_sku_lookup,  # noqa: F401
+    _group_import_rows,  # noqa: F401
     _completion_field_name,  # noqa: F401
     _display_import_color,  # noqa: F401
     _import_row_label,  # noqa: F401
@@ -15,6 +16,7 @@ from blueprints.import_shared import (
     _normalized_header,  # noqa: F401
     _parse_truthy_field,  # noqa: F401
     _preview_import_color,  # noqa: F401
+    _read_engraving_fields,  # noqa: F401
     _read_completion_rows,  # noqa: F401
     _resolve_import_variant_color,  # noqa: F401
     _safe_csv_filename,  # noqa: F401

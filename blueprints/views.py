@@ -22,6 +22,7 @@ from constants import (
     EDGELESS_CATEGORIES,
     STATUS_RANK,
     UNKNOWN_COLOR,
+    is_edgeless_category,
 )
 from extensions import db
 from helpers import (
@@ -264,7 +265,7 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
 
     edge_counts: dict[str, int] = {}
     for item in owned_items:
-        if (item.category or "") in EDGELESS_CATEGORIES:
+        if is_edgeless_category(item.category):
             continue
         edge = item.edge_type or "Unknown"
         edge_counts[edge] = edge_counts.get(edge, 0) + 1

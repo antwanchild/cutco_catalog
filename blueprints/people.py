@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import MutableMapping
-from typing import Any, cast
+from typing import Any
 
 from flask import (
     Blueprint,
@@ -25,12 +25,11 @@ from helpers import (
     top_count_rows,
     user_required,
 )
+from blueprints.data_import import _read_engraving_fields
 from models import (
     Item,
     Ownership,
     Person,
-    normalize_engraving_copy_type,
-    normalize_engraving_signature,
     record_audit_event,
 )
 
@@ -94,17 +93,6 @@ def _build_person_collection_context(
         "variant_gaps": variant_gaps,
         "top_colors": top_colors,
     }
-
-
-def _read_engraving_fields(
-    form: MutableMapping[str, Any],
-) -> tuple[str, str | None, str | None, str]:
-    """Parse engraving-related form fields into normalized values."""
-    copy_type = normalize_engraving_copy_type(cast(str | None, form.get("copy_type")))
-    engraving_text = cast(str, form.get("engraving_text", "")).strip() or None
-    engraving_notes = cast(str, form.get("engraving_notes", "")).strip() or None
-    engraving_signature = normalize_engraving_signature(copy_type, engraving_text)
-    return copy_type, engraving_text, engraving_notes, engraving_signature
 
 
 def _build_wishlist_rows(

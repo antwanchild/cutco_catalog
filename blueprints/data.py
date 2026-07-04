@@ -30,6 +30,7 @@ from constants import (
     XLSX_COL_MAP,
     canonicalize_availability,
     canonicalize_category,
+    is_edgeless_category,
     normalize_edge_for_category,
     VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
@@ -41,6 +42,7 @@ from blueprints.data_import import (
     _build_item_sku_lookup,
     _build_notes,
     _build_set_sku_lookup,
+    _group_import_rows,
     _match_import_item,
     _merge_note_text,
     _normalize_import_color,
@@ -48,6 +50,7 @@ from blueprints.data_import import (
     _parse_owned_raw,
     _parse_truthy_field,
     _preview_import_color,
+    _read_engraving_fields,
     _read_completion_rows,
     _resolve_import_variant_color,
 )
@@ -58,7 +61,6 @@ from blueprints.data_workflows import (
     _build_completion_preview,
     _build_import_header_report,
     _find_import_variant,
-    _group_import_rows,
     _import_row_label,
     _merge_import_ownership,
     _parse_quantity_fields,
@@ -76,8 +78,6 @@ from models import (
     Person,
     Set,
     get_or_create_set,
-    normalize_engraving_copy_type,
-    normalize_engraving_signature,
     normalize_sku_value,
     record_activity,
     reconcile_unknown_variant,
@@ -96,19 +96,6 @@ class SetMemberEntry(TypedDict):
     sku: str
     quantity: int
     name: str
-
-
-def _read_engraving_fields(
-    row: dict, prefix: str = ""
-) -> tuple[str, str | None, str | None, str]:
-    """Normalize engraving fields from import rows or form posts."""
-    copy_type = normalize_engraving_copy_type(row.get(f"{prefix}copy_type", "plain"))
-    if row.get(f"{prefix}engraved", "").strip().lower() in TRUTHY:
-        copy_type = "engraved"
-    engraving_text = row.get(f"{prefix}engraving_text", "").strip() or None
-    engraving_notes = row.get(f"{prefix}engraving_notes", "").strip() or None
-    engraving_signature = normalize_engraving_signature(copy_type, engraving_text)
-    return copy_type, engraving_text, engraving_notes, engraving_signature
 
 
 def _parse_set_members_field(raw_value: str | None) -> list[str]:
@@ -136,6 +123,35 @@ def _format_set_members_display(member_skus: list[str]) -> str:
         counts[sku] += 1
     return " | ".join(
         f"{sku} ×{counts[sku]}" if counts[sku] > 1 else sku for sku in order
+    )
+
+
+def _build_import_skip_detail(
+    row_num: int | None,
+    reason: str,
+    *,
+    name: str | None = None,
+    sku: str | None = None,
+) -> dict:
+    """Build a standard skipped-row payload for import confirmations."""
+    return {
+        "row": row_num,
+        "label": _import_row_label(row_num, name, sku),
+        "reason": reason,
+    }
+
+
+def _append_import_skip_detail(
+    skipped_details: list[dict],
+    row_num: int | None,
+    reason: str,
+    *,
+    name: str | None = None,
+    sku: str | None = None,
+) -> None:
+    """Append a standard skipped-row payload to the running detail list."""
+    skipped_details.append(
+        _build_import_skip_detail(row_num, reason, name=name, sku=sku)
     )
 
 
@@ -549,7 +565,7 @@ def import_page():
         )
         matched_set = existing_set_skus.get(sku) if sku else None
         is_set_row = bool(set_member_skus)
-        if category in EDGELESS_CATEGORIES:
+        if is_edgeless_category(category):
             non_catalog = (
                 legacy_non_catalog
                 or is_sku_unicorn
@@ -1010,12 +1026,12 @@ def completion_import_confirm():
             item_name = request.form.get(f"row_item_{row_index}", "").strip() or None
 
             if request.form.get(f"row_accept_{row_index}") != "on":
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, item_name, sku),
-                        "reason": "Not selected during import review.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Not selected during import review.",
+                    name=item_name,
+                    sku=sku,
                 )
                 continue
             selected_rows += 1
@@ -1023,12 +1039,12 @@ def completion_import_confirm():
             item_id = int(request.form.get(f"row_item_id_{row_index}", 0) or 0)
             item = db.session.get(Item, item_id)
             if not item:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, item_name, sku),
-                        "reason": "Matched catalog item was not found during confirmation.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Matched catalog item was not found during confirmation.",
+                    name=item_name,
+                    sku=sku,
                 )
                 continue
 
@@ -1036,21 +1052,17 @@ def completion_import_confirm():
                 request.form.get(f"row_quantity_{row_index}", "")
             )
             if qty_error:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, item_name, sku),
-                        "reason": qty_error,
-                    }
+                _append_import_skip_detail(
+                    skipped_details, row_num, qty_error, name=item_name, sku=sku
                 )
                 continue
             if quantity is None:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, item_name, sku),
-                        "reason": "Quantity is required.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Quantity is required.",
+                    name=item_name,
+                    sku=sku,
                 )
                 continue
 
@@ -1137,18 +1149,20 @@ def completion_import_confirm():
 
     if db_commit(db.session):
         for idx in range(int(request.form.get("unresolved_count", 0) or 0)):
-            skipped_details.append(
-                {
-                    "row": request.form.get(f"unresolved_row_{idx}", type=int),
-                    "label": _import_row_label(
-                        request.form.get(f"unresolved_row_{idx}", type=int),
-                        request.form.get(f"unresolved_person_{idx}", "").strip()
-                        or None,
-                        request.form.get(f"unresolved_sku_{idx}", "").strip() or None,
-                    ),
-                    "reason": request.form.get(f"unresolved_reason_{idx}", "").strip()
-                    or "Could not resolve row.",
-                }
+            unresolved_row = request.form.get(f"unresolved_row_{idx}", type=int)
+            unresolved_person = (
+                request.form.get(f"unresolved_person_{idx}", "").strip() or None
+            )
+            unresolved_sku = (
+                request.form.get(f"unresolved_sku_{idx}", "").strip() or None
+            )
+            _append_import_skip_detail(
+                skipped_details,
+                unresolved_row,
+                request.form.get(f"unresolved_reason_{idx}", "").strip()
+                or "Could not resolve row.",
+                name=unresolved_person,
+                sku=unresolved_sku,
             )
 
         skipped_details.sort(
@@ -1238,12 +1252,12 @@ def import_confirm():
             )
 
             if request.form.get(f"item_accept_{row_index}") != "on":
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, name_hint, sku_hint),
-                        "reason": "Not selected during import review.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Not selected during import review.",
+                    name=name_hint,
+                    sku=sku_hint,
                 )
                 continue
             item_rows_selected += 1
@@ -1270,12 +1284,12 @@ def import_confirm():
                 "Quantity Purchased",
             )
             if qty_error:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, name_hint, sku_hint),
-                        "reason": qty_error,
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    qty_error,
+                    name=name_hint,
+                    sku=sku_hint,
                 )
                 continue
             quantity_given_away, qty_error = _read_confirm_quantity_field(
@@ -1283,12 +1297,12 @@ def import_confirm():
                 "Quantity Given Away",
             )
             if qty_error:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, name_hint, sku_hint),
-                        "reason": qty_error,
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    qty_error,
+                    name=name_hint,
+                    sku=sku_hint,
                 )
                 continue
             if availability == "public" and (
@@ -1313,12 +1327,12 @@ def import_confirm():
             )
 
             if not name:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, name_hint, sku_hint),
-                        "reason": "Missing name.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Missing name.",
+                    name=name_hint,
+                    sku=sku_hint,
                 )
                 continue
 
@@ -1357,7 +1371,7 @@ def import_confirm():
                     item.is_unicorn = True
                 if is_edge_unicorn and not item.edge_is_unicorn:
                     item.edge_is_unicorn = True
-                if item.category in EDGELESS_CATEGORIES:
+                if is_edgeless_category(item.category):
                     item.edge_type = "N/A"
                     item.edge_is_unicorn = False
                 if non_catalog:
@@ -1438,14 +1452,12 @@ def import_confirm():
             )
 
             if request.form.get(f"set_accept_{row_index}") != "on":
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(
-                            row_num, set_name_hint, set_sku_hint
-                        ),
-                        "reason": "Not selected during import review.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Not selected during import review.",
+                    name=set_name_hint,
+                    sku=set_sku_hint,
                 )
                 continue
             set_rows_selected += 1
@@ -1456,36 +1468,30 @@ def import_confirm():
                 request.form.get(f"set_members_{row_index}", "")
             )
             if not set_name:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(
-                            row_num, set_name_hint, set_sku_hint
-                        ),
-                        "reason": "Missing set name.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Missing set name.",
+                    name=set_name_hint,
+                    sku=set_sku_hint,
                 )
                 continue
             if not set_sku:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(
-                            row_num, set_name_hint, set_sku_hint
-                        ),
-                        "reason": "Missing set SKU.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Missing set SKU.",
+                    name=set_name_hint,
+                    sku=set_sku_hint,
                 )
                 continue
             if not set_member_skus:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(
-                            row_num, set_name_hint, set_sku_hint
-                        ),
-                        "reason": "Missing set member SKUs.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Missing set member SKUs.",
+                    name=set_name_hint,
+                    sku=set_sku_hint,
                 )
                 continue
 
@@ -1503,15 +1509,12 @@ def import_confirm():
                     {"sku": member_sku, "quantity": qty, "name": item.name}
                 )
             if missing_members:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(
-                            row_num, set_name_hint, set_sku_hint
-                        ),
-                        "reason": "Missing set member SKU(s): "
-                        + ", ".join(missing_members),
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Missing set member SKU(s): " + ", ".join(missing_members),
+                    name=set_name_hint,
+                    sku=set_sku_hint,
                 )
                 continue
 
@@ -1524,12 +1527,12 @@ def import_confirm():
                 and existing_set_by_sku
                 and existing_set_by_name.id != existing_set_by_sku.id
             ):
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, set_name, set_sku),
-                        "reason": "Set name and set SKU point to different existing sets.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Set name and set SKU point to different existing sets.",
+                    name=set_name,
+                    sku=set_sku,
                 )
                 continue
 
@@ -1578,12 +1581,12 @@ def import_confirm():
             )
 
             if request.form.get(f"own_accept_{row_index}") != "on":
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, item_name_hint, sku_hint),
-                        "reason": "Not selected during import review.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Not selected during import review.",
+                    name=item_name_hint,
+                    sku=sku_hint,
                 )
                 continue
             own_rows_selected += 1
@@ -1603,12 +1606,12 @@ def import_confirm():
                 "Quantity Purchased",
             )
             if qty_error:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, item_name_hint, sku_hint),
-                        "reason": qty_error,
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    qty_error,
+                    name=item_name_hint,
+                    sku=sku_hint,
                 )
                 continue
             quantity_given_away, qty_error = _read_confirm_quantity_field(
@@ -1616,12 +1619,12 @@ def import_confirm():
                 "Quantity Given Away",
             )
             if qty_error:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, item_name_hint, sku_hint),
-                        "reason": qty_error,
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    qty_error,
+                    name=item_name_hint,
+                    sku=sku_hint,
                 )
                 continue
             is_sku_unicorn = request.form.get(f"own_sku_unicorn_{row_index}") == "on"
@@ -1632,28 +1635,28 @@ def import_confirm():
 
             item = db.session.get(Item, item_id)
             if not item:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, item_name_hint, sku_hint),
-                        "reason": "Matched catalog item was not found during confirmation.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Matched catalog item was not found during confirmation.",
+                    name=item_name_hint,
+                    sku=sku_hint,
                 )
                 continue
             if not person_name:
-                skipped_details.append(
-                    {
-                        "row": row_num,
-                        "label": _import_row_label(row_num, item_name_hint, sku_hint),
-                        "reason": "Missing person/collector name.",
-                    }
+                _append_import_skip_detail(
+                    skipped_details,
+                    row_num,
+                    "Missing person/collector name.",
+                    name=item_name_hint,
+                    sku=sku_hint,
                 )
                 continue
             if is_sku_unicorn and not item.is_unicorn:
                 item.is_unicorn = True
             if is_edge_unicorn and not item.edge_is_unicorn:
                 item.edge_is_unicorn = True
-            if item.category in EDGELESS_CATEGORIES:
+            if is_edgeless_category(item.category):
                 item.edge_type = "N/A"
                 item.edge_is_unicorn = False
 
@@ -1749,12 +1752,12 @@ def import_confirm():
                 request.form.get(f"error_reason_{idx}", "").strip()
                 or "Could not parse row."
             )
-            skipped_details.append(
-                {
-                    "row": row_num,
-                    "label": _import_row_label(row_num, name_hint, sku_hint),
-                    "reason": reason,
-                }
+            _append_import_skip_detail(
+                skipped_details,
+                row_num,
+                reason,
+                name=name_hint,
+                sku=sku_hint,
             )
 
         conflict_count = int(request.form.get("conflict_count", 0) or 0)
@@ -1775,12 +1778,12 @@ def import_confirm():
                 f"Existing entry for {person_name or 'collector'} kept unchanged "
                 f"({existing_status or 'existing'} vs {import_status or 'import'})."
             )
-            skipped_details.append(
-                {
-                    "row": row_num,
-                    "label": _import_row_label(row_num, item_name, sku_hint),
-                    "reason": reason,
-                }
+            _append_import_skip_detail(
+                skipped_details,
+                row_num,
+                reason,
+                name=item_name,
+                sku=sku_hint,
             )
 
         skipped_details.sort(
