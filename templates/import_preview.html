@@ -105,7 +105,11 @@
           <td><input type="checkbox" name="item_variant_unicorn_{{ item.form_index }}" {% if item.is_variant_unicorn %}checked{% endif %}></td>
           <td><input type="checkbox" name="item_edge_unicorn_{{ item.form_index }}" {% if item.is_edge_unicorn %}checked{% endif %}></td>
           <td>
-            <span class="badge {% if item.copy_type == 'engraved' %}badge-info{% else %}badge-secondary{% endif %}">{{ item.copy_type | capitalize }}</span>
+            {% if item.copy_type == 'engraved' %}
+              <span class="badge badge-info">Engraved</span>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
           </td>
           <td>
             <span class="small muted">{{ item.engraving_text or item.engraving_notes or '—' }}</span>
@@ -212,7 +216,11 @@
           </td>
           <td>
             <input type="hidden" name="own_copy_type_{{ entry.form_index }}" value="{{ entry.copy_type }}">
-            <span class="badge {% if entry.copy_type == 'engraved' %}badge-info{% else %}badge-secondary{% endif %}">{{ entry.copy_type | capitalize }}</span>
+            {% if entry.copy_type == 'engraved' %}
+              <span class="badge badge-info">Engraved</span>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
           </td>
           <td>
             <input type="hidden" name="own_engraving_text_{{ entry.form_index }}" value="{{ entry.engraving_text or '' }}">
@@ -267,7 +275,13 @@
         <td>{% if matched.is_sku_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if matched.is_variant_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if matched.is_edge_unicorn %}<span class="badge badge-unicorn">yes</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td><span class="badge {% if matched.copy_type == 'engraved' %}badge-info{% else %}badge-secondary{% endif %}">{{ matched.copy_type | capitalize }}</span></td>
+        <td>
+          {% if matched.copy_type == 'engraved' %}
+            <span class="badge badge-info">Engraved</span>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
         <td class="small muted">{{ matched.engraving_text or matched.engraving_notes or '—' }}</td>
         <td>{{ matched.person or '—' }}</td>
         <td>{{ matched.status }}</td>
