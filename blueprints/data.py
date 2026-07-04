@@ -6,6 +6,7 @@ import io
 import logging
 import re
 from datetime import date
+from typing import TypedDict
 
 import openpyxl
 from flask import (
@@ -85,6 +86,14 @@ from time_utils import format_container_time
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
+
+
+class SetMemberEntry(TypedDict):
+    """Typed row fragment for set membership persistence."""
+
+    sku: str
+    quantity: int
+    name: str
 
 
 def _read_engraving_fields(
@@ -1474,7 +1483,7 @@ def import_confirm():
             member_counts: dict[str, int] = {}
             for member_sku in set_member_skus:
                 member_counts[member_sku] = member_counts.get(member_sku, 0) + 1
-            member_entries: list[dict[str, object]] = []
+            member_entries: list[SetMemberEntry] = []
             missing_members: list[str] = []
             for member_sku, qty in member_counts.items():
                 item = existing_items.get(member_sku)
@@ -1527,16 +1536,17 @@ def import_confirm():
                 item_set.name = set_name
             if item_set.sku != set_sku:
                 item_set.sku = set_sku
-                existing_set_skus[set_sku] = item_set
+                if set_sku is not None:
+                    existing_set_skus[set_sku] = item_set
             item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
             existing_members = {member.item_id: member for member in item_set.members}
             incoming_member_ids: set[int] = set()
             for member in member_entries:
-                member_sku = normalize_sku_value(member.get("sku", ""))
+                member_sku = member["sku"]
                 item = existing_items.get(member_sku)
                 if not item:
                     continue
-                qty = int(member.get("quantity") or 1)
+                qty = member["quantity"]
                 if item.id not in existing_members:
                     db.session.add(
                         ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty)
