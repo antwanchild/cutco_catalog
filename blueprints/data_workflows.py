@@ -20,7 +20,6 @@ from blueprints.import_shared import (
     _safe_csv_filename,  # noqa: F401
 )
 from constants import (
-    COOKWARE_CATEGORIES,
     UNKNOWN_COLOR,
     VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
@@ -295,7 +294,7 @@ def _build_completion_preview(
             continue
         target_color = (
             UNKNOWN_COLOR
-            if (item.category or "") in COOKWARE_CATEGORIES
+            if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
             else bucket["color"]
         )
         variant = next(
@@ -540,7 +539,7 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
             items_with_no_clear_variants += 1
             continue
         if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES:
-            skip_reason = "Cookware items use a single fallback variant."
+            skip_reason = "These items use a single fallback variant."
             if (item.category or "") == "Cutting Boards":
                 skip_reason = (
                     "Cutting board items are treated as a single fallback variant."

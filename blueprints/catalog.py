@@ -27,6 +27,7 @@ from constants import (
     UNKNOWN_COLOR,
     canonicalize_category,
     canonicalize_availability,
+    VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
 from extensions import db
 from helpers import admin_required, db_commit, is_admin, is_authenticated_user
@@ -239,7 +240,7 @@ def catalog():
         availability_choices=AVAILABILITY_CHOICES,
         edge_types=EDGE_TYPES,
         UNCATEGORIZED_FILTER=UNCATEGORIZED_FILTER,
-        COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
+        SINGLE_VARIANT_CATEGORIES=VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
         UNKNOWN_COLOR=UNKNOWN_COLOR,
         unreferenced_count=unreferenced_count,
         all_item_count=all_item_count,
@@ -566,9 +567,14 @@ def variants(item_id):
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)
-    is_cookware = (item.category or "") in COOKWARE_CATEGORIES
+    is_single_variant = (
+        item.category or ""
+    ) in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
     return render_template(
-        "variants.html", item=item, UNKNOWN_COLOR=UNKNOWN_COLOR, is_cookware=is_cookware
+        "variants.html",
+        item=item,
+        UNKNOWN_COLOR=UNKNOWN_COLOR,
+        is_single_variant=is_single_variant,
     )
 
 
@@ -583,9 +589,9 @@ def variant_add(item_id):
     if not color:
         flash("Color is required.", "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
-    if (item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
+    if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES and color != UNKNOWN_COLOR:
         flash(
-            "Cookware items use a single Unknown variant; color variants are not supported.",
+            "These items use a single Unknown variant; color variants are not supported.",
             "warning",
         )
         return redirect(url_for("catalog.variants", item_id=item_id))
@@ -626,9 +632,9 @@ def variant_edit(vid):
     item = variant.item
     if item is None:
         abort(404)
-    if (item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
+    if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES and color != UNKNOWN_COLOR:
         flash(
-            "Cookware items use a single Unknown variant; color variants are not supported.",
+            "These items use a single Unknown variant; color variants are not supported.",
             "warning",
         )
         return redirect(url_for("catalog.variants", item_id=item_id))
@@ -1260,7 +1266,7 @@ def set_detail(set_id=None, sid=None):
         top_colors=top_colors,
         next_target=next_target,
         can_restore_memberships=bool(item_set.member_data) and private_view,
-        COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
+        SINGLE_VARIANT_CATEGORIES=VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
         UNKNOWN_COLOR=UNKNOWN_COLOR,
     )
 

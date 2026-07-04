@@ -123,9 +123,9 @@
 
     {# Variants #}
     <section class="detail-section">
-      {% if item.category in COOKWARE_CATEGORIES %}
+      {% if item.category in SINGLE_VARIANT_CATEGORIES %}
         <h2 class="section-heading">Variants</h2>
-        <p class="muted">Cookware does not use color variants.</p>
+        <p class="muted">These items do not use color variants.</p>
       {% else %}
         <h2 class="section-heading">Variants ({{ item.variants | length }})</h2>
         <div class="chip-list">
