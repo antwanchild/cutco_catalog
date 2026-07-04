@@ -1444,7 +1444,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(import_template_response.mimetype, "text/csv")
         self.assertIn(
             b"name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,"
-            b"copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price",
+            b"copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,set_members,price",
             import_template_response.data,
         )
 
@@ -3234,7 +3234,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Header Check Result (CSV)", response.data)
         self.assertIn(
-            b"Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code>",
+            b"Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,set_members,price</code>",
             response.data,
         )
         self.assertIn(b"Missing required headers: name", response.data)
@@ -3275,7 +3275,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Import Column Mapping", response.data)
         self.assertIn(b"<code>availability</code>", response.data)
         self.assertIn(
-            b"<code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code>",
+            b"<code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,set_members,price</code>",
             response.data,
         )
         self.assertIn(b"Rep only", response.data)
