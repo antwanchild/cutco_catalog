@@ -3740,6 +3740,34 @@ class ImportSmokeTests(SmokeBaseTest):
             b"<td>\n          Unknown\n        </td>", preview_response.data
         )
 
+    def test_import_preview_treats_cutting_board_as_edgeless(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color,category\n"
+                        b"Cutting Board Test,CB-EDGE-1,yes,Classic Brown,Cutting Board\n"
+                    ),
+                    "cutting_board.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Cutting Board Test", preview_response.data)
+        self.assertNotIn(b'<select name="item_edge_0"', preview_response.data)
+        self.assertIn(
+            b'<input type="hidden" name="item_edge_0" value="N/A">',
+            preview_response.data,
+        )
+
     def test_import_preview_csv_and_error_paths(self):
         self._login_as_admin()
         self._set_csrf_token()

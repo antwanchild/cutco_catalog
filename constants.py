@@ -182,6 +182,10 @@ CATEGORY_OVERRIDES: dict[str, str] = {
 
 CANONICAL_CATEGORY_ALIASES = {
     "everyday knives": "Kitchen Knives",
+    "bakeware": "Bakeware",
+    "cookware": "Cookware",
+    "cutting board": "Cutting Boards",
+    "cutting boards": "Cutting Boards",
 }
 
 
