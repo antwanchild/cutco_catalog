@@ -40,6 +40,12 @@ jobs:
               return;
             }
 
+            const prTagPrefix = `pr-${pullRequest.number}`;
+
+            function escapeRegExp(value) {
+              return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            }
+
             const { data: currentPr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -53,11 +59,44 @@ jobs:
             }
 
             const canPush = pullRequest.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
+            let buildNumber = 1;
+
+            try {
+              const versions = await github.paginate(
+                "GET /users/{username}/packages/container/{package_name}/versions",
+                {
+                  username: context.repo.owner,
+                  package_name: context.repo.repo,
+                  per_page: 100,
+                }
+              );
+              const buildPattern = new RegExp(`^${escapeRegExp(prTagPrefix)}\\.(\\d+)(?:$|-)`);
+              for (const version of versions) {
+                const tags = version?.metadata?.container?.tags || [];
+                for (const tag of tags) {
+                  const match = tag.match(buildPattern);
+                  if (match) {
+                    buildNumber = Math.max(buildNumber, Number(match[1]) + 1);
+                  }
+                }
+              }
+            } catch (error) {
+              core.warning(
+                `Could not determine the next preview build number for ${prTagPrefix}; defaulting to build #1. ${String(error)}`
+              );
+            }
+
+            const buildTag = `${prTagPrefix}.${buildNumber}`;
+            const shaTag = `${buildTag}-${pullRequest.head.sha}`;
 
             core.setOutput("ready", "true");
             core.setOutput("pr_number", String(pullRequest.number));
             core.setOutput("head_sha", pullRequest.head.sha);
-            core.setOutput("version", `pr-${pullRequest.number}`);
+            core.setOutput("build_number", String(buildNumber));
+            core.setOutput("version", buildTag);
+            core.setOutput("pr_tag", prTagPrefix);
+            core.setOutput("build_tag", buildTag);
+            core.setOutput("sha_tag", shaTag);
             core.setOutput("can_push", String(canPush));
 
       - name: Checkout PR head
@@ -82,8 +121,9 @@ jobs:
           push: ${{ steps.meta.outputs.can_push == 'true' }}
           load: ${{ steps.meta.outputs.can_push != 'true' }}
           tags: |
-            ${{ env.IMAGE_NAME }}:pr-${{ steps.meta.outputs.pr_number }}
-            ${{ env.IMAGE_NAME }}:pr-${{ steps.meta.outputs.pr_number }}-${{ steps.meta.outputs.head_sha }}
+            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.pr_tag }}
+            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.build_tag }}
+            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.sha_tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.meta.outputs.head_sha }}
@@ -108,7 +148,7 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const packageName = context.repo.repo;
-            const prTag = `pr-${context.payload.pull_request.number}`;
+            const prTagPrefix = `pr-${context.payload.pull_request.number}`;
             const versions = await github.paginate(
               "GET /users/{username}/packages/container/{package_name}/versions",
               {
@@ -118,22 +158,24 @@ jobs:
               }
             );
 
-            const match = versions.find((version) => {
+            const matches = versions.filter((version) => {
               const tags = version?.metadata?.container?.tags || [];
-              return tags.includes(prTag);
+              return tags.some((tag) => tag === prTagPrefix || tag.startsWith(`${prTagPrefix}.`) || tag.startsWith(`${prTagPrefix}-`));
             });
 
-            if (!match) {
-              core.info(`No GHCR version found for ${prTag}. Nothing to delete.`);
+            if (!matches.length) {
+              core.info(`No GHCR versions found for ${prTagPrefix}. Nothing to delete.`);
               return;
             }
 
-            core.info(`Deleting GHCR version ${match.id} for ${prTag}.`);
-            await github.request(
-              "DELETE /users/{username}/packages/container/{package_name}/versions/{package_version_id}",
-              {
-                username: owner,
-                package_name: packageName,
-                package_version_id: match.id,
-              }
-            );
+            for (const match of matches) {
+              core.info(`Deleting GHCR version ${match.id} for ${prTagPrefix}.`);
+              await github.request(
+                "DELETE /users/{username}/packages/container/{package_name}/versions/{package_version_id}",
+                {
+                  username: owner,
+                  package_name: packageName,
+                  package_version_id: match.id,
+                }
+              );
+            }

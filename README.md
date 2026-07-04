@@ -76,11 +76,12 @@ Notes:
 If you want to test a branch before merging, add the `docker` label to the pull request.
 
 - The PR checks page shows a `Validate Pull Request` check so you can see the preview opt-in state.
-- The PR workflow builds a preview image whenever the pull request is opened, updated, reopened, or labeled, tagged like `pr-123`.
+- The PR workflow builds a preview image whenever the pull request is opened, updated, reopened, or labeled, tagged like `pr-123.1`.
 - Keep the `docker` label on the PR while you test so the preview image stays enabled for new pushes.
 - If you add the label after the PR already exists, the next PR update or label event will build the preview image.
-- Each PR update refreshes the same `pr-123` tag, so you can keep testing the latest branch state without re-labeling the PR.
-- Same-repo PRs can publish that tag to GHCR so you can `docker pull ghcr.io/antwanchild/cutco_catalog:pr-123`.
+- Each PR gets a build sequence that starts at `pr-123.1` and increments on every push while the PR stays labeled.
+- Same-repo PRs can publish that tag to GHCR so you can `docker pull ghcr.io/antwanchild/cutco_catalog:pr-123.1`.
+- The unqualified `pr-123` tag still points at the latest preview build for convenience.
 - When the PR is merged, or when you remove the `docker` label, the matching preview tag is cleaned up automatically.
 - Forked PRs can still run the build check safely, but they do not publish a registry image.
 
