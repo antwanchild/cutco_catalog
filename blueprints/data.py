@@ -19,7 +19,6 @@ from flask import (
 from sqlalchemy import desc
 
 from constants import (
-    COOKWARE_CATEGORIES,
     EDGE_TYPES,
     STATUS_OPTIONS,
     TRUTHY,
