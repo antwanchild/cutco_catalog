@@ -1,4 +1,4 @@
-name: PR Docker Preview
+name: PR Preview
 
 on:
   pull_request:
@@ -71,7 +71,7 @@ jobs:
                 }
               );
               const matchingRuns = runs.workflow_runs.filter((run) => {
-                if (run.name !== "PR Docker Preview") return false;
+                if (run.name !== "PR Preview") return false;
                 return (run.pull_requests || []).some((pr) => pr.number === pullRequest.number);
               });
               buildNumber = matchingRuns.length + 1;

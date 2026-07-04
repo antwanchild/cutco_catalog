@@ -1,4 +1,4 @@
-name: Validate Pull Request
+name: Preview Gate
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate Pull Request
+    name: Preview Gate
     runs-on: ubuntu-latest
     steps:
       - name: Summarize PR preview status

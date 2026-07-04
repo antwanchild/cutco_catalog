@@ -1,4 +1,4 @@
-name: Cleanup Draft Releases
+name: Release Cleanup
 
 on:
   workflow_dispatch:

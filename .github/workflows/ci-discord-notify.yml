@@ -1,4 +1,4 @@
-name: CI Discord Notifications
+name: CI Notifications
 
 on:
   workflow_run:
