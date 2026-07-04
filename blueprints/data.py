@@ -27,6 +27,7 @@ from constants import (
     XLSX_COL_MAP,
     canonicalize_availability,
     canonicalize_category,
+    normalize_edge_for_category,
     VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
 from extensions import db
@@ -491,6 +492,18 @@ def import_page():
             availability = "non-catalog"
         non_catalog = non_catalog or availability != "public"
         category = canonicalize_category(row.get("category", ""))
+        edge_type, is_edge_unicorn = normalize_edge_for_category(
+            category,
+            edge_type,
+            is_edge_unicorn,
+        )
+        if category in EDGELESS_CATEGORIES:
+            non_catalog = (
+                legacy_non_catalog
+                or is_sku_unicorn
+                or is_variant_unicorn
+                or availability != "public"
+            )
         note_text, note_errors = _build_notes(row)
         quantity_purchased, quantity_given_away, quantity_errors = (
             _parse_quantity_fields(row)
@@ -1235,7 +1248,6 @@ def import_confirm():
                 sku=sku,
                 name=name,
             )
-
             if not item:
                 item = Item(
                     name=name,
@@ -1262,6 +1274,9 @@ def import_confirm():
                     item.is_unicorn = True
                 if is_edge_unicorn and not item.edge_is_unicorn:
                     item.edge_is_unicorn = True
+                if item.category in EDGELESS_CATEGORIES:
+                    item.edge_type = "N/A"
+                    item.edge_is_unicorn = False
                 if non_catalog:
                     item.in_catalog = False
 
@@ -1415,6 +1430,9 @@ def import_confirm():
                 item.is_unicorn = True
             if is_edge_unicorn and not item.edge_is_unicorn:
                 item.edge_is_unicorn = True
+            if item.category in EDGELESS_CATEGORIES:
+                item.edge_type = "N/A"
+                item.edge_is_unicorn = False
 
             person = existing_persons.get(person_name.lower())
             if not person:

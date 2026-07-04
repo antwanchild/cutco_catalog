@@ -209,6 +209,16 @@ def canonicalize_availability(availability: str | None) -> str:
     return "public"
 
 
+def normalize_edge_for_category(
+    category: str | None, edge_type: str | None, edge_is_unicorn: bool = False
+) -> tuple[str, bool]:
+    """Normalize edge data for categories that do not have edges."""
+    if (category or "") in EDGELESS_CATEGORIES:
+        return "N/A", False
+    normalized_edge = (edge_type or "").strip() or "Unknown"
+    return normalized_edge, edge_is_unicorn
+
+
 def _resolve_category(sku: str, scraped_category: str, name: str = "") -> str:
     """Return the effective category for an item, applying overrides."""
     if sku in CATEGORY_OVERRIDES:

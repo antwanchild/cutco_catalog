@@ -17,7 +17,12 @@ from flask import (
     url_for,
 )
 
-from constants import COOKWARE_CATEGORIES, STATUS_RANK, UNKNOWN_COLOR
+from constants import (
+    COOKWARE_CATEGORIES,
+    EDGELESS_CATEGORIES,
+    STATUS_RANK,
+    UNKNOWN_COLOR,
+)
 from extensions import db
 from helpers import (
     admin_required,
@@ -259,6 +264,8 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
 
     edge_counts: dict[str, int] = {}
     for item in owned_items:
+        if (item.category or "") in EDGELESS_CATEGORIES:
+            continue
         edge = item.edge_type or "Unknown"
         edge_counts[edge] = edge_counts.get(edge, 0) + 1
 
@@ -549,7 +556,9 @@ def item_owners(item_id):
     item = context["item"]
     if not item:
         abort(404)
-    return render_template("item_owners.html", **context)
+    return render_template(
+        "item_owners.html", edgeless_categories=EDGELESS_CATEGORIES, **context
+    )
 
 
 @views_bp.route("/views/item/<int:item_id>/attachments", methods=["POST"])

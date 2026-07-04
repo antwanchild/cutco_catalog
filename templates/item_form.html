@@ -32,13 +32,20 @@
       </label>
       <div class="suggest-menu" hidden></div>
     </div>
-    <label>Edge Type
-      <select name="edge_type" class="input-full">
-        {% for et in edge_types %}
-          <option value="{{ et }}" {% if item and item.edge_type == et %}selected{% endif %}>{{ et }}</option>
-        {% endfor %}
-      </select>
-    </label>
+    {% if item and item.category in edgeless_categories %}
+      <label>Edge Type
+        <input type="hidden" name="edge_type" value="N/A">
+        <span class="muted">—</span>
+      </label>
+    {% else %}
+      <label>Edge Type
+        <select name="edge_type" class="input-full">
+          {% for et in edge_types %}
+            <option value="{{ et }}" {% if item and item.edge_type == et %}selected{% endif %}>{{ et }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    {% endif %}
   </div>
 
   <div class="form-row">
@@ -71,10 +78,12 @@
       <input type="checkbox" name="is_unicorn" {% if item and item.is_unicorn %}checked{% endif %}>
       🦄 SKU Unicorn (item-level)
     </label>
-    <label class="checkbox-label">
-      <input type="checkbox" name="edge_is_unicorn" {% if item and item.edge_is_unicorn %}checked{% endif %}>
-      🦄 Edge Unicorn (blade-type rarity)
-    </label>
+    {% if not (item and item.category in edgeless_categories) %}
+      <label class="checkbox-label">
+        <input type="checkbox" name="edge_is_unicorn" {% if item and item.edge_is_unicorn %}checked{% endif %}>
+        🦄 Edge Unicorn (blade-type rarity)
+      </label>
+    {% endif %}
     <label class="checkbox-label">
       <input type="checkbox" name="set_only" {% if item and item.set_only %}checked{% endif %}>
       Set-only item

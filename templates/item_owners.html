@@ -60,7 +60,7 @@
       <span class="item-overview-value">Set-only</span>
     </div>
     {% endif %}
-    {% if item.edge_type != 'N/A' %}
+    {% if item.category not in edgeless_categories and item.edge_type != 'N/A' %}
     <div class="item-overview-item">
       <span class="item-overview-label">Edge</span>
       <span class="item-overview-value">{{ item.edge_type }}{% if item.edge_is_unicorn %} 🦄{% endif %}</span>
