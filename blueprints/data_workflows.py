@@ -986,7 +986,7 @@ def _group_import_rows(rows: list[dict], *, base_index: int = 0) -> list[dict]:
         if not group:
             group = {
                 "sku": row_copy.get("sku") or None,
-                "name": row_copy.get("name") or "—",
+                "name": row_copy.get("name") or row_copy.get("item_name") or "—",
                 "rows": [],
                 "row_count": 0,
                 "variant_colors": [],

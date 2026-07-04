@@ -38,8 +38,8 @@
   <summary>
     <span class="import-sku-group-summary">
       <span class="import-sku-group-main">
+        <span class="mono">{{ group.sku or '—' }}</span>
         <strong>{{ group.name }}</strong>
-        <span class="muted small mono">{{ group.sku or '—' }}</span>
       </span>
       <span class="import-sku-group-meta">
         {% if show_set_badge and group.rows and group.rows[0].matches_set_sku %}
@@ -155,8 +155,8 @@
   <summary>
     <span class="import-sku-group-summary">
       <span class="import-sku-group-main">
+        <span class="mono">{{ group.sku or '—' }}</span>
         <strong>{{ group.name }}</strong>
-        <span class="muted small mono">{{ group.sku or '—' }}</span>
       </span>
       <span class="import-sku-group-meta">
         {% if group.variant_colors %}
