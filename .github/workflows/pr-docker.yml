@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  actions: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -42,10 +43,6 @@ jobs:
 
             const prTagPrefix = `pr-${pullRequest.number}`;
 
-            function escapeRegExp(value) {
-              return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            }
-
             const { data: currentPr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -62,41 +59,34 @@ jobs:
             let buildNumber = 1;
 
             try {
-              const versions = await github.paginate(
-                "GET /users/{username}/packages/container/{package_name}/versions",
+              const runs = await github.paginate(
+                github.rest.actions.listWorkflowRunsForRepo,
                 {
-                  username: context.repo.owner,
-                  package_name: context.repo.repo,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  branch: pullRequest.head.ref,
+                  event: "pull_request",
+                  status: "completed",
                   per_page: 100,
                 }
               );
-              const buildPattern = new RegExp(`^${escapeRegExp(prTagPrefix)}\\.(\\d+)(?:$|-)`);
-              for (const version of versions) {
-                const tags = version?.metadata?.container?.tags || [];
-                for (const tag of tags) {
-                  const match = tag.match(buildPattern);
-                  if (match) {
-                    buildNumber = Math.max(buildNumber, Number(match[1]) + 1);
-                  }
-                }
-              }
+              const matchingRuns = runs.workflow_runs.filter((run) => {
+                if (run.name !== "PR Docker Preview") return false;
+                return (run.pull_requests || []).some((pr) => pr.number === pullRequest.number);
+              });
+              buildNumber = matchingRuns.length + 1;
             } catch (error) {
               core.warning(
                 `Could not determine the next preview build number for ${prTagPrefix}; defaulting to build #1. ${String(error)}`
               );
             }
 
-            const buildTag = `${prTagPrefix}.${buildNumber}`;
-            const shaTag = `${buildTag}-${pullRequest.head.sha}`;
-
             core.setOutput("ready", "true");
             core.setOutput("pr_number", String(pullRequest.number));
             core.setOutput("head_sha", pullRequest.head.sha);
             core.setOutput("build_number", String(buildNumber));
-            core.setOutput("version", buildTag);
+            core.setOutput("version", prTagPrefix);
             core.setOutput("pr_tag", prTagPrefix);
-            core.setOutput("build_tag", buildTag);
-            core.setOutput("sha_tag", shaTag);
             core.setOutput("can_push", String(canPush));
 
       - name: Checkout PR head
@@ -120,16 +110,15 @@ jobs:
           context: .
           push: ${{ steps.meta.outputs.can_push == 'true' }}
           load: ${{ steps.meta.outputs.can_push != 'true' }}
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.pr_tag }}
-            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.build_tag }}
-            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.sha_tag }}
+          tags: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.pr_tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.meta.outputs.head_sha }}
             org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            com.cutco.preview.build-number=${{ steps.meta.outputs.build_number }}
           build-args: |
             APP_VERSION=${{ steps.meta.outputs.version }}
+            PR_BUILD_NUMBER=${{ steps.meta.outputs.build_number }}
             GIT_SHA=${{ steps.meta.outputs.head_sha }}
 
   cleanup:
@@ -160,7 +149,7 @@ jobs:
 
             const matches = versions.filter((version) => {
               const tags = version?.metadata?.container?.tags || [];
-              return tags.some((tag) => tag === prTagPrefix || tag.startsWith(`${prTagPrefix}.`) || tag.startsWith(`${prTagPrefix}-`));
+              return tags.some((tag) => tag === prTagPrefix);
             });
 
             if (!matches.length) {
