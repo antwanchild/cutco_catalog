@@ -80,6 +80,7 @@ SHARPEN_THRESHOLD_DAYS = int(os.environ.get("SHARPEN_THRESHOLD_DAYS", "180"))
 COOKWARE_THRESHOLD_DAYS = int(os.environ.get("COOKWARE_THRESHOLD_DAYS", "60"))
 _cookware_env = os.environ.get("COOKWARE_CATEGORIES", "Cookware")
 COOKWARE_CATEGORIES = {cat.strip() for cat in _cookware_env.split(",") if cat.strip()}
+EDGELESS_CATEGORIES = COOKWARE_CATEGORIES | {"Bakeware", "Cutting Boards"}
 SHARPENING_PAGE_EXCLUDED_CATEGORIES = {
     "BBQ Tools",
     "Accessories",
@@ -93,7 +94,10 @@ SHARPENING_PAGE_EXCLUDED_CATEGORIES = {
     "Storage",
     "Cutting Boards",
 }
-VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES = COOKWARE_CATEGORIES | {"Cutting Boards"}
+VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES = COOKWARE_CATEGORIES | {
+    "Bakeware",
+    "Cutting Boards",
+}
 SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS = ("shear",)
 SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS = ("gift box",)
 KNIFE_TASK_PRESETS = [
@@ -178,6 +182,10 @@ CATEGORY_OVERRIDES: dict[str, str] = {
 
 CANONICAL_CATEGORY_ALIASES = {
     "everyday knives": "Kitchen Knives",
+    "bakeware": "Bakeware",
+    "cookware": "Cookware",
+    "cutting board": "Cutting Boards",
+    "cutting boards": "Cutting Boards",
 }
 
 
@@ -203,6 +211,16 @@ def canonicalize_availability(availability: str | None) -> str:
         if lowered == canonical.lower():
             return canonical
     return "public"
+
+
+def normalize_edge_for_category(
+    category: str | None, edge_type: str | None, edge_is_unicorn: bool = False
+) -> tuple[str, bool]:
+    """Normalize edge data for categories that do not have edges."""
+    if (category or "") in EDGELESS_CATEGORIES:
+        return "N/A", False
+    normalized_edge = (edge_type or "").strip() or "Unknown"
+    return normalized_edge, edge_is_unicorn
 
 
 def _resolve_category(sku: str, scraped_category: str, name: str = "") -> str:
@@ -277,6 +295,7 @@ XLSX_COL_MAP = {
     "is_sku_unicorn": "is_sku_unicorn",
     "is_variant_unicorn": "is_variant_unicorn",
     "is_edge_unicorn": "is_edge_unicorn",
+    "set_members": "set_members",
     "owned?": "owned_raw",
     "price": "_notes_price",
     "quantity purchased": "quantity_purchased",

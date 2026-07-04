@@ -1,9 +1,12 @@
 """Import, export, and completion-sync routes."""
 
 import csv
+import json
 import io
 import logging
+import re
 from datetime import date
+from typing import TypedDict
 
 import openpyxl
 from flask import (
@@ -19,25 +22,29 @@ from flask import (
 from sqlalchemy import desc
 
 from constants import (
-    COOKWARE_CATEGORIES,
     EDGE_TYPES,
     STATUS_OPTIONS,
     TRUTHY,
+    EDGELESS_CATEGORIES,
     UNKNOWN_COLOR,
     XLSX_COL_MAP,
     canonicalize_availability,
     canonicalize_category,
+    normalize_edge_for_category,
+    VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
 from extensions import db
 from number_utils import parse_positive_whole_number
 from blueprints.data_import import (
     _availability_preview_fields,
+    _build_item_name_lookup,
     _build_item_sku_lookup,
     _build_notes,
     _build_set_sku_lookup,
     _match_import_item,
     _merge_note_text,
     _normalize_import_color,
+    _normalize_variant_lookup_name,
     _parse_owned_raw,
     _parse_truthy_field,
     _preview_import_color,
@@ -62,11 +69,15 @@ from blueprints.data_workflows import (
 from helpers import admin_required, db_commit
 from models import (
     Item,
+    ItemSetMember,
     ItemVariant,
     Ownership,
     ActivityEvent,
     Person,
     Set,
+    get_or_create_set,
+    normalize_engraving_copy_type,
+    normalize_engraving_signature,
     normalize_sku_value,
     record_activity,
     reconcile_unknown_variant,
@@ -77,6 +88,55 @@ from time_utils import format_container_time
 
 data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
+
+
+class SetMemberEntry(TypedDict):
+    """Typed row fragment for set membership persistence."""
+
+    sku: str
+    quantity: int
+    name: str
+
+
+def _read_engraving_fields(
+    row: dict, prefix: str = ""
+) -> tuple[str, str | None, str | None, str]:
+    """Normalize engraving fields from import rows or form posts."""
+    copy_type = normalize_engraving_copy_type(row.get(f"{prefix}copy_type", "plain"))
+    if row.get(f"{prefix}engraved", "").strip().lower() in TRUTHY:
+        copy_type = "engraved"
+    engraving_text = row.get(f"{prefix}engraving_text", "").strip() or None
+    engraving_notes = row.get(f"{prefix}engraving_notes", "").strip() or None
+    engraving_signature = normalize_engraving_signature(copy_type, engraving_text)
+    return copy_type, engraving_text, engraving_notes, engraving_signature
+
+
+def _parse_set_members_field(raw_value: str | None) -> list[str]:
+    """Split a set_members cell into normalized member SKUs."""
+    if not raw_value:
+        return []
+    members: list[str] = []
+    for chunk in re.split(r"[|,\n]+", raw_value):
+        sku = normalize_sku_value(chunk)
+        if sku:
+            members.append(sku)
+    return members
+
+
+def _format_set_members_display(member_skus: list[str]) -> str:
+    """Build a compact label for a set member SKU list."""
+    if not member_skus:
+        return "—"
+    counts: dict[str, int] = {}
+    order: list[str] = []
+    for sku in member_skus:
+        if sku not in counts:
+            order.append(sku)
+            counts[sku] = 0
+        counts[sku] += 1
+    return " | ".join(
+        f"{sku} ×{counts[sku]}" if counts[sku] > 1 else sku for sku in order
+    )
 
 
 @data_bp.route("/export")
@@ -96,7 +156,7 @@ def export_csv():
         .join(ItemVariant, Ownership.variant_id == ItemVariant.id)
         .join(Item, ItemVariant.item_id == Item.id)
         .join(Person, Ownership.person_id == Person.id)
-        .order_by(Person.name, Item.name, ItemVariant.color)
+        .order_by(Person.name, Item.name, ItemVariant.color, Ownership.copy_type)
         .all()
     )
 
@@ -116,6 +176,9 @@ def export_csv():
             "is_edge_unicorn",
             "quantity_purchased",
             "quantity_given_away",
+            "copy_type",
+            "engraving_text",
+            "engraving_notes",
             "notes",
         ]
     )
@@ -142,6 +205,9 @@ def export_csv():
                     if ownership.quantity_given_away is not None
                     else ""
                 ),
+                ownership.copy_type,
+                ownership.engraving_text or "",
+                ownership.engraving_notes or "",
                 ownership.notes or "",
             ]
         )
@@ -250,9 +316,14 @@ def import_template():
             "quantity given away",
             "category",
             "edge",
+            "copy_type",
+            "engraved",
+            "engraving_text",
+            "engraving_notes",
             "is_sku_unicorn",
             "is_variant_unicorn",
             "is_edge_unicorn",
+            "set_members",
             "price",
         ]
     )
@@ -267,9 +338,14 @@ def import_template():
             "0",
             "Kitchen Knives",
             "Double-D",
+            "plain",
+            "",
+            "",
+            "",
             "no",
             "no",
             "no",
+            "",
             "12.50",
         ]
     )
@@ -284,9 +360,14 @@ def import_template():
             "",
             "Kitchen Knives",
             "Straight",
+            "engraved",
+            "yes",
+            "250th Anniversary",
+            "Limited edition engraving",
             "no",
             "no",
             "no",
+            "",
             "",
         ]
     )
@@ -418,7 +499,9 @@ def import_page():
 
     existing_items = _build_item_sku_lookup(Item.query.all())
     existing_set_skus = _build_set_sku_lookup(Set.query.all())
-    existing_names = {item.name.lower(): item for item in Item.query.all()}
+    existing_names = _build_item_name_lookup(
+        [item for item in Item.query.all() if not normalize_sku_value(item.sku)]
+    )
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
 
     already_in_catalog = []
@@ -426,6 +509,7 @@ def import_page():
     new_items_list = []
     likely_unicorns = []
     set_sku_collisions = []
+    set_rows = []
     ownership_entries = []
     conflicts = []
     errors = []
@@ -438,6 +522,7 @@ def import_page():
         availability = canonicalize_availability(availability_raw)
         legacy_non_catalog = _parse_truthy_field(row.get("non_catalog", ""))
         edge_type = row.get("edge_type", "").strip() or "Unknown"
+        set_member_skus = _parse_set_members_field(row.get("set_members", ""))
         is_sku_unicorn = (
             row.get("is_sku_unicorn", row.get("item_is_unicorn", "")).strip().lower()
             in TRUTHY
@@ -457,11 +542,28 @@ def import_page():
             availability = "non-catalog"
         non_catalog = non_catalog or availability != "public"
         category = canonicalize_category(row.get("category", ""))
+        edge_type, is_edge_unicorn = normalize_edge_for_category(
+            category,
+            edge_type,
+            is_edge_unicorn,
+        )
+        matched_set = existing_set_skus.get(sku) if sku else None
+        is_set_row = bool(set_member_skus)
+        if category in EDGELESS_CATEGORIES:
+            non_catalog = (
+                legacy_non_catalog
+                or is_sku_unicorn
+                or is_variant_unicorn
+                or availability != "public"
+            )
         note_text, note_errors = _build_notes(row)
         quantity_purchased, quantity_given_away, quantity_errors = (
             _parse_quantity_fields(row)
         )
         note_errors.extend(quantity_errors)
+        copy_type, engraving_text, engraving_notes, engraving_signature = (
+            _read_engraving_fields(row)
+        )
         if note_errors:
             errors.append(
                 {
@@ -484,6 +586,24 @@ def import_page():
             errors.append({"row": row_num, "reason": "Missing name", "data": row})
             continue
 
+        if is_set_row:
+            set_rows.append(
+                {
+                    "name": name,
+                    "sku": sku,
+                    "row": row_num,
+                    "set_members": set_member_skus,
+                    "set_members_display": _format_set_members_display(set_member_skus),
+                    "member_count": len(set_member_skus),
+                    "matches_existing_set_sku": bool(matched_set),
+                    "matched_set_name": (
+                        matched_set.name if matched_set is not None else None
+                    ),
+                    "notes": notes,
+                }
+            )
+            continue
+
         if status not in STATUS_OPTIONS:
             status = "Owned"
 
@@ -494,7 +614,6 @@ def import_page():
             name=name,
         )
 
-        matched_set = existing_set_skus.get(sku) if sku else None
         matches_set_sku = bool(sku and matched_set and not matched_item)
 
         item_category_for_color = (
@@ -503,7 +622,7 @@ def import_page():
         target_color = _resolve_import_variant_color(
             name, item_category_for_color, color
         )
-        is_cookware = item_category_for_color in COOKWARE_CATEGORIES
+        is_cookware = item_category_for_color in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
         existing_variant = None
         if matched_item:
             existing_variant = next(
@@ -531,6 +650,10 @@ def import_page():
                     )[1],
                     "person": person_name,
                     "status": status,
+                    "copy_type": copy_type,
+                    "engraving_text": engraving_text,
+                    "engraving_notes": engraving_notes,
+                    "engraving_signature": engraving_signature,
                 }
             )
             already_in_catalog[-1]["row"] = row_num
@@ -580,6 +703,10 @@ def import_page():
                     "is_edge_unicorn": is_edge_unicorn,
                     "quantity_purchased": quantity_purchased,
                     "quantity_given_away": quantity_given_away,
+                    "copy_type": copy_type,
+                    "engraving_text": engraving_text,
+                    "engraving_notes": engraving_notes,
+                    "engraving_signature": engraving_signature,
                     "category": category,
                     "notes": notes,
                     "person": person_name,
@@ -632,6 +759,10 @@ def import_page():
                     "is_edge_unicorn": is_edge_unicorn,
                     "quantity_purchased": quantity_purchased,
                     "quantity_given_away": quantity_given_away,
+                    "copy_type": copy_type,
+                    "engraving_text": engraving_text,
+                    "engraving_notes": engraving_notes,
+                    "engraving_signature": engraving_signature,
                     "is_new_variant": existing_variant is None,
                     "is_new_person": person_name.lower() not in existing_persons,
                 }
@@ -652,6 +783,7 @@ def import_page():
             set_sku_collisions,
             base_index=len(new_items_list) + len(likely_unicorns),
         ),
+        set_rows=set_rows,
         ownership_entries=ownership_entries,
         ownership_groups=_group_import_rows(ownership_entries, base_index=0),
         conflicts=conflicts,
@@ -660,7 +792,9 @@ def import_page():
         item_rows_total=len(new_items_list)
         + len(likely_unicorns)
         + len(set_sku_collisions),
+        set_rows_total=len(set_rows),
         edge_types=EDGE_TYPES,
+        edgeless_categories=EDGELESS_CATEGORIES,
         status_options=STATUS_OPTIONS,
         person_override=person_override,
     )
@@ -1070,19 +1204,28 @@ def import_confirm():
     from sqlalchemy.exc import SQLAlchemyError
 
     added_items = 0
+    created_sets = 0
+    updated_sets = 0
     added_ownership = 0
     added_persons = 0
     item_rows_selected = 0
     item_rows_imported = 0
+    set_rows_selected = 0
+    set_rows_imported = 0
     own_rows_selected = 0
     own_rows_imported = 0
     skipped_details = []
 
     existing_items = _build_item_sku_lookup(Item.query.all())
-    existing_names = {item.name.lower(): item for item in Item.query.all()}
+    existing_set_skus = _build_set_sku_lookup(Set.query.all())
+    existing_set_ids = {item_set.id for item_set in Set.query.all()}
+    existing_names = _build_item_name_lookup(
+        [item for item in Item.query.all() if not normalize_sku_value(item.sku)]
+    )
     existing_persons = {person.name.lower(): person for person in Person.query.all()}
 
     item_count = int(request.form.get("item_count", 0) or 0)
+    set_count = int(request.form.get("set_count", 0) or 0)
     own_count = int(request.form.get("own_count", 0) or 0)
     total_rows = int(request.form.get("total_rows", 0) or 0)
 
@@ -1165,6 +1308,9 @@ def import_confirm():
             notes = request.form.get(f"item_notes_{row_index}", "").strip() or None
             person_name = request.form.get(f"item_person_{row_index}", "").strip()
             status = request.form.get(f"item_status_{row_index}", "Owned")
+            copy_type, engraving_text, engraving_notes, engraving_signature = (
+                _read_engraving_fields(request.form, prefix="item_")
+            )
 
             if not name:
                 skipped_details.append(
@@ -1182,7 +1328,6 @@ def import_confirm():
                 sku=sku,
                 name=name,
             )
-
             if not item:
                 item = Item(
                     name=name,
@@ -1199,7 +1344,10 @@ def import_confirm():
                 db.session.flush()
                 if sku:
                     existing_items[sku] = item
-                existing_names[name.lower()] = item
+                if not sku:
+                    existing_names.setdefault(
+                        _normalize_variant_lookup_name(name), item
+                    )
                 added_items += 1
             else:
                 if availability_specified or non_catalog:
@@ -1209,6 +1357,9 @@ def import_confirm():
                     item.is_unicorn = True
                 if is_edge_unicorn and not item.edge_is_unicorn:
                     item.edge_is_unicorn = True
+                if item.category in EDGELESS_CATEGORIES:
+                    item.edge_type = "N/A"
+                    item.edge_is_unicorn = False
                 if non_catalog:
                     item.in_catalog = False
 
@@ -1238,7 +1389,10 @@ def import_confirm():
                     existing_persons[person_name.lower()] = person
                     added_persons += 1
                 existing_o = Ownership.query.filter_by(
-                    person_id=person.id, variant_id=variant.id
+                    person_id=person.id,
+                    variant_id=variant.id,
+                    copy_type=copy_type,
+                    engraving_signature=engraving_signature,
                 ).first()
                 if existing_o:
                     if existing_o.status != status:
@@ -1249,6 +1403,10 @@ def import_confirm():
                         notes=existing_o.notes,
                         quantity_purchased=quantity_purchased,
                         quantity_given_away=quantity_given_away,
+                        copy_type=copy_type,
+                        engraving_text=engraving_text,
+                        engraving_notes=engraving_notes,
+                        engraving_signature=engraving_signature,
                     )
                 else:
                     db.session.add(
@@ -1258,6 +1416,10 @@ def import_confirm():
                             status=status,
                             quantity_purchased=quantity_purchased,
                             quantity_given_away=quantity_given_away,
+                            copy_type=copy_type,
+                            engraving_text=engraving_text,
+                            engraving_notes=engraving_notes,
+                            engraving_signature=engraving_signature,
                         )
                     )
                     added_ownership += 1
@@ -1265,6 +1427,146 @@ def import_confirm():
             db.session.flush()
             reconcile_unknown_variant(item)
             item_rows_imported += 1
+
+        for row_index in range(set_count):
+            row_num = request.form.get(f"set_row_{row_index}", type=int)
+            set_name_hint = (
+                request.form.get(f"set_name_{row_index}", "").strip() or None
+            )
+            set_sku_hint = normalize_sku_value(
+                request.form.get(f"set_sku_{row_index}", "")
+            )
+
+            if request.form.get(f"set_accept_{row_index}") != "on":
+                skipped_details.append(
+                    {
+                        "row": row_num,
+                        "label": _import_row_label(
+                            row_num, set_name_hint, set_sku_hint
+                        ),
+                        "reason": "Not selected during import review.",
+                    }
+                )
+                continue
+            set_rows_selected += 1
+
+            set_name = request.form.get(f"set_name_{row_index}", "").strip()
+            set_sku = normalize_sku_value(request.form.get(f"set_sku_{row_index}", ""))
+            set_member_skus = _parse_set_members_field(
+                request.form.get(f"set_members_{row_index}", "")
+            )
+            if not set_name:
+                skipped_details.append(
+                    {
+                        "row": row_num,
+                        "label": _import_row_label(
+                            row_num, set_name_hint, set_sku_hint
+                        ),
+                        "reason": "Missing set name.",
+                    }
+                )
+                continue
+            if not set_sku:
+                skipped_details.append(
+                    {
+                        "row": row_num,
+                        "label": _import_row_label(
+                            row_num, set_name_hint, set_sku_hint
+                        ),
+                        "reason": "Missing set SKU.",
+                    }
+                )
+                continue
+            if not set_member_skus:
+                skipped_details.append(
+                    {
+                        "row": row_num,
+                        "label": _import_row_label(
+                            row_num, set_name_hint, set_sku_hint
+                        ),
+                        "reason": "Missing set member SKUs.",
+                    }
+                )
+                continue
+
+            member_counts: dict[str, int] = {}
+            for member_sku in set_member_skus:
+                member_counts[member_sku] = member_counts.get(member_sku, 0) + 1
+            member_entries: list[SetMemberEntry] = []
+            missing_members: list[str] = []
+            for member_sku, qty in member_counts.items():
+                item = existing_items.get(member_sku)
+                if not item:
+                    missing_members.append(member_sku)
+                    continue
+                member_entries.append(
+                    {"sku": member_sku, "quantity": qty, "name": item.name}
+                )
+            if missing_members:
+                skipped_details.append(
+                    {
+                        "row": row_num,
+                        "label": _import_row_label(
+                            row_num, set_name_hint, set_sku_hint
+                        ),
+                        "reason": "Missing set member SKU(s): "
+                        + ", ".join(missing_members),
+                    }
+                )
+                continue
+
+            existing_set_by_name = Set.query.filter(
+                db.func.lower(Set.name) == set_name.lower()
+            ).first()
+            existing_set_by_sku = existing_set_skus.get(set_sku)
+            if (
+                existing_set_by_name
+                and existing_set_by_sku
+                and existing_set_by_name.id != existing_set_by_sku.id
+            ):
+                skipped_details.append(
+                    {
+                        "row": row_num,
+                        "label": _import_row_label(row_num, set_name, set_sku),
+                        "reason": "Set name and set SKU point to different existing sets.",
+                    }
+                )
+                continue
+
+            item_set = existing_set_by_sku or existing_set_by_name
+            if item_set is None:
+                item_set = get_or_create_set(set_name)
+            if item_set.id in existing_set_ids:
+                updated_sets += 1
+            else:
+                created_sets += 1
+                existing_set_ids.add(item_set.id)
+            if item_set.name != set_name:
+                item_set.name = set_name
+            if item_set.sku != set_sku:
+                item_set.sku = set_sku
+                if set_sku is not None:
+                    existing_set_skus[set_sku] = item_set
+            item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
+            existing_members = {member.item_id: member for member in item_set.members}
+            incoming_member_ids: set[int] = set()
+            for member in member_entries:
+                member_sku = member["sku"]
+                item = existing_items.get(member_sku)
+                if not item:
+                    continue
+                qty = member["quantity"]
+                if item.id not in existing_members:
+                    db.session.add(
+                        ItemSetMember(set_id=item_set.id, item_id=item.id, quantity=qty)
+                    )
+                else:
+                    existing_members[item.id].quantity = qty
+                incoming_member_ids.add(item.id)
+            for membership in list(item_set.members):
+                if membership.item_id not in incoming_member_ids:
+                    db.session.delete(membership)
+            set_rows_imported += 1
 
         for row_index in range(own_count):
             row_num = request.form.get(f"own_row_{row_index}", type=int)
@@ -1293,6 +1595,9 @@ def import_confirm():
             )
             status = request.form.get(f"own_status_{row_index}", "Owned")
             notes = request.form.get(f"own_notes_{row_index}", "").strip() or None
+            copy_type, engraving_text, engraving_notes, engraving_signature = (
+                _read_engraving_fields(request.form, prefix="own_")
+            )
             quantity_purchased, qty_error = _read_confirm_quantity_field(
                 request.form.get(f"own_quantity_purchased_{row_index}", ""),
                 "Quantity Purchased",
@@ -1348,6 +1653,9 @@ def import_confirm():
                 item.is_unicorn = True
             if is_edge_unicorn and not item.edge_is_unicorn:
                 item.edge_is_unicorn = True
+            if item.category in EDGELESS_CATEGORIES:
+                item.edge_type = "N/A"
+                item.edge_is_unicorn = False
 
             person = existing_persons.get(person_name.lower())
             if not person:
@@ -1374,7 +1682,10 @@ def import_confirm():
                 variant.is_unicorn = True
 
             existing_o = Ownership.query.filter_by(
-                person_id=person.id, variant_id=variant.id
+                person_id=person.id,
+                variant_id=variant.id,
+                copy_type=copy_type,
+                engraving_signature=engraving_signature,
             ).first()
             if existing_o:
                 if existing_o.status != status:
@@ -1385,6 +1696,10 @@ def import_confirm():
                     notes=notes,
                     quantity_purchased=quantity_purchased,
                     quantity_given_away=quantity_given_away,
+                    copy_type=copy_type,
+                    engraving_text=engraving_text,
+                    engraving_notes=engraving_notes,
+                    engraving_signature=engraving_signature,
                 )
             else:
                 db.session.add(
@@ -1395,6 +1710,10 @@ def import_confirm():
                         notes=notes,
                         quantity_purchased=quantity_purchased,
                         quantity_given_away=quantity_given_away,
+                        copy_type=copy_type,
+                        engraving_text=engraving_text,
+                        engraving_notes=engraving_notes,
+                        engraving_signature=engraving_signature,
                     )
                 )
                 added_ownership += 1
@@ -1419,8 +1738,8 @@ def import_confirm():
             added_ownership,
             added_persons,
         )
-        selected_rows = item_rows_selected + own_rows_selected
-        imported_rows = item_rows_imported + own_rows_imported
+        selected_rows = item_rows_selected + set_rows_selected + own_rows_selected
+        imported_rows = item_rows_imported + set_rows_imported + own_rows_imported
         error_count = int(request.form.get("error_count", 0) or 0)
         for idx in range(error_count):
             row_num = request.form.get(f"error_row_{idx}", type=int)
@@ -1478,6 +1797,14 @@ def import_confirm():
             parts.append(
                 f"{added_persons} collector{'s' if added_persons != 1 else ''}"
             )
+        if created_sets:
+            parts.append(
+                f"{created_sets} set{'s' if created_sets != 1 else ''} created"
+            )
+        if updated_sets:
+            parts.append(
+                f"{updated_sets} set{'s' if updated_sets != 1 else ''} updated"
+            )
         if added_ownership:
             parts.append(
                 f"{added_ownership} ownership entr{'ies' if added_ownership != 1 else 'y'}"
@@ -1490,7 +1817,7 @@ def import_confirm():
         record_activity(
             "import",
             "Import complete",
-            f"Imported {imported_rows} rows, added {added_items} items, {added_persons} collectors, {added_ownership} ownership entries.",
+            f"Imported {imported_rows} rows, added {added_items} items, created {created_sets} sets, updated {updated_sets} sets, {added_persons} collectors, {added_ownership} ownership entries.",
         )
         db.session.commit()
         return render_template(
@@ -1501,6 +1828,8 @@ def import_confirm():
             imported_rows=imported_rows,
             skipped_details=skipped_details,
             added_items=added_items,
+            created_sets=created_sets,
+            updated_sets=updated_sets,
             added_persons=added_persons,
             added_ownership=added_ownership,
         )

@@ -81,6 +81,7 @@
           </div>
           <div class="search-result-badges">
             <span class="badge badge-info">{{ person.ownerships | length }} entries</span>
+            <span class="badge badge-secondary">{{ person.ownerships | selectattr('copy_type', 'equalto', 'engraved') | list | length }} engraved</span>
             <a class="btn btn-xs btn-secondary" href="{{ url_for('people.people_edit', person_id=person.id) }}">Edit</a>
           </div>
         </div>

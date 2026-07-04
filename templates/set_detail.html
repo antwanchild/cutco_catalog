@@ -176,7 +176,7 @@
               <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
             {% endif %}
           </td>
-          <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if item.category not in edgeless_categories and item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
           <td>
             {% if item.category in COOKWARE_CATEGORIES %}
               <span class="muted">—</span>
@@ -239,7 +239,7 @@
               <span class="badge badge-uncategorized" title="No category assigned yet">Uncategorized</span>
             {% endif %}
           </td>
-          <td>{% if item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if item.category not in edgeless_categories and item.edge_type != 'N/A' %}{{ item.edge_type }}{% else %}<span class="muted">—</span>{% endif %}</td>
           <td>{% if item.msrp %}${{ "%.2f"|format(item.msrp) }}{% else %}<span class="muted">—</span>{% endif %}</td>
           <td>
             {% if person_id and item.id in wishlisted_item_ids %}

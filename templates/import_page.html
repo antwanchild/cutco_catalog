@@ -40,7 +40,7 @@
   <details class="form-card import-mapping">
     <summary>Import Column Mapping</summary>
     <p class="muted">Case-insensitive matching. Lowercase is easiest to scan, and these are the headers we recognize.</p>
-    <p class="muted small"><code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
+    <p class="muted small"><code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,set_members,price</code> - leave <code>edge</code> blank for edgeless items like cookware, bakeware, and cutting boards.</p>
     <table class="data-table compact">
       <thead><tr><th>Spreadsheet Column</th><th>Maps To</th></tr></thead>
       <tbody>
@@ -54,9 +54,14 @@
         <tr><td><code>quantity given away</code></td><td>Whole number</td></tr>
         <tr><td><code>category</code></td><td>Category</td></tr>
         <tr><td><code>edge</code></td><td>Edge type</td></tr>
+        <tr><td><code>copy_type</code></td><td><code>plain</code> or <code>engraved</code></td></tr>
+        <tr><td><code>engraved</code></td><td>Truthy alias for an engraved copy</td></tr>
+        <tr><td><code>engraving_text</code></td><td>Text on the engraved copy</td></tr>
+        <tr><td><code>engraving_notes</code></td><td>Optional engraving notes</td></tr>
         <tr><td><code>is_sku_unicorn</code></td><td>SKU/item unicorn flag</td></tr>
         <tr><td><code>is_variant_unicorn</code></td><td>Variant/color unicorn flag</td></tr>
         <tr><td><code>is_edge_unicorn</code></td><td>Edge/blade-type unicorn flag</td></tr>
+        <tr><td><code>set_members</code></td><td>Pipe-separated list of set member SKUs, like <code>1726|1730|1731</code></td></tr>
         <tr><td><code>price</code></td><td>Merged into notes</td></tr>
       </tbody>
     </table>
@@ -65,7 +70,7 @@
   {% if import_check %}
   <div class="form-card">
     <h2>Header Check Result ({{ import_check.file_type }})</h2>
-    <p class="muted small">Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code></p>
+    <p class="muted small">Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,set_members,price</code></p>
     {% if import_check.ok %}
       <p class="flash flash-success">Required headers look good.</p>
     {% else %}

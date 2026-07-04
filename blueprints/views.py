@@ -17,7 +17,12 @@ from flask import (
     url_for,
 )
 
-from constants import COOKWARE_CATEGORIES, STATUS_RANK, UNKNOWN_COLOR
+from constants import (
+    COOKWARE_CATEGORIES,
+    EDGELESS_CATEGORIES,
+    STATUS_RANK,
+    UNKNOWN_COLOR,
+)
 from extensions import db
 from helpers import (
     admin_required,
@@ -107,7 +112,7 @@ def _build_item_owners_context(item_id: int, *, private_view: bool) -> dict:
         entries = (
             Ownership.query.join(ItemVariant, Ownership.variant_id == ItemVariant.id)
             .filter(ItemVariant.item_id == item_id)
-            .order_by(Ownership.status)
+            .order_by(Ownership.status, Ownership.copy_type, Ownership.engraving_text)
             .all()
         )
         owner_ids = {entry.person_id for entry in entries}
@@ -252,8 +257,15 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
             color = "Unknown"
         color_counts[color] = color_counts.get(color, 0) + 1
 
+    engraving_counts = {
+        "Plain": sum(1 for ownership in owned if ownership.copy_type != "engraved"),
+        "Engraved": sum(1 for ownership in owned if ownership.copy_type == "engraved"),
+    }
+
     edge_counts: dict[str, int] = {}
     for item in owned_items:
+        if (item.category or "") in EDGELESS_CATEGORIES:
+            continue
         edge = item.edge_type or "Unknown"
         edge_counts[edge] = edge_counts.get(edge, 0) + 1
 
@@ -264,6 +276,9 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
                 person_id=person.id, status="Owned"
             ).all()
             person_item_ids = {ownership.variant.item_id for ownership in person_owned}
+            person_engraved_count = sum(
+                1 for ownership in person_owned if ownership.copy_type == "engraved"
+            )
             person_items = (
                 Item.query.filter(Item.id.in_(person_item_ids)).all()
                 if person_item_ids
@@ -276,6 +291,7 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
                     name=person.name,
                     count=len(person_item_ids),
                     value=person_value,
+                    engraved_count=person_engraved_count,
                 )
             )
         collector_rows.sort(key=lambda row: row["count"], reverse=True)
@@ -305,6 +321,8 @@ def _build_stats_context(person_id: int | None, *, private_view: bool) -> dict:
         coverage_pct=(
             round(100 * len(owned_items) / catalog_total, 1) if catalog_total else 0
         ),
+        engraved_entries=engraving_counts["Engraved"],
+        plain_entries=engraving_counts["Plain"],
     )
 
     cat_data = sorted(cat_counts.items(), key=lambda kv: kv[1], reverse=True)
@@ -413,7 +431,9 @@ def _build_person_collection_context(person_id: int, *, session: dict) -> dict:
 
     session["last_person_id"] = person_id
     ownerships = (
-        Ownership.query.filter_by(person_id=person_id).order_by(Ownership.status).all()
+        Ownership.query.filter_by(person_id=person_id)
+        .order_by(Ownership.status, Ownership.copy_type, Ownership.engraving_text)
+        .all()
     )
 
     owned_item_ids = {o.variant.item_id for o in ownerships if o.status == "Owned"}
@@ -536,7 +556,9 @@ def item_owners(item_id):
     item = context["item"]
     if not item:
         abort(404)
-    return render_template("item_owners.html", **context)
+    return render_template(
+        "item_owners.html", edgeless_categories=EDGELESS_CATEGORIES, **context
+    )
 
 
 @views_bp.route("/views/item/<int:item_id>/attachments", methods=["POST"])

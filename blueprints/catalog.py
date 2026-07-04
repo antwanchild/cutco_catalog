@@ -21,12 +21,15 @@ from sqlalchemy.orm import selectinload
 
 from constants import (
     AVAILABILITY_CHOICES,
+    EDGELESS_CATEGORIES,
     COOKWARE_CATEGORIES,
     EDGE_TYPES,
     SYNC_BLOCKED_CATEGORIES,
     UNKNOWN_COLOR,
     canonicalize_category,
     canonicalize_availability,
+    normalize_edge_for_category,
+    VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
 from extensions import db
 from helpers import admin_required, db_commit, is_admin, is_authenticated_user
@@ -239,7 +242,8 @@ def catalog():
         availability_choices=AVAILABILITY_CHOICES,
         edge_types=EDGE_TYPES,
         UNCATEGORIZED_FILTER=UNCATEGORIZED_FILTER,
-        COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
+        SINGLE_VARIANT_CATEGORIES=VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
+        edgeless_categories=EDGELESS_CATEGORIES,
         UNKNOWN_COLOR=UNKNOWN_COLOR,
         unreferenced_count=unreferenced_count,
         all_item_count=all_item_count,
@@ -269,9 +273,16 @@ def catalog_add():
             or None,
             category=canonicalize_category(request.form.get("category", "")),
             availability=availability,
-            edge_type=request.form.get("edge_type", "Unknown"),
+            edge_type=normalize_edge_for_category(
+                canonicalize_category(request.form.get("category", "")),
+                request.form.get("edge_type", "Unknown"),
+            )[0],
             is_unicorn=request.form.get("is_unicorn") == "on",
-            edge_is_unicorn=request.form.get("edge_is_unicorn") == "on",
+            edge_is_unicorn=normalize_edge_for_category(
+                canonicalize_category(request.form.get("category", "")),
+                request.form.get("edge_type", "Unknown"),
+                request.form.get("edge_is_unicorn") == "on",
+            )[1],
             set_only=request.form.get("set_only") == "on",
             in_catalog=availability == "public"
             and request.form.get("set_only") != "on",
@@ -313,6 +324,7 @@ def catalog_add():
         availability_choices=AVAILABILITY_CHOICES,
         alternate_skus_text="",
         next_target=_safe_redirect_target(next_target),
+        edgeless_categories=EDGELESS_CATEGORIES,
     )
 
 
@@ -340,9 +352,12 @@ def catalog_edit(item_id):
         )
         item.category = canonicalize_category(request.form.get("category", ""))
         item.availability = availability
-        item.edge_type = request.form.get("edge_type", "Unknown")
+        item.edge_type, item.edge_is_unicorn = normalize_edge_for_category(
+            item.category,
+            request.form.get("edge_type", "Unknown"),
+            request.form.get("edge_is_unicorn") == "on",
+        )
         item.is_unicorn = request.form.get("is_unicorn") == "on"
-        item.edge_is_unicorn = request.form.get("edge_is_unicorn") == "on"
         item.set_only = request.form.get("set_only") == "on"
         item.in_catalog = (
             availability == "public" and request.form.get("set_only") != "on"
@@ -399,6 +414,7 @@ def catalog_edit(item_id):
         availability_choices=AVAILABILITY_CHOICES,
         alternate_skus_text=_item_alternate_skus_text(item),
         next_target=_safe_redirect_target(next_target),
+        edgeless_categories=EDGELESS_CATEGORIES,
     )
 
 
@@ -566,9 +582,12 @@ def variants(item_id):
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)
-    is_cookware = (item.category or "") in COOKWARE_CATEGORIES
+    is_single_variant = (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
     return render_template(
-        "variants.html", item=item, UNKNOWN_COLOR=UNKNOWN_COLOR, is_cookware=is_cookware
+        "variants.html",
+        item=item,
+        UNKNOWN_COLOR=UNKNOWN_COLOR,
+        is_single_variant=is_single_variant,
     )
 
 
@@ -583,9 +602,11 @@ def variant_add(item_id):
     if not color:
         flash("Color is required.", "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
-    if (item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
+    if (
+        item.category or ""
+    ) in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES and color != UNKNOWN_COLOR:
         flash(
-            "Cookware items use a single Unknown variant; color variants are not supported.",
+            "These items use a single Unknown variant; color variants are not supported.",
             "warning",
         )
         return redirect(url_for("catalog.variants", item_id=item_id))
@@ -626,9 +647,11 @@ def variant_edit(vid):
     item = variant.item
     if item is None:
         abort(404)
-    if (item.category or "") in COOKWARE_CATEGORIES and color != UNKNOWN_COLOR:
+    if (
+        item.category or ""
+    ) in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES and color != UNKNOWN_COLOR:
         flash(
-            "Cookware items use a single Unknown variant; color variants are not supported.",
+            "These items use a single Unknown variant; color variants are not supported.",
             "warning",
         )
         return redirect(url_for("catalog.variants", item_id=item_id))
@@ -1260,7 +1283,8 @@ def set_detail(set_id=None, sid=None):
         top_colors=top_colors,
         next_target=next_target,
         can_restore_memberships=bool(item_set.member_data) and private_view,
-        COOKWARE_CATEGORIES=COOKWARE_CATEGORIES,
+        SINGLE_VARIANT_CATEGORIES=VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
+        edgeless_categories=EDGELESS_CATEGORIES,
         UNKNOWN_COLOR=UNKNOWN_COLOR,
     )
 
@@ -1359,7 +1383,12 @@ def catalog_sync():
         job = _read_catalog_sync_job()
         if job.get("status") == "done" and job.get("preview"):
             preview = job["preview"]
-            return render_template("sync_preview.html", job=job, **preview)
+            return render_template(
+                "sync_preview.html",
+                job=job,
+                edgeless_categories=EDGELESS_CATEGORIES,
+                **preview,
+            )
         if job.get("status") == "error":
             flash(
                 f"Catalog sync failed: {job.get('error') or 'Unknown error'}", "error"
@@ -1377,10 +1406,16 @@ def catalog_sync():
             scraped_sets_total=0,
             has_missing_set_members=False,
             blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES),
+            edgeless_categories=EDGELESS_CATEGORIES,
         )
 
     if job.get("status") == "done" and job.get("preview"):
-        return render_template("sync_preview.html", job=job, **job["preview"])
+        return render_template(
+            "sync_preview.html",
+            job=job,
+            edgeless_categories=EDGELESS_CATEGORIES,
+            **job["preview"],
+        )
     if job.get("status") == "running":
         return render_template(
             "sync_preview.html",
@@ -1395,6 +1430,7 @@ def catalog_sync():
             scraped_sets_total=0,
             has_missing_set_members=False,
             blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES),
+            edgeless_categories=EDGELESS_CATEGORIES,
         )
     if job.get("status") == "error":
         flash(f"Catalog sync failed: {job.get('error') or 'Unknown error'}", "error")
@@ -1411,6 +1447,7 @@ def catalog_sync():
             scraped_sets_total=0,
             has_missing_set_members=False,
             blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES),
+            edgeless_categories=EDGELESS_CATEGORIES,
         )
 
     return render_template(
@@ -1426,6 +1463,7 @@ def catalog_sync():
         scraped_sets_total=0,
         has_missing_set_members=False,
         blocked_categories=sorted(SYNC_BLOCKED_CATEGORIES),
+        edgeless_categories=EDGELESS_CATEGORIES,
     )
 
 
@@ -1477,8 +1515,15 @@ def catalog_sync_confirm():
             in_catalog=True,
             set_only=False,
             is_unicorn=False,
-            edge_is_unicorn=False,
-            edge_type=data.get("edge_type") or "Unknown",
+            edge_is_unicorn=normalize_edge_for_category(
+                canonicalize_category(data.get("category")),
+                data.get("edge_type"),
+                False,
+            )[1],
+            edge_type=normalize_edge_for_category(
+                canonicalize_category(data.get("category")),
+                data.get("edge_type"),
+            )[0],
             msrp=msrp,
             blade_length=data.get("blade_length") or None,
             overall_length=data.get("overall_length") or None,

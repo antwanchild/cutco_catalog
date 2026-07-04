@@ -20,7 +20,6 @@ from blueprints.import_shared import (
     _safe_csv_filename,  # noqa: F401
 )
 from constants import (
-    COOKWARE_CATEGORIES,
     UNKNOWN_COLOR,
     VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
@@ -295,7 +294,7 @@ def _build_completion_preview(
             continue
         target_color = (
             UNKNOWN_COLOR
-            if (item.category or "") in COOKWARE_CATEGORIES
+            if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
             else bucket["color"]
         )
         variant = next(
@@ -540,7 +539,7 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
             items_with_no_clear_variants += 1
             continue
         if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES:
-            skip_reason = "Cookware items use a single fallback variant."
+            skip_reason = "These items use a single fallback variant."
             if (item.category or "") == "Cutting Boards":
                 skip_reason = (
                     "Cutting board items are treated as a single fallback variant."
@@ -903,6 +902,10 @@ def _merge_import_ownership(
     notes: str | None = None,
     quantity_purchased: int | None = None,
     quantity_given_away: int | None = None,
+    copy_type: str | None = None,
+    engraving_text: str | None = None,
+    engraving_notes: str | None = None,
+    engraving_signature: str | None = None,
 ) -> None:
     """Update an existing ownership row from an import row."""
     ownership.status = status
@@ -912,6 +915,14 @@ def _merge_import_ownership(
         ownership.quantity_purchased = quantity_purchased
     if quantity_given_away is not None:
         ownership.quantity_given_away = quantity_given_away
+    if copy_type is not None:
+        ownership.copy_type = copy_type
+    if engraving_text is not None:
+        ownership.engraving_text = engraving_text
+    if engraving_notes is not None:
+        ownership.engraving_notes = engraving_notes
+    if engraving_signature is not None:
+        ownership.engraving_signature = engraving_signature
 
 
 def _add_import_ownership_quantities(
@@ -921,6 +932,10 @@ def _add_import_ownership_quantities(
     notes: str | None = None,
     quantity_purchased: int | None = None,
     quantity_given_away: int | None = None,
+    copy_type: str | None = None,
+    engraving_text: str | None = None,
+    engraving_notes: str | None = None,
+    engraving_signature: str | None = None,
 ) -> None:
     """Add imported quantities onto an existing ownership row."""
     ownership.status = status
@@ -934,6 +949,14 @@ def _add_import_ownership_quantities(
         ownership.quantity_given_away = (
             ownership.quantity_given_away or 0
         ) + quantity_given_away
+    if copy_type is not None:
+        ownership.copy_type = copy_type
+    if engraving_text is not None:
+        ownership.engraving_text = engraving_text
+    if engraving_notes is not None:
+        ownership.engraving_notes = engraving_notes
+    if engraving_signature is not None:
+        ownership.engraving_signature = engraving_signature
 
 
 def _find_import_variant(item: Item, color: str) -> ItemVariant | None:
@@ -963,7 +986,7 @@ def _group_import_rows(rows: list[dict], *, base_index: int = 0) -> list[dict]:
         if not group:
             group = {
                 "sku": row_copy.get("sku") or None,
-                "name": row_copy.get("name") or "—",
+                "name": row_copy.get("name") or row_copy.get("item_name") or "—",
                 "rows": [],
                 "row_count": 0,
                 "variant_colors": [],

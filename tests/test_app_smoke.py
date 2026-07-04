@@ -1444,7 +1444,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertEqual(import_template_response.mimetype, "text/csv")
         self.assertIn(
             b"name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,"
-            b"is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price",
+            b"copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,set_members,price",
             import_template_response.data,
         )
 
@@ -1872,6 +1872,34 @@ class UtilitySmokeTests(SmokeBaseTest):
             ),
             "2135-2",
         )
+        self.assertIsNone(
+            _extract_sku_from_href(
+                "https://www.cutco.com/p/250th-celebration-knife-with-sheath&view=product"
+            )
+        )
+
+    def test_fetch_sku_from_page_ignores_descriptive_slug_digits(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html>
+              <head>
+                <meta property="product:sku" content="2135">
+              </head>
+              <body>
+                <h1>The 250th Celebration Knife with Sheath</h1>
+              </body>
+            </html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            from scraping import _fetch_sku_from_page
+
+            _fetch_sku_from_page.cache_clear()
+            sku, name = _fetch_sku_from_page(
+                "https://www.cutco.com/p/250th-celebration-knife-with-sheath&view=product"
+            )
+        self.assertEqual(sku, "2135")
+        self.assertEqual(name, "The 250th Celebration Knife with Sheath")
 
     def test_extract_product_variant_colors_uses_page_color_without_swatch_group(self):
         response = mock.Mock()
@@ -3206,7 +3234,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Header Check Result (CSV)", response.data)
         self.assertIn(
-            b"Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code>",
+            b"Recommended header order: <code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,set_members,price</code>",
             response.data,
         )
         self.assertIn(b"Missing required headers: name", response.data)
@@ -3247,7 +3275,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Import Column Mapping", response.data)
         self.assertIn(b"<code>availability</code>", response.data)
         self.assertIn(
-            b"<code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,price</code>",
+            b"<code>name,sku,owned,color,availability,quantity purchased,quantity given away,category,edge,copy_type,engraved,engraving_text,engraving_notes,is_sku_unicorn,is_variant_unicorn,is_edge_unicorn,set_members,price</code>",
             response.data,
         )
         self.assertIn(b"Rep only", response.data)
@@ -3710,6 +3738,34 @@ class ImportSmokeTests(SmokeBaseTest):
         )
         self.assertNotIn(
             b"<td>\n          Unknown\n        </td>", preview_response.data
+        )
+
+    def test_import_preview_treats_cutting_board_as_edgeless(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color,category\n"
+                        b"Cutting Board Test,CB-EDGE-1,yes,Classic Brown,Cutting Board\n"
+                    ),
+                    "cutting_board.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Cutting Board Test", preview_response.data)
+        self.assertNotIn(b'<select name="item_edge_0"', preview_response.data)
+        self.assertIn(
+            b'<input type="hidden" name="item_edge_0" value="N/A">',
+            preview_response.data,
         )
 
     def test_import_preview_csv_and_error_paths(self):
