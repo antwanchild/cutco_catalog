@@ -322,6 +322,7 @@
 <form method="post" action="{{ url_for('data.import_confirm') }}">
   <input type="hidden" name="total_rows" value="{{ total_rows or 0 }}">
   <input type="hidden" name="item_count" value="{{ item_rows_total }}">
+  <input type="hidden" name="set_count" value="{{ set_rows_total or 0 }}">
   <input type="hidden" name="error_count" value="{{ errors | length }}">
   {% for error in errors %}
   <input type="hidden" name="error_row_{{ loop.index0 }}" value="{{ error.row }}">
@@ -353,6 +354,53 @@
   {{ render_grouped_item_section("⚠️ Set SKU Collisions", set_sku_collisions, set_sku_collision_groups, "These rows match an existing set SKU. They are unchecked by default because they usually should not import as standalone items.", (new_items | length) + (likely_unicorns | length), checked_by_default=False, show_set_badge=True) }}
   {% endif %}
 
+  {# ── Set Rows ───────────────────────────────────────────────────────── #}
+  {% if set_rows %}
+  <h2>Set Rows ({{ set_rows | length }})</h2>
+  <p class="muted">Rows with <code>set_members</code> create or update sets. Member SKUs are linked after item rows in the same file are processed.</p>
+  <div class="table-wrap">
+    <table class="data-table import-set-table">
+      <thead>
+        <tr>
+          <th>Keep</th>
+          <th>Row</th>
+          <th>Name</th>
+          <th>SKU</th>
+          <th>Members</th>
+          <th>Match</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for set_row in set_rows %}
+        <tr>
+          <td class="import-accept-cell"><input type="checkbox" class="import-accept-checkbox" name="set_accept_{{ loop.index0 }}" checked></td>
+          <td>
+            <input type="hidden" name="set_row_{{ loop.index0 }}" value="{{ set_row.row }}">
+            <input type="hidden" name="set_name_{{ loop.index0 }}" value="{{ set_row.name }}">
+            <input type="hidden" name="set_sku_{{ loop.index0 }}" value="{{ set_row.sku or '' }}">
+            <input type="hidden" name="set_members_{{ loop.index0 }}" value="{{ set_row.set_members | join('|') }}">
+            {{ set_row.row }}
+          </td>
+          <td>{{ set_row.name }}</td>
+          <td><span class="mono">{{ set_row.sku or '—' }}</span></td>
+          <td>
+            <span class="small muted">{{ set_row.set_members_display }}</span>
+            <div class="muted small">{{ set_row.member_count }} member{{ 's' if set_row.member_count != 1 else '' }}</div>
+          </td>
+          <td>
+            {% if set_row.matches_existing_set_sku %}
+              <span class="badge badge-warning">Existing set SKU{% if set_row.matched_set_name %}: {{ set_row.matched_set_name }}{% endif %}</span>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
   {# ── Ownership Entries ──────────────────────────────────────────────── #}
   {% if ownership_entries %}
   {% set new_variant_count = ownership_entries | selectattr("is_new_variant") | list | length %}
@@ -365,7 +413,7 @@
   <p class="muted small">Variant colors are item-specific, so a new variant here applies only to that item/SKU.</p>
   {% endif %}
 
-  {% if not new_items and not likely_unicorns and not ownership_entries %}
+  {% if not new_items and not likely_unicorns and not set_rows and not ownership_entries %}
   <p class="flash flash-info">Nothing new to import — all rows already exist.</p>
   {% else %}
   <div class="form-actions">

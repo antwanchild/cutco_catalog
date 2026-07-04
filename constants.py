@@ -291,6 +291,7 @@ XLSX_COL_MAP = {
     "is_sku_unicorn": "is_sku_unicorn",
     "is_variant_unicorn": "is_variant_unicorn",
     "is_edge_unicorn": "is_edge_unicorn",
+    "set_members": "set_members",
     "owned?": "owned_raw",
     "price": "_notes_price",
     "quantity purchased": "quantity_purchased",
