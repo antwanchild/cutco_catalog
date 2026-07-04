@@ -539,9 +539,7 @@ def import_page():
         target_color = _resolve_import_variant_color(
             name, item_category_for_color, color
         )
-        is_cookware = (
-            item_category_for_color in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
-        )
+        is_cookware = item_category_for_color in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
         existing_variant = None
         if matched_item:
             existing_variant = next(

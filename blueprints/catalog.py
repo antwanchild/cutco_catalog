@@ -567,9 +567,7 @@ def variants(item_id):
     item = db.session.get(Item, item_id)
     if not item:
         abort(404)
-    is_single_variant = (
-        item.category or ""
-    ) in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+    is_single_variant = (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
     return render_template(
         "variants.html",
         item=item,
@@ -589,7 +587,9 @@ def variant_add(item_id):
     if not color:
         flash("Color is required.", "error")
         return redirect(url_for("catalog.variants", item_id=item_id))
-    if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES and color != UNKNOWN_COLOR:
+    if (
+        item.category or ""
+    ) in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES and color != UNKNOWN_COLOR:
         flash(
             "These items use a single Unknown variant; color variants are not supported.",
             "warning",
@@ -632,7 +632,9 @@ def variant_edit(vid):
     item = variant.item
     if item is None:
         abort(404)
-    if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES and color != UNKNOWN_COLOR:
+    if (
+        item.category or ""
+    ) in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES and color != UNKNOWN_COLOR:
         flash(
             "These items use a single Unknown variant; color variants are not supported.",
             "warning",
