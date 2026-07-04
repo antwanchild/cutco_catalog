@@ -7,6 +7,7 @@ from blueprints.import_shared import (
     _build_item_sku_lookup,  # noqa: F401
     _build_notes,  # noqa: F401
     _build_set_sku_lookup,  # noqa: F401
+    _group_import_rows,  # noqa: F401
     _completion_field_name,  # noqa: F401
     _display_import_color,  # noqa: F401
     _import_row_label,  # noqa: F401

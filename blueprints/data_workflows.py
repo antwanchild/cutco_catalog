@@ -14,7 +14,6 @@ from blueprints.import_shared import (
     _build_item_sku_lookup,
     _build_import_header_report,  # noqa: F401
     _build_set_sku_lookup,
-    _group_import_rows,
     _import_row_label,  # noqa: F401
     _normalize_variant_lookup_name,
     _read_completion_rows,  # noqa: F401
