@@ -22,6 +22,7 @@ from constants import (
     EDGE_TYPES,
     STATUS_OPTIONS,
     TRUTHY,
+    EDGELESS_CATEGORIES,
     UNKNOWN_COLOR,
     XLSX_COL_MAP,
     canonicalize_availability,
@@ -709,6 +710,7 @@ def import_page():
         + len(likely_unicorns)
         + len(set_sku_collisions),
         edge_types=EDGE_TYPES,
+        edgeless_categories=EDGELESS_CATEGORIES,
         status_options=STATUS_OPTIONS,
         person_override=person_override,
     )

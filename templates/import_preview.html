@@ -84,11 +84,16 @@
             {{ item.display_color }}
           </td>
           <td>
-            <select name="item_edge_{{ item.form_index }}" class="select-xs">
-              {% for et in edge_types %}
-                <option value="{{ et }}" {% if et == item.edge_type %}selected{% endif %}>{{ et }}</option>
-              {% endfor %}
-            </select>
+            {% if (item.category or '') in edgeless_categories %}
+              <input type="hidden" name="item_edge_{{ item.form_index }}" value="{{ item.edge_type }}">
+              <span class="muted">—</span>
+            {% else %}
+              <select name="item_edge_{{ item.form_index }}" class="select-xs">
+                {% for et in edge_types %}
+                  <option value="{{ et }}" {% if et == item.edge_type %}selected{% endif %}>{{ et }}</option>
+                {% endfor %}
+              </select>
+            {% endif %}
           </td>
           <td>
             <input type="text" name="item_category_{{ item.form_index }}" value="{{ item.category or '' }}" class="input-xs">
