@@ -1501,7 +1501,9 @@ def catalog_sync_confirm():
     detected_variant_color_total = 0
     reconciled_item_variants = 0
 
-    def _add_catalog_sync_variants(item: Item, raw_variant_colors: object) -> tuple[int, int]:
+    def _add_catalog_sync_variants(
+        item: Item, raw_variant_colors: object
+    ) -> tuple[int, int]:
         variant_colors: list[str] = []
         if raw_variant_colors:
             try:

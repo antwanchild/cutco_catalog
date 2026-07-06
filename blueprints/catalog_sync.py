@@ -786,9 +786,7 @@ def _build_set_membership_preview(
             set_sku=set_sku,
         )
         matched_item_id = _get_item_field(resolved_item, "id")
-        compare_key = (
-            f"item:{matched_item_id}" if matched_item_id is not None else key
-        )
+        compare_key = f"item:{matched_item_id}" if matched_item_id is not None else key
         incoming["item_id"] = matched_item_id
         incoming["source_sku"] = incoming.get("sku")
         incoming["display_sku"] = _normalize_member_sku(
