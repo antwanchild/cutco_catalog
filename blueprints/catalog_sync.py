@@ -31,6 +31,7 @@ from models import (
 )
 from scraping import (
     _member_hover_title,
+    _resolve_cutco_item_page_url,
     scrape_catalog,
     scrape_item_specs,
     scrape_item_variant_colors,
@@ -612,11 +613,12 @@ def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> It
     db.session.flush()
     variant_colors: list[str] = []
     try:
+        item_url = _resolve_cutco_item_page_url(
+            f"https://www.cutco.com/p/{sku}", item_name=name
+        )
         variant_colors = [
             str(color).strip()
-            for color in scrape_item_variant_colors(
-                f"https://www.cutco.com/p/{sku}&view=product"
-            )
+            for color in scrape_item_variant_colors(item_url)
             if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
         ]
     except Exception as exc:
