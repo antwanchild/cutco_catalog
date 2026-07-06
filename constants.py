@@ -80,7 +80,7 @@ SHARPEN_THRESHOLD_DAYS = int(os.environ.get("SHARPEN_THRESHOLD_DAYS", "180"))
 COOKWARE_THRESHOLD_DAYS = int(os.environ.get("COOKWARE_THRESHOLD_DAYS", "60"))
 _cookware_env = os.environ.get("COOKWARE_CATEGORIES", "Cookware")
 COOKWARE_CATEGORIES = {cat.strip() for cat in _cookware_env.split(",") if cat.strip()}
-EDGELESS_CATEGORIES = COOKWARE_CATEGORIES | {"Bakeware", "Cutting Boards"}
+EDGELESS_CATEGORIES = COOKWARE_CATEGORIES | {"Bakeware", "Cutting Boards", "Flatware"}
 SHARPENING_PAGE_EXCLUDED_CATEGORIES = {
     "BBQ Tools",
     "Accessories",
