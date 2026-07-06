@@ -23,6 +23,7 @@ from job_state import read_json_file, reset_json_file, write_json_file
 from models import (
     Item,
     ItemSetMember,
+    ItemVariant,
     Set,
     parse_alternate_skus,
     record_activity,
@@ -609,6 +610,31 @@ def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> It
     )
     db.session.add(item)
     db.session.flush()
+    variant_colors: list[str] = []
+    try:
+        variant_colors = [
+            str(color).strip()
+            for color in scrape_item_variant_colors(
+                f"https://www.cutco.com/p/{sku}&view=product"
+            )
+            if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+        ]
+    except Exception as exc:
+        logger.debug("Variant scrape failed for missing set member %s: %s", sku, exc)
+    if variant_colors:
+        existing_colors = {
+            existing_variant.color.lower()
+            for existing_variant in item.variants
+            if existing_variant.color != UNKNOWN_COLOR
+        }
+        seen_colors: set[str] = set()
+        for color in variant_colors:
+            color_key = color.lower()
+            if color_key in seen_colors or color_key in existing_colors:
+                continue
+            seen_colors.add(color_key)
+            db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
+        db.session.flush()
     reconcile_unknown_variant(item)
     return item
 
