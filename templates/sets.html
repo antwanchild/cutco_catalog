@@ -8,7 +8,10 @@
 
 {# ── Set filters ───────────────────────────────────────────────────────────── #}
 <form method="get" class="filter-bar" style="margin-bottom:1rem">
-  <input name="q" value="{{ q }}" placeholder="Search set name or SKU…" class="input-search">
+  <label style="font-size:.9rem; white-space:nowrap">
+    Search:
+    <input name="q" value="{{ q }}" placeholder="Search set name or SKU…" class="input-search">
+  </label>
   <label class="flex-center" style="font-size:.9rem; white-space:nowrap">
     Completion for:
     <select name="person" onchange="this.form.submit()" class="input-sm">

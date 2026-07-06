@@ -199,6 +199,7 @@
       var confirmPreview = document.getElementById('confirm-action-preview');
       var confirmContinue = document.getElementById('confirm-action-continue');
       var pendingForm = null;
+      var pendingSubmitter = null;
 
       if (!confirmDialog || !confirmTitle || !confirmCount || !confirmMessage || !confirmPreview || !confirmContinue) {
         return;
@@ -206,6 +207,7 @@
 
       function resetConfirmDialog() {
         pendingForm = null;
+        pendingSubmitter = null;
         confirmTitle.textContent = 'Confirm action';
         confirmCount.textContent = '';
         confirmCount.hidden = true;
@@ -217,6 +219,7 @@
 
       function openConfirmDialog(form, submitter) {
         pendingForm = form;
+        pendingSubmitter = submitter;
         confirmTitle.textContent = submitter.dataset.confirmTitle || 'Confirm action';
         confirmCount.textContent = submitter.dataset.confirmCount || '';
         confirmCount.hidden = !confirmCount.textContent;
@@ -238,8 +241,13 @@
       confirmContinue.addEventListener('click', function() {
         if (!pendingForm) return;
         var form = pendingForm;
+        var submitter = pendingSubmitter;
         confirmDialog.close();
-        form.submit();
+        if (form.requestSubmit && submitter) {
+          form.requestSubmit(submitter);
+        } else {
+          form.submit();
+        }
       });
 
       confirmDialog.addEventListener('close', resetConfirmDialog);
