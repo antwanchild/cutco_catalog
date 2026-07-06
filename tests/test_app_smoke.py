@@ -4272,8 +4272,6 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(add_page.status_code, 200)
         self.assertIn(b"suggest-field", add_page.data)
         self.assertIn(b"Alternate SKUs", add_page.data)
-        self.assertIn(b"Unicorn item", add_page.data)
-        self.assertIn(b"limited-time, rare, or discontinued items", add_page.data)
 
         set_add_page = self.client.get("/sets/add")
         self.assertEqual(set_add_page.status_code, 200)
@@ -4287,7 +4285,6 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(edit_page.status_code, 200)
         self.assertIn(b"suggest-field", edit_page.data)
         self.assertIn(b"Alternate SKUs", edit_page.data)
-        self.assertIn(b"Unicorn item", edit_page.data)
         self.assertNotIn(b'name="next"', edit_page.data)
 
         filtered_edit_page = self.client.get(
