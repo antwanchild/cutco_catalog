@@ -1505,7 +1505,7 @@ def catalog_sync_confirm():
         item: Item, raw_variant_colors: object
     ) -> tuple[int, int]:
         variant_colors: list[str] = []
-        if raw_variant_colors:
+        if isinstance(raw_variant_colors, str) and raw_variant_colors:
             try:
                 parsed_colors = json.loads(raw_variant_colors)
             except json.JSONDecodeError:
@@ -1590,7 +1590,7 @@ def catalog_sync_confirm():
         if not item:
             continue
         raw_variant_colors = data.get("variant_colors")
-        if raw_variant_colors:
+        if isinstance(raw_variant_colors, str) and raw_variant_colors:
             try:
                 parsed_colors = json.loads(raw_variant_colors)
             except json.JSONDecodeError:
