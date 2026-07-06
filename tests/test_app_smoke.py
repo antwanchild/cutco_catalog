@@ -5598,6 +5598,8 @@ class CatalogSmokeTests(SmokeBaseTest):
             ).scalar_one()
             self.assertIsNone(new_item.msrp)
             self.assertTrue(new_item.is_unicorn)
+            self.assertEqual(new_item.availability, "non-catalog")
+            self.assertFalse(new_item.in_catalog)
             self.assertEqual(
                 [variant.color for variant in new_item.variants], ["Classic Blue"]
             )
