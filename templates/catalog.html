@@ -18,12 +18,12 @@
     <div class="catalog-toolbar-copy">
       <div class="section-kicker">Browse Controls</div>
       <p class="catalog-toolbar-text">
-        Search by name or SKU, narrow the list by category or status, and jump into item details from the table below.
+        Search by name or SKU, narrow the list by category or status, and jump into item details below.
       </p>
     </div>
     <div class="catalog-toolbar-count">
-      <div class="stat-number">{{ items | length }}</div>
-      <div class="stat-label">Shown</div>
+      <span class="catalog-toolbar-count-number">{{ items | length }}</span>
+      <span class="catalog-toolbar-count-label">Shown</span>
     </div>
   </div>
 
@@ -68,6 +68,21 @@
 <form method="post" action="{{ url_for('catalog.bulk_delete_catalog_items') }}" id="catalog-bulk-delete-form">
   <input type="hidden" name="next" value="{{ request.full_path[:-1] if request.full_path.endswith('?') else request.full_path }}">
 </form>
+
+<div class="bulk-bar bulk-bar-sticky" id="catalog-bulk-bar">
+  <span class="bulk-count" id="catalog-bulk-count">0 selected</span>
+  <button type="submit"
+          form="catalog-bulk-delete-form"
+          class="btn btn-danger btn-sm"
+          id="catalog-bulk-delete"
+          data-confirm-title="Delete selected items"
+          data-confirm-message="This will permanently remove the selected catalog items."
+          data-confirm-count="1 item"
+          data-confirm-preview="Selected items, their variants, attachments, and linked memberships will be removed."
+          data-confirm-button="Delete items"
+          disabled>Delete selected</button>
+  <button type="button" class="btn btn-ghost btn-sm" id="catalog-bulk-cancel">Cancel</button>
+</div>
 {% endif %}
 
 <div class="table-wrap">
@@ -180,20 +195,6 @@
 <p class="table-count">{{ items | length }} item{% if items | length != 1 %}s{% endif %}</p>
 
 {% if is_admin() %}
-<div class="bulk-bar" id="catalog-bulk-bar">
-  <span class="bulk-count" id="catalog-bulk-count">0 selected</span>
-  <button type="submit"
-          form="catalog-bulk-delete-form"
-          class="btn btn-danger btn-sm"
-          id="catalog-bulk-delete"
-          data-confirm-title="Delete selected items"
-          data-confirm-message="This will permanently remove the selected catalog items."
-          data-confirm-count="1 item"
-          data-confirm-preview="Selected items, their variants, attachments, and linked memberships will be removed."
-          data-confirm-button="Delete items"
-          disabled>Delete selected</button>
-  <button type="button" class="btn btn-ghost btn-sm" id="catalog-bulk-cancel">Cancel</button>
-</div>
 <script>
 (function() {
   var selectAll = document.getElementById('catalog-select-all');

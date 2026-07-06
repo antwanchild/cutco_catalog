@@ -362,39 +362,47 @@ a:hover { text-decoration: underline; }
 }
 .catalog-toolbar {
   display: grid;
-  gap: .9rem;
+  gap: .65rem;
 }
 .catalog-toolbar-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 1rem;
+  gap: .75rem;
   flex-wrap: wrap;
 }
 .catalog-toolbar-copy {
   display: grid;
   gap: .25rem;
-  max-width: 56rem;
+  max-width: 48rem;
 }
 .catalog-toolbar-text {
   color: var(--muted);
   line-height: 1.5;
 }
 .catalog-toolbar-count {
-  min-width: 6.5rem;
-  padding: .55rem .75rem;
+  min-width: 5.75rem;
+  padding: .45rem .7rem;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
   background: var(--bg3);
   box-shadow: var(--shadow);
   text-align: center;
+  display: grid;
+  gap: .1rem;
 }
-.catalog-toolbar-count .stat-number {
-  font-size: 1.35rem;
+.catalog-toolbar-count-number {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--accent);
   line-height: 1;
 }
-.catalog-toolbar-count .stat-label {
-  margin-top: .15rem;
+.catalog-toolbar-count-label {
+  font-size: .68rem;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: .03em;
+  line-height: 1.2;
 }
 
 /* ── Admin snapshot strip ───────────────────────────────────────────────── */
@@ -2390,6 +2398,11 @@ textarea { resize: vertical; }
   border-radius: var(--radius);
   padding: .6rem 1rem;
   margin-top: .75rem;
+}
+.bulk-bar-sticky {
+  position: sticky;
+  top: calc(52px + .75rem);
+  z-index: 35;
 }
 .bulk-bar-visible { display: flex; }
 .bulk-count { font-size: .875rem; font-weight: 600; color: var(--accent); min-width: 6rem; }
