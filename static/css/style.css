@@ -334,6 +334,30 @@ a:hover { text-decoration: underline; }
 .sync-empty-message {
   margin: 0 0 1.25rem;
 }
+.sync-change-summary {
+  margin-bottom: .35rem;
+}
+.sync-change-details {
+  margin-top: .15rem;
+}
+.sync-change-details summary {
+  cursor: pointer;
+  list-style: none;
+}
+.sync-change-details summary::-webkit-details-marker {
+  display: none;
+}
+.sync-change-list {
+  margin-top: .45rem;
+  display: grid;
+  gap: .35rem;
+}
+.sync-change-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
 .collection-empty-state {
   margin: 2rem 0 1.5rem;
   padding: 1.35rem 1.5rem;

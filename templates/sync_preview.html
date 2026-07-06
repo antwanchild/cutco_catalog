@@ -235,19 +235,23 @@
           {% endif %}
         </td>
         <td>
-          <div style="margin-bottom:.35rem">{{ item_set.membership_preview.summary }}</div>
+          <div class="sync-change-summary">{{ item_set.membership_preview.summary }}</div>
           {% if item_set.membership_preview.change_rows %}
-            <div class="muted small" style="margin-bottom:.35rem">Diff</div>
-            {% for change in item_set.membership_preview.change_rows %}
-              <div class="sync-change-row">
-                <span class="badge badge-{% if change.action == 'added' %}new{% elif change.action == 'removed' %}missing{% else %}warning{% endif %}">{{ change.action }}</span>
-                <span class="mono small">{{ change.sku }}</span>
-                <span class="small">{{ change.name }}</span>
-                <span class="mono small">
-                  {{ change.current_quantity if change.current_quantity is not none else '—' }} -> {{ change.incoming_quantity if change.incoming_quantity is not none else '—' }}
-                </span>
+            <details class="sync-change-details">
+              <summary class="muted small">View member changes ({{ item_set.membership_preview.change_rows | length }})</summary>
+              <div class="sync-change-list">
+                {% for change in item_set.membership_preview.change_rows %}
+                  <div class="sync-change-row">
+                    <span class="badge badge-{% if change.action == 'added' %}new{% elif change.action == 'removed' %}missing{% else %}warning{% endif %}">{{ change.action }}</span>
+                    <span class="mono small">{{ change.sku }}</span>
+                    <span class="small">{{ change.name }}</span>
+                    <span class="mono small">
+                      {{ change.current_quantity if change.current_quantity is not none else '—' }} -> {{ change.incoming_quantity if change.incoming_quantity is not none else '—' }}
+                    </span>
+                  </div>
+                {% endfor %}
               </div>
-            {% endfor %}
+            </details>
           {% endif %}
         </td>
         <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
