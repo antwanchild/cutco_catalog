@@ -1209,6 +1209,7 @@ _VARIANT_SWATCH_FALLBACK_BLOCKLIST = {
 _VARIANT_SELECT_HINTS = (
     "color",
     "finish",
+    "style",
     "handle color",
     "handle finish",
 )
@@ -1455,6 +1456,8 @@ def _normalize_variant_label(value: str) -> str | None:
     if lowered in _VARIANT_SKIP_LABELS:
         return None
     if lowered.startswith("select "):
+        return None
+    if lowered.startswith("choose "):
         return None
     if lowered.startswith("image "):
         return None
