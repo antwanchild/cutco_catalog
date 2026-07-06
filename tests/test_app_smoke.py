@@ -14,7 +14,7 @@ os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 from app import create_app
 import blueprints.catalog as catalog_blueprint
-from constants import UNKNOWN_COLOR
+from constants import UNKNOWN_COLOR, normalize_edge_for_category
 from extensions import db
 from helpers import (
     _collection_token,
@@ -4683,7 +4683,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(
             b"Scrapes Cutco.com to discover new items and sets.", response.data
         )
-        self.assertIn(b"SKU Unicorn", response.data)
+        self.assertIn(b"Limited Edition", response.data)
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)
 
@@ -4701,6 +4701,12 @@ class CatalogSmokeTests(SmokeBaseTest):
             "Will create a placeholder", members_row.get_text(" ", strip=True)
         )
         self.assertNotIn("Will be skipped", members_row.get_text(" ", strip=True))
+
+    def test_flatware_treats_edge_as_n_a(self):
+        self.assertEqual(
+            normalize_edge_for_category("Flatware", "Double-D"),
+            ("N/A", False),
+        )
 
     def test_catalog_sync_idle_page_does_not_scrape_inline(self):
         self._login_as_admin()
