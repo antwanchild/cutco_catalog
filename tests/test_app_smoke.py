@@ -4683,6 +4683,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(
             b"Scrapes Cutco.com to discover new items and sets.", response.data
         )
+        self.assertIn(b"SKU Unicorn", response.data)
         self.assertNotIn(b"EX-1 ,", response.data)
         self.assertIn(b"Not in catalog", response.data)
 
@@ -5522,6 +5523,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "category_SX-NEW-1": "Kitchen Knives",
                 "url_SX-NEW-1": "https://example.com/sync-new",
                 "edge_type_SX-NEW-1": "Straight",
+                "item_unicorn_SX-NEW-1": "on",
                 "msrp_SX-NEW-1": "not-a-number",
                 "blade_length_SX-NEW-1": "4 in",
                 "overall_length_SX-NEW-1": "8 in",
@@ -5574,6 +5576,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 db.select(Item).filter_by(sku="SX-NEW-1")
             ).scalar_one()
             self.assertIsNone(new_item.msrp)
+            self.assertTrue(new_item.is_unicorn)
             self.assertEqual(
                 [variant.color for variant in new_item.variants], ["Classic Blue"]
             )
