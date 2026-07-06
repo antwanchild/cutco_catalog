@@ -124,10 +124,16 @@
               data-confirm-message="This will re-scrape Cutco and rebuild the selected sets from the live set pages."
               data-confirm-count="1 set"
               data-confirm-button="Resync memberships">Resync from Cutco</button>
+      <button type="submit" form="sets-bulk-restore-form" formaction="{{ url_for('catalog.bulk_delete_sets') }}" class="btn btn-danger btn-sm" id="sets-bulk-delete"
+              data-confirm-title="Delete selected sets"
+              data-confirm-message="This will permanently remove the selected sets and their memberships."
+              data-confirm-count="1 set"
+              data-confirm-preview="Selected sets and their memberships will be removed."
+              data-confirm-button="Delete sets">Delete selected</button>
       <button type="button" class="btn btn-ghost btn-sm" id="sets-bulk-cancel">Cancel</button>
     </div>
     <p class="muted" style="margin-top:.5rem">
-      Restore memberships uses the saved imported snapshot. Resync from Cutco re-scrapes the live set pages and rebuilds from there.
+      Restore memberships uses the saved imported snapshot. Resync from Cutco re-scrapes the live set pages and rebuilds from there. Delete selected removes sets and their memberships.
     </p>
   {% endif %}
 
@@ -141,9 +147,10 @@
   var countEl = document.getElementById('sets-bulk-count');
   var submitBtn = document.getElementById('sets-bulk-restore');
   var resyncBtn = document.getElementById('sets-bulk-resync');
+  var deleteBtn = document.getElementById('sets-bulk-delete');
   var cancelBtn = document.getElementById('sets-bulk-cancel');
 
-  if (!form || !selectAll || !checks.length || !bar || !countEl || !submitBtn || !resyncBtn || !cancelBtn) {
+  if (!form || !selectAll || !checks.length || !bar || !countEl || !submitBtn || !resyncBtn || !deleteBtn || !cancelBtn) {
     return;
   }
 
@@ -155,7 +162,9 @@
     selectAll.checked = n === checks.length;
     submitBtn.disabled = n === 0;
     resyncBtn.disabled = n === 0;
+    deleteBtn.disabled = n === 0;
     resyncBtn.dataset.confirmCount = n + ' set' + (n === 1 ? '' : 's');
+    deleteBtn.dataset.confirmCount = n + ' set' + (n === 1 ? '' : 's');
   }
 
   selectAll.addEventListener('change', function() {

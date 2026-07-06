@@ -505,6 +505,55 @@ def catalog_delete(item_id):
     return redirect(url_for("catalog.catalog"))
 
 
+@catalog_bp.route("/catalog/bulk-delete", methods=["POST"])
+@admin_required
+def bulk_delete_catalog_items():
+    """Delete multiple catalog items at once."""
+    selected_item_ids: set[int] = set()
+    invalid_seen = False
+    for raw_item_id in request.form.getlist("item_ids"):
+        try:
+            selected_item_ids.add(int(raw_item_id))
+        except (TypeError, ValueError):
+            invalid_seen = True
+
+    if invalid_seen:
+        flash("Some item selections were invalid and were ignored.", "warning")
+    if not selected_item_ids:
+        flash("Choose one or more items to delete.", "warning")
+        return redirect(
+            _safe_redirect_target(request.form.get("next"))
+            or url_for("catalog.catalog")
+        )
+
+    items_by_id = {
+        item.id: item
+        for item in Item.query.filter(Item.id.in_(selected_item_ids)).all()
+    }
+    if not items_by_id:
+        flash("No valid items were selected.", "warning")
+        return redirect(
+            _safe_redirect_target(request.form.get("next"))
+            or url_for("catalog.catalog")
+        )
+
+    deleted_items = 0
+    for item in items_by_id.values():
+        _delete_attachment_files(item)
+        db.session.delete(item)
+        deleted_items += 1
+
+    if db_commit(db.session):
+        logger.info("Bulk catalog delete: %d item(s)", deleted_items)
+        flash(
+            f"Deleted {deleted_items} item{'s' if deleted_items != 1 else ''}.",
+            "info",
+        )
+    return redirect(
+        _safe_redirect_target(request.form.get("next")) or url_for("catalog.catalog")
+    )
+
+
 # ── Variants ──────────────────────────────────────────────────────────────────
 
 
@@ -1148,6 +1197,54 @@ def set_delete(set_id=None, sid=None):
         logger.info("Set deleted: %s", name)
         flash(f'Deleted set "{name}".', "info")
     return redirect(url_for("catalog.sets_list"))
+
+
+@catalog_bp.route("/sets/bulk-delete", methods=["POST"])
+@admin_required
+def bulk_delete_sets():
+    """Delete multiple sets at once."""
+    selected_set_ids: set[int] = set()
+    invalid_seen = False
+    for raw_set_id in request.form.getlist("set_ids"):
+        try:
+            selected_set_ids.add(int(raw_set_id))
+        except (TypeError, ValueError):
+            invalid_seen = True
+
+    if invalid_seen:
+        flash("Some set selections were invalid and were ignored.", "warning")
+    if not selected_set_ids:
+        flash("Choose one or more sets to delete.", "warning")
+        return redirect(
+            _safe_redirect_target(request.form.get("next"))
+            or url_for("catalog.sets_list")
+        )
+
+    item_sets = {
+        item_set.id: item_set
+        for item_set in Set.query.filter(Set.id.in_(selected_set_ids)).all()
+    }
+    if not item_sets:
+        flash("No valid sets were selected.", "warning")
+        return redirect(
+            _safe_redirect_target(request.form.get("next"))
+            or url_for("catalog.sets_list")
+        )
+
+    deleted_sets = 0
+    for item_set in item_sets.values():
+        db.session.delete(item_set)
+        deleted_sets += 1
+
+    if db_commit(db.session):
+        logger.info("Bulk set delete: %d set(s)", deleted_sets)
+        flash(
+            f"Deleted {deleted_sets} set{'s' if deleted_sets != 1 else ''}.",
+            "info",
+        )
+    return redirect(
+        _safe_redirect_target(request.form.get("next")) or url_for("catalog.sets_list")
+    )
 
 
 @catalog_bp.route("/sets/<int:set_id>")
