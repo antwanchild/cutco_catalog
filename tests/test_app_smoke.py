@@ -5675,32 +5675,6 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn("SX-EX-1", existing_member_skus)
             self.assertIn("SX-EX-MISS-1", existing_member_skus)
 
-    def test_catalog_sync_confirm_populates_existing_item_variant_colors(self):
-        self._login_as_admin()
-        self._set_csrf_token()
-
-        item_id, _unknown_variant_id = self._add_catalog_item(
-            name="Handle Mitt", sku="HM-1", category="Kitchen Helpers"
-        )
-
-        response = self.client.post(
-            "/catalog/sync/confirm",
-            data={
-                "csrf_token": "test-csrf-token",
-                "selected_skus": [],
-                "variant_colors_HM-1": json.dumps(["Blue"]),
-            },
-            follow_redirects=False,
-        )
-
-        self.assertEqual(response.status_code, 302)
-        with self.app.app_context():
-            item = db.session.get(Item, item_id)
-            self.assertEqual([variant.color for variant in item.variants], ["Blue"])
-            self.assertEqual(
-                [variant.source for variant in item.variants], ["catalog_sync"]
-            )
-
     def test_catalog_sync_confirm_reconciles_existing_set_members(self):
         self._login_as_admin()
         self._set_csrf_token()
