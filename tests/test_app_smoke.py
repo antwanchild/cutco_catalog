@@ -5067,6 +5067,38 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(preview["incoming_rows"][0]["display_sku"], "1705D")
         self.assertEqual(preview["incoming_rows"][0]["source_sku"], "2117D")
 
+    def test_set_membership_preview_handles_dict_name_lookup_matches(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _ = self._add_catalog_item(name="Shear Utility", sku="1705D")
+
+        with self.app.app_context():
+            item_set = Set(name="Shear Set", sku="SHEAR-1")
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(
+                ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1)
+            )
+            db.session.commit()
+
+            preview = _build_set_membership_preview(
+                db.session.get(Set, item_set.id),
+                [{"sku": "2117D", "name": "Shear Utility", "quantity": 1}],
+                {},
+                {
+                    "shear utility": {
+                        "id": item_id,
+                        "sku": "1705D",
+                        "name": "Shear Utility",
+                    }
+                },
+            )
+
+        self.assertFalse(preview["has_changes"])
+        self.assertEqual(preview["incoming_rows"][0]["item_id"], item_id)
+        self.assertEqual(preview["incoming_rows"][0]["display_sku"], "1705D")
+
     def test_variant_sync_page_renders_and_creates_missing_variants(self):
         self._login_as_admin()
         self._set_csrf_token()
