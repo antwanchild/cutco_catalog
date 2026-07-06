@@ -9,7 +9,7 @@
 {# ── Set filters ───────────────────────────────────────────────────────────── #}
 <form method="get" class="filter-bar" style="margin-bottom:1rem">
   <input name="q" value="{{ q }}" placeholder="Search set name or SKU…" class="input-search">
-  <label class="flex-center" style="font-size:.9rem">
+  <label class="flex-center" style="font-size:.9rem; white-space:nowrap">
     Completion for:
     <select name="person" onchange="this.form.submit()" class="input-sm">
       <option value="">— everyone —</option>
@@ -18,14 +18,14 @@
       {% endfor %}
     </select>
   </label>
-  <label class="flex-center" style="font-size:.9rem">
+  <label class="flex-center" style="font-size:.9rem; white-space:nowrap">
     Set filter:
     <select name="missing" onchange="this.form.submit()" class="input-sm">
       <option value="">All sets</option>
       <option value="1" {% if not_in_catalog_f == '1' %}selected{% endif %}>Has items not in catalog</option>
     </select>
   </label>
-  <label class="flex-center" style="font-size:.9rem">
+  <label class="flex-center" style="font-size:.9rem; white-space:nowrap">
     Completion:
     <select name="incomplete" onchange="this.form.submit()" class="input-sm">
       <option value="">All sets</option>
@@ -40,6 +40,27 @@
 <form method="post" action="{{ url_for('catalog.bulk_restore_set_memberships') }}" id="sets-bulk-restore-form">
   <input type="hidden" name="next" value="{{ request.full_path[:-1] if request.full_path.endswith('?') else request.full_path }}">
 </form>
+{% if is_admin() %}
+  <div class="bulk-bar bulk-bar-sticky" id="sets-bulk-bar">
+    <span class="bulk-count" id="sets-bulk-count">0 selected</span>
+    <button type="submit" form="sets-bulk-restore-form" class="btn btn-primary btn-sm" id="sets-bulk-restore">Restore memberships</button>
+    <button type="submit" form="sets-bulk-restore-form" formaction="{{ url_for('catalog.bulk_resync_set_memberships') }}" class="btn btn-secondary btn-sm" id="sets-bulk-resync"
+            data-confirm-title="Resync set memberships"
+            data-confirm-message="This will re-scrape Cutco and rebuild the selected sets from the live set pages."
+            data-confirm-count="1 set"
+            data-confirm-button="Resync memberships">Resync from Cutco</button>
+    <button type="submit" form="sets-bulk-restore-form" formaction="{{ url_for('catalog.bulk_delete_sets') }}" class="btn btn-danger btn-sm" id="sets-bulk-delete"
+            data-confirm-title="Delete selected sets"
+            data-confirm-message="This will permanently remove the selected sets and their memberships."
+            data-confirm-count="1 set"
+            data-confirm-preview="Selected sets and their memberships will be removed."
+            data-confirm-button="Delete sets">Delete selected</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="sets-bulk-cancel">Cancel</button>
+  </div>
+  <p class="muted" style="margin:0 0 .75rem">
+    Restore memberships uses the saved imported snapshot. Resync from Cutco re-scrapes the live set pages and rebuilds from there. Delete selected removes sets and their memberships.
+  </p>
+{% endif %}
 <div class="table-wrap">
   <table class="data-table sets-table">
     <colgroup>
@@ -117,28 +138,6 @@
     </tbody>
   </table>
   </div>
-
-  {% if is_admin() %}
-    <div class="bulk-bar bulk-bar-sticky" id="sets-bulk-bar">
-      <span class="bulk-count" id="sets-bulk-count">0 selected</span>
-      <button type="submit" form="sets-bulk-restore-form" class="btn btn-primary btn-sm" id="sets-bulk-restore">Restore memberships</button>
-      <button type="submit" form="sets-bulk-restore-form" formaction="{{ url_for('catalog.bulk_resync_set_memberships') }}" class="btn btn-secondary btn-sm" id="sets-bulk-resync"
-              data-confirm-title="Resync set memberships"
-              data-confirm-message="This will re-scrape Cutco and rebuild the selected sets from the live set pages."
-              data-confirm-count="1 set"
-              data-confirm-button="Resync memberships">Resync from Cutco</button>
-      <button type="submit" form="sets-bulk-restore-form" formaction="{{ url_for('catalog.bulk_delete_sets') }}" class="btn btn-danger btn-sm" id="sets-bulk-delete"
-              data-confirm-title="Delete selected sets"
-              data-confirm-message="This will permanently remove the selected sets and their memberships."
-              data-confirm-count="1 set"
-              data-confirm-preview="Selected sets and their memberships will be removed."
-              data-confirm-button="Delete sets">Delete selected</button>
-      <button type="button" class="btn btn-ghost btn-sm" id="sets-bulk-cancel">Cancel</button>
-    </div>
-    <p class="muted" style="margin-top:.5rem">
-      Restore memberships uses the saved imported snapshot. Resync from Cutco re-scrapes the live set pages and rebuilds from there. Delete selected removes sets and their memberships.
-    </p>
-  {% endif %}
 
 {% if is_admin() %}
 <script>
