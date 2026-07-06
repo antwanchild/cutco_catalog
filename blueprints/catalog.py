@@ -1507,15 +1507,17 @@ def catalog_sync_confirm():
             msrp = float(data["msrp"]) if data.get("msrp") else None
         except ValueError:
             msrp = None
+        is_limited_edition = data.get("item_unicorn") == "on"
+        availability = "non-catalog" if is_limited_edition else "public"
         item = Item(
             name=data.get("name", sku),
             sku=sku,
             category=canonicalize_category(data.get("category")),
             cutco_url=data.get("url"),
-            availability="public",
-            in_catalog=True,
+            availability=availability,
+            in_catalog=availability == "public",
             set_only=False,
-            is_unicorn=data.get("item_unicorn") == "on",
+            is_unicorn=is_limited_edition,
             edge_is_unicorn=normalize_edge_for_category(
                 canonicalize_category(data.get("category")),
                 data.get("edge_type"),

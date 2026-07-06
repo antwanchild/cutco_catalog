@@ -1156,7 +1156,9 @@ _VARIANT_SKIP_LABELS = {
     "default",
     "choose",
     "choose a color",
+    "choose a finish",
     "choose color",
+    "select a finish",
     "add gift wrap",
     "add personalization",
 }
@@ -1203,6 +1205,13 @@ _VARIANT_SWATCH_FALLBACK_BLOCKLIST = {
     "style",
     "text",
 }
+
+_VARIANT_SELECT_HINTS = (
+    "color",
+    "finish",
+    "handle color",
+    "handle finish",
+)
 
 _VARIANT_COLOR_WORDS = {
     "amber",
@@ -1369,6 +1378,38 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
     return tuple(candidates)
 
 
+def _collect_variant_candidates_from_selects(soup: BeautifulSoup) -> tuple[str, ...]:
+    """Extract color-like choices from select dropdowns."""
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for select in soup.select("select"):
+        select_text = " ".join(
+            [
+                " ".join(_tag_classes(select)),
+                _tag_attr_text(select, "data-type") or "",
+                _tag_attr_text(select, "name") or "",
+                _tag_attr_text(select, "id") or "",
+                _tag_attr_text(select, "aria-label") or "",
+                _tag_attr_text(select, "title") or "",
+                select.get_text(" ", strip=True),
+            ]
+        ).lower()
+        if not any(hint in select_text for hint in _VARIANT_SELECT_HINTS):
+            continue
+
+        for option in select.find_all("option"):
+            option_text = option.get_text(" ", strip=True)
+            option_value = _tag_attr_text(option, "value") or ""
+            normalized = _normalize_variant_label(option_text or option_value)
+            if not normalized:
+                continue
+            if normalized.lower() == (option_value or "").strip().lower():
+                if not _looks_like_variant_color(normalized):
+                    continue
+            _collect_variant_candidate(candidates, seen, normalized)
+    return tuple(candidates)
+
+
 def _extract_selected_page_color(soup: BeautifulSoup) -> str | None:
     """Return the currently selected color label when the page exposes one."""
     page_text = soup.get_text(" ", strip=True)
@@ -1447,6 +1488,7 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
             seen.add(key)
             candidates.append(candidate)
         swatch_candidates = _collect_variant_candidates_from_swatches(soup)
+        select_candidates = _collect_variant_candidates_from_selects(soup)
         selected_color = _extract_selected_page_color(soup)
         if selected_color and _page_has_size_selector(soup):
             if selected_color in swatch_candidates:
@@ -1454,6 +1496,12 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
         if not swatch_candidates and selected_color:
             swatch_candidates = (selected_color,)
         for candidate in swatch_candidates:
+            key = candidate.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(candidate)
+        for candidate in select_candidates:
             key = candidate.lower()
             if key in seen:
                 continue
