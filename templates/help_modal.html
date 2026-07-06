@@ -130,15 +130,6 @@
         <li><strong>Sharpening history</strong> and <strong>task log</strong> appear below if any events have been logged.</li>
       </ul>
 
-    {% elif page in ['sync', 'sync_preview'] %}
-      <p>Scrapes Cutco.com to discover new items and sets.</p>
-      <ul>
-        <li>New items are grouped by category — check the ones you want to import.</li>
-        <li>New sets are listed separately — check any you want to add.</li>
-        <li>Items in blocked categories (e.g. Accessories) are hidden by default.</li>
-        <li>Only items with SKUs not already in the database are shown.</li>
-      </ul>
-
     {% elif page in ['variant_sync', 'variant_sync_preview'] %}
       <p>Scans product pages for color variants without touching catalog sync.</p>
       <ul>
@@ -146,6 +137,16 @@
         <li>Existing variants are kept, missing variants are created, and nothing is deleted.</li>
         <li>Items that do not expose clear variant choices are skipped and reviewed separately.</li>
         <li>The preview shows <strong>existing</strong>, <strong>create</strong>, and <strong>not seen in sync</strong> status labels.</li>
+      </ul>
+
+    {% elif page in ['sync', 'sync_preview'] %}
+      <p>Scrapes Cutco.com to discover new items and sets.</p>
+      <ul>
+        <li>Use the SKU unicorn checkbox on a new item when it is limited-time, rare, or otherwise hard to find.</li>
+        <li>New items are grouped by category — check the ones you want to import.</li>
+        <li>New sets are listed separately — check any you want to add.</li>
+        <li>Items in blocked categories (e.g. Accessories) are hidden by default.</li>
+        <li>Only items with SKUs not already in the database are shown.</li>
       </ul>
 
     {% elif page in ['import', 'import_page'] %}

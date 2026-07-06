@@ -1491,6 +1491,7 @@ def catalog_sync_confirm():
             "overall_length_",
             "weight_",
             "variant_colors_",
+            "item_unicorn_",
         ):
             if key.startswith(prefix):
                 sku = key[len(prefix) :]
@@ -1514,7 +1515,7 @@ def catalog_sync_confirm():
             availability="public",
             in_catalog=True,
             set_only=False,
-            is_unicorn=False,
+            is_unicorn=data.get("item_unicorn") == "on",
             edge_is_unicorn=normalize_edge_for_category(
                 canonicalize_category(data.get("category")),
                 data.get("edge_type"),

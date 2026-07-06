@@ -96,6 +96,7 @@
       <col style="width:100px">
       <col style="width:180px">
       <col style="width:130px">
+      <col style="width:56px">
       <col style="width:32px">
     </colgroup>
     <thead>
@@ -105,6 +106,7 @@
         <th><span class="sort-hdr active" data-col="sku" style="cursor:pointer">SKU ▲</span></th>
         <th>Category</th>
         <th>Edge</th>
+        <th>SKU Unicorn</th>
         <th></th>
       </tr>
     </thead>
@@ -127,6 +129,9 @@
               {% endfor %}
             </select>
           {% endif %}
+        </td>
+        <td>
+          <input type="checkbox" name="item_unicorn_{{ item.sku }}" value="on" title="Mark this item as a SKU unicorn">
         </td>
         <td><a href="{{ item.url }}" target="_blank" class="ext-link">↗</a></td>
         <input type="hidden" name="name_{{ item.sku }}"           value="{{ item.name }}">
