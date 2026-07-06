@@ -2223,6 +2223,27 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Gray",),
             )
 
+    def test_extract_product_variant_colors_parses_color_dropdowns(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <label for="finish">Finish</label>
+              <select id="finish" name="finish">
+                <option value="">Choose a finish</option>
+                <option value="Stainless">Stainless</option>
+                <option value="Pearl">Pearl</option>
+                <option value="Black">Black</option>
+              </select>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors("https://www.cutco.com/p/1570W-test"),
+                ("Stainless", "Pearl", "Black"),
+            )
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """
