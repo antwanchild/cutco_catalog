@@ -5073,6 +5073,38 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(preview["incoming_rows"][0]["display_sku"], "1705D")
         self.assertEqual(preview["incoming_rows"][0]["source_sku"], "2117D")
 
+    def test_set_membership_preview_handles_dict_name_lookup_matches(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        item_id, _ = self._add_catalog_item(name="Shear Utility", sku="1705D")
+
+        with self.app.app_context():
+            item_set = Set(name="Shear Set", sku="SHEAR-1")
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(
+                ItemSetMember(item_id=item_id, set_id=item_set.id, quantity=1)
+            )
+            db.session.commit()
+
+            preview = _build_set_membership_preview(
+                db.session.get(Set, item_set.id),
+                [{"sku": "2117D", "name": "Shear Utility", "quantity": 1}],
+                {},
+                {
+                    "shear utility": {
+                        "id": item_id,
+                        "sku": "1705D",
+                        "name": "Shear Utility",
+                    }
+                },
+            )
+
+        self.assertFalse(preview["has_changes"])
+        self.assertEqual(preview["incoming_rows"][0]["item_id"], item_id)
+        self.assertEqual(preview["incoming_rows"][0]["display_sku"], "1705D")
+
     def test_variant_sync_page_renders_and_creates_missing_variants(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -5648,32 +5680,6 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertNotIn("SX-STALE-1", existing_member_skus)
             self.assertIn("SX-EX-1", existing_member_skus)
             self.assertIn("SX-EX-MISS-1", existing_member_skus)
-
-    def test_catalog_sync_confirm_populates_existing_item_variant_colors(self):
-        self._login_as_admin()
-        self._set_csrf_token()
-
-        item_id, _unknown_variant_id = self._add_catalog_item(
-            name="Handle Mitt", sku="HM-1", category="Kitchen Helpers"
-        )
-
-        response = self.client.post(
-            "/catalog/sync/confirm",
-            data={
-                "csrf_token": "test-csrf-token",
-                "selected_skus": [],
-                "variant_colors_HM-1": json.dumps(["Blue"]),
-            },
-            follow_redirects=False,
-        )
-
-        self.assertEqual(response.status_code, 302)
-        with self.app.app_context():
-            item = db.session.get(Item, item_id)
-            self.assertEqual([variant.color for variant in item.variants], ["Blue"])
-            self.assertEqual(
-                [variant.source for variant in item.variants], ["catalog_sync"]
-            )
 
     def test_catalog_sync_confirm_reconciles_existing_set_members(self):
         self._login_as_admin()

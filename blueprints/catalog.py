@@ -1499,6 +1499,48 @@ def catalog_sync_confirm():
 
     added_items = 0
     detected_variant_color_total = 0
+    reconciled_item_variants = 0
+
+    def _add_catalog_sync_variants(
+        item: Item, raw_variant_colors: object
+    ) -> tuple[int, int]:
+        variant_colors: list[str] = []
+        if isinstance(raw_variant_colors, str) and raw_variant_colors:
+            try:
+                parsed_colors = json.loads(raw_variant_colors)
+            except json.JSONDecodeError:
+                parsed_colors = []
+            if isinstance(parsed_colors, list):
+                variant_colors = [
+                    str(color).strip()
+                    for color in parsed_colors
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+
+        detected = len(variant_colors)
+        if not variant_colors:
+            return 0, 0
+
+        existing_colors = {
+            existing_variant.color.lower()
+            for existing_variant in item.variants
+            if existing_variant.color != UNKNOWN_COLOR
+        }
+        seen_colors: set[str] = set()
+        created = 0
+        for color in variant_colors:
+            color_key = color.lower()
+            if color_key in seen_colors or color_key in existing_colors:
+                continue
+            seen_colors.add(color_key)
+            db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
+            created += 1
+
+        if created:
+            db.session.flush()
+            reconcile_unknown_variant(item)
+        return detected, created
+
     for sku in selected:
         if Item.query.filter_by(sku=sku).first():
             continue
@@ -1534,80 +1576,31 @@ def catalog_sync_confirm():
         )
         db.session.add(item)
         db.session.flush()
-        raw_variant_colors = data.get("variant_colors")
-        variant_colors: list[str] = []
-        if raw_variant_colors:
-            try:
-                parsed_colors = json.loads(raw_variant_colors)
-            except json.JSONDecodeError:
-                parsed_colors = []
-            if isinstance(parsed_colors, list):
-                variant_colors = [
-                    str(color).strip()
-                    for color in parsed_colors
-                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
-                ]
-        detected_variant_color_total += len(variant_colors)
-        seen_colors: set[str] = set()
-        for color in variant_colors:
-            color_key = color.lower()
-            if color_key in seen_colors:
-                continue
-            seen_colors.add(color_key)
-            if any(
-                existing_variant.color.lower() == color_key
-                for existing_variant in item.variants
-            ):
-                continue
-            db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
-        db.session.flush()
-        reconcile_unknown_variant(item)
+        detected, created = _add_catalog_sync_variants(item, data.get("variant_colors"))
+        detected_variant_color_total += detected
+        reconciled_item_variants += created
         added_items += 1
 
     db.session.flush()
 
-    reconciled_item_variants = 0
     for sku, data in item_data.items():
         if sku in selected:
             continue
         item = Item.query.filter_by(sku=sku).first()
         if not item:
             continue
-        if any(
-            existing_variant.color != UNKNOWN_COLOR
-            for existing_variant in item.variants
-        ):
-            continue
         raw_variant_colors = data.get("variant_colors")
-        variant_colors: list[str] = []
-        if raw_variant_colors:
+        if isinstance(raw_variant_colors, str) and raw_variant_colors:
             try:
                 parsed_colors = json.loads(raw_variant_colors)
             except json.JSONDecodeError:
                 parsed_colors = []
             if isinstance(parsed_colors, list):
-                variant_colors = [
-                    str(color).strip()
+                detected_variant_color_total += sum(
+                    1
                     for color in parsed_colors
                     if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
-                ]
-        detected_variant_color_total += len(variant_colors)
-        seen_colors: set[str] = set()
-        for color in variant_colors:
-            color_key = color.lower()
-            if color_key in seen_colors:
-                continue
-            seen_colors.add(color_key)
-            if any(
-                existing_variant.color.lower() == color_key
-                for existing_variant in item.variants
-            ):
-                continue
-            db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
-            reconciled_item_variants += 1
-        if seen_colors:
-            db.session.flush()
-            reconcile_unknown_variant(item)
+                )
 
     selected_sets = set(request.form.getlist("selected_sets"))
     added_sets = 0

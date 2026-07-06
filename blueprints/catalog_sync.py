@@ -785,12 +785,12 @@ def _build_set_membership_preview(
             catalog_name_lookup,
             set_sku=set_sku,
         )
-        matched_item = cast(Item, resolved_item) if resolved_item is not None else None
-        compare_key = f"item:{matched_item.id}" if matched_item is not None else key
-        incoming["item_id"] = matched_item.id if matched_item is not None else None
+        matched_item_id = _get_item_field(resolved_item, "id")
+        compare_key = f"item:{matched_item_id}" if matched_item_id is not None else key
+        incoming["item_id"] = matched_item_id
         incoming["source_sku"] = incoming.get("sku")
         incoming["display_sku"] = _normalize_member_sku(
-            getattr(matched_item, "sku", None)
+            _get_item_field(resolved_item, "sku")
         ) or incoming.get("sku")
         incoming_compare_rows[compare_key] = incoming
         if resolved_item is not None:
