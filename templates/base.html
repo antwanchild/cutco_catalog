@@ -200,6 +200,7 @@
       var confirmContinue = document.getElementById('confirm-action-continue');
       var pendingForm = null;
       var pendingSubmitter = null;
+      var bypassConfirmOnce = false;
 
       if (!confirmDialog || !confirmTitle || !confirmCount || !confirmMessage || !confirmPreview || !confirmContinue) {
         return;
@@ -208,6 +209,7 @@
       function resetConfirmDialog() {
         pendingForm = null;
         pendingSubmitter = null;
+        bypassConfirmOnce = false;
         confirmTitle.textContent = 'Confirm action';
         confirmCount.textContent = '';
         confirmCount.hidden = true;
@@ -233,6 +235,10 @@
 
       document.addEventListener('submit', function(e) {
         var submitter = e.submitter;
+        if (bypassConfirmOnce) {
+          bypassConfirmOnce = false;
+          return;
+        }
         if (!submitter || !submitter.dataset.confirmTitle) return;
         e.preventDefault();
         openConfirmDialog(e.target, submitter);
@@ -242,6 +248,7 @@
         if (!pendingForm) return;
         var form = pendingForm;
         var submitter = pendingSubmitter;
+        bypassConfirmOnce = true;
         confirmDialog.close();
         if (form.requestSubmit && submitter) {
           form.requestSubmit(submitter);
