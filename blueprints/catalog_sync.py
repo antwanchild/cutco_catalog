@@ -611,18 +611,26 @@ def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> It
     )
     db.session.add(item)
     db.session.flush()
+    item_url = None
     variant_colors: list[str] = []
     try:
-        item_url = _resolve_cutco_item_page_url(
-            f"https://www.cutco.com/p/{sku}", item_name=name
-        )
-        variant_colors = [
-            str(color).strip()
-            for color in scrape_item_variant_colors(item_url)
-            if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
-        ]
+        for candidate_url in (
+            f"https://www.cutco.com/p/{sku}",
+            f"https://www.cutco.com/p/{sku}&view=product",
+        ):
+            item_url = _resolve_cutco_item_page_url(candidate_url, item_name=name)
+            if item_url:
+                variant_colors = [
+                    str(color).strip()
+                    for color in scrape_item_variant_colors(item_url)
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+            if variant_colors:
+                break
     except Exception as exc:
         logger.debug("Variant scrape failed for missing set member %s: %s", sku, exc)
+    if item_url:
+        item.cutco_url = item_url
     if variant_colors:
         existing_colors = {
             existing_variant.color.lower()

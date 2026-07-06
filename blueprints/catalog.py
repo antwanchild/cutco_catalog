@@ -779,11 +779,17 @@ def sets_list():
     """Render the set list page."""
     from models import Ownership, Person
 
-    all_sets = Set.query.order_by(Set.name).all()
+    search_query = request.args.get("q", "").strip()
     all_persons = Person.query.order_by(Person.name).all()
     person_id = request.args.get("person", type=int)
     not_in_catalog_f = request.args.get("missing", "")
     incomplete_f = request.args.get("incomplete", "")
+
+    set_query = Set.query
+    if search_query:
+        like = f"%{search_query}%"
+        set_query = set_query.filter(or_(Set.name.ilike(like), Set.sku.ilike(like)))
+    all_sets = set_query.order_by(Set.name).all()
 
     # Completion relative to selected person, or globally if none selected
     owned_q = Ownership.query.filter_by(status="Owned")
@@ -828,6 +834,7 @@ def sets_list():
         not_in_catalog_counts=not_in_catalog_counts,
         all_persons=all_persons,
         person_id=person_id,
+        q=search_query,
         not_in_catalog_f=not_in_catalog_f,
         incomplete_f=incomplete_f,
     )
