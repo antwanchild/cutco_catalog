@@ -1074,6 +1074,13 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .variant-sync-summary-grid {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
+.variant-sync-summary-grid .stat-card {
+  min-height: 72px;
+  padding: .7rem .85rem;
+}
+.variant-sync-summary-grid .stat-number {
+  font-size: 1.75rem;
+}
 .variant-sync-form {
   position: relative;
   overflow: hidden;
