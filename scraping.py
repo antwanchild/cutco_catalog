@@ -1486,6 +1486,17 @@ def _collect_variant_candidates_from_web_items_map(raw_html: str) -> tuple[str, 
     candidates: list[str] = []
     seen: set[str] = set()
 
+    def _walk_payload(value: object) -> None:
+        if isinstance(value, dict):
+            for key, nested_value in value.items():
+                if isinstance(nested_value, str) and key in _WEB_ITEMS_MAP_LABEL_FIELDS:
+                    _collect_variant_candidate(candidates, seen, nested_value)
+                else:
+                    _walk_payload(nested_value)
+        elif isinstance(value, list):
+            for nested_value in value:
+                _walk_payload(nested_value)
+
     search_from = 0
     while True:
         marker = re.search(r"\bwebItemsMap\b", raw_html[search_from:])
@@ -1505,15 +1516,7 @@ def _collect_variant_candidates_from_web_items_map(raw_html: str) -> tuple[str, 
             continue
         if not isinstance(payload, dict):
             continue
-        for entry in payload.values():
-            if not isinstance(entry, dict):
-                continue
-            for field in _WEB_ITEMS_MAP_LABEL_FIELDS:
-                raw_value = entry.get(field)
-                if not isinstance(raw_value, str):
-                    continue
-                _collect_variant_candidate(candidates, seen, raw_value)
-                break
+        _walk_payload(payload)
 
     return tuple(candidates)
 
