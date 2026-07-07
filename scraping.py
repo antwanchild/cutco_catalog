@@ -1556,56 +1556,70 @@ def _normalize_variant_label(value: str) -> str | None:
 @lru_cache(maxsize=1024)
 def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
     """Fetch a product page and return a tuple of candidate color/variant names."""
-    clean_url = url.split("&view=")[0].split("?view=")[0]
     try:
-        resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
-        if resp.status_code != 200:
-            logger.debug("Variant fetch: HTTP %d for %s", resp.status_code, clean_url)
-            return ()
-        raw_html = resp.text
-        soup = BeautifulSoup(raw_html, "html.parser")
-        for noise in soup.find_all(["script", "style"]):
-            noise.decompose()
+        candidate_urls = [url]
+        clean_url = url.split("&view=")[0].split("?view=")[0]
+        if clean_url != url:
+            candidate_urls.append(clean_url)
 
-        candidates: list[str] = []
-        seen: set[str] = set()
-        campaign_candidates = _collect_campaign_variant_candidates(soup)
-        for candidate in campaign_candidates:
-            key = candidate.lower()
-            if key in seen:
+        for fetch_url in candidate_urls:
+            resp = requests.get(
+                fetch_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+            )
+            if resp.status_code != 200:
+                logger.debug(
+                    "Variant fetch: HTTP %d for %s", resp.status_code, fetch_url
+                )
                 continue
-            seen.add(key)
-            candidates.append(candidate)
-        web_items_candidates = _collect_variant_candidates_from_web_items_map(raw_html)
-        for candidate in web_items_candidates:
-            key = candidate.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            candidates.append(candidate)
-        swatch_candidates = _collect_variant_candidates_from_swatches(soup)
-        select_candidates = _collect_variant_candidates_from_selects(soup)
-        selected_color = _extract_selected_page_color(soup)
-        if selected_color and _page_has_size_selector(soup):
-            if selected_color in swatch_candidates:
+            raw_html = resp.text
+            soup = BeautifulSoup(raw_html, "html.parser")
+            for noise in soup.find_all(["script", "style"]):
+                noise.decompose()
+
+            candidates: list[str] = []
+            seen: set[str] = set()
+            campaign_candidates = _collect_campaign_variant_candidates(soup)
+            for candidate in campaign_candidates:
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(candidate)
+            web_items_candidates = _collect_variant_candidates_from_web_items_map(
+                raw_html
+            )
+            for candidate in web_items_candidates:
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(candidate)
+            swatch_candidates = _collect_variant_candidates_from_swatches(soup)
+            select_candidates = _collect_variant_candidates_from_selects(soup)
+            selected_color = _extract_selected_page_color(soup)
+            if selected_color and _page_has_size_selector(soup):
+                if selected_color in swatch_candidates:
+                    swatch_candidates = (selected_color,)
+            if not swatch_candidates and selected_color:
                 swatch_candidates = (selected_color,)
-        if not swatch_candidates and selected_color:
-            swatch_candidates = (selected_color,)
-        for candidate in swatch_candidates:
-            key = candidate.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            candidates.append(candidate)
-        for candidate in select_candidates:
-            key = candidate.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            candidates.append(candidate)
+            for candidate in swatch_candidates:
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(candidate)
+            for candidate in select_candidates:
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(candidate)
 
-        logger.debug("Variant fetch: %s → %d candidates", clean_url, len(candidates))
-        return tuple(candidates)
+            logger.debug(
+                "Variant fetch: %s → %d candidates", fetch_url, len(candidates)
+            )
+            return tuple(candidates)
+        return ()
     except Exception as exc:
         logger.warning("Variant scrape failed for %s: %s", url, exc)
         return ()
