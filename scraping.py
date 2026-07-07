@@ -1433,6 +1433,91 @@ def _collect_campaign_variant_candidates(soup: BeautifulSoup) -> tuple[str, ...]
     return tuple(candidates)
 
 
+_WEB_ITEMS_MAP_LABEL_FIELDS = (
+    "name",
+    "itemName",
+    "variantName",
+    "webItemName",
+    "displayName",
+    "productName",
+    "setName",
+    "label",
+    "optionName",
+    "color",
+    "finish",
+    "style",
+)
+
+
+def _extract_balanced_braces(text: str, start_index: int) -> str | None:
+    """Return the balanced brace block starting at ``start_index`` if present."""
+    if start_index < 0 or start_index >= len(text) or text[start_index] != "{":
+        return None
+
+    depth = 0
+    in_string = False
+    quote_char = ""
+    escape = False
+
+    for index in range(start_index, len(text)):
+        char = text[index]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == quote_char:
+                in_string = False
+        else:
+            if char in {'"', "'"}:
+                in_string = True
+                quote_char = char
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start_index : index + 1]
+    return None
+
+
+def _collect_variant_candidates_from_web_items_map(raw_html: str) -> tuple[str, ...]:
+    """Extract variant labels from Cutco's ``webItemsMap`` product metadata."""
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    search_from = 0
+    while True:
+        marker = re.search(r"\bwebItemsMap\b", raw_html[search_from:])
+        if not marker:
+            break
+        marker_index = search_from + marker.start()
+        brace_index = raw_html.find("{", marker_index)
+        if brace_index < 0:
+            break
+        block = _extract_balanced_braces(raw_html, brace_index)
+        search_from = brace_index + 1
+        if not block:
+            continue
+        try:
+            payload = json.loads(block)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        for entry in payload.values():
+            if not isinstance(entry, dict):
+                continue
+            for field in _WEB_ITEMS_MAP_LABEL_FIELDS:
+                raw_value = entry.get(field)
+                if not isinstance(raw_value, str):
+                    continue
+                _collect_variant_candidate(candidates, seen, raw_value)
+                break
+
+    return tuple(candidates)
+
+
 def _page_has_size_selector(soup: BeautifulSoup) -> bool:
     """Return True if the page exposes a size swatch group."""
     for fieldset in soup.select("fieldset.swatch-group"):
@@ -1477,7 +1562,8 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
         if resp.status_code != 200:
             logger.debug("Variant fetch: HTTP %d for %s", resp.status_code, clean_url)
             return ()
-        soup = BeautifulSoup(resp.text, "html.parser")
+        raw_html = resp.text
+        soup = BeautifulSoup(raw_html, "html.parser")
         for noise in soup.find_all(["script", "style"]):
             noise.decompose()
 
@@ -1485,6 +1571,13 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
         seen: set[str] = set()
         campaign_candidates = _collect_campaign_variant_candidates(soup)
         for candidate in campaign_candidates:
+            key = candidate.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(candidate)
+        web_items_candidates = _collect_variant_candidates_from_web_items_map(raw_html)
+        for candidate in web_items_candidates:
             key = candidate.lower()
             if key in seen:
                 continue
