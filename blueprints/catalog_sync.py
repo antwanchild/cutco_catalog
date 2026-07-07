@@ -618,13 +618,19 @@ def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> It
             f"https://www.cutco.com/p/{sku}",
             f"https://www.cutco.com/p/{sku}&view=product",
         ):
-            item_url = _resolve_cutco_item_page_url(candidate_url, item_name=name)
-            if item_url:
+            resolved_url = _resolve_cutco_item_page_url(candidate_url, item_name=name)
+            scrape_urls = [candidate_url]
+            if resolved_url and resolved_url != candidate_url:
+                scrape_urls.append(resolved_url)
+            for scrape_url in scrape_urls:
                 variant_colors = [
                     str(color).strip()
-                    for color in scrape_item_variant_colors(item_url)
+                    for color in scrape_item_variant_colors(scrape_url)
                     if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
                 ]
+                if variant_colors:
+                    item_url = scrape_url
+                    break
             if variant_colors:
                 break
     except Exception as exc:
