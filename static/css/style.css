@@ -313,8 +313,8 @@ a:hover { text-decoration: underline; }
   border-radius: calc(var(--radius) + 4px);
   background: linear-gradient(180deg, rgba(255,255,255,.02), transparent), var(--bg2);
   box-shadow: var(--shadow);
-  min-height: 108px;
-  padding: 1rem 1.1rem;
+  min-height: 76px;
+  padding: .7rem .85rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -327,7 +327,7 @@ a:hover { text-decoration: underline; }
   font-weight: 700;
 }
 .sync-empty-value {
-  font-size: 1.8rem;
+  font-size: 1.55rem;
   font-weight: 800;
   line-height: 1;
 }
@@ -1073,13 +1073,6 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 }
 .variant-sync-summary-grid {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-}
-.variant-sync-summary-grid .stat-card {
-  min-height: 72px;
-  padding: .7rem .85rem;
-}
-.variant-sync-summary-grid .stat-number {
-  font-size: 1.75rem;
 }
 .variant-sync-form {
   position: relative;
