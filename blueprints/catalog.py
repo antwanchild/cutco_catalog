@@ -1687,25 +1687,6 @@ def catalog_sync_confirm():
 
     db.session.flush()
 
-    for sku, data in item_data.items():
-        if sku in selected:
-            continue
-        item = Item.query.filter_by(sku=sku).first()
-        if not item:
-            continue
-        raw_variant_colors = data.get("variant_colors")
-        if isinstance(raw_variant_colors, str) and raw_variant_colors:
-            try:
-                parsed_colors = json.loads(raw_variant_colors)
-            except json.JSONDecodeError:
-                parsed_colors = []
-            if isinstance(parsed_colors, list):
-                detected_variant_color_total += sum(
-                    1
-                    for color in parsed_colors
-                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
-                )
-
     selected_sets = set(request.form.getlist("selected_sets"))
     added_sets = 0
     linked_items = 0
