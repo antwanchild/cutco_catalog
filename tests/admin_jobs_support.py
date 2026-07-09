@@ -9,7 +9,7 @@ os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 
 from flask import Flask  # noqa: F401
 
-from app import create_app  # noqa: F401
+from app import _teardown_logging, create_app  # noqa: F401
 import constants  # noqa: F401
 from constants import KNIFE_TASK_PRESETS  # noqa: F401
 from extensions import db  # noqa: F401
@@ -38,6 +38,7 @@ class AdminJobBaseTest(unittest.TestCase):
         self.client = self.app.test_client()
 
     def tearDown(self):
+        _teardown_logging(self.temp_dir.name)
         self.temp_dir.cleanup()
 
     def _login_as_admin(self):

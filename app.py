@@ -74,6 +74,18 @@ def _setup_logging(log_dir: str, log_level: str) -> None:
         logger.warning("Could not set up file logging (%s) - console only", exc)
 
 
+def _teardown_logging(log_dir: str) -> None:
+    root_logger = logging.getLogger()
+    log_path = os.path.join(log_dir, "cutco.log")
+
+    for handler in list(root_logger.handlers):
+        if isinstance(handler, RotatingFileHandler) and handler.baseFilename == log_path:
+            root_logger.removeHandler(handler)
+            handler.close()
+            _FILE_LOG_PATHS.discard(log_dir)
+            logger.info("File logging stopped: %s", log_dir)
+
+
 def _register_blueprints(app: Flask) -> None:
     from blueprints.admin import admin_bp
     from blueprints.catalog import catalog_bp
