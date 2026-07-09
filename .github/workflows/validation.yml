@@ -118,17 +118,13 @@ jobs:
   # Quick end-to-end checks that prove the CLI still boots and the common
   # happy-path flows still behave as expected.
   smoke:
-    name: Smoke - ${{ matrix.label }}
+    name: Smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: lint
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            label: Ubuntu
-          - os: windows-latest
-            label: Windows
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -155,17 +151,13 @@ jobs:
   # ── Imports ──────────────────────────────────────────────────────────────
   # Catches circular-import regressions and platform-only import failures.
   imports:
-    name: Imports - ${{ matrix.label }}
+    name: Imports (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: lint
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            label: Ubuntu
-          - os: windows-latest
-            label: Windows
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -252,17 +244,13 @@ jobs:
   # ── Tests ────────────────────────────────────────────────────────────────
   # Main unit suite. This is the broad safety net for the codebase.
   tests:
-    name: Tests - ${{ matrix.label }}
+    name: Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: lint
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            label: Ubuntu
-          - os: windows-latest
-            label: Windows
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
 
