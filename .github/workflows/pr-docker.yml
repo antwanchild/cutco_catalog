@@ -56,29 +56,7 @@ jobs:
             }
 
             const canPublishPreviewImage = pullRequest.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
-            let previewBuildNumber = 1;
-
-            // Keep the preview image tag stable for cleanup, but make the version
-            // string reflect which pushed preview image version we are on.
-            try {
-              const packageVersions = await github.paginate(
-                "GET /users/{username}/packages/container/{package_name}/versions",
-                {
-                  username: context.repo.owner,
-                  package_name: context.repo.repo,
-                  per_page: 100,
-                }
-              );
-              const matchingPreviewVersions = packageVersions.filter((version) => {
-                const tags = version?.metadata?.container?.tags || [];
-                return tags.some((tag) => tag === previewTagPrefix);
-              });
-              previewBuildNumber = matchingPreviewVersions.length + 1;
-            } catch (error) {
-              core.warning(
-                `Could not determine the next preview build number for ${previewTagPrefix}; defaulting to build #1. ${String(error)}`
-              );
-            }
+            const previewBuildNumber = Number(process.env.GITHUB_RUN_NUMBER || "1");
 
             core.setOutput("ready", "true");
             core.setOutput("pr_number", String(pullRequest.number));
