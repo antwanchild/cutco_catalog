@@ -33,9 +33,10 @@ concurrency:
 #   7. coverage   - repository coverage thresholds and report generation
 #   8. security   - secret and filesystem vulnerability scanning
 #
-# The matrix jobs (`smoke`, `imports`, and `tests`) catch OS-specific
-# regressions. The Windows runs are especially useful for import-path and
-# platform-API mistakes that would never show up on Linux alone.
+# The matrix jobs (`regression`, `smoke`, `imports`, and `tests`) catch
+# OS-specific regressions. The Windows runs are especially useful for
+# import-path and platform-API mistakes that would never show up on Linux
+# alone.
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
   # ── Lint ─────────────────────────────────────────────────────────────────
@@ -79,9 +80,13 @@ jobs:
   # The job is bootstrap-friendly: if no such tests exist yet, unittest
   # exits with code 5 and the workflow passes with a notice.
   regression:
-    name: Regression
-    runs-on: ubuntu-latest
+    name: Regression (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -103,6 +108,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run regression tests
+        shell: bash
         run: |
           set +e
           python -m unittest discover -s tests -k regression -k issue_ -k bug_
