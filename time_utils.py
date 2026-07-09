@@ -37,7 +37,7 @@ class _MountainTimezone(tzinfo):
         return cls._first_sunday(year, month) + timedelta(days=7)
 
 
-def container_timezone() -> tuple[timezone | ZoneInfo, str]:
+def container_timezone() -> tuple[tzinfo | ZoneInfo, str]:
     """Return the configured container timezone and its display name."""
     tz_name = os.environ.get("TZ", "UTC").strip() or "UTC"
     if tz_name in {"America/Boise", "America/Denver"}:
