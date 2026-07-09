@@ -115,9 +115,14 @@ jobs:
           tags: ${{ env.IMAGE_NAME }}:${{ steps.preview_meta.outputs.pr_tag }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}#readme
             org.opencontainers.image.revision=${{ steps.preview_meta.outputs.head_sha }}
             org.opencontainers.image.version=${{ steps.preview_meta.outputs.version }}.${{ steps.preview_meta.outputs.build_number }}
+            org.opencontainers.image.ref.name=${{ steps.preview_meta.outputs.pr_tag }}
+            org.opencontainers.image.licenses=MIT
             com.cutco.preview.build-number=${{ steps.preview_meta.outputs.build_number }}
+            com.cutco.preview.pr-number=${{ steps.preview_meta.outputs.pr_number }}
           build-args: |
             APP_VERSION=${{ steps.preview_meta.outputs.version }}.${{ steps.preview_meta.outputs.build_number }}
             PR_BUILD_NUMBER=${{ steps.preview_meta.outputs.build_number }}
