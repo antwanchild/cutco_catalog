@@ -114,10 +114,10 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.meta.outputs.head_sha }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}.${{ steps.meta.outputs.build_number }}
             com.cutco.preview.build-number=${{ steps.meta.outputs.build_number }}
           build-args: |
-            APP_VERSION=${{ steps.meta.outputs.version }}
+            APP_VERSION=${{ steps.meta.outputs.version }}.${{ steps.meta.outputs.build_number }}
             PR_BUILD_NUMBER=${{ steps.meta.outputs.build_number }}
             GIT_SHA=${{ steps.meta.outputs.head_sha }}
 
