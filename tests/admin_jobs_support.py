@@ -38,6 +38,9 @@ class AdminJobBaseTest(unittest.TestCase):
         self.client = self.app.test_client()
 
     def tearDown(self):
+        with self.app.app_context():
+            db.session.remove()
+            db.engine.dispose()
         _teardown_logging(self.temp_dir.name)
         self.temp_dir.cleanup()
 
