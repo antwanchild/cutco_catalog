@@ -293,12 +293,13 @@ def _read_engraving_fields(
 
 def _build_notes(row: dict) -> tuple[str | None, list[str]]:
     """Combine spreadsheet auxiliary columns into a single notes string."""
-    parts = []
+    note_parts = []
+    # Keep only the note fragments that add meaning to the import preview.
     for key, label in [("_notes_price", "Price")]:
         value = row.get(key, "").strip()
         if value and value not in ("0", "none", "n/a", "-"):
-            parts.append(f"{label}: {value}")
-    return ("; ".join(parts) or None), []
+            note_parts.append(f"{label}: {value}")
+    return ("; ".join(note_parts) or None), []
 
 
 def _normalize_import_color(value: str) -> str:

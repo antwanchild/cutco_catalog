@@ -132,7 +132,7 @@ def variant_sync_confirm():
     try:
         promo_summary = preview.get("promo_summary", {})
 
-        def should_process(item_data: dict, *, section: str) -> bool:
+        def should_process(preview_item: dict, *, section: str) -> bool:
             if confirm_target == "all":
                 return True
             if confirm_target == "promo":
@@ -140,15 +140,15 @@ def variant_sync_confirm():
             if confirm_target.startswith("category:"):
                 return (
                     section == "category"
-                    and confirm_target == f"category:{item_data.get('category', '')}"
+                    and confirm_target == f"category:{preview_item.get('category', '')}"
                 )
             return True
 
         def apply_item_preview(
-            item_data: dict, *, allow_purple_unicorn: bool = False
+            preview_item: dict, *, allow_purple_unicorn: bool = False
         ) -> None:
             nonlocal created_variants, retained_variants, skipped_items, touched_items
-            item_id = item_data.get("item_id")
+            item_id = preview_item.get("item_id")
             if not item_id:
                 return
             item = db.session.get(Item, item_id)
@@ -156,20 +156,20 @@ def variant_sync_confirm():
                 skipped_items += 1
                 skipped_details.append(
                     {
-                        "item": item_data.get("item_name", "Unknown item"),
-                        "sku": item_data.get("sku", "—"),
+                        "item": preview_item.get("item_name", "Unknown item"),
+                        "sku": preview_item.get("sku", "—"),
                         "reason": "Item was not found during confirmation.",
                     }
                 )
                 return
 
-            if item_data.get("status") == "skipped":
+            if preview_item.get("status") == "skipped":
                 skipped_items += 1
                 skipped_details.append(
                     {
                         "item": item.name,
                         "sku": item.sku or "—",
-                        "reason": item_data.get("skip_reason")
+                        "reason": preview_item.get("skip_reason")
                         or "No clear variants were detected.",
                     }
                 )
@@ -181,7 +181,7 @@ def variant_sync_confirm():
                 if variant.color != UNKNOWN_COLOR
             }
             create_colors = []
-            for color in item_data.get("create_colors", []):
+            for color in preview_item.get("create_colors", []):
                 color_value = (color or "").strip()
                 if not color_value:
                     continue
@@ -205,18 +205,18 @@ def variant_sync_confirm():
                     if variant.color.lower().startswith("purple"):
                         if mark_purple_as_unicorn:
                             variant.is_unicorn = True
-            retained_variants += len(item_data.get("retained_colors", []))
-            if create_colors or item_data.get("retained_colors"):
+            retained_variants += len(preview_item.get("retained_colors", []))
+            if create_colors or preview_item.get("retained_colors"):
                 touched_items += 1
                 db.session.flush()
                 reconcile_unknown_variant(item)
 
-        for item_data in preview.get("items", []):
-            if should_process(item_data, section="category"):
-                apply_item_preview(item_data)
-        for item_data in preview.get("promo_items", []):
-            if should_process(item_data, section="promo"):
-                apply_item_preview(item_data, allow_purple_unicorn=True)
+        for preview_item in preview.get("items", []):
+            if should_process(preview_item, section="category"):
+                apply_item_preview(preview_item)
+        for preview_item in preview.get("promo_items", []):
+            if should_process(preview_item, section="promo"):
+                apply_item_preview(preview_item, allow_purple_unicorn=True)
 
         combined_summary = dict(preview.get("summary", {}))
         for key in (

@@ -95,8 +95,8 @@ def _read_catalog_sync_job() -> dict:
     return recovered
 
 
-def _write_catalog_sync_job(data: dict) -> None:
-    write_json_file(_CATALOG_SYNC_JOB_FILE, data, lock=_catalog_sync_job_lock)
+def _write_catalog_sync_job(job_data: dict) -> None:
+    write_json_file(_CATALOG_SYNC_JOB_FILE, job_data, lock=_catalog_sync_job_lock)
 
 
 def _reset_catalog_sync_job() -> None:
@@ -130,8 +130,8 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
     for item in new_items:
         _grouped_unsorted.setdefault(item["category"], []).append(item)
 
-    def _sku_sort_key(item):
-        sku = item.get("sku") or ""
+    def _sku_sort_key(catalog_item: dict):
+        sku = catalog_item.get("sku") or ""
         sku_num_match = re.match(r"(\d+)", sku)
         return (0, int(sku_num_match.group(1)), sku) if sku_num_match else (1, 0, sku)
 
@@ -385,35 +385,35 @@ def _item_alternate_skus_text(item: Item | None) -> str:
     return ", ".join(parse_alternate_skus(item.alternate_skus))
 
 
-def _normalize_member_sku(value: object) -> str | None:
-    sku = str(value).strip().upper() if value is not None else ""
+def _normalize_member_sku(raw_value: object) -> str | None:
+    sku = str(raw_value).strip().upper() if raw_value is not None else ""
     return sku or None
 
 
-def _normalize_member_name(value: object) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+def _normalize_member_name(raw_value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(raw_value or "").lower()).strip()
 
 
-def _coerce_quantity(value: object, default: int = 1) -> int:
+def _coerce_quantity(raw_value: object, default: int = 1) -> int:
     """Convert scraped quantity values to a positive integer."""
-    if not isinstance(value, str | float | int):
+    if not isinstance(raw_value, str | float | int):
         return default
     try:
-        return max(1, int(value))
+        return max(1, int(raw_value))
     except (TypeError, ValueError):
         return default
 
 
-def _get_item_field(item: object, field: str) -> Any:
+def _get_item_field(item: object, field_name: str) -> Any:
     if isinstance(item, dict):
-        return item.get(field)
-    return getattr(item, field, None)
+        return item.get(field_name)
+    return getattr(item, field_name, None)
 
 
-def _build_member_name_lookup(items: list[object]) -> dict[str, object]:
+def _build_member_name_lookup(catalog_items: list[object]) -> dict[str, object]:
     lookup: dict[str, object] = {}
     ambiguous: set[str] = set()
-    for item in items:
+    for item in catalog_items:
         name = _normalize_member_name(_get_item_field(item, "name"))
         if not name:
             continue
