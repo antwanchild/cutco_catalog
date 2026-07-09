@@ -79,7 +79,10 @@ def _teardown_logging(log_dir: str) -> None:
     log_path = os.path.join(log_dir, "cutco.log")
 
     for handler in list(root_logger.handlers):
-        if isinstance(handler, RotatingFileHandler) and handler.baseFilename == log_path:
+        if (
+            isinstance(handler, RotatingFileHandler)
+            and handler.baseFilename == log_path
+        ):
             root_logger.removeHandler(handler)
             handler.close()
             _FILE_LOG_PATHS.discard(log_dir)
