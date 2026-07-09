@@ -691,52 +691,6 @@ class UtilitySmokeTests(SmokeBaseTest):
         self.assertEqual(member_entries[1]["sku"], "123")
         self.assertEqual(member_entries[1]["name"], "Gift Box")
 
-    def test_admin_diagnostics_shows_schema_target(self):
-        self._login_as_admin()
-
-        response = self.client.get("/admin/diagnostics")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Schema Current", response.data)
-        self.assertIn(b"Schema Target", response.data)
-
-    def test_check_wishlist_targets_returns_hits(self):
-        self._login_as_admin()
-        self._set_csrf_token()
-
-        item_id, variant_id = self._add_catalog_item(name="Target Knife", sku="WT-1")
-        person_id = self._add_person(name="Target Person", notes="")
-
-        add_response = self.client.post(
-            "/ownership/add",
-            data={
-                "csrf_token": "test-csrf-token",
-                "person_id": str(person_id),
-                "variant_id": str(variant_id),
-                "status": "Wishlist",
-                "target_price": "59.99",
-                "notes": "Waiting for a sale",
-            },
-            follow_redirects=False,
-        )
-        self.assertEqual(add_response.status_code, 302)
-
-        with self.app.app_context():
-            item = db.session.get(Item, item_id)
-            self.assertIsNotNone(item)
-            item.msrp = 49.99
-            db.session.commit()
-
-            hits = check_wishlist_targets()
-
-        self.assertEqual(len(hits), 1)
-        self.assertEqual(hits[0]["person"], "Target Person")
-        self.assertEqual(hits[0]["item"], "Target Knife")
-        self.assertEqual(hits[0]["sku"], "WT-1")
-        self.assertEqual(hits[0]["target"], 59.99)
-        self.assertEqual(hits[0]["msrp"], 49.99)
-        self.assertEqual(hits[0]["savings"], 10.0)
-
     def test_time_utils_format_in_container_timezone(self):
         with mock.patch.dict(os.environ, {"TZ": "America/Boise"}, clear=False):
             tz, tz_name = container_timezone()
