@@ -1,6 +1,6 @@
 {
   "include": ["."],
-  "exclude": ["**/__pycache__", ".git", ".ruff_cache", ".venv", "tests"],
+  "exclude": ["**/__pycache__", ".git", ".ruff_cache", ".venv"],
   "typeCheckingMode": "basic",
   "useLibraryCodeForTypes": true,
   "reportMissingTypeStubs": "none"
