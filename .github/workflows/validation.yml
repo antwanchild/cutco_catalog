@@ -18,6 +18,25 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Testing & Quality Gates
+#
+# Runs on every PR targeting master and on push to master.
+#
+# Checks, roughly in order of speed:
+#   1. lint       - Ruff, Black, and Pyright on the full tree
+#   2. regression - bug-specific tests that should never come back
+#   3. smoke      - small end-to-end checks for the CLI and key flows
+#   4. imports    - import-safety checks for the import subset
+#   5. perf       - full-suite timing to highlight slow tests
+#   6. tests      - the main unit suite on Ubuntu and Windows
+#   7. coverage   - repository coverage thresholds and report generation
+#   8. security   - secret and filesystem vulnerability scanning
+#
+# The matrix jobs (`tests`) catch OS-specific regressions. The Windows run is
+# especially useful for import-path and platform-API mistakes that would never
+# show up on Linux alone.
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
   # ── Lint ─────────────────────────────────────────────────────────────────
   lint:
@@ -53,13 +72,10 @@ jobs:
         run: pyright
 
   # ── Regression ──────────────────────────────────────────────────────────
-  # Runs tests named to protect against fixed bugs coming back.
-  # We use unittest naming conventions here:
-  #
-  #   def test_regression_<slug>(...):
-  #   def test_issue_<issue_number>_<slug>(...):
-  #   def test_bug_<slug>(...):
-  #
+  # Keeps fixed bugs fixed. Naming conventions:
+  #   test_regression_<slug>
+  #   test_issue_<issue_number>_<slug>
+  #   test_bug_<slug>
   # The job is bootstrap-friendly: if no such tests exist yet, unittest
   # exits with code 5 and the workflow passes with a notice.
   regression:
@@ -98,6 +114,8 @@ jobs:
           exit $status
 
   # ── Smoke ────────────────────────────────────────────────────────────────
+  # Quick end-to-end checks that prove the CLI still boots and the common
+  # happy-path flows still behave as expected.
   smoke:
     name: Smoke
     runs-on: ubuntu-latest
@@ -126,6 +144,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_smoke_*.py'
 
   # ── Imports ──────────────────────────────────────────────────────────────
+  # Catches circular-import regressions and platform-only import failures.
   imports:
     name: Imports
     runs-on: ubuntu-latest
@@ -157,6 +176,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_smoke_import.py'
 
   # ── Perf ─────────────────────────────────────────────────────────────────
+  # Shows the slowest tests so we can spot accidental performance cliffs.
   perf:
     name: Perf
     runs-on: ubuntu-latest
@@ -213,6 +233,7 @@ jobs:
           PY
 
   # ── Tests ────────────────────────────────────────────────────────────────
+  # Main unit suite. This is the broad safety net for the codebase.
   tests:
     name: Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -248,6 +269,7 @@ jobs:
         run: python -m unittest discover -s tests
 
   # ── Coverage ─────────────────────────────────────────────────────────────
+  # Generates the coverage report and enforces the repository threshold.
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
@@ -297,6 +319,7 @@ jobs:
           path: coverage.xml
 
   # ── Security scans ────────────────────────────────────────────────────────
+  # Runs after the test and coverage jobs so it only evaluates trusted code.
   security:
     name: Security Scan
     runs-on: ubuntu-latest
