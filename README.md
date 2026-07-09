@@ -106,6 +106,12 @@ python3 -m unittest discover -s tests
 
 The smoke suite is grouped by feature area: public, import, catalog, people, ownership, logs, and tasks.
 
+Regression tests should use one of these prefixes so the workflow picks them up:
+
+- `test_regression_<slug>`
+- `test_issue_<issue_number>_<slug>`
+- `test_bug_<slug>`
+
 Lint the repo with:
 
 ```bash
@@ -115,6 +121,8 @@ black --check .
 pyright
 pre-commit run --all-files
 ```
+
+`ruff` handles the lint pass and import-order checks, so there is no separate `isort` or `flake8` step in this repo.
 
 To enable the local hooks, install the tooling once and run `pre-commit install`.
 
