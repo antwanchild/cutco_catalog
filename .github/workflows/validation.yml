@@ -33,9 +33,9 @@ concurrency:
 #   7. coverage   - repository coverage thresholds and report generation
 #   8. security   - secret and filesystem vulnerability scanning
 #
-# The matrix jobs (`tests`) catch OS-specific regressions. The Windows run is
-# especially useful for import-path and platform-API mistakes that would never
-# show up on Linux alone.
+# The matrix jobs (`smoke`, `imports`, and `tests`) catch OS-specific
+# regressions. The Windows runs are especially useful for import-path and
+# platform-API mistakes that would never show up on Linux alone.
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
   # ── Lint ─────────────────────────────────────────────────────────────────
@@ -117,9 +117,13 @@ jobs:
   # Quick end-to-end checks that prove the CLI still boots and the common
   # happy-path flows still behave as expected.
   smoke:
-    name: Smoke
-    runs-on: ubuntu-latest
+    name: Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -146,9 +150,13 @@ jobs:
   # ── Imports ──────────────────────────────────────────────────────────────
   # Catches circular-import regressions and platform-only import failures.
   imports:
-    name: Imports
-    runs-on: ubuntu-latest
+    name: Imports (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
 
