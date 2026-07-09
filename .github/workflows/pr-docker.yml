@@ -59,23 +59,21 @@ jobs:
             let previewBuildNumber = 1;
 
             // Keep the preview image tag stable for cleanup, but make the version
-            // string reflect which rebuild of the PR image we are on.
+            // string reflect which pushed preview image version we are on.
             try {
-              const workflowRuns = await github.paginate(
-                github.rest.actions.listWorkflowRunsForRepo,
+              const packageVersions = await github.paginate(
+                "GET /users/{username}/packages/container/{package_name}/versions",
                 {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  event: "pull_request",
-                  status: "completed",
+                  username: context.repo.owner,
+                  package_name: context.repo.repo,
                   per_page: 100,
                 }
               );
-              const matchingPreviewRuns = workflowRuns.workflow_runs.filter((run) => {
-                if (run.name !== "PR Preview") return false;
-                return (run.pull_requests || []).some((pr) => pr.number === pullRequest.number);
+              const matchingPreviewVersions = packageVersions.filter((version) => {
+                const tags = version?.metadata?.container?.tags || [];
+                return tags.some((tag) => tag === previewTagPrefix);
               });
-              previewBuildNumber = matchingPreviewRuns.length + 1;
+              previewBuildNumber = matchingPreviewVersions.length + 1;
             } catch (error) {
               core.warning(
                 `Could not determine the next preview build number for ${previewTagPrefix}; defaulting to build #1. ${String(error)}`
