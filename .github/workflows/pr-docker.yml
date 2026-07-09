@@ -108,8 +108,10 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'pull_request_target' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true
+      (
+        github.event.action == 'closed' && github.event.pull_request.merged == true ||
+        github.event.action == 'unlabeled'
+      )
     permissions:
       contents: read
       packages: write
