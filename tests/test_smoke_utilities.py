@@ -2,6 +2,7 @@
 # ruff: noqa: F403,F405
 from smoke_support import *
 
+
 class UtilitySmokeTests(SmokeBaseTest):
     def test_token_helpers_validate_and_reject_tampering(self):
         self._login_as_admin()

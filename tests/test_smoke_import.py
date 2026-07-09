@@ -2,6 +2,7 @@
 # ruff: noqa: F403,F405
 from smoke_support import *
 
+
 class ImportSmokeTests(SmokeBaseTest):
     def test_import_template_downloads_csv(self):
         self._login_as_admin()

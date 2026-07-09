@@ -2,6 +2,7 @@
 # ruff: noqa: F403,F405
 from smoke_support import *
 
+
 class OwnershipSmokeTests(SmokeBaseTest):
     def test_ownership_add_edit_and_delete(self):
         self._login_as_admin()

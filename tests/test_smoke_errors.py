@@ -2,6 +2,7 @@
 # ruff: noqa: F403,F405
 from smoke_support import *
 
+
 class ErrorSmokeTests(SmokeBaseTest):
     def test_forbidden_page_shows_access_denied(self):
         self._login_as_admin()

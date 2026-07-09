@@ -2,6 +2,7 @@
 # ruff: noqa: F403,F405
 from smoke_support import *
 
+
 class TaskSmokeTests(SmokeBaseTest):
     def test_task_add_detail_and_delete(self):
         self._login_as_admin()

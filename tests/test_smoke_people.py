@@ -2,6 +2,7 @@
 # ruff: noqa: F403,F405
 from smoke_support import *
 
+
 class PeopleSmokeTests(SmokeBaseTest):
     def test_people_add_creates_a_record(self):
         self._login_as_admin()

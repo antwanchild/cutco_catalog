@@ -2,6 +2,7 @@
 # ruff: noqa: F403,F405
 from smoke_support import *
 
+
 class PublicSmokeTests(SmokeBaseTest):
     def test_public_pages_load(self):
         response = self.client.get("/")

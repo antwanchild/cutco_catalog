@@ -2,6 +2,7 @@
 # ruff: noqa: F403,F405
 from smoke_support import *
 
+
 class CatalogSmokeTests(SmokeBaseTest):
     def test_catalog_page_filters_and_forms_render(self):
         self._login_as_admin()

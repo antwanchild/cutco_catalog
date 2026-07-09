@@ -2,6 +2,7 @@
 # ruff: noqa: F403,F405
 from smoke_support import *
 
+
 class LogSmokeTests(SmokeBaseTest):
     def test_log_pages_render_and_notifications(self):
         self._login_as_admin()

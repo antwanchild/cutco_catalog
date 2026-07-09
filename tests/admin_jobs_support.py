@@ -16,7 +16,11 @@ from constants import KNIFE_TASK_PRESETS  # noqa: F401
 from extensions import db  # noqa: F401
 import msrp_jobs  # noqa: F401
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Set  # noqa: F401
-from schema_migrations import SCHEMA_VERSION, SchemaState, apply_schema_migrations  # noqa: F401
+from schema_migrations import (
+    SCHEMA_VERSION,
+    SchemaState,
+    apply_schema_migrations,
+)  # noqa: F401
 from startup import BOOTSTRAP_VERSION, BootstrapState, initialize_database  # noqa: F401
 
 
