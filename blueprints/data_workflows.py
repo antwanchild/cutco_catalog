@@ -34,7 +34,11 @@ from models import (
     normalize_sku_value,
 )
 from number_utils import parse_nonnegative_whole_number, parse_positive_whole_number
-from scraping import scrape_item_variant_colors, scrape_purple_campaign_variants
+from scraping import (
+    discover_cutco_item_page_url,
+    scrape_item_variant_colors,
+    scrape_purple_campaign_variants,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -519,6 +523,12 @@ def _scrape_variant_sync_item(item: Item) -> tuple[tuple[str, ...], str | None]:
         colors = scrape_item_variant_colors(url)
         if colors:
             return colors, url
+    if item.set_only:
+        discovered_url = discover_cutco_item_page_url(item.sku)
+        if discovered_url:
+            colors = scrape_item_variant_colors(discovered_url)
+            if colors:
+                return colors, discovered_url
     return (), None
 
 

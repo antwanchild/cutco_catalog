@@ -552,6 +552,46 @@ def _build_category_list() -> list[tuple[str, str]]:
     return list(known.values())
 
 
+@lru_cache(maxsize=1)
+def _cutco_product_url_lookup() -> dict[str, str]:
+    """Build a SKU-to-product-URL index from Cutco's category pages."""
+
+    def _fetch_category(category_url: str) -> dict[str, str]:
+        found: dict[str, str] = {}
+        try:
+            response = requests.get(
+                category_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+            )
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            for anchor in soup.select("a[href*='/p/']"):
+                href = _tag_attr_text(anchor, "href") or ""
+                sku = _extract_sku_from_href(href, preserve_lettered_code=True)
+                if not sku:
+                    continue
+                found.setdefault(sku.upper(), urljoin("https://www.cutco.com", href))
+        except Exception as exc:
+            logger.debug("Product URL discovery failed for %s: %s", category_url, exc)
+        return found
+
+    lookup: dict[str, str] = {}
+    category_urls = [url for _name, url in _build_category_list()]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for found in pool.map(_fetch_category, category_urls):
+            for sku, url in found.items():
+                lookup.setdefault(sku, url)
+    logger.info("Indexed %d Cutco product URLs by SKU", len(lookup))
+    return lookup
+
+
+def discover_cutco_item_page_url(sku: str | None) -> str | None:
+    """Find a Cutco product URL by exact SKU when direct URL guesses fail."""
+    normalized_sku = (sku or "").strip().upper()
+    if not normalized_sku:
+        return None
+    return _cutco_product_url_lookup().get(normalized_sku)
+
+
 def _product_link_name(anchor: Tag | None) -> str | None:
     if anchor is None:
         return None

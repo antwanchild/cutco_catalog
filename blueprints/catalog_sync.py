@@ -32,6 +32,7 @@ from models import (
 from scraping import (
     _member_hover_title,
     _resolve_cutco_item_page_url,
+    discover_cutco_item_page_url,
     scrape_catalog,
     scrape_item_specs,
     scrape_item_variant_colors,
@@ -626,6 +627,16 @@ def _add_initial_set_member_variants(item: Item, member_name: str | None = None)
                     break
             if variant_colors:
                 break
+        if not variant_colors:
+            discovered_url = discover_cutco_item_page_url(sku)
+            if discovered_url:
+                variant_colors = [
+                    str(color).strip()
+                    for color in scrape_item_variant_colors(discovered_url)
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+                if variant_colors:
+                    item_url = discovered_url
     except Exception as exc:
         logger.debug("Variant scrape failed for missing set member %s: %s", sku, exc)
     if item_url:

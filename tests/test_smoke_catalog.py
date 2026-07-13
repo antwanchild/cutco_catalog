@@ -1154,7 +1154,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 [variant.source for variant in item.variants], ["variant_sync"]
             )
 
-    def test_variant_sync_discovers_set_only_variants_from_name_url(self):
+    def test_variant_sync_discovers_set_only_variants_by_sku(self):
         self._login_as_admin()
         self._set_csrf_token()
         expected_url = (
@@ -1164,7 +1164,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         with self.app.app_context():
             item = Item(
-                name="Traditional Flatware Accessories",
+                name="6-Pc. Traditional Accessory Set",
                 sku="1570W",
                 set_only=True,
                 in_catalog=False,
@@ -1179,10 +1179,16 @@ class CatalogSmokeTests(SmokeBaseTest):
         def scrape_variants(url):
             return ("Pearl", "Classic") if url == expected_url else ()
 
-        with mock.patch(
-            "blueprints.data.scrape_item_variant_colors",
-            side_effect=scrape_variants,
-        ) as variant_scraper:
+        with (
+            mock.patch(
+                "blueprints.data.scrape_item_variant_colors",
+                side_effect=scrape_variants,
+            ) as variant_scraper,
+            mock.patch(
+                "blueprints.data_workflows.discover_cutco_item_page_url",
+                return_value=expected_url,
+            ) as url_discovery,
+        ):
             preview_response = self.client.post(
                 "/variant-sync",
                 data={
@@ -1195,7 +1201,8 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertEqual(variant_scraper.call_args_list[0].args, (expected_url,))
+        url_discovery.assert_called_once_with("1570W")
+        self.assertIn(mock.call(expected_url), variant_scraper.call_args_list)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
@@ -1695,7 +1702,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn("SX-EX-1", existing_member_skus)
             self.assertIn("SX-EX-MISS-1", existing_member_skus)
 
-    def test_missing_set_member_uses_name_based_product_url_for_variants(self):
+    def test_missing_set_member_discovers_product_url_by_sku_for_variants(self):
         from blueprints.catalog_sync import _create_missing_set_member_item
 
         expected_url = (
@@ -1716,9 +1723,13 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "blueprints.catalog_sync.scrape_item_variant_colors",
                 side_effect=scrape_variants,
             ) as variant_scraper,
+            mock.patch(
+                "blueprints.catalog_sync.discover_cutco_item_page_url",
+                return_value=expected_url,
+            ) as url_discovery,
         ):
             item = _create_missing_set_member_item(
-                {"sku": "1570W", "name": "Traditional Flatware Accessories"},
+                {"sku": "1570W", "name": "6-Pc. Traditional Accessory Set"},
                 "Traditional Flatware Set",
             )
             db.session.commit()
@@ -1733,7 +1744,8 @@ class CatalogSmokeTests(SmokeBaseTest):
                 [variant.source for variant in item.variants],
                 ["catalog_sync", "catalog_sync"],
             )
-            self.assertEqual(variant_scraper.call_args_list[0].args, (expected_url,))
+            url_discovery.assert_called_once_with("1570W")
+            self.assertIn(mock.call(expected_url), variant_scraper.call_args_list)
 
     def test_catalog_sync_does_not_backfill_existing_set_only_item_variants(self):
         from blueprints.catalog_sync import _aggregate_resolved_members

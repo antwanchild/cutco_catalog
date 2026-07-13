@@ -547,6 +547,36 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Pearl", "Classic"),
             )
 
+    def test_discovers_product_page_url_by_exact_sku_from_category_pages(self):
+        from scraping import (
+            _cutco_product_url_lookup,
+            discover_cutco_item_page_url,
+        )
+
+        response = mock.Mock()
+        response.text = """
+            <html><body>
+              <a href="/p/traditional-flatware-accessories/1570W">Accessories</a>
+              <a href="/p/traditional-flatware-accessories/1570C">Accessories</a>
+            </body></html>
+        """
+        response.raise_for_status.return_value = None
+
+        _cutco_product_url_lookup.cache_clear()
+        with (
+            mock.patch(
+                "scraping._build_category_list",
+                return_value=[("Flatware", "https://www.cutco.com/shop/flatware")],
+            ),
+            mock.patch("scraping.requests.get", return_value=response),
+        ):
+            self.assertEqual(
+                discover_cutco_item_page_url("1570W"),
+                "https://www.cutco.com/p/traditional-flatware-accessories/1570W",
+            )
+            self.assertIsNone(discover_cutco_item_page_url("1570"))
+        _cutco_product_url_lookup.cache_clear()
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """
