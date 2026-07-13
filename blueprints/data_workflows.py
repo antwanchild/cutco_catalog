@@ -517,18 +517,18 @@ def _variant_sync_candidate_urls(item: Item) -> list[str]:
     return list(dict.fromkeys(candidates))
 
 
-def _scrape_variant_sync_item(item: Item) -> tuple[tuple[str, ...], str | None]:
+def _scrape_variant_sync_item(
+    item: Item, discovered_url: str | None = None
+) -> tuple[tuple[str, ...], str | None]:
     """Try an item's viable product URLs until one exposes clear variants."""
     for url in _variant_sync_candidate_urls(item):
         colors = scrape_item_variant_colors(url)
         if colors:
             return colors, url
-    if item.set_only:
-        discovered_url = discover_cutco_item_page_url(item.sku)
-        if discovered_url:
-            colors = scrape_item_variant_colors(discovered_url)
-            if colors:
-                return colors, discovered_url
+    if item.set_only and discovered_url:
+        colors = scrape_item_variant_colors(discovered_url)
+        if colors:
+            return colors, discovered_url
     return (), None
 
 
@@ -544,9 +544,19 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
 
     fetched_variants: dict[int, tuple[str, ...]] = {}
     fetched_urls: dict[int, str] = {}
+    discovered_urls = {
+        item.id: discover_cutco_item_page_url(item.sku)
+        for item in items
+        if item.set_only
+        and (item.category or "") not in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+    }
     with ThreadPoolExecutor(max_workers=6) as pool:
         future_map = {
-            pool.submit(_scrape_variant_sync_item, item): item.id
+            pool.submit(
+                _scrape_variant_sync_item,
+                item,
+                discovered_urls.get(item.id),
+            ): item.id
             for item in items
             if _variant_sync_candidate_urls(item)
             and (item.category or "") not in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
