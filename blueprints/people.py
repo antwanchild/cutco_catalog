@@ -434,9 +434,7 @@ def ownership_edit(ownership_id):
 def _available_ownership_quantity(ownership: Ownership) -> int:
     """Return the number of copies that can be split from an ownership row."""
     purchased = (
-        ownership.quantity_purchased
-        if ownership.quantity_purchased is not None
-        else 1
+        ownership.quantity_purchased if ownership.quantity_purchased is not None else 1
     )
     return max(purchased - (ownership.quantity_given_away or 0), 0)
 
@@ -493,8 +491,7 @@ def ownership_engrave(ownership_id):
         ).first()
 
         converts_entire_row = (
-            quantity == available_quantity
-            and (ownership.quantity_given_away or 0) == 0
+            quantity == available_quantity and (ownership.quantity_given_away or 0) == 0
         )
         if converts_entire_row:
             if matching_engraving:

@@ -283,10 +283,7 @@ def _read_engraving_fields(
     copy_type = normalize_engraving_copy_type(
         cast(str | None, row.get(f"{prefix}copy_type{suffix}", "plain"))
     )
-    if (
-        cast(str, row.get(f"{prefix}engraved{suffix}", "")).strip().lower()
-        in TRUTHY
-    ):
+    if cast(str, row.get(f"{prefix}engraved{suffix}", "")).strip().lower() in TRUTHY:
         copy_type = "engraved"
     engraving_text = (
         cast(str, row.get(f"{prefix}engraving_text{suffix}", "")).strip() or None
