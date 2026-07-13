@@ -277,16 +277,20 @@ def _availability_preview_fields(availability: str) -> tuple[str, str | None]:
 
 
 def _read_engraving_fields(
-    row: Mapping[str, object], prefix: str = ""
+    row: Mapping[str, object], prefix: str = "", suffix: str = ""
 ) -> tuple[str, str | None, str | None, str]:
     """Normalize engraving fields from import rows or form posts."""
     copy_type = normalize_engraving_copy_type(
-        cast(str | None, row.get(f"{prefix}copy_type", "plain"))
+        cast(str | None, row.get(f"{prefix}copy_type{suffix}", "plain"))
     )
-    if cast(str, row.get(f"{prefix}engraved", "")).strip().lower() in TRUTHY:
+    if cast(str, row.get(f"{prefix}engraved{suffix}", "")).strip().lower() in TRUTHY:
         copy_type = "engraved"
-    engraving_text = cast(str, row.get(f"{prefix}engraving_text", "")).strip() or None
-    engraving_notes = cast(str, row.get(f"{prefix}engraving_notes", "")).strip() or None
+    engraving_text = (
+        cast(str, row.get(f"{prefix}engraving_text{suffix}", "")).strip() or None
+    )
+    engraving_notes = (
+        cast(str, row.get(f"{prefix}engraving_notes{suffix}", "")).strip() or None
+    )
     engraving_signature = normalize_engraving_signature(copy_type, engraving_text)
     return copy_type, engraving_text, engraving_notes, engraving_signature
 

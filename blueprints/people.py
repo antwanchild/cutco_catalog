@@ -431,6 +431,135 @@ def ownership_edit(ownership_id):
     )
 
 
+def _available_ownership_quantity(ownership: Ownership) -> int:
+    """Return the number of copies that can be split from an ownership row."""
+    purchased = (
+        ownership.quantity_purchased if ownership.quantity_purchased is not None else 1
+    )
+    return max(purchased - (ownership.quantity_given_away or 0), 0)
+
+
+@people_bp.route("/ownership/<int:ownership_id>/engrave", methods=["GET", "POST"])
+@user_required
+def ownership_engrave(ownership_id):
+    """Convert or split plain owned copies into an engraved ownership row."""
+    ownership = db.session.get(Ownership, ownership_id)
+    if not ownership:
+        abort(404)
+
+    person_id = ownership.person_id
+    if ownership.copy_type == "engraved":
+        flash("That entry is already engraved.", "error")
+        return redirect(url_for("people.person_collection", person_id=person_id))
+    if ownership.status != "Owned":
+        flash("Only owned copies can be marked as engraved.", "error")
+        return redirect(url_for("people.person_collection", person_id=person_id))
+
+    available_quantity = _available_ownership_quantity(ownership)
+    if request.method == "POST":
+        quantity, quantity_error = parse_nonnegative_whole_number(
+            request.form.get("quantity", ""), "Copies to engrave"
+        )
+        if quantity_error or quantity is None or quantity < 1:
+            flash(quantity_error or "Copies to engrave must be at least 1.", "error")
+            return redirect(
+                url_for("people.ownership_engrave", ownership_id=ownership_id)
+            )
+        if quantity > available_quantity:
+            flash(
+                f"Only {available_quantity} available cop{'y' if available_quantity == 1 else 'ies'} can be engraved.",
+                "error",
+            )
+            return redirect(
+                url_for("people.ownership_engrave", ownership_id=ownership_id)
+            )
+
+        engraving_data = {
+            "copy_type": "engraved",
+            "engraving_text": request.form.get("engraving_text", ""),
+            "engraving_notes": request.form.get("engraving_notes", ""),
+        }
+        copy_type, engraving_text, engraving_notes, engraving_signature = (
+            _read_engraving_fields(engraving_data)
+        )
+        matching_engraving = Ownership.query.filter(
+            Ownership.id != ownership.id,
+            Ownership.person_id == ownership.person_id,
+            Ownership.variant_id == ownership.variant_id,
+            Ownership.copy_type == copy_type,
+            Ownership.engraving_signature == engraving_signature,
+        ).first()
+
+        converts_entire_row = (
+            quantity == available_quantity and (ownership.quantity_given_away or 0) == 0
+        )
+        if converts_entire_row:
+            if matching_engraving:
+                existing_quantity = (
+                    matching_engraving.quantity_purchased
+                    if matching_engraving.quantity_purchased is not None
+                    else 1
+                )
+                matching_engraving.quantity_purchased = existing_quantity + quantity
+                if engraving_notes:
+                    matching_engraving.engraving_notes = engraving_notes
+                db.session.delete(ownership)
+            else:
+                ownership.copy_type = copy_type
+                ownership.engraving_text = engraving_text
+                ownership.engraving_notes = engraving_notes
+                ownership.engraving_signature = engraving_signature
+        else:
+            if ownership.quantity_purchased is None:
+                ownership.quantity_purchased = available_quantity
+            ownership.quantity_purchased -= quantity
+
+            if matching_engraving:
+                existing_quantity = (
+                    matching_engraving.quantity_purchased
+                    if matching_engraving.quantity_purchased is not None
+                    else 1
+                )
+                matching_engraving.quantity_purchased = existing_quantity + quantity
+                if engraving_notes:
+                    matching_engraving.engraving_notes = engraving_notes
+            else:
+                db.session.add(
+                    Ownership(
+                        person_id=ownership.person_id,
+                        variant_id=ownership.variant_id,
+                        status=ownership.status,
+                        quantity_purchased=quantity,
+                        copy_type=copy_type,
+                        engraving_text=engraving_text,
+                        engraving_notes=engraving_notes,
+                        engraving_signature=engraving_signature,
+                    )
+                )
+
+        if db_commit(
+            db.session,
+            error_msg="Could not mark the copy as engraved — no changes were saved.",
+        ):
+            logger.info(
+                "Ownership engraving split: id %d, quantity %d, signature %s",
+                ownership_id,
+                quantity,
+                engraving_signature,
+            )
+            flash(
+                f"Marked {quantity} cop{'y' if quantity == 1 else 'ies'} as engraved.",
+                "success",
+            )
+        return redirect(url_for("people.person_collection", person_id=person_id))
+
+    return render_template(
+        "ownership_engrave.html",
+        ownership=ownership,
+        available_quantity=available_quantity,
+    )
+
+
 @people_bp.route("/ownership/<int:ownership_id>/delete", methods=["POST"])
 @user_required
 def ownership_delete(ownership_id):

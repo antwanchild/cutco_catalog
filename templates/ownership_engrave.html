@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Mark Copy as Engraved – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Mark Copy as Engraved</h1>
+  <a href="{{ url_for('people.person_collection', person_id=ownership.person_id) }}" class="btn btn-ghost">← Collection</a>
+</div>
+
+<form method="post" class="form-card">
+  <div class="form-row">
+    <label>Collector
+      <input type="text" value="{{ ownership.person.name }}" disabled class="input-full">
+    </label>
+    <label>Item
+      <input type="text" value="{{ ownership.variant.item.name }}{% if ownership.variant.item.sku %} · #{{ ownership.variant.item.sku }}{% endif %}" disabled class="input-full">
+    </label>
+  </div>
+
+  <div class="form-row">
+    <label>Color
+      <input type="text" value="{{ ownership.variant.color }}" disabled class="input-full">
+    </label>
+    <label>Copies to Engrave
+      <input type="number" name="quantity" min="1" max="{{ available_quantity }}" step="1" value="1" required class="input-full">
+      <span class="hint">{{ available_quantity }} available plain cop{{ 'y' if available_quantity == 1 else 'ies' }}. The remaining copies stay plain.</span>
+    </label>
+  </div>
+
+  <label>Engraving Text
+    <input type="text" name="engraving_text" class="input-full" placeholder="Optional engraved text">
+  </label>
+
+  <label>Engraving Notes
+    <textarea name="engraving_notes" rows="2" class="input-full" placeholder="Optional engraving details"></textarea>
+  </label>
+
+  {% if available_quantity < 1 %}
+    <p class="flash flash-error">This entry has no available copies to engrave.</p>
+  {% endif %}
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary" {% if available_quantity < 1 %}disabled{% endif %}>Mark as Engraved</button>
+    <a href="{{ url_for('people.person_collection', person_id=ownership.person_id) }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

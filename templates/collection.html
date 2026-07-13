@@ -95,6 +95,9 @@
       <td>{% if ownership.quantity_given_away is not none %}<span class="mono">{{ ownership.quantity_given_away }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{{ ownership.notes or '—' }}</td>
       <td class="actions">
+        {% if ownership.status == 'Owned' and ownership.copy_type != 'engraved' %}
+        <a href="{{ url_for('people.ownership_engrave', ownership_id=ownership.id) }}" class="btn btn-xs btn-secondary">Engrave</a>
+        {% endif %}
         <a href="{{ url_for('people.ownership_edit', ownership_id=ownership.id) }}" class="btn btn-xs btn-secondary">Edit</a>
         <form method="post" action="{{ url_for('people.ownership_delete', ownership_id=ownership.id) }}"
               class="form-inline">
