@@ -507,6 +507,46 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Stainless", "Pearl", "Black"),
             )
 
+    def test_extract_product_variant_colors_uses_web_item_options_without_item_names(
+        self,
+    ):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body><script>
+              const webItemsMap = {
+                "1570W": {
+                  "itemName": "6-Pc. Traditional Accessory Set",
+                  "displayedOptions": [{
+                    "optionType": "Flatware Handle Color",
+                    "displayedType": "Color",
+                    "optionCode": "Pearl",
+                    "description": "Pearl"
+                  }],
+                  "itemSetList": [{"name": "Traditional Gravy Ladle"}]
+                },
+                "1570C": {
+                  "itemName": "6-Pc. Traditional Accessory Set",
+                  "displayedOptions": [{
+                    "optionType": "Flatware Handle Color",
+                    "displayedType": "Color",
+                    "optionCode": "Classic",
+                    "description": "Classic"
+                  }],
+                  "itemSetList": [{"name": "Traditional Serving Spoon"}]
+                }
+              };
+            </script></body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors(
+                    "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+                ),
+                ("Pearl", "Classic"),
+            )
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """

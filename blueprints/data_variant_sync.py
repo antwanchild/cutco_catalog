@@ -35,7 +35,7 @@ def variant_sync_page():
     )
     all_items = (
         Item.query.options(selectinload(Item.variants))
-        .filter(Item.cutco_url.isnot(None))
+        .filter(Item.cutco_url.isnot(None) | Item.set_only.is_(True))
         .all()
     )
     categories = sorted(
@@ -73,7 +73,10 @@ def variant_sync_page():
             selected_skus_text=selected_skus_text,
         )
     if not items:
-        flash("No catalog items with URLs were found for that scope.", "warning")
+        flash(
+            "No variant-sync eligible catalog items were found for that scope.",
+            "warning",
+        )
         return render_template(
             "variant_sync.html",
             categories=categories,
@@ -175,6 +178,11 @@ def variant_sync_confirm():
                 )
                 return
 
+            scraped_url = (preview_item.get("scraped_url") or "").strip()
+            url_changed = bool(scraped_url and item.cutco_url != scraped_url)
+            if url_changed:
+                item.cutco_url = scraped_url
+
             existing_real = {
                 variant.color.lower()
                 for variant in item.variants
@@ -206,7 +214,7 @@ def variant_sync_confirm():
                         if mark_purple_as_unicorn:
                             variant.is_unicorn = True
             retained_variants += len(preview_item.get("retained_colors", []))
-            if create_colors or preview_item.get("retained_colors"):
+            if create_colors or preview_item.get("retained_colors") or url_changed:
                 touched_items += 1
                 db.session.flush()
                 reconcile_unknown_variant(item)

@@ -589,6 +589,67 @@ def _build_member_status_rows(
     return rows, missing_skus
 
 
+def _add_initial_set_member_variants(item: Item, member_name: str | None = None) -> int:
+    """Add variants while creating a new set-only catalog item."""
+    if any(variant.color != UNKNOWN_COLOR for variant in item.variants):
+        return 0
+    sku = _normalize_member_sku(item.sku)
+    if not sku:
+        return 0
+    name = str(member_name or item.name or "").strip() or f"Set Member {sku}"
+    name_slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    candidate_urls = []
+    if name_slug:
+        candidate_urls.append(f"https://www.cutco.com/p/{name_slug}/{sku}&view=product")
+    candidate_urls.extend(
+        (
+            f"https://www.cutco.com/p/{sku}&view=product",
+            f"https://www.cutco.com/p/{sku}",
+        )
+    )
+    item_url = None
+    variant_colors: list[str] = []
+    try:
+        for candidate_url in candidate_urls:
+            resolved_url = _resolve_cutco_item_page_url(candidate_url, item_name=name)
+            scrape_urls = [candidate_url]
+            if resolved_url and resolved_url != candidate_url:
+                scrape_urls.append(resolved_url)
+            for scrape_url in scrape_urls:
+                variant_colors = [
+                    str(color).strip()
+                    for color in scrape_item_variant_colors(scrape_url)
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+                if variant_colors:
+                    item_url = scrape_url
+                    break
+            if variant_colors:
+                break
+    except Exception as exc:
+        logger.debug("Variant scrape failed for missing set member %s: %s", sku, exc)
+    if item_url:
+        item.cutco_url = item_url
+    created_variants = 0
+    if variant_colors:
+        existing_colors = {
+            existing_variant.color.lower()
+            for existing_variant in item.variants
+            if existing_variant.color != UNKNOWN_COLOR
+        }
+        seen_colors: set[str] = set()
+        for color in variant_colors:
+            color_key = color.lower()
+            if color_key in seen_colors or color_key in existing_colors:
+                continue
+            seen_colors.add(color_key)
+            db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
+            created_variants += 1
+        db.session.flush()
+    reconcile_unknown_variant(item)
+    return created_variants
+
+
 def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> Item:
     sku = _normalize_member_sku(member.get("sku"))
     if not sku:
@@ -611,47 +672,7 @@ def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> It
     )
     db.session.add(item)
     db.session.flush()
-    item_url = None
-    variant_colors: list[str] = []
-    try:
-        for candidate_url in (
-            f"https://www.cutco.com/p/{sku}",
-            f"https://www.cutco.com/p/{sku}&view=product",
-        ):
-            resolved_url = _resolve_cutco_item_page_url(candidate_url, item_name=name)
-            scrape_urls = [candidate_url]
-            if resolved_url and resolved_url != candidate_url:
-                scrape_urls.append(resolved_url)
-            for scrape_url in scrape_urls:
-                variant_colors = [
-                    str(color).strip()
-                    for color in scrape_item_variant_colors(scrape_url)
-                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
-                ]
-                if variant_colors:
-                    item_url = scrape_url
-                    break
-            if variant_colors:
-                break
-    except Exception as exc:
-        logger.debug("Variant scrape failed for missing set member %s: %s", sku, exc)
-    if item_url:
-        item.cutco_url = item_url
-    if variant_colors:
-        existing_colors = {
-            existing_variant.color.lower()
-            for existing_variant in item.variants
-            if existing_variant.color != UNKNOWN_COLOR
-        }
-        seen_colors: set[str] = set()
-        for color in variant_colors:
-            color_key = color.lower()
-            if color_key in seen_colors or color_key in existing_colors:
-                continue
-            seen_colors.add(color_key)
-            db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
-        db.session.flush()
-    reconcile_unknown_variant(item)
+    _add_initial_set_member_variants(item, name)
     return item
 
 

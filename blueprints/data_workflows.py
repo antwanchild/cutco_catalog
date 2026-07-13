@@ -426,7 +426,7 @@ def _resolve_variant_sync_items(
     """Resolve the item set to scan for variant sync."""
     items = (
         Item.query.options(selectinload(Item.variants))
-        .filter(Item.cutco_url.isnot(None))
+        .filter(Item.cutco_url.isnot(None) | Item.set_only.is_(True))
         .all()
     )
     if scope == "all":
@@ -447,7 +447,7 @@ def _resolve_variant_sync_items(
             return [], "Please choose a category."
         filtered = [item for item in items if (item.category or "") == category]
         if not filtered:
-            return [], f'No items with URLs were found in "{category}".'
+            return [], f'No variant-sync eligible items were found in "{category}".'
         return (
             sorted(
                 filtered,
@@ -485,10 +485,41 @@ def _resolve_variant_sync_items(
                 "warning",
             )
         if not selected_items:
-            return [], "None of the selected SKUs matched a catalog item with a URL."
+            return [], "None of the selected SKUs matched a variant-sync eligible item."
         return selected_items, None
 
     return [], "Please choose a valid scan scope."
+
+
+def _variant_sync_candidate_urls(item: Item) -> list[str]:
+    """Return product URLs to try for a variant-sync item, in priority order."""
+    candidates: list[str] = []
+    if item.set_only:
+        sku = normalize_sku_value(item.sku or "")
+        name_slug = re.sub(r"[^a-z0-9]+", "-", (item.name or "").lower()).strip("-")
+        if sku and name_slug:
+            candidates.append(f"https://www.cutco.com/p/{name_slug}/{sku}&view=product")
+    if item.cutco_url:
+        candidates.append(item.cutco_url)
+    if item.set_only:
+        sku = normalize_sku_value(item.sku or "")
+        if sku:
+            candidates.extend(
+                (
+                    f"https://www.cutco.com/p/{sku}&view=product",
+                    f"https://www.cutco.com/p/{sku}",
+                )
+            )
+    return list(dict.fromkeys(candidates))
+
+
+def _scrape_variant_sync_item(item: Item) -> tuple[tuple[str, ...], str | None]:
+    """Try an item's viable product URLs until one exposes clear variants."""
+    for url in _variant_sync_candidate_urls(item):
+        colors = scrape_item_variant_colors(url)
+        if colors:
+            return colors, url
+    return (), None
 
 
 def _build_variant_sync_preview(items: list[Item]) -> dict:
@@ -502,19 +533,24 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
     purple_variant_count = 0
 
     fetched_variants: dict[int, tuple[str, ...]] = {}
+    fetched_urls: dict[int, str] = {}
     with ThreadPoolExecutor(max_workers=6) as pool:
         future_map = {
-            pool.submit(scrape_item_variant_colors, item.cutco_url or ""): item.id
+            pool.submit(_scrape_variant_sync_item, item): item.id
             for item in items
-            if item.cutco_url
+            if _variant_sync_candidate_urls(item)
             and (item.category or "") not in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
         }
         for future in as_completed(future_map):
-            fetched_variants[future_map[future]] = future.result()
+            item_id = future_map[future]
+            colors, scraped_url = future.result()
+            fetched_variants[item_id] = colors
+            if scraped_url:
+                fetched_urls[item_id] = scraped_url
 
     for item in items:
         scanned_items += 1
-        if not item.cutco_url:
+        if not _variant_sync_candidate_urls(item):
             preview_items.append(
                 {
                     "item_id": item.id,
@@ -631,6 +667,7 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
                 "has_unknown_variant": has_unknown_variant,
                 "no_clear_variants": no_clear_variants,
                 "has_purple_variant": has_purple_variant,
+                "scraped_url": fetched_urls.get(item.id),
                 "scraped_variant_count": len(scraped_colors),
                 "swatch_count": len(scraped_colors),
             }

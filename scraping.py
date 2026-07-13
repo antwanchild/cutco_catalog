@@ -1488,8 +1488,21 @@ def _collect_variant_candidates_from_web_items_map(raw_html: str) -> tuple[str, 
 
     def _walk_payload(value: object) -> None:
         if isinstance(value, dict):
+            option_context = " ".join(
+                str(value.get(field) or "") for field in ("displayedType", "optionType")
+            ).lower()
+            if any(hint in option_context for hint in _VARIANT_SELECT_HINTS):
+                for field in ("description", "optionCode", "label", "name"):
+                    option_label = value.get(field)
+                    if isinstance(option_label, str):
+                        _collect_variant_candidate(candidates, seen, option_label)
+                        break
             for key, nested_value in value.items():
-                if isinstance(nested_value, str) and key in _WEB_ITEMS_MAP_LABEL_FIELDS:
+                if (
+                    isinstance(nested_value, str)
+                    and key in _WEB_ITEMS_MAP_LABEL_FIELDS
+                    and _looks_like_variant_color(nested_value)
+                ):
                     _collect_variant_candidate(candidates, seen, nested_value)
                 else:
                     _walk_payload(nested_value)
