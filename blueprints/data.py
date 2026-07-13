@@ -740,7 +740,10 @@ def import_page():
             if person_obj:
                 if existing_variant:
                     existing_o = Ownership.query.filter_by(
-                        person_id=person_obj.id, variant_id=existing_variant.id
+                        person_id=person_obj.id,
+                        variant_id=existing_variant.id,
+                        copy_type=copy_type,
+                        engraving_signature=engraving_signature,
                     ).first()
                     if existing_o:
                         if existing_o.status != status:
@@ -1323,7 +1326,9 @@ def import_confirm():
             person_name = request.form.get(f"item_person_{row_index}", "").strip()
             status = request.form.get(f"item_status_{row_index}", "Owned")
             copy_type, engraving_text, engraving_notes, engraving_signature = (
-                _read_engraving_fields(request.form, prefix="item_")
+                _read_engraving_fields(
+                    request.form, prefix="item_", suffix=f"_{row_index}"
+                )
             )
 
             if not name:
@@ -1599,7 +1604,9 @@ def import_confirm():
             status = request.form.get(f"own_status_{row_index}", "Owned")
             notes = request.form.get(f"own_notes_{row_index}", "").strip() or None
             copy_type, engraving_text, engraving_notes, engraving_signature = (
-                _read_engraving_fields(request.form, prefix="own_")
+                _read_engraving_fields(
+                    request.form, prefix="own_", suffix=f"_{row_index}"
+                )
             )
             quantity_purchased, qty_error = _read_confirm_quantity_field(
                 request.form.get(f"own_quantity_purchased_{row_index}", ""),

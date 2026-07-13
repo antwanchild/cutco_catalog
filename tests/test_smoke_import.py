@@ -87,6 +87,74 @@ class ImportSmokeTests(SmokeBaseTest):
             self.assertEqual(ownership.quantity_purchased, 3)
             self.assertEqual(ownership.quantity_given_away, 1)
 
+    def test_import_keeps_plain_and_engraved_copies_separate(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        item_id, variant_id = self._add_catalog_item(
+            name="Imported Engraving Knife", sku="IM-ENG-1"
+        )
+        person_id = self._add_person(name="Engraved Importer", notes="")
+
+        with self.app.app_context():
+            db.session.add(
+                Ownership(
+                    person_id=person_id,
+                    variant_id=variant_id,
+                    status="Owned",
+                    quantity_purchased=2,
+                )
+            )
+            db.session.commit()
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color,quantity purchased,copy_type,engraving_text\n"
+                        b"Imported Engraving Knife,IM-ENG-1,Engraved Importer,Unknown / Unspecified,1,engraved,AC\n"
+                    ),
+                    "engraved-import.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Ownership Entries", preview_response.data)
+        self.assertIn(b'name="own_accept_0"', preview_response.data)
+
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        confirm_payload = {"csrf_token": "test-csrf-token"}
+        for field in soup.select('form[action="/import/confirm"] input'):
+            name = field.get("name")
+            if not name:
+                continue
+            if field.get("type") == "checkbox":
+                if field.has_attr("checked"):
+                    confirm_payload[name] = "on"
+                continue
+            confirm_payload[name] = field.get("value", "")
+
+        confirm_response = self.client.post(
+            "/import/confirm", data=confirm_payload, follow_redirects=False
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        with self.app.app_context():
+            ownerships = Ownership.query.filter_by(
+                person_id=person_id, variant_id=variant_id
+            ).all()
+            self.assertEqual(len(ownerships), 2)
+            plain = next(row for row in ownerships if row.copy_type == "plain")
+            engraved = next(row for row in ownerships if row.copy_type == "engraved")
+            self.assertEqual(plain.quantity_purchased, 2)
+            self.assertEqual(engraved.quantity_purchased, 1)
+            self.assertEqual(engraved.engraving_text, "AC")
+            self.assertEqual(engraved.engraving_signature, "engraved:ac")
+
     def test_import_confirm_creates_catalog_item_and_set_from_item_rows(self):
         self._login_as_admin()
         self._set_csrf_token()
