@@ -574,7 +574,10 @@ class UtilitySmokeTests(SmokeBaseTest):
                 discover_cutco_item_page_url("1570W"),
                 "https://www.cutco.com/p/traditional-flatware-accessories/1570W",
             )
-            self.assertIsNone(discover_cutco_item_page_url("1570"))
+            self.assertEqual(
+                discover_cutco_item_page_url("1570"),
+                "https://www.cutco.com/p/traditional-flatware-accessories/1570W",
+            )
         _cutco_product_url_lookup.cache_clear()
 
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):

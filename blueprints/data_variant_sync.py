@@ -21,6 +21,7 @@ from constants import UNKNOWN_COLOR
 from extensions import db
 from helpers import db_commit
 from models import Item, ItemVariant, record_activity, reconcile_unknown_variant
+from scraping import discover_cutco_item_page_url
 import blueprints.data as data_module
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,7 @@ def variant_sync_page():
     # Variant color pages can change over time, so always start with a fresh scrape.
     cast(Any, data_module.scrape_item_variant_colors).cache_clear()
     cast(Any, data_module.scrape_purple_campaign_variants).cache_clear()
+    cast(Any, discover_cutco_item_page_url).cache_clear()
     items, selection_error = _resolve_variant_sync_items(scope, category, selected_skus)
     if selection_error:
         flash(selection_error, "error")

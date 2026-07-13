@@ -294,6 +294,7 @@ def _run_catalog_sync_job(app) -> None:
             )
 
         try:
+            cast(Any, discover_cutco_item_page_url).cache_clear()
             log("Scraping live catalog…")
             scraped, set_candidates = scrape_catalog(progress_cb=log)
             log(f"Found {len(scraped)} items on cutco.com")

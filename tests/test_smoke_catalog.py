@@ -1165,7 +1165,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             item = Item(
                 name="6-Pc. Traditional Accessory Set",
-                sku="1570W",
+                sku="1570",
                 set_only=True,
                 in_catalog=False,
                 availability="non-catalog",
@@ -1194,14 +1194,14 @@ class CatalogSmokeTests(SmokeBaseTest):
                 data={
                     "csrf_token": "test-csrf-token",
                     "scope": "selected",
-                    "selected_skus": "1570W",
+                    "selected_skus": "1570",
                 },
                 content_type="multipart/form-data",
                 follow_redirects=False,
             )
 
         self.assertEqual(preview_response.status_code, 200)
-        url_discovery.assert_called_once_with("1570W")
+        url_discovery.assert_called_once_with("1570")
         self.assertIn(mock.call(expected_url), variant_scraper.call_args_list)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')

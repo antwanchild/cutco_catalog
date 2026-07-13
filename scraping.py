@@ -580,16 +580,22 @@ def _cutco_product_url_lookup() -> dict[str, str]:
         for found in pool.map(_fetch_category, category_urls):
             for sku, url in found.items():
                 lookup.setdefault(sku, url)
+                base_sku = re.sub(r"[A-Z]+$", "", sku)
+                if base_sku and base_sku != sku:
+                    lookup.setdefault(base_sku, url)
     logger.info("Indexed %d Cutco product URLs by SKU", len(lookup))
     return lookup
 
 
 def discover_cutco_item_page_url(sku: str | None) -> str | None:
-    """Find a Cutco product URL by exact SKU when direct URL guesses fail."""
+    """Find a Cutco product URL by exact or handle-neutral base SKU."""
     normalized_sku = (sku or "").strip().upper()
     if not normalized_sku:
         return None
     return _cutco_product_url_lookup().get(normalized_sku)
+
+
+discover_cutco_item_page_url.cache_clear = _cutco_product_url_lookup.cache_clear  # type: ignore[attr-defined]
 
 
 def _product_link_name(anchor: Tag | None) -> str | None:
