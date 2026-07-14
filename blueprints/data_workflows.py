@@ -20,6 +20,7 @@ from blueprints.import_shared import (
     _safe_csv_filename,  # noqa: F401
 )
 from constants import (
+    SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES,
     UNKNOWN_COLOR,
     VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
@@ -206,7 +207,7 @@ def _build_completion_preview(
                 member_color = (
                     UNKNOWN_COLOR
                     if (member_item.category or "")
-                    in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+                    in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
                     else requested_color
                 )
                 expanded_rows.append(
@@ -777,8 +778,12 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
     }
 
 
-def _build_set_variant_sync_preview(item_sets: list[Set]) -> dict:
+def _build_set_variant_sync_preview(
+    item_sets: list[Set],
+    pending_item_colors: dict[int, set[str]] | None = None,
+) -> dict:
     """Build variant-sync rows for sets and their member propagation."""
+    pending_item_colors = pending_item_colors or {}
     preview_items: list[dict] = []
     variants_found = 0
     variants_to_create = 0
@@ -791,7 +796,7 @@ def _build_set_variant_sync_preview(item_sets: list[Set]) -> dict:
             for membership in item_set.members
             if membership.item
             and (membership.item.category or "")
-            not in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+            not in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
         ]
         discovered_url = discover_cutco_item_page_url(item_set.sku)
         candidate_urls = list(
@@ -870,6 +875,7 @@ def _build_set_variant_sync_preview(item_sets: list[Set]) -> dict:
         )
         variant_rows.extend({**option, "status": "remove"} for option in remove_options)
         member_create_count = 0
+        member_covered_count = 0
         eligible_member_count = 0
         for member in eligible_members:
             eligible_member_count += 1
@@ -878,9 +884,15 @@ def _build_set_variant_sync_preview(item_sets: list[Set]) -> dict:
                 for variant in member.variants
                 if variant.color != UNKNOWN_COLOR
             }
-            member_create_count += sum(
-                color.lower() not in member_colors for color in scraped_colors
-            )
+            pending_colors = pending_item_colors.get(member.id, set())
+            for color in scraped_colors:
+                color_key = color.lower()
+                if color_key in member_colors:
+                    continue
+                if color_key in pending_colors:
+                    member_covered_count += 1
+                else:
+                    member_create_count += 1
 
         variants_found += len(scraped_options)
         variants_to_create += (
@@ -912,6 +924,7 @@ def _build_set_variant_sync_preview(item_sets: list[Set]) -> dict:
                 "create_count": len(create_options) + len(reclassify_options),
                 "retained_count": len(retained_colors),
                 "member_create_count": member_create_count,
+                "member_covered_count": member_covered_count,
                 "eligible_member_count": eligible_member_count,
                 "has_unknown_variant": False,
                 "no_clear_variants": not scraped_options,

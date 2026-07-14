@@ -1418,6 +1418,45 @@ class CatalogSmokeTests(SmokeBaseTest):
             [("handle", "Red")],
         )
 
+    def test_set_variant_preview_does_not_recount_pending_item_variants(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+
+        with self.app.app_context():
+            member = Item(
+                name="Traditional Gravy Ladle",
+                sku="1573",
+                category="Flatware",
+            )
+            item_set = Set(name="Traditional Accessory Set", sku="1570")
+            db.session.add_all([member, item_set])
+            db.session.flush()
+            db.session.add(
+                ItemSetMember(set_id=item_set.id, item_id=member.id, quantity=1)
+            )
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/1570W",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Classic",),
+                        "block_finishes": (),
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview(
+                    [item_set], {member.id: {"classic"}}
+                )
+
+        row = preview["items"][0]
+        self.assertEqual(row["member_create_count"], 0)
+        self.assertEqual(row["member_covered_count"], 1)
+        self.assertEqual(preview["summary"]["variants_to_create"], 1)
+
     def test_variant_sync_can_mark_purple_campaign_variants_as_unicorns(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -1671,7 +1710,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 [variant.color for variant in promo_sheath_item.variants], ["Purple"]
             )
 
-    def test_variant_sync_skips_cutting_boards(self):
+    def test_variant_sync_adds_cutting_board_item_variants(self):
         self._login_as_admin()
         self._set_csrf_token()
 
@@ -1681,8 +1720,11 @@ class CatalogSmokeTests(SmokeBaseTest):
             category="Cutting Boards",
         )
 
-        with mock.patch("blueprints.data.scrape_item_variant_colors") as scrape_mock:
-            page_response = self.client.post(
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=("Gray", "Red"),
+        ) as scrape_mock:
+            preview_response = self.client.post(
                 "/variant-sync",
                 data={
                     "csrf_token": "test-csrf-token",
@@ -1693,15 +1735,30 @@ class CatalogSmokeTests(SmokeBaseTest):
                 follow_redirects=False,
             )
 
-        self.assertEqual(page_response.status_code, 200)
-        self.assertIn(
-            b"Cutting board items are treated as a single fallback variant.",
-            page_response.data,
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Gray", preview_response.data)
+        self.assertIn(b"Red", preview_response.data)
+        scrape_mock.assert_called()
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
         )
-        scrape_mock.assert_not_called()
+
+        self.assertEqual(confirm_response.status_code, 200)
         with self.app.app_context():
             item = db.session.get(Item, item_id)
-            self.assertEqual(len(item.variants), 1)
+            self.assertEqual(
+                sorted(variant.color for variant in item.variants), ["Gray", "Red"]
+            )
 
     def test_variant_sync_shows_fallback_only_variant(self):
         self._login_as_admin()

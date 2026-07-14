@@ -20,7 +20,10 @@ from blueprints.data_workflows import (
     _resolve_variant_sync_sets,
     sync_variant_sync_helpers,
 )
-from constants import UNKNOWN_COLOR, VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+from constants import (
+    SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES,
+    UNKNOWN_COLOR,
+)
 from extensions import db
 from helpers import db_commit
 from models import (
@@ -101,9 +104,19 @@ def variant_sync_page():
             selected_skus_text=selected_skus_text,
         )
 
+    item_preview = _build_variant_sync_preview(items)
+    pending_item_colors = {
+        preview_item["item_id"]: {
+            str(color).strip().lower()
+            for color in preview_item.get("create_colors", [])
+            if str(color).strip()
+        }
+        for preview_item in item_preview.get("items", [])
+        if preview_item.get("item_id")
+    }
     preview = _merge_variant_sync_previews(
-        _build_variant_sync_preview(items),
-        _build_set_variant_sync_preview(item_sets),
+        item_preview,
+        _build_set_variant_sync_preview(item_sets, pending_item_colors),
     )
     promo_preview = _build_purple_campaign_variant_preview()
     preview["promo_items"] = promo_preview.get("items", [])
@@ -232,7 +245,7 @@ def variant_sync_confirm():
                     if (
                         not member
                         or (member.category or "")
-                        in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+                        in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
                     ):
                         continue
                     existing_member_colors = {

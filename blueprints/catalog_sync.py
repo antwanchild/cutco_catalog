@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from constants import (
     DATA_DIR,
     SYNC_BLOCKED_CATEGORIES,
+    SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES,
     UNKNOWN_COLOR,
     VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
     infer_item_category,
@@ -223,7 +224,7 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
                     for member in item_set.get("member_entries", [])
                 ]
                 has_only_single_variant_members = bool(member_categories) and all(
-                    category in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+                    category in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
                     for category in member_categories
                 )
                 item_set["variant_colors"] = [

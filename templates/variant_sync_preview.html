@@ -141,6 +141,7 @@
         <p class="muted small">
           Handle colors will also be added to {{ item.eligible_member_count }} eligible member item{{ 's' if item.eligible_member_count != 1 }}. Block finishes stay on the set only.
           {% if item.member_create_count %}{{ item.member_create_count }} member variant{{ 's' if item.member_create_count != 1 }} will be created.{% endif %}
+          {% if item.member_covered_count %}{{ item.member_covered_count }} member variant{{ 's' if item.member_covered_count != 1 }} already covered by the item scan.{% endif %}
         </p>
       {% endif %}
 
