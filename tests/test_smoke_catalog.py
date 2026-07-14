@@ -621,6 +621,10 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "blueprints.catalog.scrape_item_variant_colors", return_value=()
             ),
             mock.patch(
+                "blueprints.catalog.scrape_set_variant_options",
+                return_value={"handle_colors": (), "block_finishes": ()},
+            ),
+            mock.patch(
                 "blueprints.catalog._start_catalog_sync_background_job",
                 side_effect=catalog_blueprint._run_catalog_sync_job,
             ),
@@ -1265,12 +1269,17 @@ class CatalogSmokeTests(SmokeBaseTest):
             db.session.add(
                 ItemSetMember(set_id=item_set.id, item_id=member.id, quantity=1)
             )
+            db.session.add(SetVariant(set=item_set, color="Cherry"))
+            db.session.add(SetVariant(set=item_set, color="Santoku-Style"))
             db.session.commit()
 
         with (
             mock.patch(
-                "blueprints.data.scrape_item_variant_colors",
-                return_value=("Pearl", "Classic"),
+                "blueprints.data.scrape_set_variant_options",
+                return_value={
+                    "handle_colors": ("Pearl", "Classic"),
+                    "block_finishes": ("Cherry",),
+                },
             ),
             mock.patch(
                 "blueprints.data_workflows.discover_cutco_item_page_url",
@@ -1291,6 +1300,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(preview_response.status_code, 200)
         self.assertIn(b"Sets Variants", preview_response.data)
         self.assertIn(b"eligible member item", preview_response.data)
+        self.assertIn(b"remove invalid", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
@@ -1312,7 +1322,15 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual(item_set.cutco_url, expected_url)
             self.assertEqual(
                 sorted(variant.color for variant in item_set.variants),
-                ["Classic", "Pearl"],
+                ["Cherry", "Classic", "Pearl"],
+            )
+            self.assertEqual(
+                sorted((variant.kind, variant.color) for variant in item_set.variants),
+                [
+                    ("block_finish", "Cherry"),
+                    ("handle", "Classic"),
+                    ("handle", "Pearl"),
+                ],
             )
             self.assertEqual(
                 len(
@@ -1320,7 +1338,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                     .scalars()
                     .all()
                 ),
-                2,
+                3,
             )
             self.assertEqual(
                 sorted(variant.color for variant in member.variants),
@@ -1329,6 +1347,47 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertTrue(
                 all(variant.source == "set_variant_sync" for variant in member.variants)
             )
+
+    def test_variant_sync_removes_member_only_color_from_cutting_board_set(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+        from models import SetVariant
+
+        with self.app.app_context():
+            board = Item(
+                name="Medium Cutting Board",
+                sku="125",
+                category="Cutting Boards",
+            )
+            item_set = Set(name="3-Pc. Cutting Board Set", sku="1905")
+            db.session.add_all([board, item_set])
+            db.session.flush()
+            db.session.add(
+                ItemSetMember(set_id=item_set.id, item_id=board.id, quantity=1)
+            )
+            db.session.add(SetVariant(set=item_set, color="Red"))
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/3-pc-cutting-board-set",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Red",),
+                        "block_finishes": (),
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview([item_set])
+
+        row = preview["items"][0]
+        self.assertEqual(row["propagate_colors"], [])
+        self.assertEqual(
+            [(option["kind"], option["color"]) for option in row["remove_options"]],
+            [("handle", "Red")],
+        )
 
     def test_variant_sync_can_mark_purple_campaign_variants_as_unicorns(self):
         self._login_as_admin()
@@ -1892,8 +1951,11 @@ class CatalogSmokeTests(SmokeBaseTest):
             db.session.commit()
 
             with mock.patch(
-                "blueprints.catalog_sync.scrape_item_variant_colors",
-                return_value=("Pearl", "Classic"),
+                "blueprints.catalog_sync.scrape_set_variant_options",
+                return_value={
+                    "handle_colors": ("Pearl", "Classic"),
+                    "block_finishes": (),
+                },
             ) as variant_scraper:
                 preview = _build_catalog_sync_preview(
                     [],
@@ -1915,7 +1977,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(len(preview["new_sets"]), 1)
         self.assertEqual(preview["new_sets"][0]["variant_colors"], ["Pearl", "Classic"])
-        variant_scraper.assert_called_once_with(new_set_url)
+        variant_scraper.assert_called_once_with(new_set_url, "1570")
 
     def test_catalog_sync_adds_variants_for_new_set_and_members_only(self):
         from models import SetVariant
@@ -1940,6 +2002,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "set_sku_0": "1570",
                 "set_url_0": set_url,
                 "set_variant_colors_0": json.dumps(["Pearl", "Classic"]),
+                "set_block_finishes_0": json.dumps(["Cherry"]),
                 "set_member_entries_0": json.dumps(
                     [
                         {
@@ -1963,7 +2026,15 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual(item_set.cutco_url, set_url)
             self.assertEqual(
                 sorted(variant.color for variant in item_set.variants),
-                ["Classic", "Pearl"],
+                ["Cherry", "Classic", "Pearl"],
+            )
+            self.assertEqual(
+                sorted((variant.kind, variant.color) for variant in item_set.variants),
+                [
+                    ("block_finish", "Cherry"),
+                    ("handle", "Classic"),
+                    ("handle", "Pearl"),
+                ],
             )
             self.assertEqual(
                 len(
@@ -1973,7 +2044,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                     .scalars()
                     .all()
                 ),
-                2,
+                3,
             )
             self.assertEqual(
                 sorted(variant.color for variant in member.variants),

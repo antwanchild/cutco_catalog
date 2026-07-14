@@ -54,6 +54,7 @@ from scraping import (
     scrape_item_specs,
     scrape_item_variant_colors,
     scrape_item_uses,
+    scrape_set_variant_options,
     scrape_sets,
 )
 import blueprints.catalog_sync as catalog_sync_module
@@ -91,6 +92,7 @@ def _sync_catalog_sync_helpers() -> None:
     catalog_sync_module.scrape_catalog = scrape_catalog
     catalog_sync_module.scrape_item_specs = scrape_item_specs
     catalog_sync_module.scrape_item_variant_colors = scrape_item_variant_colors
+    catalog_sync_module.scrape_set_variant_options = scrape_set_variant_options
     catalog_sync_module.scrape_sets = scrape_sets
 
 
@@ -1650,30 +1652,55 @@ def catalog_sync_confirm():
         return detected, created
 
     def _add_catalog_sync_set_variants(
-        item_set: Set, member_items: list[Item], raw_variant_colors: object
+        item_set: Set,
+        member_items: list[Item],
+        raw_variant_colors: object,
+        raw_block_finishes: object,
     ) -> tuple[int, int]:
-        if not isinstance(raw_variant_colors, str) or not raw_variant_colors:
-            return 0, 0
-        try:
-            parsed_colors = json.loads(raw_variant_colors)
-        except json.JSONDecodeError:
-            return 0, 0
-        if not isinstance(parsed_colors, list):
-            return 0, 0
-        colors = list(
-            dict.fromkeys(
-                str(color).strip()
-                for color in parsed_colors
-                if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+        def parse_values(raw_values: object) -> list[str]:
+            if not isinstance(raw_values, str) or not raw_values:
+                return []
+            try:
+                parsed_values = json.loads(raw_values)
+            except json.JSONDecodeError:
+                return []
+            if not isinstance(parsed_values, list):
+                return []
+            return list(
+                dict.fromkeys(
+                    str(value).strip()
+                    for value in parsed_values
+                    if str(value).strip() and str(value).strip() != UNKNOWN_COLOR
+                )
             )
-        )
-        existing_set_colors = {variant.color.lower() for variant in item_set.variants}
+
+        colors = parse_values(raw_variant_colors)
+        block_finishes = parse_values(raw_block_finishes)
+        if not any(
+            (member.category or "") not in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+            for member in member_items
+        ):
+            colors = []
+        existing_set_options = {
+            (variant.kind, variant.color.lower()) for variant in item_set.variants
+        }
         created = 0
-        for color in colors:
-            if color.lower() in existing_set_colors:
+        set_options = [
+            *(("handle", color) for color in colors),
+            *(("block_finish", finish) for finish in block_finishes),
+        ]
+        for kind, value in set_options:
+            if (kind, value.lower()) in existing_set_options:
                 continue
-            db.session.add(SetVariant(set=item_set, color=color, source="catalog_sync"))
-            existing_set_colors.add(color.lower())
+            db.session.add(
+                SetVariant(
+                    set=item_set,
+                    color=value,
+                    kind=kind,
+                    source="catalog_sync",
+                )
+            )
+            existing_set_options.add((kind, value.lower()))
             created += 1
         for member in member_items:
             if (member.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES:
@@ -1697,7 +1724,7 @@ def catalog_sync_confirm():
                 created += 1
             db.session.flush()
             reconcile_unknown_variant(member)
-        return len(colors), created
+        return len(set_options), created
 
     for sku in selected:
         if Item.query.filter_by(sku=sku).first():
@@ -1837,6 +1864,7 @@ def catalog_sync_confirm():
                 item_set,
                 [resolved["item"] for resolved in resolved_members.values()],
                 request.form.get(f"set_variant_colors_{index}", ""),
+                request.form.get(f"set_block_finishes_{index}", ""),
             )
             detected_variant_color_total += detected
             reconciled_set_variants += created

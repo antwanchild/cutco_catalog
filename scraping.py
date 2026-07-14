@@ -60,6 +60,13 @@ class SetMemberEntry(TypedDict):
     is_set_only: bool
 
 
+class SetVariantOptions(TypedDict):
+    """Set options split by the product component they customize."""
+
+    handle_colors: tuple[str, ...]
+    block_finishes: tuple[str, ...]
+
+
 def _tag_attr_text(tag: PageElement | None, *attrs: str) -> str | None:
     """Return the first non-empty string attribute from a BeautifulSoup tag."""
     if not isinstance(tag, Tag):
@@ -1271,6 +1278,7 @@ _VARIANT_COLOR_WORDS = {
     "burgundy",
     "champagne",
     "charcoal",
+    "cherry",
     "chrome",
     "classic",
     "clear",
@@ -1282,6 +1290,7 @@ _VARIANT_COLOR_WORDS = {
     "gray",
     "grey",
     "green",
+    "honey",
     "ivory",
     "light",
     "mahogany",
@@ -1290,6 +1299,7 @@ _VARIANT_COLOR_WORDS = {
     "navy",
     "nickel",
     "onyx",
+    "oak",
     "pearl",
     "pewter",
     "pink",
@@ -1309,6 +1319,7 @@ _VARIANT_COLOR_WORDS = {
     "tan",
     "teal",
     "white",
+    "walnut",
     "yellow",
 }
 
@@ -1352,7 +1363,9 @@ def _looks_like_variant_color(label: str | None) -> bool:
     return all(word in _VARIANT_COLOR_WORDS for word in word_set)
 
 
-def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str, ...]:
+def _collect_variant_candidates_from_swatches(
+    soup: BeautifulSoup, *, option_kind: str | None = None
+) -> tuple[str, ...]:
     """Extract color-like choices from product swatch groups."""
     candidates: list[str] = []
     seen: set[str] = set()
@@ -1365,6 +1378,13 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
             ]
         ).lower()
         if not any(keyword in group_text for keyword in ("color", "finish")):
+            continue
+        group_kind = (
+            "block_finish"
+            if "block finish" in group_text or "block color" in group_text
+            else "handle"
+        )
+        if option_kind and option_kind != group_kind:
             continue
         preferred_swatch_nodes: list[Tag] = []
         generic_swatch_nodes: list[Tag] = []
@@ -1425,7 +1445,9 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
     return tuple(candidates)
 
 
-def _collect_variant_candidates_from_selects(soup: BeautifulSoup) -> tuple[str, ...]:
+def _collect_variant_candidates_from_selects(
+    soup: BeautifulSoup, *, option_kind: str | None = None
+) -> tuple[str, ...]:
     """Extract color-like choices from select dropdowns."""
     candidates: list[str] = []
     seen: set[str] = set()
@@ -1442,6 +1464,13 @@ def _collect_variant_candidates_from_selects(soup: BeautifulSoup) -> tuple[str, 
             ]
         ).lower()
         if not any(hint in select_text for hint in _VARIANT_SELECT_HINTS):
+            continue
+        select_kind = (
+            "block_finish"
+            if "block finish" in select_text or "block color" in select_text
+            else "handle"
+        )
+        if option_kind and option_kind != select_kind:
             continue
 
         for option in select.find_all("option"):
@@ -1527,7 +1556,12 @@ def _extract_balanced_braces(text: str, start_index: int) -> str | None:
     return None
 
 
-def _collect_variant_candidates_from_web_items_map(raw_html: str) -> tuple[str, ...]:
+def _collect_variant_candidates_from_web_items_map(
+    raw_html: str,
+    *,
+    target_sku: str | None = None,
+    option_kind: str | None = None,
+) -> tuple[str, ...]:
     """Extract variant labels from Cutco's ``webItemsMap`` product metadata."""
     candidates: list[str] = []
     seen: set[str] = set()
@@ -1537,10 +1571,19 @@ def _collect_variant_candidates_from_web_items_map(raw_html: str) -> tuple[str, 
             option_context = " ".join(
                 str(value.get(field) or "") for field in ("displayedType", "optionType")
             ).lower()
-            if any(hint in option_context for hint in _VARIANT_SELECT_HINTS):
+            context_kind = (
+                "block_finish"
+                if "block finish" in option_context or "block color" in option_context
+                else "handle"
+            )
+            if any(hint in option_context for hint in _VARIANT_SELECT_HINTS) and (
+                not option_kind or option_kind == context_kind
+            ):
                 for field in ("description", "optionCode", "label", "name"):
                     option_label = value.get(field)
-                    if isinstance(option_label, str):
+                    if isinstance(option_label, str) and _looks_like_variant_color(
+                        option_label
+                    ):
                         _collect_variant_candidate(candidates, seen, option_label)
                         break
             for key, nested_value in value.items():
@@ -1548,6 +1591,7 @@ def _collect_variant_candidates_from_web_items_map(raw_html: str) -> tuple[str, 
                     isinstance(nested_value, str)
                     and key in _WEB_ITEMS_MAP_LABEL_FIELDS
                     and _looks_like_variant_color(nested_value)
+                    and option_kind != "block_finish"
                 ):
                     _collect_variant_candidate(candidates, seen, nested_value)
                 else:
@@ -1575,7 +1619,20 @@ def _collect_variant_candidates_from_web_items_map(raw_html: str) -> tuple[str, 
             continue
         if not isinstance(payload, dict):
             continue
-        _walk_payload(payload)
+        payloads: list[object] = [payload]
+        normalized_target = re.sub(r"[^A-Z0-9]", "", (target_sku or "").upper())
+        if normalized_target:
+            matching_payloads = [
+                value
+                for key, value in payload.items()
+                if re.fullmatch(
+                    re.escape(normalized_target) + r"[A-Z]*",
+                    re.sub(r"[^A-Z0-9]", "", str(key).upper()),
+                )
+            ]
+            payloads = matching_payloads
+        for selected_payload in payloads:
+            _walk_payload(selected_payload)
 
     return tuple(candidates)
 
@@ -1690,6 +1747,50 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
 def scrape_item_variant_colors(url: str) -> tuple[str, ...]:
     """Public alias for the product-page variant color scraper."""
     return _extract_product_variant_colors(url)
+
+
+@lru_cache(maxsize=512)
+def scrape_set_variant_options(url: str, sku: str | None = None) -> SetVariantOptions:
+    """Return set-wide handle colors and block finishes for one exact set SKU."""
+    empty: SetVariantOptions = {"handle_colors": (), "block_finishes": ()}
+    try:
+        response = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if response.status_code != 200:
+            return empty
+        raw_html = response.text
+        soup = BeautifulSoup(raw_html, "html.parser")
+        visible_soup = BeautifulSoup(raw_html, "html.parser")
+        for noise in visible_soup.find_all(["script", "style"]):
+            noise.decompose()
+
+        def collect(kind: str) -> tuple[str, ...]:
+            candidates: list[str] = []
+            seen: set[str] = set()
+            sources = (
+                _collect_variant_candidates_from_web_items_map(
+                    raw_html, target_sku=sku, option_kind=kind
+                ),
+                _collect_variant_candidates_from_swatches(soup, option_kind=kind),
+                _collect_variant_candidates_from_selects(soup, option_kind=kind),
+            )
+            for source in sources:
+                for candidate in source:
+                    if not _looks_like_variant_color(candidate):
+                        continue
+                    _collect_variant_candidate(candidates, seen, candidate)
+            if kind == "handle":
+                selected_color = _extract_selected_page_color(visible_soup)
+                if selected_color and _looks_like_variant_color(selected_color):
+                    _collect_variant_candidate(candidates, seen, selected_color)
+            return tuple(candidates)
+
+        return {
+            "handle_colors": collect("handle"),
+            "block_finishes": collect("block_finish"),
+        }
+    except Exception as exc:
+        logger.warning("Set variant scrape failed for %s: %s", url, exc)
+        return empty
 
 
 # Preserve cache helpers on the public alias used by callers.

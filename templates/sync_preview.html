@@ -173,6 +173,7 @@
           <input type="hidden" name="set_sku_{{ loop.index0 }}"     value="{{ item_set.sku or '' }}">
           <input type="hidden" name="set_url_{{ loop.index0 }}"     value="{{ item_set.url or '' }}">
           <input type="hidden" name="set_variant_colors_{{ loop.index0 }}" value='{{ item_set.variant_colors | tojson }}'>
+          <input type="hidden" name="set_block_finishes_{{ loop.index0 }}" value='{{ item_set.block_finishes | tojson }}'>
           <input type="hidden" name="set_member_entries_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
         </td>
         <td>{{ item_set.name }}</td>
@@ -190,8 +191,14 @@
         </td>
         <td>
           {% if item_set.variant_colors %}
+            <span class="muted small">Handles:</span>
             {% for color in item_set.variant_colors %}<span class="badge badge-info">{{ color }}</span>{% if not loop.last %} {% endif %}{% endfor %}
-          {% else %}
+          {% endif %}
+          {% if item_set.block_finishes %}
+            <div><span class="muted small">Block:</span>
+            {% for finish in item_set.block_finishes %}<span class="badge badge-warning">{{ finish }}</span>{% if not loop.last %} {% endif %}{% endfor %}</div>
+          {% endif %}
+          {% if not item_set.variant_colors and not item_set.block_finishes %}
             <span class="muted">—</span>
           {% endif %}
         </td>

@@ -17,6 +17,7 @@ from constants import (
     DATA_DIR,
     SYNC_BLOCKED_CATEGORIES,
     UNKNOWN_COLOR,
+    VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
 from extensions import db
 from job_state import read_json_file, reset_json_file, write_json_file
@@ -36,6 +37,7 @@ from scraping import (
     scrape_catalog,
     scrape_item_specs,
     scrape_item_variant_colors,
+    scrape_set_variant_options,
     scrape_sets,
 )
 
@@ -189,23 +191,56 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
     if new_sets:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
+        category_by_sku = {
+            _normalize_member_sku(item.get("sku")): item.get("category")
+            for item in scraped
+            if _normalize_member_sku(item.get("sku"))
+        }
+        category_by_sku.update(
+            {
+                _normalize_member_sku(item.sku): item.category
+                for item in Item.query.filter(Item.sku.isnot(None)).all()
+                if _normalize_member_sku(item.sku)
+            }
+        )
         with ThreadPoolExecutor(max_workers=6) as pool:
             future_map = {
                 pool.submit(
-                    scrape_item_variant_colors, str(item_set.get("url") or "")
+                    scrape_set_variant_options,
+                    str(item_set.get("url") or ""),
+                    str(item_set.get("sku") or "") or None,
                 ): item_set
                 for item_set in new_sets
                 if item_set.get("url")
             }
             for future in as_completed(future_map):
                 item_set = future_map[future]
+                options = future.result()
+                member_categories = [
+                    category_by_sku.get(_normalize_member_sku(member.get("sku")))
+                    for member in item_set.get("member_entries", [])
+                ]
+                has_only_single_variant_members = bool(member_categories) and all(
+                    category in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+                    for category in member_categories
+                )
                 item_set["variant_colors"] = [
                     str(color).strip()
-                    for color in future.result()
+                    for color in (
+                        ()
+                        if has_only_single_variant_members
+                        else options["handle_colors"]
+                    )
                     if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+                item_set["block_finishes"] = [
+                    str(finish).strip()
+                    for finish in options["block_finishes"]
+                    if str(finish).strip()
                 ]
         for item_set in new_sets:
             item_set.setdefault("variant_colors", [])
+            item_set.setdefault("block_finishes", [])
     existing_sets_data = [
         scraped_set
         for scraped_set in scraped_sets

@@ -43,6 +43,7 @@ def variant_sync_page():
     sync_variant_sync_helpers(
         data_module.scrape_item_variant_colors,
         data_module.scrape_purple_campaign_variants,
+        data_module.scrape_set_variant_options,
     )
     all_items = (
         Item.query.options(selectinload(Item.variants))
@@ -71,6 +72,7 @@ def variant_sync_page():
 
     # Variant color pages can change over time, so always start with a fresh scrape.
     cast(Any, data_module.scrape_item_variant_colors).cache_clear()
+    cast(Any, data_module.scrape_set_variant_options).cache_clear()
     cast(Any, data_module.scrape_purple_campaign_variants).cache_clear()
     cast(Any, discover_cutco_item_page_url).cache_clear()
     items, selection_error = _resolve_variant_sync_items(scope, category, selected_skus)
@@ -187,20 +189,43 @@ def variant_sync_confirm():
                 scraped_url = (preview_item.get("scraped_url") or "").strip()
                 if scraped_url:
                     item_set.cutco_url = scraped_url
-                existing_set_colors = {
-                    variant.color.lower() for variant in item_set.variants
+                existing_set_options = {
+                    (variant.kind, variant.color.lower())
+                    for variant in item_set.variants
                 }
-                for color in preview_item.get("create_colors", []):
-                    color_value = (color or "").strip()
-                    if color_value and color_value.lower() not in existing_set_colors:
+                existing_set_by_color = {
+                    variant.color.lower(): variant for variant in item_set.variants
+                }
+                for option in preview_item.get("remove_options", []):
+                    variant_id = option.get("variant_id")
+                    variant = (
+                        db.session.get(SetVariant, variant_id) if variant_id else None
+                    )
+                    if variant and variant.set_id == item_set.id:
+                        db.session.delete(variant)
+                for option in preview_item.get("reclassify_options", []):
+                    color_value = (option.get("color") or "").strip()
+                    kind = option.get("kind") or "handle"
+                    existing_variant = existing_set_by_color.get(color_value.lower())
+                    if existing_variant and existing_variant.kind != kind:
+                        existing_variant.kind = kind
+                        created_variants += 1
+                for option in preview_item.get("create_options", []):
+                    color_value = (option.get("color") or "").strip()
+                    kind = option.get("kind") or "handle"
+                    if (
+                        color_value
+                        and (kind, color_value.lower()) not in existing_set_options
+                    ):
                         db.session.add(
                             SetVariant(
                                 set=item_set,
                                 color=color_value,
+                                kind=kind,
                                 source="variant_sync",
                             )
                         )
-                        existing_set_colors.add(color_value.lower())
+                        existing_set_options.add((kind, color_value.lower()))
                         created_variants += 1
                 for membership in item_set.members:
                     member = membership.item

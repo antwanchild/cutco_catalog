@@ -252,7 +252,7 @@ class Set(BaseModel):
 
 
 class SetVariant(BaseModel):
-    """A color-specific variant offered for a set."""
+    """A handle-color or block-finish option offered for a set."""
 
     __tablename__ = "set_variants"
 
@@ -262,6 +262,7 @@ class SetVariant(BaseModel):
     id = db.Column(db.Integer, primary_key=True)
     set_id = db.Column(db.Integer, db.ForeignKey("sets.id"), nullable=False)
     color = db.Column(db.String(80), nullable=False)
+    kind = db.Column(db.String(24), nullable=False, default="handle")
     source = db.Column(db.String(40), nullable=True, default="manual")
 
     set: Mapped[Set | None] = relationship("Set", back_populates="variants")

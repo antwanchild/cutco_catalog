@@ -547,6 +547,84 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Pearl", "Classic"),
             )
 
+    def test_set_variant_options_reject_product_names_and_member_only_colors(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <fieldset class="swatch-group Color" data-type="Handle Color">
+                <div class="swatch product-option color-swatch" data-option="Classic"></div>
+                <div class="swatch product-option color-swatch" data-option="Pearl"></div>
+                <div class="swatch product-option color-swatch" data-option="Red"></div>
+              </fieldset>
+              <script>
+                const webItemsMap = {
+                  "3822CD": {"displayedOptions": [{"optionType": "Color", "description": "Santoku-Style"}]},
+                  "125": {"displayedOptions": [{"optionType": "Color", "description": "Red"}]},
+                  "1905": {"itemName": "3-Pc. Cutting Board Set"}
+                };
+              </script>
+            </body></html>
+        """
+        board_response = mock.Mock()
+        board_response.status_code = 200
+        board_response.text = """
+            <html><body><script>
+              const webItemsMap = {
+                "125": {"displayedOptions": [{"optionType": "Color", "description": "Red"}]},
+                "1905": {"itemName": "3-Pc. Cutting Board Set"}
+              };
+            </script></body></html>
+        """
+        with mock.patch(
+            "scraping.requests.get",
+            side_effect=lambda url, **_kwargs: (
+                board_response if "cutting-board-set" in url else response
+            ),
+        ):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options("https://www.cutco.com/p/3822CD", "3822"),
+                {
+                    "handle_colors": ("Classic", "Pearl", "Red"),
+                    "block_finishes": (),
+                },
+            )
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/3-pc-cutting-board-set", "1905"
+                ),
+                {"handle_colors": (), "block_finishes": ()},
+            )
+
+    def test_set_variant_options_separate_handles_from_block_finishes(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body><script>
+              const webItemsMap = {
+                "1815C": {"displayedOptions": [
+                  {"optionType": "Handle Color", "description": "Classic"},
+                  {"optionType": "Block Finish", "description": "Cherry"}
+                ]},
+                "1815W": {"displayedOptions": [
+                  {"optionType": "Handle Color", "description": "Pearl"},
+                  {"optionType": "Block Finish", "description": "Natural"}
+                ]}
+              };
+            </script></body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options("https://www.cutco.com/p/1815C", "1815"),
+                {
+                    "handle_colors": ("Classic", "Pearl"),
+                    "block_finishes": ("Cherry", "Natural"),
+                },
+            )
+
     def test_discovers_product_page_url_by_exact_sku_from_category_pages(self):
         from scraping import (
             _cutco_product_url_lookup,

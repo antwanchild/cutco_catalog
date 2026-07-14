@@ -35,21 +35,27 @@ from models import (
 )
 from number_utils import parse_nonnegative_whole_number, parse_positive_whole_number
 from scraping import (
+    _looks_like_variant_color,
     discover_cutco_item_page_url,
     scrape_item_variant_colors,
     scrape_purple_campaign_variants,
+    scrape_set_variant_options,
 )
 
 logger = logging.getLogger(__name__)
 
 
 def sync_variant_sync_helpers(
-    scrape_item_variant_colors_fn, scrape_purple_campaign_variants_fn
+    scrape_item_variant_colors_fn,
+    scrape_purple_campaign_variants_fn,
+    scrape_set_variant_options_fn,
 ) -> None:
     """Keep the workflow helpers pointed at the patchable route-level scrapers."""
     global scrape_item_variant_colors, scrape_purple_campaign_variants
+    global scrape_set_variant_options
     scrape_item_variant_colors = scrape_item_variant_colors_fn
     scrape_purple_campaign_variants = scrape_purple_campaign_variants_fn
+    scrape_set_variant_options = scrape_set_variant_options_fn
 
 
 def _parse_quantity_fields(row: dict) -> tuple[int | None, int | None, list[str]]:
@@ -780,49 +786,92 @@ def _build_set_variant_sync_preview(item_sets: list[Set]) -> dict:
     items_with_no_clear_variants = 0
 
     for item_set in item_sets:
+        eligible_members = [
+            membership.item
+            for membership in item_set.members
+            if membership.item
+            and (membership.item.category or "")
+            not in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+        ]
         discovered_url = discover_cutco_item_page_url(item_set.sku)
         candidate_urls = list(
             dict.fromkeys(url for url in (item_set.cutco_url, discovered_url) if url)
         )
         scraped_colors: list[str] = []
+        scraped_block_finishes: list[str] = []
         scraped_url = None
         for url in candidate_urls:
-            scraped_colors = list(scrape_item_variant_colors(url))
-            if scraped_colors:
+            options = scrape_set_variant_options(url, item_set.sku)
+            scraped_colors = list(options["handle_colors"])
+            if not eligible_members:
+                scraped_colors = []
+            scraped_block_finishes = list(options["block_finishes"])
+            if scraped_colors or scraped_block_finishes:
                 scraped_url = url
                 break
 
         existing_lookup = {
+            (variant.kind, variant.color.lower()): variant
+            for variant in item_set.variants
+        }
+        existing_by_color = {
             variant.color.lower(): variant for variant in item_set.variants
         }
-        scraped_lookup = {color.lower() for color in scraped_colors}
-        create_colors = [
-            color for color in scraped_colors if color.lower() not in existing_lookup
+        scraped_options = [
+            *(("handle", color) for color in scraped_colors),
+            *(("block_finish", finish) for finish in scraped_block_finishes),
         ]
-        retained_colors = [
-            variant.color
+        create_options = [
+            {"kind": kind, "color": value}
+            for kind, value in scraped_options
+            if (kind, value.lower()) not in existing_lookup
+            and value.lower() not in existing_by_color
+        ]
+        reclassify_options = [
+            {"kind": kind, "color": value}
+            for kind, value in scraped_options
+            if (kind, value.lower()) not in existing_lookup
+            and value.lower() in existing_by_color
+        ]
+        scraped_color_lookup = {value.lower() for _kind, value in scraped_options}
+        remove_options = [
+            {
+                "variant_id": variant.id,
+                "kind": variant.kind,
+                "color": variant.color,
+            }
             for variant in item_set.variants
-            if variant.color.lower() not in scraped_lookup
+            if not _looks_like_variant_color(variant.color)
+            or (variant.kind == "handle" and not eligible_members)
+        ]
+        remove_variant_ids = {option["variant_id"] for option in remove_options}
+        retained_colors = [
+            {"kind": variant.kind, "color": variant.color}
+            for variant in item_set.variants
+            if variant.color.lower() not in scraped_color_lookup
+            and variant.id not in remove_variant_ids
         ]
         variant_rows = [
             {
-                "color": color,
-                "status": "existing" if color.lower() in existing_lookup else "create",
+                "color": value,
+                "kind": kind,
+                "status": (
+                    "existing"
+                    if (kind, value.lower()) in existing_lookup
+                    else (
+                        "reclassify" if value.lower() in existing_by_color else "create"
+                    )
+                ),
             }
-            for color in scraped_colors
+            for kind, value in scraped_options
         ]
         variant_rows.extend(
-            {"color": color, "status": "not seen in sync"} for color in retained_colors
+            {**option, "status": "not seen in sync"} for option in retained_colors
         )
+        variant_rows.extend({**option, "status": "remove"} for option in remove_options)
         member_create_count = 0
         eligible_member_count = 0
-        for membership in item_set.members:
-            member = membership.item
-            if (
-                not member
-                or (member.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
-            ):
-                continue
+        for member in eligible_members:
             eligible_member_count += 1
             member_colors = {
                 variant.color.lower()
@@ -833,10 +882,12 @@ def _build_set_variant_sync_preview(item_sets: list[Set]) -> dict:
                 color.lower() not in member_colors for color in scraped_colors
             )
 
-        variants_found += len(scraped_colors)
-        variants_to_create += len(create_colors) + member_create_count
+        variants_found += len(scraped_options)
+        variants_to_create += (
+            len(create_options) + len(reclassify_options) + member_create_count
+        )
         variants_retained += len(retained_colors)
-        if not scraped_colors:
+        if not scraped_options:
             items_with_no_clear_variants += 1
         preview_items.append(
             {
@@ -845,29 +896,31 @@ def _build_set_variant_sync_preview(item_sets: list[Set]) -> dict:
                 "item_name": item_set.name,
                 "sku": item_set.sku or "—",
                 "category": "Sets",
-                "status": "ready" if scraped_colors else "skipped",
+                "status": "ready" if scraped_options else "skipped",
                 "skip_reason": (
-                    None if scraped_colors else "No clear set variants were detected."
+                    None if scraped_options else "No clear set variants were detected."
                 ),
                 "variant_rows": sorted(
                     variant_rows, key=lambda row: (row["color"].lower(), row["status"])
                 ),
-                "create_colors": create_colors,
+                "create_options": create_options,
+                "reclassify_options": reclassify_options,
+                "remove_options": remove_options,
                 "propagate_colors": scraped_colors,
                 "retained_colors": retained_colors,
-                "existing_count": len(scraped_colors) - len(create_colors),
-                "create_count": len(create_colors),
+                "existing_count": len(scraped_options) - len(create_options),
+                "create_count": len(create_options) + len(reclassify_options),
                 "retained_count": len(retained_colors),
                 "member_create_count": member_create_count,
                 "eligible_member_count": eligible_member_count,
                 "has_unknown_variant": False,
-                "no_clear_variants": not scraped_colors,
+                "no_clear_variants": not scraped_options,
                 "has_purple_variant": any(
                     color.lower() == "purple" for color in scraped_colors
                 ),
                 "scraped_url": scraped_url,
-                "scraped_variant_count": len(scraped_colors),
-                "swatch_count": len(scraped_colors),
+                "scraped_variant_count": len(scraped_options),
+                "swatch_count": len(scraped_options),
             }
         )
 

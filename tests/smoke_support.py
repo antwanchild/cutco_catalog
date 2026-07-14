@@ -55,6 +55,7 @@ from scraping import (  # noqa: F401
     _resolve_cutco_item_page_url,
     _should_queue_slug,
     _extract_product_variant_colors,
+    scrape_set_variant_options,
     scrape_purple_campaign_variants,
     scrape_item_specs,
 )
@@ -114,6 +115,7 @@ __all__ = [
     "_resolve_cutco_item_page_url",
     "_should_queue_slug",
     "_extract_product_variant_colors",
+    "scrape_set_variant_options",
     "scrape_purple_campaign_variants",
     "scrape_item_specs",
     "_build_member_name_lookup",

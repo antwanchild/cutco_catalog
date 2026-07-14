@@ -89,6 +89,10 @@
                 <span class="badge badge-info">existing</span>
               {% elif row.status == 'create' %}
                 <span class="badge badge-new">create</span>
+              {% elif row.status == 'reclassify' %}
+                <span class="badge badge-warning">reclassify</span>
+              {% elif row.status == 'remove' %}
+                <span class="badge badge-missing">remove invalid</span>
               {% elif row.status == 'fallback only' %}
                 <span class="badge badge-alias">fallback only</span>
               {% else %}
@@ -133,7 +137,7 @@
       {% endif %}
       {% if item.entity_type == 'set' and not item.no_clear_variants %}
         <p class="muted small">
-          These colors will also be added to {{ item.eligible_member_count }} eligible member item{{ 's' if item.eligible_member_count != 1 }}.
+          Handle colors will also be added to {{ item.eligible_member_count }} eligible member item{{ 's' if item.eligible_member_count != 1 }}. Block finishes stay on the set only.
           {% if item.member_create_count %}{{ item.member_create_count }} member variant{{ 's' if item.member_create_count != 1 }} will be created.{% endif %}
         </p>
       {% endif %}
@@ -151,6 +155,9 @@
           <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% elif row.color|lower == 'purple sheath' %}variant-sync-sheath-row{% endif %}">
             <td>
               {{ row.color }}
+              {% if item.entity_type == 'set' %}
+                <span class="badge badge-mini {% if row.kind == 'block_finish' %}badge-warning{% else %}badge-info{% endif %}">{{ 'block finish' if row.kind == 'block_finish' else 'handle' }}</span>
+              {% endif %}
               {% if row.status == 'fallback only' %}
                 <span class="badge badge-alias badge-mini">fallback only</span>
               {% endif %}
@@ -160,6 +167,10 @@
                 <span class="badge badge-info">existing</span>
               {% elif row.status == 'create' %}
                 <span class="badge badge-new">create</span>
+              {% elif row.status == 'reclassify' %}
+                <span class="badge badge-warning">reclassify</span>
+              {% elif row.status == 'remove' %}
+                <span class="badge badge-missing">remove invalid</span>
               {% elif row.status == 'fallback only' %}
                 <span class="badge badge-alias">fallback only</span>
               {% else %}
