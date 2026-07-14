@@ -23,7 +23,8 @@
   </div>
 </div>
 
-<form method="post" action="{{ url_for('data.variant_sync_confirm') }}">
+<form method="post" action="{{ url_for('data.variant_sync_confirm') }}"
+      data-submit-progress="Applying the selected variant changes… This may take a moment.">
   <input type="hidden" name="preview_json" value="{{ preview_json | e }}">
   <input type="hidden" name="scope_label" value="{{ preview.scope_label }}">
   <input type="hidden" name="set_selection_enabled" value="1">
@@ -34,7 +35,7 @@
       <h2>Promo Variants</h2>
       <div class="variant-sync-section-actions">
         <span class="muted small">{{ preview.promo_items | length }} item{{ 's' if preview.promo_items | length != 1 }}</span>
-        <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="promo">Confirm Purple Promo Only</button>
+        <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="promo" data-submitting-label="Applying…">Confirm Purple Promo Only</button>
       </div>
     </div>
     <p class="muted">Detected from the Cutco Cares campaign page.</p>
@@ -138,9 +139,9 @@
           <span class="muted small">Choose which set changes to apply.</span>
           <button type="button" class="btn btn-ghost btn-sm" data-select-sets="all">Select all</button>
           <button type="button" class="btn btn-ghost btn-sm" data-select-sets="none">Clear all</button>
-          <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="selected_sets" data-confirm-selected-sets disabled>Confirm Selected (0)</button>
+          <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="selected_sets" data-confirm-selected-sets data-submitting-label="Applying…" disabled>Confirm Selected (0)</button>
         {% else %}
-          <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="category:{{ category_block.category }}">Confirm This Section Only</button>
+          <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="category:{{ category_block.category }}" data-submitting-label="Applying…">Confirm This Section Only</button>
         {% endif %}
       </div>
       {% endif %}
@@ -230,7 +231,7 @@
   </div>
 
   <div class="form-actions variant-sync-preview-actions">
-    <button type="submit" class="btn btn-primary" name="confirm_target" value="all">Confirm Variant Sync</button>
+    <button type="submit" class="btn btn-primary" name="confirm_target" value="all" data-submitting-label="Applying…">Confirm Variant Sync</button>
     <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-secondary">Back</a>
   </div>
 </form>

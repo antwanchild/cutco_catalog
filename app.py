@@ -180,7 +180,7 @@ def _register_error_handlers(app: Flask) -> None:
                 "error.html",
                 code=413,
                 icon="📦",
-                message="File too large - maximum upload size is 10 MB.",
+                message="Request too large - the upload or submitted form data exceeded the 10 MB limit.",
             ),
             413,
         )

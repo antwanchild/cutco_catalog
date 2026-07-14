@@ -1155,6 +1155,11 @@ class CatalogSmokeTests(SmokeBaseTest):
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
         preview_json = preview_json_input["value"]
+        confirmation_payload = json.loads(preview_json)
+        self.assertNotIn("grouped_items", confirmation_payload)
+        self.assertTrue(
+            all("variant_rows" not in item for item in confirmation_payload["items"])
+        )
 
         confirm_response = self.client.post(
             "/variant-sync/confirm",
@@ -1395,6 +1400,14 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Select all", preview_response.data)
         self.assertIn(b"Clear all", preview_response.data)
         self.assertIn(b"Confirm Selected (0)", preview_response.data)
+        self.assertIn(
+            b'data-submit-progress="Applying the selected variant changes',
+            preview_response.data,
+        )
+        self.assertEqual(set_checkbox.find_parent("form")["method"], "post")
+        selected_confirm = soup.select_one("[data-confirm-selected-sets]")
+        self.assertIsNotNone(selected_confirm)
+        self.assertEqual(selected_confirm["data-submitting-label"], "Applying\u2026")
 
         confirm_response = self.client.post(
             "/variant-sync/confirm",

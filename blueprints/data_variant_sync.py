@@ -40,6 +40,47 @@ import blueprints.data as data_module
 
 logger = logging.getLogger(__name__)
 
+_VARIANT_CONFIRM_ITEM_FIELDS = (
+    "entity_type",
+    "set_id",
+    "item_id",
+    "item_name",
+    "sku",
+    "category",
+    "status",
+    "skip_reason",
+    "scraped_url",
+    "create_colors",
+    "retained_colors",
+    "remove_options",
+    "reclassify_options",
+    "create_options",
+    "propagate_colors",
+    "propagate_color_member_skus",
+    "eligible_member_count",
+    "member_create_count",
+    "member_covered_count",
+)
+
+
+def _build_variant_sync_confirmation_payload(preview: dict) -> dict:
+    """Strip display-only data from a variant-sync confirmation payload."""
+
+    def compact_item(preview_item: dict) -> dict:
+        return {
+            field: preview_item[field]
+            for field in _VARIANT_CONFIRM_ITEM_FIELDS
+            if field in preview_item
+        }
+
+    return {
+        "items": [compact_item(item) for item in preview.get("items", [])],
+        "promo_items": [compact_item(item) for item in preview.get("promo_items", [])],
+        "summary": preview.get("summary", {}),
+        "promo_summary": preview.get("promo_summary", {}),
+        "scope_label": preview.get("scope_label", "Entire catalog"),
+    }
+
 
 @data_bp.route("/variant-sync", methods=["GET", "POST"])
 def variant_sync_page():
@@ -130,7 +171,10 @@ def variant_sync_page():
     }.get(scope, "Entire catalog")
     preview["category"] = category
     preview["selected_skus_text"] = selected_skus_text
-    preview_json = json.dumps(preview, ensure_ascii=False)
+    confirmation_payload = _build_variant_sync_confirmation_payload(preview)
+    preview_json = json.dumps(
+        confirmation_payload, ensure_ascii=False, separators=(",", ":")
+    )
     return render_template(
         "variant_sync_preview.html",
         preview=preview,
