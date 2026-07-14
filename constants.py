@@ -80,7 +80,13 @@ SHARPEN_THRESHOLD_DAYS = int(os.environ.get("SHARPEN_THRESHOLD_DAYS", "180"))
 COOKWARE_THRESHOLD_DAYS = int(os.environ.get("COOKWARE_THRESHOLD_DAYS", "60"))
 _cookware_env = os.environ.get("COOKWARE_CATEGORIES", "Cookware")
 COOKWARE_CATEGORIES = {cat.strip() for cat in _cookware_env.split(",") if cat.strip()}
-EDGELESS_CATEGORIES = COOKWARE_CATEGORIES | {"Bakeware", "Cutting Boards", "Flatware"}
+EDGELESS_CATEGORIES = COOKWARE_CATEGORIES | {
+    "Bakeware",
+    "BBQ Tools",
+    "Cutting Boards",
+    "Flatware",
+    "Gift Boxes",
+}
 SHARPENING_PAGE_EXCLUDED_CATEGORIES = {
     "BBQ Tools",
     "Accessories",
@@ -97,6 +103,7 @@ SHARPENING_PAGE_EXCLUDED_CATEGORIES = {
 VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES = COOKWARE_CATEGORIES | {
     "Bakeware",
     "Cutting Boards",
+    "Gift Boxes",
 }
 SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS = ("shear",)
 SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS = ("gift box",)
@@ -199,6 +206,36 @@ def canonicalize_category(category: str | None) -> str | None:
     return CANONICAL_CATEGORY_ALIASES.get(normalized.lower(), normalized)
 
 
+def is_gift_box_item_name(name: str | None) -> bool:
+    """Return whether an item name clearly identifies a standalone gift box."""
+    normalized = re.sub(r"\s+", " ", (name or "").strip()).lower()
+    return (
+        normalized == "gift box"
+        or normalized.startswith("gift box for ")
+        or normalized.endswith(" gift box")
+    )
+
+
+def is_bbq_tool_item_name(name: str | None) -> bool:
+    """Return whether a name clearly identifies an individual barbecue tool."""
+    normalized = re.sub(r"[^a-z0-9]+", " ", (name or "").strip().lower()).strip()
+    words = set(normalized.split())
+    has_bbq_term = "bbq" in words or "barbecue" in words or "barbeque" in words
+    return has_bbq_term and bool(words & {"turner", "tongs", "fork"})
+
+
+def infer_item_category(category: str | None, name: str | None) -> str | None:
+    """Preserve explicit categories and infer only unambiguous item categories."""
+    canonical = canonicalize_category(category)
+    if canonical:
+        return canonical
+    if is_gift_box_item_name(name):
+        return "Gift Boxes"
+    if is_bbq_tool_item_name(name):
+        return "BBQ Tools"
+    return None
+
+
 def canonicalize_availability(availability: str | None) -> str:
     """Normalize an item availability value to its canonical form."""
     normalized = (availability or "").strip()
@@ -236,7 +273,7 @@ def _resolve_category(sku: str, scraped_category: str, name: str = "") -> str:
         return "Sheaths"
     if "sheath" in name.lower() and "with sheath" not in name.lower():
         return "Sheaths"
-    return canonicalize_category(scraped_category) or scraped_category
+    return infer_item_category(scraped_category, name) or scraped_category
 
 
 _SET_NAME_PATTERN = re.compile(

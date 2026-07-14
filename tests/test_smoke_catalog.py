@@ -1076,6 +1076,9 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn(b"Variant Sync", page_response.data)
             self.assertIn(b"Entire catalog", page_response.data)
             self.assertIn(b"Preview Variants", page_response.data)
+            self.assertIn(b"Checking Cutco.com for handle colors", page_response.data)
+            self.assertIn(b"Elapsed time", page_response.data)
+            self.assertIn(b"Please keep this page open", page_response.data)
             self.assertIn(b"Back", page_response.data)
 
             preview_response = self.client.post(
@@ -1097,6 +1100,11 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"not seen in sync", preview_response.data)
 
         soup = BeautifulSoup(preview_response.data, "html.parser")
+        actionable_details = soup.select_one(
+            ".variant-sync-category-block details.diff-section"
+        )
+        self.assertIsNotNone(actionable_details)
+        self.assertTrue(actionable_details.has_attr("open"))
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
         preview_json = preview_json_input["value"]
@@ -1115,6 +1123,27 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Sync Summary", confirm_response.data)
         self.assertIn(b"Variants created", confirm_response.data)
         self.assertIn(b"Variant colors detected", confirm_response.data)
+
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=("Classic Brown", "Pearl White", "Red"),
+        ):
+            current_preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "VS-1",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+        current_soup = BeautifulSoup(current_preview_response.data, "html.parser")
+        current_details = current_soup.select_one(
+            ".variant-sync-category-block details.diff-section"
+        )
+        self.assertIsNotNone(current_details)
+        self.assertFalse(current_details.has_attr("open"))
 
     def test_variant_sync_replaces_unknown_only_variant_with_real_color(self):
         self._login_as_admin()
@@ -1901,6 +1930,47 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
             url_discovery.assert_called_once_with("1570W")
             self.assertIn(mock.call(expected_url), variant_scraper.call_args_list)
+
+    def test_missing_gift_box_member_is_categorized_without_variant_scan(self):
+        from blueprints.catalog_sync import _create_missing_set_member_item
+
+        with (
+            self.app.app_context(),
+            mock.patch(
+                "blueprints.catalog_sync.scrape_item_variant_colors"
+            ) as variant_scraper,
+        ):
+            item = _create_missing_set_member_item(
+                {"sku": "2026D", "name": "Gift Box for Super Shears"},
+                "Super Shears Gift Set",
+            )
+            db.session.commit()
+
+            self.assertEqual(item.category, "Gift Boxes")
+            self.assertEqual(item.edge_type, "N/A")
+            self.assertEqual(
+                [variant.color for variant in item.variants], [UNKNOWN_COLOR]
+            )
+            variant_scraper.assert_not_called()
+
+    def test_missing_bbq_tool_member_is_categorized(self):
+        from blueprints.catalog_sync import _create_missing_set_member_item
+
+        with (
+            self.app.app_context(),
+            mock.patch(
+                "blueprints.catalog_sync._add_initial_set_member_variants",
+                return_value=0,
+            ),
+        ):
+            item = _create_missing_set_member_item(
+                {"sku": "BBQ-2", "name": "Barbecue Tongs"},
+                "3-Pc. BBQ Tool Set",
+            )
+            db.session.commit()
+
+            self.assertEqual(item.category, "BBQ Tools")
+            self.assertEqual(item.edge_type, "N/A")
 
     def test_catalog_sync_does_not_backfill_existing_set_only_item_variants(self):
         from blueprints.catalog_sync import _aggregate_resolved_members

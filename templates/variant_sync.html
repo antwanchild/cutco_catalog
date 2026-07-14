@@ -21,7 +21,13 @@
   <div id="variant-sync-overlay" style="display:none" aria-live="polite" aria-busy="true">
     <div class="sync-overlay-inner">
       <div class="sync-spinner"></div>
-      <p>Scanning variants... this may take a minute…</p>
+      <div class="variant-sync-progress-copy">
+        <h3>Scanning variants…</h3>
+        <p id="variant-sync-progress-scope" class="variant-sync-progress-scope"></p>
+        <p class="muted">Checking Cutco.com for handle colors and block finishes.</p>
+        <p class="muted small">Elapsed time: <span id="variant-sync-elapsed">0:00</span></p>
+        <p class="muted small">This may take a minute. Please keep this page open.</p>
+      </div>
     </div>
   </div>
   <div class="variant-sync-body">
@@ -82,6 +88,37 @@
   const fields = document.querySelectorAll('.variant-scope-field');
   const previewBtn = document.getElementById('variant-sync-preview-btn');
   const overlay = document.getElementById('variant-sync-overlay');
+  const progressScope = document.getElementById('variant-sync-progress-scope');
+  const elapsed = document.getElementById('variant-sync-elapsed');
+  let elapsedTimer = null;
+
+  function selectedScopeLabel() {
+    const selected = document.querySelector('input[name="scope"]:checked');
+    const value = selected ? selected.value : 'all';
+    if (value === 'category') {
+      const category = form.querySelector('select[name="category"]');
+      return category && category.value ? 'Category: ' + category.value : 'Selected category';
+    }
+    if (value === 'selected') {
+      const input = form.querySelector('textarea[name="selected_skus"]');
+      const skus = input ? input.value.split(/[\s,]+/).filter(Boolean) : [];
+      const uniqueCount = new Set(skus.map(sku => sku.toUpperCase())).size;
+      return uniqueCount + ' selected SKU' + (uniqueCount === 1 ? '' : 's');
+    }
+    return 'Entire catalog';
+  }
+
+  function startElapsedTimer() {
+    const startedAt = Date.now();
+    function updateElapsed() {
+      const totalSeconds = Math.floor((Date.now() - startedAt) / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = String(totalSeconds % 60).padStart(2, '0');
+      elapsed.textContent = minutes + ':' + seconds;
+    }
+    updateElapsed();
+    elapsedTimer = window.setInterval(updateElapsed, 1000);
+  }
   function updateVisibility() {
     const selected = document.querySelector('input[name="scope"]:checked');
     const value = selected ? selected.value : 'all';
@@ -101,6 +138,8 @@
       previewBtn.classList.add('btn-disabled');
       previewBtn.style.pointerEvents = 'none';
       form.classList.add('is-scanning');
+      progressScope.textContent = selectedScopeLabel();
+      startElapsedTimer();
       overlay.style.display = 'flex';
 
       fetch(form.action || window.location.href, {
@@ -112,11 +151,13 @@
           return response.text();
         })
         .then(function(html) {
+          window.clearInterval(elapsedTimer);
           document.open();
           document.write(html);
           document.close();
         })
         .catch(function() {
+          window.clearInterval(elapsedTimer);
           form.submit();
         });
     });

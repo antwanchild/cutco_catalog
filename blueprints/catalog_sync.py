@@ -18,6 +18,8 @@ from constants import (
     SYNC_BLOCKED_CATEGORIES,
     UNKNOWN_COLOR,
     VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
+    infer_item_category,
+    normalize_edge_for_category,
 )
 from extensions import db
 from job_state import read_json_file, reset_json_file, write_json_file
@@ -648,6 +650,9 @@ def _build_member_status_rows(
 
 def _add_initial_set_member_variants(item: Item, member_name: str | None = None) -> int:
     """Add variants while creating a new set-only catalog item."""
+    if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES:
+        reconcile_unknown_variant(item)
+        return 0
     if any(variant.color != UNKNOWN_COLOR for variant in item.variants):
         return 0
     sku = _normalize_member_sku(item.sku)
@@ -722,11 +727,12 @@ def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> It
     if not sku:
         raise ValueError("Missing member SKU")
     name = str(member.get("name") or "").strip() or f"Set Member {sku}"
+    category = infer_item_category(None, name)
     item = Item(
         name=name,
         sku=sku,
-        category=None,
-        edge_type="Unknown",
+        category=category,
+        edge_type=normalize_edge_for_category(category, None)[0],
         availability="non-catalog",
         in_catalog=False,
         set_only=True,

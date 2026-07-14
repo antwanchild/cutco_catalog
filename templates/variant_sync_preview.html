@@ -49,7 +49,7 @@
     {% endif %}
 
     {% for item in preview.promo_items %}
-    <details class="diff-section" open>
+    <details class="diff-section" {% if item.create_count %}open{% endif %}>
       <summary>
         {{ item.item_name }} <span class="muted mono">#{{ item.sku }}</span>
         <span class="badge badge-info badge-mini">promo</span>
@@ -120,7 +120,8 @@
     </div>
 
     {% for item in category_block['items'] %}
-    <details class="diff-section" open>
+    {% set removal_count = item.remove_options | default([]) | length %}
+    <details class="diff-section" {% if item.create_count or item.member_create_count or removal_count %}open{% endif %}>
       <summary>
         {{ item.item_name }} <span class="muted mono">#{{ item.sku }}</span>
         {% if item.no_clear_variants %}
@@ -128,6 +129,7 @@
         {% else %}
           <span class="badge badge-info badge-mini">{{ item.scraped_variant_count }} variant{{ 's' if item.scraped_variant_count != 1 }}</span>
           {% if item.create_count %}<span class="badge badge-new badge-mini">{{ item.create_count }} create</span>{% endif %}
+          {% if removal_count %}<span class="badge badge-missing badge-mini">{{ removal_count }} remove</span>{% endif %}
           {% if item.retained_count %}<span class="badge badge-warning badge-mini">{{ item.retained_count }} retained</span>{% endif %}
         {% endif %}
       </summary>

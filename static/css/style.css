@@ -1107,6 +1107,17 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
   box-shadow: var(--shadow);
   padding: 1.25rem 1.5rem;
 }
+.variant-sync-progress-copy {
+  display: grid;
+  gap: .35rem;
+}
+.variant-sync-progress-copy h3,
+.variant-sync-progress-copy p {
+  margin: 0;
+}
+.variant-sync-progress-scope {
+  font-weight: 600;
+}
 .variant-sync-actions {
   padding-top: .25rem;
 }

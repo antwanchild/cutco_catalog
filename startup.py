@@ -10,6 +10,8 @@ from constants import (
     KNIFE_TASK_PRESETS,
     canonicalize_availability,
     canonicalize_category,
+    is_bbq_tool_item_name,
+    is_gift_box_item_name,
 )
 from extensions import db
 from models import BaseModel, Item, KnifeTask, Ownership, ensure_unknown_variant
@@ -148,6 +150,12 @@ BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
         5, "split_ownership_quantity_notes", lambda: _split_quantity_notes()
     ),
     BootstrapMigration(6, "normalize_availability", lambda: _normalize_availability()),
+    BootstrapMigration(
+        7, "categorize_gift_boxes", lambda: _categorize_uncategorized_gift_boxes()
+    ),
+    BootstrapMigration(
+        8, "categorize_bbq_tools", lambda: _categorize_uncategorized_bbq_tools()
+    ),
 )
 
 BOOTSTRAP_VERSION = BOOTSTRAP_MIGRATIONS[-1].version
@@ -204,6 +212,38 @@ def _normalize_availability() -> None:
             updated += 1
     if updated:
         logger.info("Availability normalization: updated %d item value(s)", updated)
+
+
+def _categorize_uncategorized_gift_boxes() -> None:
+    """Categorize only clearly named gift-box items with no existing category."""
+    updated = 0
+    for item in Item.query.filter(
+        db.or_(Item.category.is_(None), Item.category == "")
+    ).all():
+        if not is_gift_box_item_name(item.name):
+            continue
+        item.category = "Gift Boxes"
+        item.edge_type = "N/A"
+        item.edge_is_unicorn = False
+        updated += 1
+    if updated:
+        logger.info("Gift box categorization: updated %d item(s)", updated)
+
+
+def _categorize_uncategorized_bbq_tools() -> None:
+    """Categorize only clearly named barbecue tools with no existing category."""
+    updated = 0
+    for item in Item.query.filter(
+        db.or_(Item.category.is_(None), Item.category == "")
+    ).all():
+        if not is_bbq_tool_item_name(item.name):
+            continue
+        item.category = "BBQ Tools"
+        item.edge_type = "N/A"
+        item.edge_is_unicorn = False
+        updated += 1
+    if updated:
+        logger.info("BBQ tool categorization: updated %d item(s)", updated)
 
 
 def _ensure_unknown_variants() -> None:
