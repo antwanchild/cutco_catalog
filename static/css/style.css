@@ -1151,6 +1151,16 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
   list-style: none;
 }
 .variant-sync-category-summary::-webkit-details-marker { display: none; }
+.variant-sync-category-section:not([open]) {
+  gap: 0;
+  margin-top: .5rem;
+}
+.variant-sync-category-section:not([open]) > .variant-sync-category-summary {
+  padding: .65rem 1rem;
+}
+.variant-sync-category-section:not([open]) .variant-sync-category-title {
+  font-size: 1rem;
+}
 .variant-sync-category-section[open] > .variant-sync-category-summary {
   border-bottom: 1px solid var(--border);
 }
