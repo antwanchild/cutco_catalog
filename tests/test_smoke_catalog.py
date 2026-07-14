@@ -1100,6 +1100,15 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"not seen in sync", preview_response.data)
 
         soup = BeautifulSoup(preview_response.data, "html.parser")
+        actionable_category = soup.select_one("details.variant-sync-category-section")
+        self.assertIsNotNone(actionable_category)
+        self.assertTrue(actionable_category.has_attr("open"))
+        self.assertIn("1 change", actionable_category.get_text(" ", strip=True))
+        self.assertIsNotNone(
+            actionable_category.select_one(
+                'button[name="confirm_target"][value="category:Kitchen Knives"]'
+            )
+        )
         actionable_details = soup.select_one(
             ".variant-sync-category-block details.diff-section"
         )
@@ -1139,6 +1148,13 @@ class CatalogSmokeTests(SmokeBaseTest):
                 follow_redirects=False,
             )
         current_soup = BeautifulSoup(current_preview_response.data, "html.parser")
+        current_category = current_soup.select_one(
+            "details.variant-sync-category-section"
+        )
+        self.assertIsNotNone(current_category)
+        self.assertFalse(current_category.has_attr("open"))
+        self.assertIn("no changes", current_category.get_text(" ", strip=True))
+        self.assertIsNone(current_category.select_one('button[name="confirm_target"]'))
         current_details = current_soup.select_one(
             ".variant-sync-category-block details.diff-section"
         )

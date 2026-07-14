@@ -110,14 +110,32 @@
   {% endif %}
 
   {% for category_block in preview.grouped_items %}
-  <div class="form-card variant-sync-category-block variant-sync-preview-section">
-    <div class="section-heading-actions variant-sync-section-heading">
-      <h2>{{ category_block.category }} Variants</h2>
+  {% set category_actions = namespace(count=0) %}
+  {% for item in category_block['items'] %}
+    {% set category_actions.count = category_actions.count
+      + (item.create_count | default(0))
+      + (item.member_create_count | default(0))
+      + (item.remove_options | default([]) | length) %}
+  {% endfor %}
+  <details class="form-card variant-sync-category-block variant-sync-preview-section variant-sync-category-section" {% if category_actions.count %}open{% endif %}>
+    <summary class="variant-sync-category-summary">
+      <span class="variant-sync-category-title">{{ category_block.category }} Variants</span>
       <div class="variant-sync-section-actions">
         <span class="muted small">{{ category_block['items'] | length }} item{{ 's' if category_block['items'] | length != 1 }}</span>
+        {% if category_actions.count %}
+          <span class="badge badge-new badge-mini">{{ category_actions.count }} change{{ 's' if category_actions.count != 1 }}</span>
+        {% else %}
+          <span class="badge badge-info badge-mini">no changes</span>
+        {% endif %}
+      </div>
+    </summary>
+
+    <div class="variant-sync-category-content">
+      {% if category_actions.count %}
+      <div class="variant-sync-category-confirm">
         <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="category:{{ category_block.category }}">Confirm This Section Only</button>
       </div>
-    </div>
+      {% endif %}
 
     {% for item in category_block['items'] %}
     {% set removal_count = item.remove_options | default([]) | length %}
@@ -188,7 +206,8 @@
 
     </details>
     {% endfor %}
-  </div>
+    </div>
+  </details>
   {% endfor %}
 
   <div class="completion-confirm-note flash flash-info variant-sync-confirm-note">
