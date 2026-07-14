@@ -97,6 +97,44 @@ class CatalogSmokeTests(SmokeBaseTest):
             response.data.find(b"Alpha Knife"), response.data.find(b"Beta Knife")
         )
 
+    def test_item_detail_labels_storage_variants_as_finishes(self):
+        self._login_as_admin()
+
+        with self.app.app_context():
+            block = Item(
+                name="Homemaker + 8 Set Block (18-Slot)",
+                sku="1748",
+                category="Storage",
+            )
+            storage = Item(name="Garden Bag", sku="GB-1", category="Storage")
+            knife = Item(
+                name="Petite Chef",
+                sku="1728",
+                category="Chef Knives",
+            )
+            db.session.add_all([block, storage, knife])
+            db.session.flush()
+            db.session.add_all(
+                [
+                    ItemVariant(item_id=block.id, color="Cherry"),
+                    ItemVariant(item_id=block.id, color="Honey"),
+                    ItemVariant(item_id=storage.id, color="Green"),
+                    ItemVariant(item_id=knife.id, color="Classic"),
+                ]
+            )
+            db.session.commit()
+            block_id = block.id
+            storage_id = storage.id
+            knife_id = knife.id
+
+        block_response = self.client.get(f"/views/item/{block_id}")
+        storage_response = self.client.get(f"/views/item/{storage_id}")
+        knife_response = self.client.get(f"/views/item/{knife_id}")
+
+        self.assertIn(b"Block Finishes (2)", block_response.data)
+        self.assertIn(b"Finishes (1)", storage_response.data)
+        self.assertIn(b"Variants (1)", knife_response.data)
+
     def test_catalog_edge_sort_uses_name_tiebreaker(self):
         self._login_as_admin()
         self._set_csrf_token()
