@@ -186,6 +186,26 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
         ),
         key=_sku_sort_key,
     )
+    if new_sets:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            future_map = {
+                pool.submit(
+                    scrape_item_variant_colors, str(item_set.get("url") or "")
+                ): item_set
+                for item_set in new_sets
+                if item_set.get("url")
+            }
+            for future in as_completed(future_map):
+                item_set = future_map[future]
+                item_set["variant_colors"] = [
+                    str(color).strip()
+                    for color in future.result()
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+        for item_set in new_sets:
+            item_set.setdefault("variant_colors", [])
     existing_sets_data = [
         scraped_set
         for scraped_set in scraped_sets

@@ -41,6 +41,7 @@ from models import (
     KnifeTask,
     Ownership,
     Set,
+    SetVariant,
     normalize_sku_value,
     parse_alternate_skus,
     record_audit_event,
@@ -1606,6 +1607,7 @@ def catalog_sync_confirm():
     added_items = 0
     detected_variant_color_total = 0
     reconciled_item_variants = 0
+    reconciled_set_variants = 0
 
     def _add_catalog_sync_variants(
         item: Item, raw_variant_colors: object
@@ -1646,6 +1648,56 @@ def catalog_sync_confirm():
             db.session.flush()
             reconcile_unknown_variant(item)
         return detected, created
+
+    def _add_catalog_sync_set_variants(
+        item_set: Set, member_items: list[Item], raw_variant_colors: object
+    ) -> tuple[int, int]:
+        if not isinstance(raw_variant_colors, str) or not raw_variant_colors:
+            return 0, 0
+        try:
+            parsed_colors = json.loads(raw_variant_colors)
+        except json.JSONDecodeError:
+            return 0, 0
+        if not isinstance(parsed_colors, list):
+            return 0, 0
+        colors = list(
+            dict.fromkeys(
+                str(color).strip()
+                for color in parsed_colors
+                if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+            )
+        )
+        existing_set_colors = {variant.color.lower() for variant in item_set.variants}
+        created = 0
+        for color in colors:
+            if color.lower() in existing_set_colors:
+                continue
+            db.session.add(SetVariant(set=item_set, color=color, source="catalog_sync"))
+            existing_set_colors.add(color.lower())
+            created += 1
+        for member in member_items:
+            if (member.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES:
+                continue
+            existing_member_colors = {
+                variant.color.lower()
+                for variant in member.variants
+                if variant.color != UNKNOWN_COLOR
+            }
+            for color in colors:
+                if color.lower() in existing_member_colors:
+                    continue
+                db.session.add(
+                    ItemVariant(
+                        item=member,
+                        color=color,
+                        source="catalog_sync_set",
+                    )
+                )
+                existing_member_colors.add(color.lower())
+                created += 1
+            db.session.flush()
+            reconcile_unknown_variant(member)
+        return len(colors), created
 
     for sku in selected:
         if Item.query.filter_by(sku=sku).first():
@@ -1780,6 +1832,14 @@ def catalog_sync_confirm():
                 "Skipping set membership reconciliation for %s because no members were resolved",
                 set_name,
             )
+        if pre_existing_set is None:
+            detected, created = _add_catalog_sync_set_variants(
+                item_set,
+                [resolved["item"] for resolved in resolved_members.values()],
+                request.form.get(f"set_variant_colors_{index}", ""),
+            )
+            detected_variant_color_total += detected
+            reconciled_set_variants += created
 
     # Update quantities on existing sets (no new rows, just qty backfill)
     existing_set_count = int(request.form.get("existing_set_count", 0))
@@ -1877,12 +1937,12 @@ def catalog_sync_confirm():
         linked_items,
         qty_updates,
         created_missing_items + created_existing_missing_items,
-        reconciled_item_variants,
+        reconciled_item_variants + reconciled_set_variants,
     )
     record_activity(
         "sync",
         "Catalog sync complete",
-        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates, {created_missing_items + created_existing_missing_items} placeholder items, {reconciled_item_variants} variant updates.",
+        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates, {created_missing_items + created_existing_missing_items} placeholder items, {reconciled_item_variants + reconciled_set_variants} variant updates.",
     )
     db.session.commit()
 

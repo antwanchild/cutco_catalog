@@ -1879,6 +1879,126 @@ class CatalogSmokeTests(SmokeBaseTest):
             )
             variant_scraper.assert_not_called()
 
+    def test_catalog_sync_preview_detects_variants_for_new_sets_only(self):
+        from blueprints.catalog_sync import _build_catalog_sync_preview
+
+        new_set_url = "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+        with self.app.app_context():
+            db.session.add(Set(name="Existing Set", sku="1571"))
+            db.session.commit()
+
+            with mock.patch(
+                "blueprints.catalog_sync.scrape_item_variant_colors",
+                return_value=("Pearl", "Classic"),
+            ) as variant_scraper:
+                preview = _build_catalog_sync_preview(
+                    [],
+                    [
+                        {
+                            "name": "6-Pc. Traditional Accessory Set",
+                            "sku": "1570",
+                            "url": new_set_url,
+                            "member_entries": [],
+                        },
+                        {
+                            "name": "Existing Set",
+                            "sku": "1571",
+                            "url": "https://example.com/existing-set",
+                            "member_entries": [],
+                        },
+                    ],
+                )
+
+        self.assertEqual(len(preview["new_sets"]), 1)
+        self.assertEqual(preview["new_sets"][0]["variant_colors"], ["Pearl", "Classic"])
+        variant_scraper.assert_called_once_with(new_set_url)
+
+    def test_catalog_sync_adds_variants_for_new_set_and_members_only(self):
+        from models import SetVariant
+
+        self._login_as_admin()
+        self._set_csrf_token()
+        member_id, _unknown_variant_id = self._add_catalog_item(
+            name="Traditional Gravy Ladle",
+            sku="1573",
+            category="Flatware",
+        )
+        set_url = "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+
+        response = self.client.post(
+            "/catalog/sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "set_count": "1",
+                "selected_sets": "6-Pc. Traditional Accessory Set",
+                "set_name_0": "6-Pc. Traditional Accessory Set",
+                "set_sku_0": "1570",
+                "set_url_0": set_url,
+                "set_variant_colors_0": json.dumps(["Pearl", "Classic"]),
+                "set_member_entries_0": json.dumps(
+                    [
+                        {
+                            "sku": "1573",
+                            "name": "Traditional Gravy Ladle",
+                            "quantity": 1,
+                        }
+                    ]
+                ),
+                "existing_set_count": "0",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            item_set = db.session.execute(
+                db.select(Set).filter_by(sku="1570")
+            ).scalar_one()
+            member = db.session.get(Item, member_id)
+            self.assertEqual(item_set.cutco_url, set_url)
+            self.assertEqual(
+                sorted(variant.color for variant in item_set.variants),
+                ["Classic", "Pearl"],
+            )
+            self.assertEqual(
+                len(
+                    db.session.execute(
+                        db.select(SetVariant).filter_by(set_id=item_set.id)
+                    )
+                    .scalars()
+                    .all()
+                ),
+                2,
+            )
+            self.assertEqual(
+                sorted(variant.color for variant in member.variants),
+                ["Classic", "Pearl"],
+            )
+
+        with self.app.app_context():
+            existing_set = Set(name="Existing Variant Set", sku="1571")
+            db.session.add(existing_set)
+            db.session.commit()
+            existing_set_id = existing_set.id
+
+        response = self.client.post(
+            "/catalog/sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "set_count": "0",
+                "existing_set_count": "1",
+                "existing_set_name_0": "Existing Variant Set",
+                "existing_set_member_entries_0": "[]",
+                "set_variant_colors_0": json.dumps(["Pearl", "Classic"]),
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            existing_set = db.session.get(Set, existing_set_id)
+            self.assertEqual(existing_set.variants, [])
+
     def test_catalog_sync_confirm_reconciles_existing_set_members(self):
         self._login_as_admin()
         self._set_csrf_token()

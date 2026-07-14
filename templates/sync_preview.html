@@ -160,7 +160,7 @@
         <th style="width:32px"><input type="checkbox" id="sets-select-all" checked></th>
         <th><span class="sort-hdr" data-col="name" style="cursor:pointer">Set Name</span></th>
         <th><span class="sort-hdr active" data-col="sku" style="cursor:pointer">SKU ▲</span></th>
-        <th>Members</th><th></th>
+        <th>Members</th><th>Variants</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -171,6 +171,7 @@
           <input type="hidden" name="set_name_{{ loop.index0 }}"    value="{{ item_set.name }}">
           <input type="hidden" name="set_sku_{{ loop.index0 }}"     value="{{ item_set.sku or '' }}">
           <input type="hidden" name="set_url_{{ loop.index0 }}"     value="{{ item_set.url or '' }}">
+          <input type="hidden" name="set_variant_colors_{{ loop.index0 }}" value='{{ item_set.variant_colors | tojson }}'>
           <input type="hidden" name="set_member_entries_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
         </td>
         <td>{{ item_set.name }}</td>
@@ -184,6 +185,13 @@
           </div>
           {% if item_set.not_in_catalog_skus %}
             <div class="muted small">Not in catalog: {% for sku in item_set.not_in_catalog_skus %}<span class="badge badge-missing mono">{{ sku }}</span>{% if not loop.last %} {% endif %}{% endfor %}</div>
+          {% endif %}
+        </td>
+        <td>
+          {% if item_set.variant_colors %}
+            {% for color in item_set.variant_colors %}<span class="badge badge-info">{{ color }}</span>{% if not loop.last %} {% endif %}{% endfor %}
+          {% else %}
+            <span class="muted">—</span>
           {% endif %}
         </td>
         <td><a href="{{ item_set.url }}" target="_blank" class="ext-link">↗</a></td>
