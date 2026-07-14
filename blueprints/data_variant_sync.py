@@ -35,6 +35,7 @@ from models import (
     reconcile_unknown_variant,
 )
 from scraping import discover_cutco_item_page_url
+from scraping import set_handle_color_applies_to_member
 import blueprints.data as data_module
 
 logger = logging.getLogger(__name__)
@@ -257,6 +258,11 @@ def variant_sync_confirm():
                         color_value = (color or "").strip()
                         if (
                             not color_value
+                            or not set_handle_color_applies_to_member(
+                                member.sku,
+                                color_value,
+                                preview_item.get("propagate_color_member_skus"),
+                            )
                             or color_value.lower() in existing_member_colors
                         ):
                             continue

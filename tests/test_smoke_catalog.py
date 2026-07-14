@@ -1513,6 +1513,90 @@ class CatalogSmokeTests(SmokeBaseTest):
             [("handle", "Red")],
         )
 
+    def test_variant_sync_propagates_set_colors_only_to_applicable_members(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with self.app.app_context():
+            peeler = Item(name="Vegetable Peeler", sku="1501", category="Accessories")
+            paring = Item(name='4" Paring Knife', sku="2120", category="Paring Knives")
+            item_set = Set(name="Peel n' Pare Pack", sku="1828")
+            db.session.add_all([peeler, paring, item_set])
+            db.session.flush()
+            peeler_id = peeler.id
+            paring_id = paring.id
+            db.session.add_all(
+                [
+                    ItemVariant(item=peeler, color=UNKNOWN_COLOR),
+                    ItemVariant(item=paring, color=UNKNOWN_COLOR),
+                    ItemSetMember(set_id=item_set.id, item_id=peeler.id, quantity=1),
+                    ItemSetMember(set_id=item_set.id, item_id=paring.id, quantity=1),
+                ]
+            )
+            db.session.commit()
+
+        with (
+            mock.patch(
+                "blueprints.data.scrape_set_variant_options",
+                return_value={
+                    "handle_colors": ("Classic", "Pearl"),
+                    "block_finishes": (),
+                    "handle_colors_authoritative": True,
+                    "handle_color_member_skus": {
+                        "Classic": ("2120C",),
+                        "Pearl": ("2120W",),
+                    },
+                },
+            ),
+            mock.patch(
+                "blueprints.data_workflows.discover_cutco_item_page_url",
+                return_value="https://www.cutco.com/p/peel-n-pare-pack",
+            ),
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "1828",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+        preview_payload = json.loads(preview_json_input["value"])
+        set_preview = next(
+            item
+            for item in preview_payload["items"]
+            if item.get("entity_type") == "set"
+        )
+        self.assertEqual(set_preview["eligible_member_count"], 1)
+        self.assertEqual(set_preview["member_create_count"], 2)
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+        self.assertEqual(confirm_response.status_code, 200)
+
+        with self.app.app_context():
+            peeler = db.session.get(Item, peeler_id)
+            paring = db.session.get(Item, paring_id)
+            self.assertEqual(
+                [variant.color for variant in peeler.variants], [UNKNOWN_COLOR]
+            )
+            self.assertEqual(
+                sorted(variant.color for variant in paring.variants),
+                ["Classic", "Pearl"],
+            )
+
     def test_set_variant_preview_does_not_recount_pending_item_variants(self):
         from blueprints.data_workflows import _build_set_variant_sync_preview
 
@@ -2302,6 +2386,61 @@ class CatalogSmokeTests(SmokeBaseTest):
         with self.app.app_context():
             existing_set = db.session.get(Set, existing_set_id)
             self.assertEqual(existing_set.variants, [])
+
+    def test_catalog_sync_propagates_set_colors_only_to_applicable_members(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        peeler_id, _ = self._add_catalog_item(
+            name="Vegetable Peeler", sku="1501", category="Accessories"
+        )
+        paring_id, _ = self._add_catalog_item(
+            name='4" Paring Knife', sku="2120", category="Paring Knives"
+        )
+
+        response = self.client.post(
+            "/catalog/sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "set_count": "1",
+                "selected_sets": "Peel n' Pare Pack",
+                "set_name_0": "Peel n' Pare Pack",
+                "set_sku_0": "1828",
+                "set_url_0": "https://www.cutco.com/p/peel-n-pare-pack",
+                "set_variant_colors_0": json.dumps(["Classic", "Pearl"]),
+                "set_block_finishes_0": "[]",
+                "set_variant_member_skus_0": json.dumps(
+                    {"Classic": ["2120C"], "Pearl": ["2120W"]}
+                ),
+                "set_member_entries_0": json.dumps(
+                    [
+                        {
+                            "sku": "1501",
+                            "name": "Vegetable Peeler",
+                            "quantity": 1,
+                        },
+                        {
+                            "sku": "2120",
+                            "name": '4" Paring Knife',
+                            "quantity": 1,
+                        },
+                    ]
+                ),
+                "existing_set_count": "0",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            peeler = db.session.get(Item, peeler_id)
+            paring = db.session.get(Item, paring_id)
+            self.assertEqual(
+                [variant.color for variant in peeler.variants], [UNKNOWN_COLOR]
+            )
+            self.assertEqual(
+                sorted(variant.color for variant in paring.variants),
+                ["Classic", "Pearl"],
+            )
 
     def test_catalog_sync_confirm_reconciles_existing_set_members(self):
         self._login_as_admin()

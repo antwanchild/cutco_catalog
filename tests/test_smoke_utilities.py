@@ -751,6 +751,53 @@ class UtilitySmokeTests(SmokeBaseTest):
                 },
             )
 
+    def test_set_variant_options_map_colors_to_changing_set_members(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <h1>Peel n' Pare Pack</h1>
+              <script>
+                const webItemsMap = {
+                  "1828CD": {
+                    "itemOptions": [
+                      {"optionType": "Handle Color", "displayedType": "Color", "description": "Classic"}
+                    ],
+                    "itemSetList": [
+                      {"childItemNumber": "1501", "itemName": "Vegetable Peeler"},
+                      {"childItemNumber": "2120C", "itemName": "4-inch Paring Knife"}
+                    ]
+                  },
+                  "1828WD": {
+                    "itemOptions": [
+                      {"optionType": "Handle Color", "displayedType": "Color", "description": "Pearl"}
+                    ],
+                    "itemSetList": [
+                      {"childItemNumber": "1501", "itemName": "Vegetable Peeler"},
+                      {"childItemNumber": "2120W", "itemName": "4-inch Paring Knife"}
+                    ]
+                  }
+                };
+              </script>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/peel-n-pare-pack", "1828"
+                ),
+                {
+                    "handle_colors": ("Classic", "Pearl"),
+                    "block_finishes": (),
+                    "handle_colors_authoritative": True,
+                    "handle_color_member_skus": {
+                        "Classic": ("2120C",),
+                        "Pearl": ("2120W",),
+                    },
+                },
+            )
+
     def test_discovers_product_page_url_by_exact_sku_from_category_pages(self):
         from scraping import (
             _cutco_product_url_lookup,

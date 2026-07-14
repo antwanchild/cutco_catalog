@@ -241,9 +241,16 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
                     for finish in options["block_finishes"]
                     if str(finish).strip()
                 ]
+                item_set["variant_member_skus"] = {
+                    color: list(member_skus)
+                    for color, member_skus in options.get(
+                        "handle_color_member_skus", {}
+                    ).items()
+                }
         for item_set in new_sets:
             item_set.setdefault("variant_colors", [])
             item_set.setdefault("block_finishes", [])
+            item_set.setdefault("variant_member_skus", {})
     existing_sets_data = [
         scraped_set
         for scraped_set in scraped_sets

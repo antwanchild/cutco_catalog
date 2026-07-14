@@ -66,6 +66,7 @@ class SetVariantOptions(TypedDict):
     handle_colors: tuple[str, ...]
     block_finishes: tuple[str, ...]
     handle_colors_authoritative: NotRequired[bool]
+    handle_color_member_skus: NotRequired[dict[str, tuple[str, ...]]]
 
 
 def _tag_attr_text(tag: PageElement | None, *attrs: str) -> str | None:
@@ -1727,6 +1728,129 @@ def _collect_variant_candidates_from_web_items_map(
     return tuple(candidates)
 
 
+def _collect_handle_color_member_skus_from_web_items_map(
+    raw_html: str, target_sku: str | None
+) -> dict[str, tuple[str, ...]]:
+    """Map set handle colors to child SKUs that actually change by color."""
+    normalized_target = re.sub(r"[^A-Z0-9]", "", (target_sku or "").upper())
+    if not normalized_target:
+        return {}
+
+    configurations: list[tuple[str, dict[str, str]]] = []
+    search_from = 0
+    while True:
+        marker = re.search(r"\bwebItemsMap\b", raw_html[search_from:])
+        if not marker:
+            break
+        marker_index = search_from + marker.start()
+        brace_index = raw_html.find("{", marker_index)
+        if brace_index < 0:
+            break
+        block = _extract_balanced_braces(raw_html, brace_index)
+        search_from = brace_index + 1
+        if not block:
+            continue
+        try:
+            payload = json.loads(block)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        for key, product in payload.items():
+            normalized_key = re.sub(r"[^A-Z0-9]", "", str(key).upper())
+            if not re.fullmatch(
+                re.escape(normalized_target) + r"[A-Z]*", normalized_key
+            ) or not isinstance(product, dict):
+                continue
+            color = None
+            for option in product.get("itemOptions", []):
+                if not isinstance(option, dict):
+                    continue
+                option_context = " ".join(
+                    str(option.get(field) or "")
+                    for field in ("displayedType", "optionType")
+                ).lower()
+                if "color" not in option_context:
+                    continue
+                candidate = _normalize_variant_label(
+                    str(option.get("description") or option.get("optionCode") or "")
+                )
+                if candidate and _looks_like_variant_color(candidate):
+                    color = candidate
+                    break
+            if not color:
+                continue
+            members: dict[str, str] = {}
+            for member in product.get("itemSetList", []):
+                if not isinstance(member, dict):
+                    continue
+                child_sku = re.sub(
+                    r"[^A-Z0-9]",
+                    "",
+                    str(member.get("childItemNumber") or "").upper(),
+                )
+                member_name = _normalize_text_for_match(
+                    str(member.get("itemName") or "")
+                )
+                if child_sku and member_name:
+                    members[member_name] = child_sku
+            configurations.append((color, members))
+
+    colors = {color.lower() for color, _members in configurations}
+    if len(colors) < 2:
+        return {}
+    member_skus: dict[str, set[str]] = {}
+    member_names = {
+        member_name for _color, members in configurations for member_name in members
+    }
+    for member_name in member_names:
+        exact_skus = {
+            members[member_name]
+            for _color, members in configurations
+            if member_name in members
+        }
+        if len(exact_skus) < 2:
+            continue
+        for color, members in configurations:
+            child_sku = members.get(member_name)
+            if child_sku:
+                member_skus.setdefault(color, set()).add(child_sku)
+    return {
+        color: tuple(sorted(skus))
+        for color, skus in sorted(
+            member_skus.items(), key=lambda entry: entry[0].lower()
+        )
+    }
+
+
+def set_handle_color_applies_to_member(
+    member_sku: str | None,
+    color: str,
+    color_member_skus: Mapping[str, Sequence[str]] | None,
+) -> bool:
+    """Return whether an exact set configuration applies a color to one member."""
+    if not color_member_skus:
+        return True
+    allowed_skus = next(
+        (
+            skus
+            for mapped_color, skus in color_member_skus.items()
+            if mapped_color.lower() == color.lower()
+        ),
+        (),
+    )
+    normalized_member = re.sub(r"[^A-Z0-9]", "", (member_sku or "").upper())
+    if not normalized_member or not allowed_skus:
+        return False
+    return any(
+        re.fullmatch(
+            re.escape(normalized_member) + r"[A-Z]*",
+            re.sub(r"[^A-Z0-9]", "", str(allowed_sku).upper()),
+        )
+        for allowed_sku in allowed_skus
+    )
+
+
 def _page_has_size_selector(soup: BeautifulSoup) -> bool:
     """Return True if the page exposes a size swatch group."""
     for fieldset in soup.select("fieldset.swatch-group"):
@@ -1893,6 +2017,11 @@ def scrape_set_variant_options(url: str, sku: str | None = None) -> SetVariantOp
         }
         if structured_handle_colors:
             result["handle_colors_authoritative"] = True
+        handle_color_member_skus = _collect_handle_color_member_skus_from_web_items_map(
+            raw_html, sku
+        )
+        if handle_color_member_skus:
+            result["handle_color_member_skus"] = handle_color_member_skus
         return result
     except Exception as exc:
         logger.warning("Set variant scrape failed for %s: %s", url, exc)

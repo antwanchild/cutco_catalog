@@ -41,6 +41,7 @@ from scraping import (
     scrape_item_variant_colors,
     scrape_purple_campaign_variants,
     scrape_set_variant_options,
+    set_handle_color_applies_to_member,
 )
 
 logger = logging.getLogger(__name__)
@@ -814,6 +815,7 @@ def _build_set_variant_sync_preview(
         scraped_colors: list[str] = []
         scraped_block_finishes: list[str] = []
         handle_colors_authoritative = False
+        handle_color_member_skus: dict[str, list[str] | tuple[str, ...]] = {}
         scraped_url = None
         for url in candidate_urls:
             options = scrape_set_variant_options(url, item_set.sku)
@@ -821,6 +823,7 @@ def _build_set_variant_sync_preview(
             handle_colors_authoritative = bool(
                 options.get("handle_colors_authoritative", False)
             )
+            handle_color_member_skus = dict(options.get("handle_color_member_skus", {}))
             if not eligible_members:
                 scraped_colors = []
             scraped_block_finishes = list(options["block_finishes"])
@@ -900,6 +903,15 @@ def _build_set_variant_sync_preview(
         member_covered_count = 0
         eligible_member_count = 0
         for member in eligible_members:
+            applicable_colors = [
+                color
+                for color in scraped_colors
+                if set_handle_color_applies_to_member(
+                    member.sku, color, handle_color_member_skus
+                )
+            ]
+            if not applicable_colors:
+                continue
             eligible_member_count += 1
             member_colors = {
                 variant.color.lower()
@@ -907,7 +919,7 @@ def _build_set_variant_sync_preview(
                 if variant.color != UNKNOWN_COLOR
             }
             pending_colors = pending_item_colors.get(member.id, set())
-            for color in scraped_colors:
+            for color in applicable_colors:
                 color_key = color.lower()
                 if color_key in member_colors:
                     continue
@@ -941,6 +953,7 @@ def _build_set_variant_sync_preview(
                 "reclassify_options": reclassify_options,
                 "remove_options": remove_options,
                 "propagate_colors": scraped_colors,
+                "propagate_color_member_skus": handle_color_member_skus,
                 "retained_colors": retained_colors,
                 "existing_count": len(scraped_options) - len(create_options),
                 "create_count": len(create_options) + len(reclassify_options),
