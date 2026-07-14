@@ -602,7 +602,9 @@ class UtilitySmokeTests(SmokeBaseTest):
         response = mock.Mock()
         response.status_code = 200
         response.text = """
-            <html><body><script>
+            <html><body>
+              <h1>Kitchen Knife Set with Block</h1>
+              <script>
               const webItemsMap = {
                 "1815C": {"displayedOptions": [
                   {"optionType": "Handle Color", "description": "Classic"},
@@ -613,7 +615,8 @@ class UtilitySmokeTests(SmokeBaseTest):
                   {"optionType": "Block Finish", "description": "Natural"}
                 ]}
               };
-            </script></body></html>
+              </script>
+            </body></html>
         """
         with mock.patch("scraping.requests.get", return_value=response):
             scrape_set_variant_options.cache_clear()
@@ -622,6 +625,40 @@ class UtilitySmokeTests(SmokeBaseTest):
                 {
                     "handle_colors": ("Classic", "Pearl"),
                     "block_finishes": ("Cherry", "Natural"),
+                },
+            )
+
+    def test_set_variant_options_ignore_holder_finish_for_tools_only_set(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><head>
+              <meta property="og:title" content="Kitchen Tool Sets with Holder">
+            </head><body>
+              <h1>#1719C</h1>
+              <h1>5-Pc. Kitchen Tool Set (Tools Only)</h1>
+              <script>
+                const webItemsMap = {
+                  "1719C": {"displayedOptions": [
+                    {"optionType": "Handle Color", "description": "Classic"},
+                    {"optionType": "Block Finish", "description": "Honey"}
+                  ]},
+                  "1718C": {"displayedOptions": [
+                    {"optionType": "Block Finish", "description": "Cherry"}
+                  ]}
+                };
+              </script>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/5-pc-kitchen-tool-set", "1719"
+                ),
+                {
+                    "handle_colors": ("Classic",),
+                    "block_finishes": (),
                 },
             )
 

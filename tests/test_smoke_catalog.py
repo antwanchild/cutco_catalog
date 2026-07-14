@@ -1434,6 +1434,48 @@ class CatalogSmokeTests(SmokeBaseTest):
             [("handle", "Red")],
         )
 
+    def test_variant_sync_removes_block_finish_from_tools_only_set(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+        from models import SetVariant
+
+        with self.app.app_context():
+            item_set = Set(
+                name="5-Pc. Kitchen Tool Set (Tools Only)",
+                sku="1719",
+            )
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(
+                SetVariant(
+                    set=item_set,
+                    color="Honey",
+                    kind="block_finish",
+                )
+            )
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/5-pc-kitchen-tool-set",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Classic",),
+                        "block_finishes": ("Honey",),
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview([item_set])
+
+        row = preview["items"][0]
+        self.assertEqual(row["create_options"], [])
+        self.assertEqual(
+            [(option["kind"], option["color"]) for option in row["remove_options"]],
+            [("block_finish", "Honey")],
+        )
+
     def test_set_variant_preview_does_not_recount_pending_item_variants(self):
         from blueprints.data_workflows import _build_set_variant_sync_preview
 

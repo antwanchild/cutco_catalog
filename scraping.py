@@ -1496,6 +1496,29 @@ def _extract_selected_page_color(soup: BeautifulSoup) -> str | None:
     return _normalize_variant_label(label)
 
 
+def _page_product_supports_block_finish(soup: BeautifulSoup) -> bool:
+    """Return whether the selected product identity includes block-style storage."""
+    product_titles: list[str] = []
+    metadata_titles: list[str] = []
+    for meta in soup.select('meta[property="og:title"], meta[name="twitter:title"]'):
+        title = _tag_attr_text(meta, "content")
+        if title:
+            metadata_titles.append(title)
+    for heading in soup.select("h1"):
+        title = heading.get_text(" ", strip=True)
+        if title and not re.fullmatch(r"#?\s*[A-Za-z0-9-]+", title):
+            product_titles.append(title)
+
+    if not product_titles:
+        product_titles = metadata_titles
+    if not product_titles:
+        # Some metadata-only responses do not expose a product heading. Preserve
+        # their structured block options rather than guessing from no identity.
+        return True
+    product_identity = " ".join(product_titles).lower()
+    return any(word in product_identity for word in ("block", "holder"))
+
+
 def _collect_campaign_variant_candidates(soup: BeautifulSoup) -> tuple[str, ...]:
     """Extract promo-page variant labels when a campaign page exposes them."""
     candidates: list[str] = []
@@ -1784,9 +1807,13 @@ def scrape_set_variant_options(url: str, sku: str | None = None) -> SetVariantOp
                     _collect_variant_candidate(candidates, seen, selected_color)
             return tuple(candidates)
 
+        block_finishes = collect("block_finish")
+        if block_finishes and not _page_product_supports_block_finish(visible_soup):
+            block_finishes = ()
+
         return {
             "handle_colors": collect("handle"),
-            "block_finishes": collect("block_finish"),
+            "block_finishes": block_finishes,
         }
     except Exception as exc:
         logger.warning("Set variant scrape failed for %s: %s", url, exc)

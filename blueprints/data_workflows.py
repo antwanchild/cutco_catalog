@@ -791,6 +791,15 @@ def _build_set_variant_sync_preview(
     items_with_no_clear_variants = 0
 
     for item_set in item_sets:
+        excludes_block_finish = bool(
+            re.search(
+                r"\b(?:tools?|knives?)\s+only\b|"
+                r"\bwithout\s+(?:a\s+)?(?:block|holder)\b|"
+                r"\bno\s+(?:block|holder)\b",
+                item_set.name or "",
+                re.IGNORECASE,
+            )
+        )
         eligible_members = [
             membership.item
             for membership in item_set.members
@@ -811,6 +820,8 @@ def _build_set_variant_sync_preview(
             if not eligible_members:
                 scraped_colors = []
             scraped_block_finishes = list(options["block_finishes"])
+            if excludes_block_finish:
+                scraped_block_finishes = []
             if scraped_colors or scraped_block_finishes:
                 scraped_url = url
                 break
@@ -848,6 +859,7 @@ def _build_set_variant_sync_preview(
             for variant in item_set.variants
             if not _looks_like_variant_color(variant.color)
             or (variant.kind == "handle" and not eligible_members)
+            or (variant.kind == "block_finish" and excludes_block_finish)
         ]
         remove_variant_ids = {option["variant_id"] for option in remove_options}
         retained_colors = [
