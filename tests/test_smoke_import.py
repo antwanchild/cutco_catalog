@@ -761,6 +761,10 @@ class ImportSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Import Preview", response.data)
+        self.assertIn(
+            b'data-submit-progress="Importing the selected items', response.data
+        )
+        self.assertIn(b'data-submitting-label="Importing', response.data)
         self.assertIn(b"Ownership Entries (1)", response.data)
         self.assertIn(b"New Catalog Items (1)", response.data)
         self.assertIn(b"Preview Knife", response.data)

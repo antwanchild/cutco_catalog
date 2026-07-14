@@ -319,7 +319,8 @@
 </details>
 {% endif %}
 
-<form method="post" action="{{ url_for('data.import_confirm') }}">
+<form method="post" action="{{ url_for('data.import_confirm') }}"
+      data-submit-progress="Importing the selected items… This may take a moment.">
   <input type="hidden" name="total_rows" value="{{ total_rows or 0 }}">
   <input type="hidden" name="item_count" value="{{ item_rows_total }}">
   <input type="hidden" name="set_count" value="{{ set_rows_total or 0 }}">
@@ -417,7 +418,7 @@
   <p class="flash flash-info">Nothing new to import — all rows already exist.</p>
   {% else %}
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Confirm Import</button>
+    <button type="submit" class="btn btn-primary" data-submitting-label="Importing…">Confirm Import</button>
     <a href="{{ url_for('data.import_page') }}" class="btn btn-ghost">Cancel</a>
   </div>
   {% endif %}

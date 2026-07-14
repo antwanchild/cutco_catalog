@@ -56,7 +56,8 @@
   </div>
 {% else %}
 
-<form method="post" action="{{ url_for('catalog.catalog_sync_confirm') }}" class="sync-preview-body">
+<form method="post" action="{{ url_for('catalog.catalog_sync_confirm') }}" class="sync-preview-body"
+      data-submit-progress="Adding the selected catalog items and sets… This may take a moment.">
   <input type="hidden" name="set_count" value="{{ new_sets | length }}">
   {# Existing sets — hidden, quantities updated silently on confirm #}
   <input type="hidden" name="existing_set_count" value="{{ existing_sets_data | length }}">
@@ -290,7 +291,7 @@
   {% endif %}
 
   <div class="form-actions" style="margin-top:1.25rem">
-    <button type="submit" class="btn btn-primary">Confirm Import</button>
+    <button type="submit" class="btn btn-primary" data-submitting-label="Importing…">Confirm Import</button>
     <a href="{{ url_for('catalog.catalog') }}" class="btn btn-ghost">Cancel</a>
   </div>
 

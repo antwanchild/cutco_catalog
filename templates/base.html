@@ -538,6 +538,57 @@
   })();
 </script>
 
+<script>
+(function() {
+  document.addEventListener('submit', function(event) {
+    var form = event.target.closest('form[data-submit-progress]');
+    if (!form || event.defaultPrevented) return;
+
+    if (form.dataset.submitting === 'true') {
+      event.preventDefault();
+      return;
+    }
+
+    form.dataset.submitting = 'true';
+    form.setAttribute('aria-busy', 'true');
+
+    var submitter = event.submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+    if (submitter) {
+      submitter.dataset.submitProgressOriginalLabel = submitter.textContent;
+      submitter.dataset.submitProgressActive = 'true';
+      submitter.textContent = submitter.dataset.submittingLabel || 'Processing…';
+      submitter.classList.add('btn-disabled');
+      submitter.setAttribute('aria-disabled', 'true');
+    }
+
+    var overlay = document.createElement('div');
+    overlay.className = 'sync-overlay submit-progress-overlay';
+    overlay.setAttribute('role', 'status');
+    overlay.setAttribute('aria-live', 'polite');
+    overlay.innerHTML = '<div class="sync-overlay-inner"><div class="sync-spinner"></div><p></p></div>';
+    overlay.querySelector('p').textContent = form.dataset.submitProgress;
+    document.body.appendChild(overlay);
+  });
+
+  window.addEventListener('pageshow', function() {
+    document.querySelectorAll('.submit-progress-overlay').forEach(function(overlay) {
+      overlay.remove();
+    });
+    document.querySelectorAll('form[data-submitting="true"]').forEach(function(form) {
+      delete form.dataset.submitting;
+      form.removeAttribute('aria-busy');
+    });
+    document.querySelectorAll('[data-submit-progress-active="true"]').forEach(function(submitter) {
+      submitter.textContent = submitter.dataset.submitProgressOriginalLabel || submitter.textContent;
+      delete submitter.dataset.submitProgressOriginalLabel;
+      delete submitter.dataset.submitProgressActive;
+      submitter.classList.remove('btn-disabled');
+      submitter.removeAttribute('aria-disabled');
+    });
+  });
+})();
+</script>
+
 <main class="container">
   {% if admin_status_strip %}
     <div class="admin-status-strip">

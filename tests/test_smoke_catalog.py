@@ -629,6 +629,10 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Catalog Sync Preview", response.data)
+        self.assertIn(
+            b'data-submit-progress="Adding the selected catalog items', response.data
+        )
+        self.assertIn(b'data-submitting-label="Importing', response.data)
         self.assertIn(b"New Items", response.data)
         self.assertIn(b"New Sync Knife", response.data)
         self.assertIn(b"New Sets", response.data)
