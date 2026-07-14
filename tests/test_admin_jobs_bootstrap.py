@@ -15,10 +15,49 @@ from admin_jobs_support import (
 from startup import (
     _categorize_uncategorized_bbq_tools,
     _categorize_uncategorized_gift_boxes,
+    _categorize_uncategorized_traditional_flatware,
 )
 
 
 class AdminBootstrapSmokeTests(AdminJobBaseTest):
+    def test_traditional_flatware_backfill_is_conservative(self):
+        with self.app.app_context():
+            serving_spoon = Item(
+                name="Traditional Serving Spoon",
+                sku="1560",
+                edge_type="Unknown",
+                edge_is_unicorn=True,
+            )
+            butter_knife = Item(
+                name="Traditional Butter Knife",
+                sku="1565",
+                category="",
+                edge_type="Straight",
+            )
+            unrelated_sku = Item(
+                name="Traditional Serving Spoon",
+                sku="1566",
+            )
+            categorized = Item(
+                name="Traditional Slotted Serving Spoon",
+                sku="1561",
+                category="Accessories",
+            )
+            db.session.add_all(
+                [serving_spoon, butter_knife, unrelated_sku, categorized]
+            )
+            db.session.flush()
+
+            _categorize_uncategorized_traditional_flatware()
+            db.session.commit()
+
+            for item in (serving_spoon, butter_knife):
+                self.assertEqual(item.category, "Flatware")
+                self.assertEqual(item.edge_type, "N/A")
+                self.assertFalse(item.edge_is_unicorn)
+            self.assertIsNone(unrelated_sku.category)
+            self.assertEqual(categorized.category, "Accessories")
+
     def test_bbq_tool_backfill_is_conservative(self):
         with self.app.app_context():
             bbq_turner = Item(name="BBQ Turner", sku="BBQ-1", edge_type="Unknown")

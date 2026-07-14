@@ -156,6 +156,11 @@ BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
     BootstrapMigration(
         8, "categorize_bbq_tools", lambda: _categorize_uncategorized_bbq_tools()
     ),
+    BootstrapMigration(
+        9,
+        "categorize_traditional_flatware",
+        lambda: _categorize_uncategorized_traditional_flatware(),
+    ),
 )
 
 BOOTSTRAP_VERSION = BOOTSTRAP_MIGRATIONS[-1].version
@@ -244,6 +249,22 @@ def _categorize_uncategorized_bbq_tools() -> None:
         updated += 1
     if updated:
         logger.info("BBQ tool categorization: updated %d item(s)", updated)
+
+
+def _categorize_uncategorized_traditional_flatware() -> None:
+    """Categorize the known Traditional flatware set-only pieces."""
+    traditional_flatware_skus = {"1560", "1561", "1562", "1563", "1564", "1565"}
+    updated = 0
+    for item in Item.query.filter(
+        Item.sku.in_(traditional_flatware_skus),
+        db.or_(Item.category.is_(None), Item.category == ""),
+    ).all():
+        item.category = "Flatware"
+        item.edge_type = "N/A"
+        item.edge_is_unicorn = False
+        updated += 1
+    if updated:
+        logger.info("Traditional flatware categorization: updated %d item(s)", updated)
 
 
 def _ensure_unknown_variants() -> None:
