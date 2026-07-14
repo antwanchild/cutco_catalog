@@ -207,7 +207,7 @@ def _normalize_availability() -> None:
 
 
 def _ensure_unknown_variants() -> None:
-    """Ensure every item has an Unknown variant."""
+    """Ensure items without variants have an Unknown fallback."""
     for item in Item.query.all():
         ensure_unknown_variant(item)
 

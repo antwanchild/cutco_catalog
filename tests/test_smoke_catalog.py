@@ -1915,6 +1915,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
     def test_catalog_sync_adds_variants_for_new_set_and_members_only(self):
         from models import SetVariant
+        from startup import _ensure_unknown_variants
 
         self._login_as_admin()
         self._set_csrf_token()
@@ -1970,6 +1971,12 @@ class CatalogSmokeTests(SmokeBaseTest):
                 ),
                 2,
             )
+            self.assertEqual(
+                sorted(variant.color for variant in member.variants),
+                ["Classic", "Pearl"],
+            )
+            _ensure_unknown_variants()
+            db.session.commit()
             self.assertEqual(
                 sorted(variant.color for variant in member.variants),
                 ["Classic", "Pearl"],

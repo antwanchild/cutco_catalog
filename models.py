@@ -451,14 +451,15 @@ class KnifeTaskLog(BaseModel):
 
 
 def ensure_unknown_variant(item: Item) -> None:
-    """Guarantee every item has an 'Unknown / Unspecified' color variant."""
-    if not any(variant.color == UNKNOWN_COLOR for variant in (item.variants or [])):
-        variant = ItemVariant()
-        variant.item_id = item.id
-        variant.color = UNKNOWN_COLOR
-        variant.source = "fallback_unknown"
-        db.session.add(variant)
-        db.session.flush()
+    """Add the Unknown fallback only when an item has no variants."""
+    if item.variants:
+        return
+    variant = ItemVariant()
+    variant.item_id = item.id
+    variant.color = UNKNOWN_COLOR
+    variant.source = "fallback_unknown"
+    db.session.add(variant)
+    db.session.flush()
 
 
 def reconcile_unknown_variant(item: Item) -> None:
