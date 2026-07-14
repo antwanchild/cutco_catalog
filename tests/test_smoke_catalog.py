@@ -1476,6 +1476,43 @@ class CatalogSmokeTests(SmokeBaseTest):
             [("block_finish", "Honey")],
         )
 
+    def test_variant_sync_removes_handle_missing_from_exact_set_skus(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+        from models import SetVariant
+
+        with self.app.app_context():
+            member = Item(name="Kitchen Tool", sku="KT-1", category="Accessories")
+            item_set = Set(name="6-Pc. Kitchen Tool Set with Holder", sku="1792")
+            db.session.add_all([member, item_set])
+            db.session.flush()
+            db.session.add(
+                ItemSetMember(set_id=item_set.id, item_id=member.id, quantity=1)
+            )
+            db.session.add(SetVariant(set=item_set, color="Red", kind="handle"))
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/kitchen-tool-sets/1792C",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Classic", "Pearl"),
+                        "block_finishes": ("Honey", "Cherry"),
+                        "handle_colors_authoritative": True,
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview([item_set])
+
+        row = preview["items"][0]
+        self.assertEqual(
+            [(option["kind"], option["color"]) for option in row["remove_options"]],
+            [("handle", "Red")],
+        )
+
     def test_set_variant_preview_does_not_recount_pending_item_variants(self):
         from blueprints.data_workflows import _build_set_variant_sync_preview
 

@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 from urllib.parse import urljoin
 
 import requests
@@ -65,6 +65,7 @@ class SetVariantOptions(TypedDict):
 
     handle_colors: tuple[str, ...]
     block_finishes: tuple[str, ...]
+    handle_colors_authoritative: NotRequired[bool]
 
 
 def _tag_attr_text(tag: PageElement | None, *attrs: str) -> str | None:
@@ -1519,6 +1520,72 @@ def _page_product_supports_block_finish(soup: BeautifulSoup) -> bool:
     return any(word in product_identity for word in ("block", "holder"))
 
 
+def _web_items_map_supports_block_finish(
+    raw_html: str, target_sku: str | None
+) -> bool | None:
+    """Return block-storage applicability from the exact SKU's structured options."""
+    normalized_target = re.sub(r"[^A-Z0-9]", "", (target_sku or "").upper())
+    if not normalized_target:
+        return None
+
+    decisions: list[bool] = []
+    search_from = 0
+    while True:
+        marker = re.search(r"\bwebItemsMap\b", raw_html[search_from:])
+        if not marker:
+            break
+        marker_index = search_from + marker.start()
+        brace_index = raw_html.find("{", marker_index)
+        if brace_index < 0:
+            break
+        block = _extract_balanced_braces(raw_html, brace_index)
+        search_from = brace_index + 1
+        if not block:
+            continue
+        try:
+            payload = json.loads(block)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        for key, product in payload.items():
+            normalized_key = re.sub(r"[^A-Z0-9]", "", str(key).upper())
+            if not re.fullmatch(
+                re.escape(normalized_target) + r"[A-Z]*", normalized_key
+            ):
+                continue
+            if not isinstance(product, dict):
+                continue
+            identity = " ".join(
+                str(product.get(field) or "") for field in ("itemName", "itemHeadline")
+            ).lower()
+            if "block" in identity or "holder" in identity:
+                decisions.append(True)
+            elif "tools only" in identity or "knives only" in identity:
+                decisions.append(False)
+            for option in product.get("itemOptions", []):
+                if not isinstance(option, dict):
+                    continue
+                option_type = " ".join(
+                    str(option.get(field) or "")
+                    for field in ("optionType", "displayedType")
+                ).lower()
+                if "storage" not in option_type:
+                    continue
+                storage_value = " ".join(
+                    str(option.get(field) or "")
+                    for field in ("description", "optionCode")
+                ).lower()
+                if "block" in storage_value or "holder" in storage_value:
+                    decisions.append(True)
+                elif "only" in storage_value:
+                    decisions.append(False)
+
+    if not decisions:
+        return None
+    return any(decisions)
+
+
 def _collect_campaign_variant_candidates(soup: BeautifulSoup) -> tuple[str, ...]:
     """Extract promo-page variant labels when a campaign page exposes them."""
     candidates: list[str] = []
@@ -1789,13 +1856,16 @@ def scrape_set_variant_options(url: str, sku: str | None = None) -> SetVariantOp
         def collect(kind: str) -> tuple[str, ...]:
             candidates: list[str] = []
             seen: set[str] = set()
+            web_items_candidates = _collect_variant_candidates_from_web_items_map(
+                raw_html, target_sku=sku, option_kind=kind
+            )
             sources = (
-                _collect_variant_candidates_from_web_items_map(
-                    raw_html, target_sku=sku, option_kind=kind
-                ),
+                web_items_candidates,
                 _collect_variant_candidates_from_swatches(soup, option_kind=kind),
                 _collect_variant_candidates_from_selects(soup, option_kind=kind),
             )
+            if kind == "handle" and web_items_candidates:
+                sources = (web_items_candidates,)
             for source in sources:
                 for candidate in source:
                     if not _looks_like_variant_color(candidate):
@@ -1807,14 +1877,23 @@ def scrape_set_variant_options(url: str, sku: str | None = None) -> SetVariantOp
                     _collect_variant_candidate(candidates, seen, selected_color)
             return tuple(candidates)
 
+        structured_handle_colors = _collect_variant_candidates_from_web_items_map(
+            raw_html, target_sku=sku, option_kind="handle"
+        )
         block_finishes = collect("block_finish")
-        if block_finishes and not _page_product_supports_block_finish(visible_soup):
+        supports_block_finish = _web_items_map_supports_block_finish(raw_html, sku)
+        if supports_block_finish is None:
+            supports_block_finish = _page_product_supports_block_finish(visible_soup)
+        if block_finishes and not supports_block_finish:
             block_finishes = ()
 
-        return {
+        result: SetVariantOptions = {
             "handle_colors": collect("handle"),
             "block_finishes": block_finishes,
         }
+        if structured_handle_colors:
+            result["handle_colors_authoritative"] = True
+        return result
     except Exception as exc:
         logger.warning("Set variant scrape failed for %s: %s", url, exc)
         return empty

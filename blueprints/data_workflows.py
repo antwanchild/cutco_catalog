@@ -813,10 +813,14 @@ def _build_set_variant_sync_preview(
         )
         scraped_colors: list[str] = []
         scraped_block_finishes: list[str] = []
+        handle_colors_authoritative = False
         scraped_url = None
         for url in candidate_urls:
             options = scrape_set_variant_options(url, item_set.sku)
             scraped_colors = list(options["handle_colors"])
+            handle_colors_authoritative = bool(
+                options.get("handle_colors_authoritative", False)
+            )
             if not eligible_members:
                 scraped_colors = []
             scraped_block_finishes = list(options["block_finishes"])
@@ -850,6 +854,7 @@ def _build_set_variant_sync_preview(
             and value.lower() in existing_by_color
         ]
         scraped_color_lookup = {value.lower() for _kind, value in scraped_options}
+        scraped_handle_lookup = {value.lower() for value in scraped_colors}
         remove_options = [
             {
                 "variant_id": variant.id,
@@ -859,6 +864,11 @@ def _build_set_variant_sync_preview(
             for variant in item_set.variants
             if not _looks_like_variant_color(variant.color)
             or (variant.kind == "handle" and not eligible_members)
+            or (
+                variant.kind == "handle"
+                and handle_colors_authoritative
+                and variant.color.lower() not in scraped_handle_lookup
+            )
             or (variant.kind == "block_finish" and excludes_block_finish)
         ]
         remove_variant_ids = {option["variant_id"] for option in remove_options}

@@ -625,6 +625,7 @@ class UtilitySmokeTests(SmokeBaseTest):
                 {
                     "handle_colors": ("Classic", "Pearl"),
                     "block_finishes": ("Cherry", "Natural"),
+                    "handle_colors_authoritative": True,
                 },
             )
 
@@ -659,6 +660,94 @@ class UtilitySmokeTests(SmokeBaseTest):
                 {
                     "handle_colors": ("Classic",),
                     "block_finishes": (),
+                    "handle_colors_authoritative": True,
+                },
+            )
+
+    def test_set_variant_options_use_sku_storage_when_heading_is_generic(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <h1>Kitchen Tool Sets</h1>
+              <script>
+                const webItemsMap = {
+                  "1718C": {
+                    "itemName": "5-Pc. Kitchen Tool Set with Holder",
+                    "itemOptions": [{
+                      "optionType": "Tools Storage",
+                      "displayedType": "Storage",
+                      "optionCode": "With Holder",
+                      "description": "With Holder"
+                    }],
+                    "displayedOptions": [
+                      {"optionType": "Handle Color", "description": "Classic"},
+                      {"optionType": "Block Finish", "description": "Honey"},
+                      {"optionType": "Block Finish", "description": "Cherry"}
+                    ]
+                  },
+                  "1719C": {
+                    "itemName": "5-Pc. Kitchen Tool Set (Tools Only)",
+                    "itemOptions": [{
+                      "optionType": "Tools Storage",
+                      "displayedType": "Storage",
+                      "optionCode": "Tools Only",
+                      "description": "Tools Only"
+                    }]
+                  }
+                };
+              </script>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/kitchen-tool-sets/1718C", "1718"
+                ),
+                {
+                    "handle_colors": ("Classic",),
+                    "block_finishes": ("Honey", "Cherry"),
+                    "handle_colors_authoritative": True,
+                },
+            )
+
+    def test_set_variant_options_ignore_family_handle_without_exact_sku(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <h1>6-Pc. Kitchen Tool Set with Holder</h1>
+              <fieldset class="swatch-group Color" data-type="Handle Color">
+                <div class="swatch product-option color-swatch" data-option="Classic"></div>
+                <div class="swatch product-option color-swatch" data-option="Pearl"></div>
+                <div class="swatch product-option color-swatch" data-option="Red"></div>
+              </fieldset>
+              <script>
+                const webItemsMap = {
+                  "1792C": {"itemOptions": [
+                    {"optionType": "Tools Handle Color", "displayedType": "Color", "description": "Classic"}
+                  ]},
+                  "1792W": {"itemOptions": [
+                    {"optionType": "Tools Handle Color", "displayedType": "Color", "description": "Pearl"}
+                  ]},
+                  "1718R": {"itemOptions": [
+                    {"optionType": "Tools Handle Color", "displayedType": "Color", "description": "Red"}
+                  ]}
+                };
+              </script>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/kitchen-tool-sets/1792C", "1792"
+                ),
+                {
+                    "handle_colors": ("Classic", "Pearl"),
+                    "block_finishes": (),
+                    "handle_colors_authoritative": True,
                 },
             )
 
