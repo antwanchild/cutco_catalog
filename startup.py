@@ -11,10 +11,18 @@ from constants import (
     canonicalize_availability,
     canonicalize_category,
     is_bbq_tool_item_name,
+    is_block_storage_item_name,
     is_gift_box_item_name,
 )
 from extensions import db
-from models import BaseModel, Item, KnifeTask, Ownership, ensure_unknown_variant
+from models import (
+    BaseModel,
+    Item,
+    KnifeTask,
+    Ownership,
+    ensure_unknown_variant,
+    reconcile_unknown_variant,
+)
 from schema_migrations import apply_schema_migrations
 
 logger = logging.getLogger(__name__)
@@ -161,6 +169,11 @@ BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
         "categorize_traditional_flatware",
         lambda: _categorize_uncategorized_traditional_flatware(),
     ),
+    BootstrapMigration(
+        10,
+        "remove_propagated_block_handle_variants",
+        lambda: _remove_propagated_block_handle_variants(),
+    ),
 )
 
 BOOTSTRAP_VERSION = BOOTSTRAP_MIGRATIONS[-1].version
@@ -271,6 +284,30 @@ def _ensure_unknown_variants() -> None:
     """Ensure items without variants have an Unknown fallback."""
     for item in Item.query.all():
         ensure_unknown_variant(item)
+
+
+def _remove_propagated_block_handle_variants() -> None:
+    """Remove unowned set handle colors accidentally copied onto block items."""
+    propagation_sources = {"catalog_sync_set", "set_variant_sync"}
+    removed = 0
+    for item in Item.query.all():
+        if not is_block_storage_item_name(item.name):
+            continue
+        item_removed = 0
+        for variant in list(item.variants):
+            if variant.source not in propagation_sources or variant.ownerships:
+                continue
+            db.session.delete(variant)
+            removed += 1
+            item_removed += 1
+        if item_removed:
+            db.session.flush()
+            db.session.expire(item, ["variants"])
+            reconcile_unknown_variant(item)
+    if removed:
+        logger.info(
+            "Block variant cleanup: removed %d propagated handle variant(s)", removed
+        )
 
 
 def _split_quantity_fields_from_notes(

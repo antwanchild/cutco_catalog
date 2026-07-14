@@ -25,8 +25,8 @@ from constants import (
     COOKWARE_CATEGORIES,
     EDGE_TYPES,
     SYNC_BLOCKED_CATEGORIES,
-    SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES,
     UNKNOWN_COLOR,
+    accepts_set_handle_variants,
     canonicalize_category,
     canonicalize_availability,
     normalize_edge_for_category,
@@ -1692,7 +1692,7 @@ def catalog_sync_confirm():
                     if isinstance(skus, list)
                 }
         if not any(
-            (member.category or "") not in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
+            accepts_set_handle_variants(member.name, member.category)
             for member in member_items
         ):
             colors = []
@@ -1718,7 +1718,7 @@ def catalog_sync_confirm():
             existing_set_options.add((kind, value.lower()))
             created += 1
         for member in member_items:
-            if (member.category or "") in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES:
+            if not accepts_set_handle_variants(member.name, member.category):
                 continue
             existing_member_colors = {
                 variant.color.lower()

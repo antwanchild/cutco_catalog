@@ -20,7 +20,7 @@ from blueprints.import_shared import (
     _safe_csv_filename,  # noqa: F401
 )
 from constants import (
-    SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES,
+    accepts_set_handle_variants,
     UNKNOWN_COLOR,
     VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
 )
@@ -207,8 +207,9 @@ def _build_completion_preview(
                 member_qty = quantity * (membership.quantity or 1)
                 member_color = (
                     UNKNOWN_COLOR
-                    if (member_item.category or "")
-                    in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
+                    if not accepts_set_handle_variants(
+                        member_item.name, member_item.category
+                    )
                     else requested_color
                 )
                 expanded_rows.append(
@@ -805,8 +806,9 @@ def _build_set_variant_sync_preview(
             membership.item
             for membership in item_set.members
             if membership.item
-            and (membership.item.category or "")
-            not in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
+            and accepts_set_handle_variants(
+                membership.item.name, membership.item.category
+            )
         ]
         discovered_url = discover_cutco_item_page_url(item_set.sku)
         candidate_urls = list(

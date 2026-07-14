@@ -1579,6 +1579,46 @@ class CatalogSmokeTests(SmokeBaseTest):
             [("handle", "Red")],
         )
 
+    def test_variant_sync_does_not_propagate_handle_colors_to_block_items(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+
+        with self.app.app_context():
+            block = Item(
+                name="Galley Set Block (7-Slot)",
+                sku="BLOCK-7",
+                category="Storage",
+            )
+            knife = Item(name="Petite Chef", sku="1728", category="Chef Knives")
+            item_set = Set(name="Galley Set", sku="G-1")
+            db.session.add_all([block, knife, item_set])
+            db.session.flush()
+            db.session.add_all(
+                [
+                    ItemSetMember(set=item_set, item=block, quantity=1),
+                    ItemSetMember(set=item_set, item=knife, quantity=1),
+                ]
+            )
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/galley-set",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Classic",),
+                        "block_finishes": ("Cherry",),
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview([item_set])
+
+        row = preview["items"][0]
+        self.assertEqual(row["eligible_member_count"], 1)
+        self.assertEqual(row["member_create_count"], 1)
+
     def test_variant_sync_removes_block_finish_from_tools_only_set(self):
         from blueprints.data_workflows import _build_set_variant_sync_preview
         from models import SetVariant

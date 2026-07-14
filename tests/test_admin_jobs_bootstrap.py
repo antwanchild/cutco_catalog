@@ -3,6 +3,7 @@ from admin_jobs_support import (
     AdminJobBaseTest,
     BOOTSTRAP_VERSION,
     Item,
+    ItemVariant,
     KNIFE_TASK_PRESETS,
     KnifeTask,
     SCHEMA_VERSION,
@@ -16,10 +17,43 @@ from startup import (
     _categorize_uncategorized_bbq_tools,
     _categorize_uncategorized_gift_boxes,
     _categorize_uncategorized_traditional_flatware,
+    _remove_propagated_block_handle_variants,
 )
 
 
 class AdminBootstrapSmokeTests(AdminJobBaseTest):
+    def test_block_handle_variant_cleanup_preserves_finishes_and_ownerships(self):
+        from models import Ownership, Person
+
+        with self.app.app_context():
+            block = Item(name="Galley Set Block (7-Slot)", category="Storage")
+            knife = Item(name="Petite Chef", category="Chef Knives")
+            db.session.add_all([block, knife])
+            db.session.flush()
+            cherry = ItemVariant(item=block, color="Cherry", source="variant_sync")
+            classic = ItemVariant(
+                item=block, color="Classic", source="catalog_sync_set"
+            )
+            red = ItemVariant(item=block, color="Red", source="set_variant_sync")
+            pearl = ItemVariant(item=block, color="Pearl", source="set_variant_sync")
+            knife_classic = ItemVariant(
+                item=knife, color="Classic", source="catalog_sync_set"
+            )
+            person = Person(name="Block Collector")
+            db.session.add_all([cherry, classic, red, pearl, knife_classic, person])
+            db.session.flush()
+            db.session.add(Ownership(variant=pearl, person=person))
+            db.session.commit()
+
+            _remove_propagated_block_handle_variants()
+            db.session.commit()
+
+            self.assertEqual(
+                sorted(variant.color for variant in block.variants),
+                ["Cherry", "Pearl"],
+            )
+            self.assertEqual([variant.color for variant in knife.variants], ["Classic"])
+
     def test_traditional_flatware_backfill_is_conservative(self):
         with self.app.app_context():
             serving_spoon = Item(

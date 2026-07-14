@@ -28,6 +28,7 @@ from constants import (
     EDGELESS_CATEGORIES,
     UNKNOWN_COLOR,
     XLSX_COL_MAP,
+    accepts_set_handle_variants,
     canonicalize_availability,
     canonicalize_category,
     is_edgeless_category,
@@ -699,10 +700,17 @@ def import_page():
                         member_item = membership.item
                         if not member_item:
                             continue
-                        member_color = _resolve_import_variant_color(
-                            member_item.name,
-                            member_item.category or "",
-                            color,
+                        accepts_handle_color = accepts_set_handle_variants(
+                            member_item.name, member_item.category
+                        )
+                        member_color = (
+                            _resolve_import_variant_color(
+                                member_item.name,
+                                member_item.category or "",
+                                color,
+                            )
+                            if accepts_handle_color
+                            else UNKNOWN_COLOR
                         )
                         member_variant = _find_import_variant(member_item, member_color)
                         member_multiplier = membership.quantity or 1
@@ -726,8 +734,7 @@ def import_page():
                                 "color": member_color,
                                 "display_color": _preview_import_color(
                                     member_color,
-                                    (member_item.category or "")
-                                    in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
+                                    not accepts_handle_color,
                                 ),
                                 "status": status,
                                 "notes": notes,

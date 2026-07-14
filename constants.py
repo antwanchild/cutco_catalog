@@ -107,6 +107,21 @@ VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES = COOKWARE_CATEGORIES | {
 SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES = VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES | {
     "Cutting Boards"
 }
+
+
+def is_block_storage_item_name(name: str | None) -> bool:
+    """Return whether an item name identifies block-style knife storage."""
+    return bool(re.search(r"\b(?:block|holder)\b", name or "", re.IGNORECASE))
+
+
+def accepts_set_handle_variants(name: str | None, category: str | None) -> bool:
+    """Return whether set handle colors should propagate to an item."""
+    return (
+        (category or "") not in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
+        and not is_block_storage_item_name(name)
+    )
+
+
 SHARPENING_PAGE_INCLUDED_NAME_KEYWORDS = ("shear",)
 SHARPENING_PAGE_EXCLUDED_NAME_KEYWORDS = ("gift box",)
 KNIFE_TASK_PRESETS = [

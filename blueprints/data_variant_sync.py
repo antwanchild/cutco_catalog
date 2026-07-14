@@ -20,10 +20,7 @@ from blueprints.data_workflows import (
     _resolve_variant_sync_sets,
     sync_variant_sync_helpers,
 )
-from constants import (
-    SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES,
-    UNKNOWN_COLOR,
-)
+from constants import UNKNOWN_COLOR, accepts_set_handle_variants
 from extensions import db
 from helpers import db_commit
 from models import (
@@ -299,10 +296,8 @@ def variant_sync_confirm():
                         created_variants += 1
                 for membership in item_set.members:
                     member = membership.item
-                    if (
-                        not member
-                        or (member.category or "")
-                        in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
+                    if not member or not accepts_set_handle_variants(
+                        member.name, member.category
                     ):
                         continue
                     existing_member_colors = {
