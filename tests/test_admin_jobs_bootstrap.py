@@ -2,6 +2,8 @@
 from admin_jobs_support import (
     AdminJobBaseTest,
     BOOTSTRAP_VERSION,
+    Item,
+    ItemVariant,
     KNIFE_TASK_PRESETS,
     KnifeTask,
     SCHEMA_VERSION,
@@ -11,9 +13,138 @@ from admin_jobs_support import (
     db,
     initialize_database,
 )
+from startup import (
+    _categorize_uncategorized_bbq_tools,
+    _categorize_uncategorized_gift_boxes,
+    _categorize_uncategorized_traditional_flatware,
+    _remove_propagated_block_handle_variants,
+)
 
 
 class AdminBootstrapSmokeTests(AdminJobBaseTest):
+    def test_block_handle_variant_cleanup_preserves_finishes_and_ownerships(self):
+        from models import Ownership, Person
+
+        with self.app.app_context():
+            block = Item(name="Galley Set Block (7-Slot)", category="Storage")
+            knife = Item(name="Petite Chef", category="Chef Knives")
+            db.session.add_all([block, knife])
+            db.session.flush()
+            cherry = ItemVariant(item=block, color="Cherry", source="variant_sync")
+            classic = ItemVariant(
+                item=block, color="Classic", source="catalog_sync_set"
+            )
+            red = ItemVariant(item=block, color="Red", source="set_variant_sync")
+            pearl = ItemVariant(item=block, color="Pearl", source="set_variant_sync")
+            knife_classic = ItemVariant(
+                item=knife, color="Classic", source="catalog_sync_set"
+            )
+            person = Person(name="Block Collector")
+            db.session.add_all([cherry, classic, red, pearl, knife_classic, person])
+            db.session.flush()
+            db.session.add(Ownership(variant=pearl, person=person))
+            db.session.commit()
+
+            _remove_propagated_block_handle_variants()
+            db.session.commit()
+
+            self.assertEqual(
+                sorted(variant.color for variant in block.variants),
+                ["Cherry", "Pearl"],
+            )
+            self.assertEqual([variant.color for variant in knife.variants], ["Classic"])
+
+    def test_traditional_flatware_backfill_is_conservative(self):
+        with self.app.app_context():
+            serving_spoon = Item(
+                name="Traditional Serving Spoon",
+                sku="1560",
+                edge_type="Unknown",
+                edge_is_unicorn=True,
+            )
+            butter_knife = Item(
+                name="Traditional Butter Knife",
+                sku="1565",
+                category="",
+                edge_type="Straight",
+            )
+            unrelated_sku = Item(
+                name="Traditional Serving Spoon",
+                sku="1566",
+            )
+            categorized = Item(
+                name="Traditional Slotted Serving Spoon",
+                sku="1561",
+                category="Accessories",
+            )
+            db.session.add_all(
+                [serving_spoon, butter_knife, unrelated_sku, categorized]
+            )
+            db.session.flush()
+
+            _categorize_uncategorized_traditional_flatware()
+            db.session.commit()
+
+            for item in (serving_spoon, butter_knife):
+                self.assertEqual(item.category, "Flatware")
+                self.assertEqual(item.edge_type, "N/A")
+                self.assertFalse(item.edge_is_unicorn)
+            self.assertIsNone(unrelated_sku.category)
+            self.assertEqual(categorized.category, "Accessories")
+
+    def test_bbq_tool_backfill_is_conservative(self):
+        with self.app.app_context():
+            bbq_turner = Item(name="BBQ Turner", sku="BBQ-1", edge_type="Unknown")
+            barbecue_tongs = Item(name="Barbecue Tongs", sku="BBQ-2")
+            barbeque_fork = Item(name="Barbeque Fork", sku="BBQ-3")
+            kitchen_fork = Item(name="Turning Fork", sku="BBQ-4")
+            bbq_set = Item(name="3-Pc. BBQ Tool Set", sku="BBQ-5")
+            categorized = Item(name="BBQ Turner", sku="BBQ-6", category="Kitchen Tools")
+            db.session.add_all(
+                [
+                    bbq_turner,
+                    barbecue_tongs,
+                    barbeque_fork,
+                    kitchen_fork,
+                    bbq_set,
+                    categorized,
+                ]
+            )
+            db.session.flush()
+
+            _categorize_uncategorized_bbq_tools()
+            db.session.commit()
+
+            for item in (bbq_turner, barbecue_tongs, barbeque_fork):
+                self.assertEqual(item.category, "BBQ Tools")
+                self.assertEqual(item.edge_type, "N/A")
+                self.assertFalse(item.edge_is_unicorn)
+            self.assertIsNone(kitchen_fork.category)
+            self.assertIsNone(bbq_set.category)
+            self.assertEqual(categorized.category, "Kitchen Tools")
+
+    def test_gift_box_backfill_is_conservative(self):
+        with self.app.app_context():
+            exact = Item(name="Gift Box", sku="GB-1", edge_type="Unknown")
+            described = Item(
+                name="Gift Box for Super Shears", sku="GB-2", edge_type="Straight"
+            )
+            suffix = Item(name="Trimmer Gift Box", sku="GB-3")
+            boxed_set = Item(name="Gift-Boxed Knife Set", sku="GB-4")
+            categorized = Item(name="Gift Box", sku="GB-5", category="Accessories")
+            db.session.add_all([exact, described, suffix, boxed_set, categorized])
+            db.session.flush()
+
+            _categorize_uncategorized_gift_boxes()
+            db.session.commit()
+
+            for item in (exact, described, suffix):
+                self.assertEqual(item.category, "Gift Boxes")
+                self.assertEqual(item.edge_type, "N/A")
+                self.assertFalse(item.edge_is_unicorn)
+            self.assertIsNone(boxed_set.category)
+            self.assertEqual(categorized.category, "Accessories")
+
     def test_startup_bootstrap_is_idempotent(self):
         with self.app.app_context():
             schema_state = db.session.get(SchemaState, "schema")

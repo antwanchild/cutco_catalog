@@ -23,9 +23,11 @@
   </div>
 </div>
 
-<form method="post" action="{{ url_for('data.variant_sync_confirm') }}">
+<form method="post" action="{{ url_for('data.variant_sync_confirm') }}"
+      data-submit-progress="Applying the selected variant changes… This may take a moment.">
   <input type="hidden" name="preview_json" value="{{ preview_json | e }}">
   <input type="hidden" name="scope_label" value="{{ preview.scope_label }}">
+  <input type="hidden" name="set_selection_enabled" value="1">
 
   {% if preview.promo_items %}
   <div class="form-card variant-sync-category-block variant-sync-preview-section">
@@ -33,7 +35,7 @@
       <h2>Promo Variants</h2>
       <div class="variant-sync-section-actions">
         <span class="muted small">{{ preview.promo_items | length }} item{{ 's' if preview.promo_items | length != 1 }}</span>
-        <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="promo">Confirm Purple Promo Only</button>
+        <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="promo" data-submitting-label="Applying…">Confirm Purple Promo Only</button>
       </div>
     </div>
     <p class="muted">Detected from the Cutco Cares campaign page.</p>
@@ -49,7 +51,7 @@
     {% endif %}
 
     {% for item in preview.promo_items %}
-    <details class="diff-section" open>
+    <details class="diff-section" {% if item.create_count %}open{% endif %}>
       <summary>
         {{ item.item_name }} <span class="muted mono">#{{ item.sku }}</span>
         <span class="badge badge-info badge-mini">promo</span>
@@ -67,7 +69,6 @@
       {% if item.skip_reason %}
         <p class="muted">{{ item.skip_reason }}</p>
       {% endif %}
-
       {% if item.variant_rows %}
       <table class="data-table compact variant-sync-table">
         <thead>
@@ -90,6 +91,10 @@
                 <span class="badge badge-info">existing</span>
               {% elif row.status == 'create' %}
                 <span class="badge badge-new">create</span>
+              {% elif row.status == 'reclassify' %}
+                <span class="badge badge-warning">reclassify</span>
+              {% elif row.status == 'remove' %}
+                <span class="badge badge-missing">remove invalid</span>
               {% elif row.status == 'fallback only' %}
                 <span class="badge badge-alias">fallback only</span>
               {% else %}
@@ -107,30 +112,71 @@
   {% endif %}
 
   {% for category_block in preview.grouped_items %}
-  <div class="form-card variant-sync-category-block variant-sync-preview-section">
-    <div class="section-heading-actions variant-sync-section-heading">
-      <h2>{{ category_block.category }} Variants</h2>
+  {% set category_actions = namespace(count=0) %}
+  {% for item in category_block['items'] %}
+    {% set category_actions.count = category_actions.count
+      + (item.create_count | default(0))
+      + (item.member_create_count | default(0))
+      + (item.remove_options | default([]) | length) %}
+  {% endfor %}
+  <details class="form-card variant-sync-category-block variant-sync-preview-section variant-sync-category-section" {% if category_actions.count %}open{% endif %}>
+    <summary class="variant-sync-category-summary">
+      <span class="variant-sync-category-title">{{ category_block.category }} Variants</span>
       <div class="variant-sync-section-actions">
         <span class="muted small">{{ category_block['items'] | length }} item{{ 's' if category_block['items'] | length != 1 }}</span>
-        <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="category:{{ category_block.category }}">Confirm This Section Only</button>
+        {% if category_actions.count %}
+          <span class="badge badge-new badge-mini">{{ category_actions.count }} change{{ 's' if category_actions.count != 1 }}</span>
+        {% else %}
+          <span class="badge badge-info badge-mini">no changes</span>
+        {% endif %}
       </div>
-    </div>
+    </summary>
+
+    <div class="variant-sync-category-content">
+      {% if category_actions.count %}
+      <div class="variant-sync-category-confirm">
+        {% if category_block.category == 'Sets' %}
+          <span class="muted small">Choose which set changes to apply.</span>
+          <button type="button" class="btn btn-ghost btn-sm" data-select-sets="all">Select all</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-select-sets="none">Clear all</button>
+          <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="selected_sets" data-confirm-selected-sets data-submitting-label="Applying…" disabled>Confirm Selected (0)</button>
+        {% else %}
+          <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="category:{{ category_block.category }}" data-submitting-label="Applying…">Confirm This Section Only</button>
+        {% endif %}
+      </div>
+      {% endif %}
 
     {% for item in category_block['items'] %}
-    <details class="diff-section" open>
+    {% set removal_count = item.remove_options | default([]) | length %}
+    {% set item_action_count = (item.create_count | default(0)) + (item.member_create_count | default(0)) + removal_count %}
+    <details class="diff-section" {% if item.create_count or item.member_create_count or removal_count %}open{% endif %}>
       <summary>
+        {% if item.entity_type == 'set' and item_action_count %}
+          <label class="variant-sync-set-selector" title="Apply changes for this set">
+            <input type="checkbox" name="selected_set_ids" value="{{ item.set_id }}" class="variant-sync-set-checkbox">
+            <span class="sr-only">Select</span>
+          </label>
+        {% endif %}
         {{ item.item_name }} <span class="muted mono">#{{ item.sku }}</span>
         {% if item.no_clear_variants %}
           <span class="badge badge-warning badge-mini">no clear variants</span>
         {% else %}
           <span class="badge badge-info badge-mini">{{ item.scraped_variant_count }} variant{{ 's' if item.scraped_variant_count != 1 }}</span>
           {% if item.create_count %}<span class="badge badge-new badge-mini">{{ item.create_count }} create</span>{% endif %}
+          {% if removal_count %}<span class="badge badge-missing badge-mini">{{ removal_count }} remove</span>{% endif %}
           {% if item.retained_count %}<span class="badge badge-warning badge-mini">{{ item.retained_count }} retained</span>{% endif %}
         {% endif %}
       </summary>
 
       {% if item.skip_reason %}
         <p class="muted">{{ item.skip_reason }}</p>
+      {% endif %}
+      {% if item.entity_type == 'set' and not item.no_clear_variants %}
+        <p class="muted small">
+          Handle colors will also be added to {{ item.eligible_member_count }} eligible member item{{ 's' if item.eligible_member_count != 1 }}. Block finishes stay on the set only.
+          {% if item.member_create_count %}{{ item.member_create_count }} member variant{{ 's' if item.member_create_count != 1 }} will be created.{% endif %}
+          {% if item.member_covered_count %}{{ item.member_covered_count }} member variant{{ 's' if item.member_covered_count != 1 }} already covered by the item scan.{% endif %}
+        </p>
       {% endif %}
 
       {% if item.variant_rows %}
@@ -146,6 +192,9 @@
           <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% elif row.color|lower == 'purple sheath' %}variant-sync-sheath-row{% endif %}">
             <td>
               {{ row.color }}
+              {% if item.entity_type == 'set' %}
+                <span class="badge badge-mini {% if row.kind == 'block_finish' %}badge-warning{% else %}badge-info{% endif %}">{{ 'block finish' if row.kind == 'block_finish' else 'handle' }}</span>
+              {% endif %}
               {% if row.status == 'fallback only' %}
                 <span class="badge badge-alias badge-mini">fallback only</span>
               {% endif %}
@@ -155,6 +204,10 @@
                 <span class="badge badge-info">existing</span>
               {% elif row.status == 'create' %}
                 <span class="badge badge-new">create</span>
+              {% elif row.status == 'reclassify' %}
+                <span class="badge badge-warning">reclassify</span>
+              {% elif row.status == 'remove' %}
+                <span class="badge badge-missing">remove invalid</span>
               {% elif row.status == 'fallback only' %}
                 <span class="badge badge-alias">fallback only</span>
               {% else %}
@@ -169,16 +222,56 @@
 
     </details>
     {% endfor %}
-  </div>
+    </div>
+  </details>
   {% endfor %}
 
   <div class="completion-confirm-note flash flash-info variant-sync-confirm-note">
-    Missing variants are kept rather than deleted.
+    Missing variants are kept rather than deleted. Set changes are applied only to the sets checked above.
   </div>
 
   <div class="form-actions variant-sync-preview-actions">
-    <button type="submit" class="btn btn-primary" name="confirm_target" value="all">Confirm Variant Sync</button>
+    <button type="submit" class="btn btn-primary" name="confirm_target" value="all" data-submitting-label="Applying…">Confirm Variant Sync</button>
     <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-secondary">Back</a>
   </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function() {
+  const setCheckboxes = Array.from(document.querySelectorAll('.variant-sync-set-checkbox'));
+  const confirmButtons = document.querySelectorAll('[data-confirm-selected-sets]');
+
+  function updateSetSelection() {
+    const selectedCount = setCheckboxes.filter(function(checkbox) {
+      return checkbox.checked;
+    }).length;
+    confirmButtons.forEach(function(button) {
+      button.disabled = selectedCount === 0;
+      button.textContent = 'Confirm Selected (' + selectedCount + ')';
+    });
+  }
+
+  document.querySelectorAll('.variant-sync-set-selector').forEach(function(selector) {
+    selector.addEventListener('click', function(event) {
+      event.stopPropagation();
+    });
+  });
+  setCheckboxes.forEach(function(checkbox) {
+    checkbox.addEventListener('change', updateSetSelection);
+  });
+  document.querySelectorAll('[data-select-sets]').forEach(function(button) {
+    button.addEventListener('click', function() {
+      const shouldSelect = button.dataset.selectSets === 'all';
+      setCheckboxes.forEach(function(checkbox) {
+        checkbox.checked = shouldSelect;
+      });
+      updateSetSelection();
+    });
+  });
+  updateSetSelection();
+})();
+</script>
 {% endblock %}

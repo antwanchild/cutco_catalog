@@ -48,14 +48,14 @@ def container_timezone() -> tuple[tzinfo | ZoneInfo, str]:
         return timezone.utc, "UTC"
 
 
-def format_container_time(value: str | None) -> str:
+def format_container_time(iso_timestamp: str | None) -> str:
     """Format an ISO timestamp in the container timezone."""
-    if not value:
+    if not iso_timestamp:
         return "—"
     try:
-        dt = datetime.fromisoformat(value)
+        dt = datetime.fromisoformat(iso_timestamp)
     except ValueError:
-        return value
+        return iso_timestamp
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     tz, tz_name = container_timezone()

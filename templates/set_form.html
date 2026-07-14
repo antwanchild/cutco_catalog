@@ -22,6 +22,9 @@
     </label>
     <div class="suggest-menu" hidden></div>
   </div>
+  <label>Cutco URL
+    <input type="url" name="cutco_url" value="{{ set.cutco_url if set and set.cutco_url else '' }}" class="input-full" placeholder="https://www.cutco.com/p/…">
+  </label>
   <label>Notes
     <textarea name="notes" rows="2" class="input-full">{{ set.notes if set and set.notes else '' }}</textarea>
   </label>

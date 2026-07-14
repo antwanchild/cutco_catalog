@@ -33,6 +33,20 @@
       <span class="set-overview-label">Imported members</span>
       <span class="set-overview-value">{{ member_snapshot_rows | length }}</span>
     </div>
+    <div class="set-overview-item">
+      <span class="set-overview-label">Handle variants</span>
+      <span class="set-overview-value">{{ set.variants | selectattr('kind', 'equalto', 'handle') | map(attribute='color') | join(', ') or '—' }}</span>
+    </div>
+    <div class="set-overview-item">
+      <span class="set-overview-label">Block finishes</span>
+      <span class="set-overview-value">{{ set.variants | selectattr('kind', 'equalto', 'block_finish') | map(attribute='color') | join(', ') or '—' }}</span>
+    </div>
+    {% if set.cutco_url %}
+    <div class="set-overview-item">
+      <span class="set-overview-label">Cutco page</span>
+      <span class="set-overview-value"><a href="{{ set.cutco_url }}" target="_blank" rel="noopener">Open ↗</a></span>
+    </div>
+    {% endif %}
     {% if is_private_user() %}
     <div class="set-overview-item">
       <span class="set-overview-label">Owned</span>

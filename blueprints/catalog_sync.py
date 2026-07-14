@@ -17,12 +17,17 @@ from constants import (
     DATA_DIR,
     SYNC_BLOCKED_CATEGORIES,
     UNKNOWN_COLOR,
+    VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
+    accepts_set_handle_variants,
+    infer_item_category,
+    normalize_edge_for_category,
 )
 from extensions import db
 from job_state import read_json_file, reset_json_file, write_json_file
 from models import (
     Item,
     ItemSetMember,
+    ItemVariant,
     Set,
     parse_alternate_skus,
     record_activity,
@@ -30,9 +35,12 @@ from models import (
 )
 from scraping import (
     _member_hover_title,
+    _resolve_cutco_item_page_url,
+    discover_cutco_item_page_url,
     scrape_catalog,
     scrape_item_specs,
     scrape_item_variant_colors,
+    scrape_set_variant_options,
     scrape_sets,
 )
 
@@ -93,8 +101,8 @@ def _read_catalog_sync_job() -> dict:
     return recovered
 
 
-def _write_catalog_sync_job(data: dict) -> None:
-    write_json_file(_CATALOG_SYNC_JOB_FILE, data, lock=_catalog_sync_job_lock)
+def _write_catalog_sync_job(job_data: dict) -> None:
+    write_json_file(_CATALOG_SYNC_JOB_FILE, job_data, lock=_catalog_sync_job_lock)
 
 
 def _reset_catalog_sync_job() -> None:
@@ -128,8 +136,8 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
     for item in new_items:
         _grouped_unsorted.setdefault(item["category"], []).append(item)
 
-    def _sku_sort_key(item):
-        sku = item.get("sku") or ""
+    def _sku_sort_key(catalog_item: dict):
+        sku = catalog_item.get("sku") or ""
         sku_num_match = re.match(r"(\d+)", sku)
         return (0, int(sku_num_match.group(1)), sku) if sku_num_match else (1, 0, sku)
 
@@ -183,6 +191,69 @@ def _build_catalog_sync_preview(scraped: list[dict], scraped_sets: list[dict]) -
         ),
         key=_sku_sort_key,
     )
+    if new_sets:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        category_by_sku = {
+            _normalize_member_sku(item.get("sku")): item.get("category")
+            for item in scraped
+            if _normalize_member_sku(item.get("sku"))
+        }
+        category_by_sku.update(
+            {
+                _normalize_member_sku(item.sku): item.category
+                for item in Item.query.filter(Item.sku.isnot(None)).all()
+                if _normalize_member_sku(item.sku)
+            }
+        )
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            future_map = {
+                pool.submit(
+                    scrape_set_variant_options,
+                    str(item_set.get("url") or ""),
+                    str(item_set.get("sku") or "") or None,
+                ): item_set
+                for item_set in new_sets
+                if item_set.get("url")
+            }
+            for future in as_completed(future_map):
+                item_set = future_map[future]
+                options = future.result()
+                member_categories = [
+                    category_by_sku.get(_normalize_member_sku(member.get("sku")))
+                    for member in item_set.get("member_entries", [])
+                ]
+                member_names = [
+                    member.get("name") for member in item_set.get("member_entries", [])
+                ]
+                has_only_single_variant_members = bool(member_categories) and all(
+                    not accepts_set_handle_variants(name, category)
+                    for name, category in zip(member_names, member_categories)
+                )
+                item_set["variant_colors"] = [
+                    str(color).strip()
+                    for color in (
+                        ()
+                        if has_only_single_variant_members
+                        else options["handle_colors"]
+                    )
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+                item_set["block_finishes"] = [
+                    str(finish).strip()
+                    for finish in options["block_finishes"]
+                    if str(finish).strip()
+                ]
+                item_set["variant_member_skus"] = {
+                    color: list(member_skus)
+                    for color, member_skus in options.get(
+                        "handle_color_member_skus", {}
+                    ).items()
+                }
+        for item_set in new_sets:
+            item_set.setdefault("variant_colors", [])
+            item_set.setdefault("block_finishes", [])
+            item_set.setdefault("variant_member_skus", {})
     existing_sets_data = [
         scraped_set
         for scraped_set in scraped_sets
@@ -291,6 +362,7 @@ def _run_catalog_sync_job(app) -> None:
             )
 
         try:
+            cast(Any, discover_cutco_item_page_url).cache_clear()
             log("Scraping live catalog…")
             scraped, set_candidates = scrape_catalog(progress_cb=log)
             log(f"Found {len(scraped)} items on cutco.com")
@@ -383,35 +455,35 @@ def _item_alternate_skus_text(item: Item | None) -> str:
     return ", ".join(parse_alternate_skus(item.alternate_skus))
 
 
-def _normalize_member_sku(value: object) -> str | None:
-    sku = str(value).strip().upper() if value is not None else ""
+def _normalize_member_sku(raw_value: object) -> str | None:
+    sku = str(raw_value).strip().upper() if raw_value is not None else ""
     return sku or None
 
 
-def _normalize_member_name(value: object) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+def _normalize_member_name(raw_value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(raw_value or "").lower()).strip()
 
 
-def _coerce_quantity(value: object, default: int = 1) -> int:
+def _coerce_quantity(raw_value: object, default: int = 1) -> int:
     """Convert scraped quantity values to a positive integer."""
-    if not isinstance(value, str | float | int):
+    if not isinstance(raw_value, str | float | int):
         return default
     try:
-        return max(1, int(value))
+        return max(1, int(raw_value))
     except (TypeError, ValueError):
         return default
 
 
-def _get_item_field(item: object, field: str) -> Any:
+def _get_item_field(item: object, field_name: str) -> Any:
     if isinstance(item, dict):
-        return item.get(field)
-    return getattr(item, field, None)
+        return item.get(field_name)
+    return getattr(item, field_name, None)
 
 
-def _build_member_name_lookup(items: list[object]) -> dict[str, object]:
+def _build_member_name_lookup(catalog_items: list[object]) -> dict[str, object]:
     lookup: dict[str, object] = {}
     ambiguous: set[str] = set()
-    for item in items:
+    for item in catalog_items:
         name = _normalize_member_name(_get_item_field(item, "name"))
         if not name:
             continue
@@ -587,16 +659,91 @@ def _build_member_status_rows(
     return rows, missing_skus
 
 
+def _add_initial_set_member_variants(item: Item, member_name: str | None = None) -> int:
+    """Add variants while creating a new set-only catalog item."""
+    if (item.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES:
+        reconcile_unknown_variant(item)
+        return 0
+    if any(variant.color != UNKNOWN_COLOR for variant in item.variants):
+        return 0
+    sku = _normalize_member_sku(item.sku)
+    if not sku:
+        return 0
+    name = str(member_name or item.name or "").strip() or f"Set Member {sku}"
+    name_slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    candidate_urls = []
+    if name_slug:
+        candidate_urls.append(f"https://www.cutco.com/p/{name_slug}/{sku}&view=product")
+    candidate_urls.extend(
+        (
+            f"https://www.cutco.com/p/{sku}&view=product",
+            f"https://www.cutco.com/p/{sku}",
+        )
+    )
+    item_url = None
+    variant_colors: list[str] = []
+    try:
+        for candidate_url in candidate_urls:
+            resolved_url = _resolve_cutco_item_page_url(candidate_url, item_name=name)
+            scrape_urls = [candidate_url]
+            if resolved_url and resolved_url != candidate_url:
+                scrape_urls.append(resolved_url)
+            for scrape_url in scrape_urls:
+                variant_colors = [
+                    str(color).strip()
+                    for color in scrape_item_variant_colors(scrape_url)
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+                if variant_colors:
+                    item_url = scrape_url
+                    break
+            if variant_colors:
+                break
+        if not variant_colors:
+            discovered_url = discover_cutco_item_page_url(sku)
+            if discovered_url:
+                variant_colors = [
+                    str(color).strip()
+                    for color in scrape_item_variant_colors(discovered_url)
+                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
+                ]
+                if variant_colors:
+                    item_url = discovered_url
+    except Exception as exc:
+        logger.debug("Variant scrape failed for missing set member %s: %s", sku, exc)
+    if item_url:
+        item.cutco_url = item_url
+    created_variants = 0
+    if variant_colors:
+        existing_colors = {
+            existing_variant.color.lower()
+            for existing_variant in item.variants
+            if existing_variant.color != UNKNOWN_COLOR
+        }
+        seen_colors: set[str] = set()
+        for color in variant_colors:
+            color_key = color.lower()
+            if color_key in seen_colors or color_key in existing_colors:
+                continue
+            seen_colors.add(color_key)
+            db.session.add(ItemVariant(item=item, color=color, source="catalog_sync"))
+            created_variants += 1
+        db.session.flush()
+    reconcile_unknown_variant(item)
+    return created_variants
+
+
 def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> Item:
     sku = _normalize_member_sku(member.get("sku"))
     if not sku:
         raise ValueError("Missing member SKU")
     name = str(member.get("name") or "").strip() or f"Set Member {sku}"
+    category = infer_item_category(None, name)
     item = Item(
         name=name,
         sku=sku,
-        category=None,
-        edge_type="Unknown",
+        category=category,
+        edge_type=normalize_edge_for_category(category, None)[0],
         availability="non-catalog",
         in_catalog=False,
         set_only=True,
@@ -609,7 +756,7 @@ def _create_missing_set_member_item(member: dict[str, Any], set_name: str) -> It
     )
     db.session.add(item)
     db.session.flush()
-    reconcile_unknown_variant(item)
+    _add_initial_set_member_variants(item, name)
     return item
 
 

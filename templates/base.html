@@ -199,6 +199,8 @@
       var confirmPreview = document.getElementById('confirm-action-preview');
       var confirmContinue = document.getElementById('confirm-action-continue');
       var pendingForm = null;
+      var pendingSubmitter = null;
+      var bypassConfirmOnce = false;
 
       if (!confirmDialog || !confirmTitle || !confirmCount || !confirmMessage || !confirmPreview || !confirmContinue) {
         return;
@@ -206,6 +208,8 @@
 
       function resetConfirmDialog() {
         pendingForm = null;
+        pendingSubmitter = null;
+        bypassConfirmOnce = false;
         confirmTitle.textContent = 'Confirm action';
         confirmCount.textContent = '';
         confirmCount.hidden = true;
@@ -217,6 +221,7 @@
 
       function openConfirmDialog(form, submitter) {
         pendingForm = form;
+        pendingSubmitter = submitter;
         confirmTitle.textContent = submitter.dataset.confirmTitle || 'Confirm action';
         confirmCount.textContent = submitter.dataset.confirmCount || '';
         confirmCount.hidden = !confirmCount.textContent;
@@ -230,6 +235,10 @@
 
       document.addEventListener('submit', function(e) {
         var submitter = e.submitter;
+        if (bypassConfirmOnce) {
+          bypassConfirmOnce = false;
+          return;
+        }
         if (!submitter || !submitter.dataset.confirmTitle) return;
         e.preventDefault();
         openConfirmDialog(e.target, submitter);
@@ -238,8 +247,14 @@
       confirmContinue.addEventListener('click', function() {
         if (!pendingForm) return;
         var form = pendingForm;
+        var submitter = pendingSubmitter;
+        bypassConfirmOnce = true;
         confirmDialog.close();
-        form.submit();
+        if (form.requestSubmit && submitter) {
+          form.requestSubmit(submitter);
+        } else {
+          form.submit();
+        }
       });
 
       confirmDialog.addEventListener('close', resetConfirmDialog);
@@ -521,6 +536,57 @@
       scheduleSetChipClamp();
     });
   })();
+</script>
+
+<script>
+(function() {
+  document.addEventListener('submit', function(event) {
+    var form = event.target.closest('form[data-submit-progress]');
+    if (!form || event.defaultPrevented) return;
+
+    if (form.dataset.submitting === 'true') {
+      event.preventDefault();
+      return;
+    }
+
+    form.dataset.submitting = 'true';
+    form.setAttribute('aria-busy', 'true');
+
+    var submitter = event.submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+    if (submitter) {
+      submitter.dataset.submitProgressOriginalLabel = submitter.textContent;
+      submitter.dataset.submitProgressActive = 'true';
+      submitter.textContent = submitter.dataset.submittingLabel || 'Processing…';
+      submitter.classList.add('btn-disabled');
+      submitter.setAttribute('aria-disabled', 'true');
+    }
+
+    var overlay = document.createElement('div');
+    overlay.className = 'sync-overlay submit-progress-overlay';
+    overlay.setAttribute('role', 'status');
+    overlay.setAttribute('aria-live', 'polite');
+    overlay.innerHTML = '<div class="sync-overlay-inner"><div class="sync-spinner"></div><p></p></div>';
+    overlay.querySelector('p').textContent = form.dataset.submitProgress;
+    document.body.appendChild(overlay);
+  });
+
+  window.addEventListener('pageshow', function() {
+    document.querySelectorAll('.submit-progress-overlay').forEach(function(overlay) {
+      overlay.remove();
+    });
+    document.querySelectorAll('form[data-submitting="true"]').forEach(function(form) {
+      delete form.dataset.submitting;
+      form.removeAttribute('aria-busy');
+    });
+    document.querySelectorAll('[data-submit-progress-active="true"]').forEach(function(submitter) {
+      submitter.textContent = submitter.dataset.submitProgressOriginalLabel || submitter.textContent;
+      delete submitter.dataset.submitProgressOriginalLabel;
+      delete submitter.dataset.submitProgressActive;
+      submitter.classList.remove('btn-disabled');
+      submitter.removeAttribute('aria-disabled');
+    });
+  });
+})();
 </script>
 
 <main class="container">

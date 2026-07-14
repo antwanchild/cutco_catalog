@@ -51,4 +51,5 @@ class ErrorSmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual(response.status_code, 413)
-        self.assertIn(b"File too large", response.data)
+        self.assertIn(b"Request too large", response.data)
+        self.assertIn(b"upload or submitted form data", response.data)

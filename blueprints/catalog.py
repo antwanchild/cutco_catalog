@@ -26,6 +26,7 @@ from constants import (
     EDGE_TYPES,
     SYNC_BLOCKED_CATEGORIES,
     UNKNOWN_COLOR,
+    accepts_set_handle_variants,
     canonicalize_category,
     canonicalize_availability,
     normalize_edge_for_category,
@@ -41,6 +42,7 @@ from models import (
     KnifeTask,
     Ownership,
     Set,
+    SetVariant,
     normalize_sku_value,
     parse_alternate_skus,
     record_audit_event,
@@ -53,6 +55,8 @@ from scraping import (
     scrape_item_specs,
     scrape_item_variant_colors,
     scrape_item_uses,
+    scrape_set_variant_options,
+    set_handle_color_applies_to_member,
     scrape_sets,
 )
 import blueprints.catalog_sync as catalog_sync_module
@@ -90,6 +94,7 @@ def _sync_catalog_sync_helpers() -> None:
     catalog_sync_module.scrape_catalog = scrape_catalog
     catalog_sync_module.scrape_item_specs = scrape_item_specs
     catalog_sync_module.scrape_item_variant_colors = scrape_item_variant_colors
+    catalog_sync_module.scrape_set_variant_options = scrape_set_variant_options
     catalog_sync_module.scrape_sets = scrape_sets
 
 
@@ -505,6 +510,55 @@ def catalog_delete(item_id):
     return redirect(url_for("catalog.catalog"))
 
 
+@catalog_bp.route("/catalog/bulk-delete", methods=["POST"])
+@admin_required
+def bulk_delete_catalog_items():
+    """Delete multiple catalog items at once."""
+    selected_item_ids: set[int] = set()
+    invalid_seen = False
+    for raw_item_id in request.form.getlist("item_ids"):
+        try:
+            selected_item_ids.add(int(raw_item_id))
+        except (TypeError, ValueError):
+            invalid_seen = True
+
+    if invalid_seen:
+        flash("Some item selections were invalid and were ignored.", "warning")
+    if not selected_item_ids:
+        flash("Choose one or more items to delete.", "warning")
+        return redirect(
+            _safe_redirect_target(request.form.get("next"))
+            or url_for("catalog.catalog")
+        )
+
+    items_by_id = {
+        item.id: item
+        for item in Item.query.filter(Item.id.in_(selected_item_ids)).all()
+    }
+    if not items_by_id:
+        flash("No valid items were selected.", "warning")
+        return redirect(
+            _safe_redirect_target(request.form.get("next"))
+            or url_for("catalog.catalog")
+        )
+
+    deleted_items = 0
+    for item in items_by_id.values():
+        _delete_attachment_files(item)
+        db.session.delete(item)
+        deleted_items += 1
+
+    if db_commit(db.session):
+        logger.info("Bulk catalog delete: %d item(s)", deleted_items)
+        flash(
+            f"Deleted {deleted_items} item{'s' if deleted_items != 1 else ''}.",
+            "info",
+        )
+    return redirect(
+        _safe_redirect_target(request.form.get("next")) or url_for("catalog.catalog")
+    )
+
+
 # ── Variants ──────────────────────────────────────────────────────────────────
 
 
@@ -730,11 +784,17 @@ def sets_list():
     """Render the set list page."""
     from models import Ownership, Person
 
-    all_sets = Set.query.order_by(Set.name).all()
+    search_query = request.args.get("q", "").strip()
     all_persons = Person.query.order_by(Person.name).all()
     person_id = request.args.get("person", type=int)
     not_in_catalog_f = request.args.get("missing", "")
     incomplete_f = request.args.get("incomplete", "")
+
+    set_query = Set.query
+    if search_query:
+        like = f"%{search_query}%"
+        set_query = set_query.filter(or_(Set.name.ilike(like), Set.sku.ilike(like)))
+    all_sets = set_query.order_by(Set.name).all()
 
     # Completion relative to selected person, or globally if none selected
     owned_q = Ownership.query.filter_by(status="Owned")
@@ -779,6 +839,7 @@ def sets_list():
         not_in_catalog_counts=not_in_catalog_counts,
         all_persons=all_persons,
         person_id=person_id,
+        q=search_query,
         not_in_catalog_f=not_in_catalog_f,
         incomplete_f=incomplete_f,
     )
@@ -801,6 +862,7 @@ def set_add():
         item_set = Set(
             name=name,
             sku=request.form.get("sku", "").strip().upper() or None,
+            cutco_url=request.form.get("cutco_url", "").strip() or None,
             notes=request.form.get("notes", "").strip() or None,
         )
         db.session.add(item_set)
@@ -842,6 +904,7 @@ def set_edit(set_id=None, sid=None):
     if request.method == "POST":
         item_set.name = request.form["name"].strip()
         item_set.sku = request.form.get("sku", "").strip().upper() or None
+        item_set.cutco_url = request.form.get("cutco_url", "").strip() or None
         item_set.notes = request.form.get("notes", "").strip() or None
 
         selected_item_ids: set[int] = set()
@@ -1148,6 +1211,54 @@ def set_delete(set_id=None, sid=None):
         logger.info("Set deleted: %s", name)
         flash(f'Deleted set "{name}".', "info")
     return redirect(url_for("catalog.sets_list"))
+
+
+@catalog_bp.route("/sets/bulk-delete", methods=["POST"])
+@admin_required
+def bulk_delete_sets():
+    """Delete multiple sets at once."""
+    selected_set_ids: set[int] = set()
+    invalid_seen = False
+    for raw_set_id in request.form.getlist("set_ids"):
+        try:
+            selected_set_ids.add(int(raw_set_id))
+        except (TypeError, ValueError):
+            invalid_seen = True
+
+    if invalid_seen:
+        flash("Some set selections were invalid and were ignored.", "warning")
+    if not selected_set_ids:
+        flash("Choose one or more sets to delete.", "warning")
+        return redirect(
+            _safe_redirect_target(request.form.get("next"))
+            or url_for("catalog.sets_list")
+        )
+
+    item_sets = {
+        item_set.id: item_set
+        for item_set in Set.query.filter(Set.id.in_(selected_set_ids)).all()
+    }
+    if not item_sets:
+        flash("No valid sets were selected.", "warning")
+        return redirect(
+            _safe_redirect_target(request.form.get("next"))
+            or url_for("catalog.sets_list")
+        )
+
+    deleted_sets = 0
+    for item_set in item_sets.values():
+        db.session.delete(item_set)
+        deleted_sets += 1
+
+    if db_commit(db.session):
+        logger.info("Bulk set delete: %d set(s)", deleted_sets)
+        flash(
+            f"Deleted {deleted_sets} set{'s' if deleted_sets != 1 else ''}.",
+            "info",
+        )
+    return redirect(
+        _safe_redirect_target(request.form.get("next")) or url_for("catalog.sets_list")
+    )
 
 
 @catalog_bp.route("/sets/<int:set_id>")
@@ -1500,6 +1611,7 @@ def catalog_sync_confirm():
     added_items = 0
     detected_variant_color_total = 0
     reconciled_item_variants = 0
+    reconciled_set_variants = 0
 
     def _add_catalog_sync_variants(
         item: Item, raw_variant_colors: object
@@ -1540,6 +1652,98 @@ def catalog_sync_confirm():
             db.session.flush()
             reconcile_unknown_variant(item)
         return detected, created
+
+    def _add_catalog_sync_set_variants(
+        item_set: Set,
+        member_items: list[Item],
+        raw_variant_colors: object,
+        raw_block_finishes: object,
+        raw_variant_member_skus: object,
+    ) -> tuple[int, int]:
+        def parse_values(raw_values: object) -> list[str]:
+            if not isinstance(raw_values, str) or not raw_values:
+                return []
+            try:
+                parsed_values = json.loads(raw_values)
+            except json.JSONDecodeError:
+                return []
+            if not isinstance(parsed_values, list):
+                return []
+            return list(
+                dict.fromkeys(
+                    str(value).strip()
+                    for value in parsed_values
+                    if str(value).strip() and str(value).strip() != UNKNOWN_COLOR
+                )
+            )
+
+        colors = parse_values(raw_variant_colors)
+        block_finishes = parse_values(raw_block_finishes)
+        variant_member_skus: dict[str, list[str]] = {}
+        if isinstance(raw_variant_member_skus, str) and raw_variant_member_skus:
+            try:
+                parsed_member_skus = json.loads(raw_variant_member_skus)
+            except json.JSONDecodeError:
+                parsed_member_skus = {}
+            if isinstance(parsed_member_skus, dict):
+                variant_member_skus = {
+                    str(color): [str(sku) for sku in skus]
+                    for color, skus in parsed_member_skus.items()
+                    if isinstance(skus, list)
+                }
+        if not any(
+            accepts_set_handle_variants(member.name, member.category)
+            for member in member_items
+        ):
+            colors = []
+        existing_set_options = {
+            (variant.kind, variant.color.lower()) for variant in item_set.variants
+        }
+        created = 0
+        set_options = [
+            *(("handle", color) for color in colors),
+            *(("block_finish", finish) for finish in block_finishes),
+        ]
+        for kind, value in set_options:
+            if (kind, value.lower()) in existing_set_options:
+                continue
+            db.session.add(
+                SetVariant(
+                    set=item_set,
+                    color=value,
+                    kind=kind,
+                    source="catalog_sync",
+                )
+            )
+            existing_set_options.add((kind, value.lower()))
+            created += 1
+        for member in member_items:
+            if not accepts_set_handle_variants(member.name, member.category):
+                continue
+            existing_member_colors = {
+                variant.color.lower()
+                for variant in member.variants
+                if variant.color != UNKNOWN_COLOR
+            }
+            for color in colors:
+                if not set_handle_color_applies_to_member(
+                    member.sku, color, variant_member_skus
+                ):
+                    continue
+                if color.lower() in existing_member_colors:
+                    continue
+                db.session.add(
+                    ItemVariant(
+                        item=member,
+                        color=color,
+                        source="catalog_sync_set",
+                    )
+                )
+                existing_member_colors.add(color.lower())
+                created += 1
+            db.session.flush()
+            reconcile_unknown_variant(member)
+        return len(set_options), created
 
     for sku in selected:
         if Item.query.filter_by(sku=sku).first():
@@ -1583,25 +1787,6 @@ def catalog_sync_confirm():
 
     db.session.flush()
 
-    for sku, data in item_data.items():
-        if sku in selected:
-            continue
-        item = Item.query.filter_by(sku=sku).first()
-        if not item:
-            continue
-        raw_variant_colors = data.get("variant_colors")
-        if isinstance(raw_variant_colors, str) and raw_variant_colors:
-            try:
-                parsed_colors = json.loads(raw_variant_colors)
-            except json.JSONDecodeError:
-                parsed_colors = []
-            if isinstance(parsed_colors, list):
-                detected_variant_color_total += sum(
-                    1
-                    for color in parsed_colors
-                    if str(color).strip() and str(color).strip() != UNKNOWN_COLOR
-                )
-
     selected_sets = set(request.form.getlist("selected_sets"))
     added_sets = 0
     linked_items = 0
@@ -1643,6 +1828,7 @@ def catalog_sync_confirm():
                 for sku in legacy_member_skus
             ]
         set_sku = request.form.get(f"set_sku_{index}", "").strip() or None
+        set_url = request.form.get(f"set_url_{index}", "").strip() or None
 
         pre_existing_set = Set.query.filter(
             db.func.lower(Set.name) == set_name.lower()
@@ -1652,6 +1838,8 @@ def catalog_sync_confirm():
             added_sets += 1
         if set_sku and not item_set.sku:
             item_set.sku = set_sku
+        if set_url:
+            item_set.cutco_url = set_url
         if member_entries_raw:
             item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
 
@@ -1690,6 +1878,16 @@ def catalog_sync_confirm():
                 "Skipping set membership reconciliation for %s because no members were resolved",
                 set_name,
             )
+        if pre_existing_set is None:
+            detected, created = _add_catalog_sync_set_variants(
+                item_set,
+                [resolved["item"] for resolved in resolved_members.values()],
+                request.form.get(f"set_variant_colors_{index}", ""),
+                request.form.get(f"set_block_finishes_{index}", ""),
+                request.form.get(f"set_variant_member_skus_{index}", ""),
+            )
+            detected_variant_color_total += detected
+            reconciled_set_variants += created
 
     # Update quantities on existing sets (no new rows, just qty backfill)
     existing_set_count = int(request.form.get("existing_set_count", 0))
@@ -1702,6 +1900,9 @@ def catalog_sync_confirm():
         item_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         if not item_set:
             continue
+        set_url = request.form.get(f"existing_set_url_{index}", "").strip()
+        if set_url:
+            item_set.cutco_url = set_url
         member_entries_raw = request.form.get(
             f"existing_set_member_entries_{index}", ""
         ).strip()
@@ -1784,12 +1985,12 @@ def catalog_sync_confirm():
         linked_items,
         qty_updates,
         created_missing_items + created_existing_missing_items,
-        reconciled_item_variants,
+        reconciled_item_variants + reconciled_set_variants,
     )
     record_activity(
         "sync",
         "Catalog sync complete",
-        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates, {created_missing_items + created_existing_missing_items} placeholder items, {reconciled_item_variants} variant updates.",
+        f"Added {added_items} items, {added_sets} sets, {linked_items} memberships, {qty_updates} quantity updates, {created_missing_items + created_existing_missing_items} placeholder items, {reconciled_item_variants + reconciled_set_variants} variant updates.",
     )
     db.session.commit()
 

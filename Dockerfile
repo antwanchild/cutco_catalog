@@ -2,6 +2,7 @@ FROM python:3.13.14-slim-bookworm
 
 LABEL org.opencontainers.image.title="cutco-vault"
 LABEL org.opencontainers.image.description="Cutco Collection Tracker"
+LABEL org.opencontainers.image.licenses="MIT"
 
 WORKDIR /app
 

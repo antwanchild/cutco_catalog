@@ -123,11 +123,19 @@
 
     {# Variants #}
     <section class="detail-section">
+      {% set item_name_lower = item.name | lower %}
+      {% if 'block' in item_name_lower or 'holder' in item_name_lower %}
+        {% set variant_heading = 'Block Finishes' %}
+      {% elif item.category == 'Storage' %}
+        {% set variant_heading = 'Finishes' %}
+      {% else %}
+        {% set variant_heading = 'Variants' %}
+      {% endif %}
       {% if item.category in SINGLE_VARIANT_CATEGORIES %}
-        <h2 class="section-heading">Variants</h2>
+        <h2 class="section-heading">{{ variant_heading }}</h2>
         <p class="muted">These items do not use color variants.</p>
       {% else %}
-        <h2 class="section-heading">Variants ({{ item.variants | length }})</h2>
+        <h2 class="section-heading">{{ variant_heading }} ({{ item.variants | length }})</h2>
         <div class="chip-list">
           {% for v in item.variants %}
             {% if v.color != UNKNOWN_COLOR %}

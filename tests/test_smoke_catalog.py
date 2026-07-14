@@ -97,6 +97,44 @@ class CatalogSmokeTests(SmokeBaseTest):
             response.data.find(b"Alpha Knife"), response.data.find(b"Beta Knife")
         )
 
+    def test_item_detail_labels_storage_variants_as_finishes(self):
+        self._login_as_admin()
+
+        with self.app.app_context():
+            block = Item(
+                name="Homemaker + 8 Set Block (18-Slot)",
+                sku="1748",
+                category="Storage",
+            )
+            storage = Item(name="Garden Bag", sku="GB-1", category="Storage")
+            knife = Item(
+                name="Petite Chef",
+                sku="1728",
+                category="Chef Knives",
+            )
+            db.session.add_all([block, storage, knife])
+            db.session.flush()
+            db.session.add_all(
+                [
+                    ItemVariant(item_id=block.id, color="Cherry"),
+                    ItemVariant(item_id=block.id, color="Honey"),
+                    ItemVariant(item_id=storage.id, color="Green"),
+                    ItemVariant(item_id=knife.id, color="Classic"),
+                ]
+            )
+            db.session.commit()
+            block_id = block.id
+            storage_id = storage.id
+            knife_id = knife.id
+
+        block_response = self.client.get(f"/views/item/{block_id}")
+        storage_response = self.client.get(f"/views/item/{storage_id}")
+        knife_response = self.client.get(f"/views/item/{knife_id}")
+
+        self.assertIn(b"Block Finishes (2)", block_response.data)
+        self.assertIn(b"Finishes (1)", storage_response.data)
+        self.assertIn(b"Variants (1)", knife_response.data)
+
     def test_catalog_edge_sort_uses_name_tiebreaker(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -621,6 +659,10 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "blueprints.catalog.scrape_item_variant_colors", return_value=()
             ),
             mock.patch(
+                "blueprints.catalog.scrape_set_variant_options",
+                return_value={"handle_colors": (), "block_finishes": ()},
+            ),
+            mock.patch(
                 "blueprints.catalog._start_catalog_sync_background_job",
                 side_effect=catalog_blueprint._run_catalog_sync_job,
             ),
@@ -629,6 +671,10 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Catalog Sync Preview", response.data)
+        self.assertIn(
+            b'data-submit-progress="Adding the selected catalog items', response.data
+        )
+        self.assertIn(b'data-submitting-label="Importing', response.data)
         self.assertIn(b"New Items", response.data)
         self.assertIn(b"New Sync Knife", response.data)
         self.assertIn(b"New Sets", response.data)
@@ -1068,6 +1114,9 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn(b"Variant Sync", page_response.data)
             self.assertIn(b"Entire catalog", page_response.data)
             self.assertIn(b"Preview Variants", page_response.data)
+            self.assertIn(b"Checking Cutco.com for handle colors", page_response.data)
+            self.assertIn(b"Elapsed time", page_response.data)
+            self.assertIn(b"Please keep this page open", page_response.data)
             self.assertIn(b"Back", page_response.data)
 
             preview_response = self.client.post(
@@ -1089,9 +1138,28 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"not seen in sync", preview_response.data)
 
         soup = BeautifulSoup(preview_response.data, "html.parser")
+        actionable_category = soup.select_one("details.variant-sync-category-section")
+        self.assertIsNotNone(actionable_category)
+        self.assertTrue(actionable_category.has_attr("open"))
+        self.assertIn("1 change", actionable_category.get_text(" ", strip=True))
+        self.assertIsNotNone(
+            actionable_category.select_one(
+                'button[name="confirm_target"][value="category:Kitchen Knives"]'
+            )
+        )
+        actionable_details = soup.select_one(
+            ".variant-sync-category-block details.diff-section"
+        )
+        self.assertIsNotNone(actionable_details)
+        self.assertTrue(actionable_details.has_attr("open"))
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
         preview_json = preview_json_input["value"]
+        confirmation_payload = json.loads(preview_json)
+        self.assertNotIn("grouped_items", confirmation_payload)
+        self.assertTrue(
+            all("variant_rows" not in item for item in confirmation_payload["items"])
+        )
 
         confirm_response = self.client.post(
             "/variant-sync/confirm",
@@ -1107,6 +1175,34 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIn(b"Sync Summary", confirm_response.data)
         self.assertIn(b"Variants created", confirm_response.data)
         self.assertIn(b"Variant colors detected", confirm_response.data)
+
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=("Classic Brown", "Pearl White", "Red"),
+        ):
+            current_preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "VS-1",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+        current_soup = BeautifulSoup(current_preview_response.data, "html.parser")
+        current_category = current_soup.select_one(
+            "details.variant-sync-category-section"
+        )
+        self.assertIsNotNone(current_category)
+        self.assertFalse(current_category.has_attr("open"))
+        self.assertIn("no changes", current_category.get_text(" ", strip=True))
+        self.assertIsNone(current_category.select_one('button[name="confirm_target"]'))
+        current_details = current_soup.select_one(
+            ".variant-sync-category-block details.diff-section"
+        )
+        self.assertIsNotNone(current_details)
+        self.assertFalse(current_details.has_attr("open"))
 
     def test_variant_sync_replaces_unknown_only_variant_with_real_color(self):
         self._login_as_admin()
@@ -1153,6 +1249,577 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertEqual(
                 [variant.source for variant in item.variants], ["variant_sync"]
             )
+
+    def test_variant_sync_discovers_set_only_variants_by_sku(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        expected_url = (
+            "https://www.cutco.com/p/traditional-flatware-accessories/"
+            "1570W&view=product"
+        )
+
+        with self.app.app_context():
+            item = Item(
+                name="6-Pc. Traditional Accessory Set",
+                sku="1570",
+                set_only=True,
+                in_catalog=False,
+                availability="non-catalog",
+            )
+            db.session.add(item)
+            db.session.flush()
+            item_id = item.id
+            db.session.add(ItemVariant(item=item, color="Pearl"))
+            db.session.commit()
+
+        def scrape_variants(url):
+            return ("Pearl", "Classic") if url == expected_url else ()
+
+        with (
+            mock.patch(
+                "blueprints.data.scrape_item_variant_colors",
+                side_effect=scrape_variants,
+            ) as variant_scraper,
+            mock.patch(
+                "blueprints.data_workflows.discover_cutco_item_page_url",
+                return_value=expected_url,
+            ) as url_discovery,
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "1570",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(preview_response.status_code, 200)
+        url_discovery.assert_called_once_with("1570")
+        self.assertIn(mock.call(expected_url), variant_scraper.call_args_list)
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            self.assertEqual(item.cutco_url, expected_url)
+            self.assertEqual(
+                sorted(variant.color for variant in item.variants),
+                ["Classic", "Pearl"],
+            )
+            self.assertEqual(
+                next(
+                    variant.source
+                    for variant in item.variants
+                    if variant.color == "Classic"
+                ),
+                "variant_sync",
+            )
+
+    def test_variant_sync_adds_set_variants_to_member_items(self):
+        from models import SetVariant
+
+        self._login_as_admin()
+        self._set_csrf_token()
+        expected_url = "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+
+        with self.app.app_context():
+            member = Item(
+                name="Traditional Gravy Ladle",
+                sku="1573",
+                category="Flatware",
+                set_only=True,
+                in_catalog=False,
+                availability="non-catalog",
+            )
+            db.session.add(member)
+            db.session.flush()
+            member_id = member.id
+            db.session.add(ItemVariant(item=member, color=UNKNOWN_COLOR))
+            item_set = Set(name="6-Pc. Traditional Accessory Set", sku="1570")
+            db.session.add(item_set)
+            db.session.flush()
+            set_id = item_set.id
+            db.session.add(
+                ItemSetMember(set_id=item_set.id, item_id=member.id, quantity=1)
+            )
+            db.session.add(SetVariant(set=item_set, color="Cherry"))
+            db.session.add(SetVariant(set=item_set, color="Santoku-Style"))
+            db.session.commit()
+
+        with (
+            mock.patch(
+                "blueprints.data.scrape_set_variant_options",
+                return_value={
+                    "handle_colors": ("Pearl", "Classic"),
+                    "block_finishes": ("Cherry",),
+                },
+            ),
+            mock.patch(
+                "blueprints.data_workflows.discover_cutco_item_page_url",
+                return_value=expected_url,
+            ),
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "1570",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Sets Variants", preview_response.data)
+        self.assertIn(b"eligible member item", preview_response.data)
+        self.assertIn(b"remove invalid", preview_response.data)
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+        set_checkbox = soup.select_one(
+            f'input[name="selected_set_ids"][value="{set_id}"]'
+        )
+        self.assertIsNotNone(set_checkbox)
+        self.assertFalse(set_checkbox.has_attr("checked"))
+        self.assertIn(b"Select all", preview_response.data)
+        self.assertIn(b"Clear all", preview_response.data)
+        self.assertIn(b"Confirm Selected (0)", preview_response.data)
+        self.assertIn(
+            b'data-submit-progress="Applying the selected variant changes',
+            preview_response.data,
+        )
+        self.assertEqual(set_checkbox.find_parent("form")["method"], "post")
+        selected_confirm = soup.select_one("[data-confirm-selected-sets]")
+        self.assertIsNotNone(selected_confirm)
+        self.assertEqual(selected_confirm["data-submitting-label"], "Applying\u2026")
+
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+                "set_selection_enabled": "1",
+                "selected_set_ids": str(set_id),
+                "confirm_target": "selected_sets",
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        with self.app.app_context():
+            item_set = db.session.get(Set, set_id)
+            member = db.session.get(Item, member_id)
+            self.assertEqual(item_set.cutco_url, expected_url)
+            self.assertEqual(
+                sorted(variant.color for variant in item_set.variants),
+                ["Cherry", "Classic", "Pearl"],
+            )
+            self.assertEqual(
+                sorted((variant.kind, variant.color) for variant in item_set.variants),
+                [
+                    ("block_finish", "Cherry"),
+                    ("handle", "Classic"),
+                    ("handle", "Pearl"),
+                ],
+            )
+            self.assertEqual(
+                len(
+                    db.session.execute(db.select(SetVariant).filter_by(set_id=set_id))
+                    .scalars()
+                    .all()
+                ),
+                3,
+            )
+            self.assertEqual(
+                sorted(variant.color for variant in member.variants),
+                ["Classic", "Pearl"],
+            )
+            self.assertTrue(
+                all(variant.source == "set_variant_sync" for variant in member.variants)
+            )
+
+    def test_variant_sync_only_applies_checked_set_changes(self):
+        from models import SetVariant
+
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with self.app.app_context():
+            selected_set = Set(name="Selected Block Set", sku="SEL-1")
+            unchecked_set = Set(name="Unchecked Block Set", sku="SEL-2")
+            db.session.add_all([selected_set, unchecked_set])
+            db.session.commit()
+            selected_set_id = selected_set.id
+            unchecked_set_id = unchecked_set.id
+
+        def set_preview(set_id, name, sku):
+            return {
+                "entity_type": "set",
+                "set_id": set_id,
+                "item_name": name,
+                "sku": sku,
+                "category": "Sets",
+                "status": "ready",
+                "scraped_url": None,
+                "remove_options": [],
+                "reclassify_options": [],
+                "create_options": [{"kind": "block_finish", "color": "Cherry"}],
+                "propagate_colors": [],
+                "propagate_color_member_skus": {},
+                "retained_colors": [],
+            }
+
+        preview = {
+            "items": [
+                set_preview(selected_set_id, "Selected Block Set", "SEL-1"),
+                set_preview(unchecked_set_id, "Unchecked Block Set", "SEL-2"),
+            ],
+            "summary": {
+                "items_scanned": 2,
+                "variants_found": 2,
+                "variants_to_create": 2,
+                "variants_retained": 0,
+                "items_with_no_clear_variants": 0,
+                "purple_variant_count": 0,
+            },
+            "promo_items": [],
+            "promo_summary": {},
+            "scope_label": "Entire catalog",
+        }
+        response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": json.dumps(preview),
+                "set_selection_enabled": "1",
+                "selected_set_ids": str(selected_set_id),
+                "confirm_target": "all",
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            selected_variants = (
+                db.session.execute(
+                    db.select(SetVariant).filter_by(set_id=selected_set_id)
+                )
+                .scalars()
+                .all()
+            )
+            unchecked_variants = (
+                db.session.execute(
+                    db.select(SetVariant).filter_by(set_id=unchecked_set_id)
+                )
+                .scalars()
+                .all()
+            )
+            self.assertEqual(
+                [(variant.kind, variant.color) for variant in selected_variants],
+                [("block_finish", "Cherry")],
+            )
+            self.assertEqual(unchecked_variants, [])
+
+    def test_variant_sync_removes_member_only_color_from_cutting_board_set(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+        from models import SetVariant
+
+        with self.app.app_context():
+            board = Item(
+                name="Medium Cutting Board",
+                sku="125",
+                category="Cutting Boards",
+            )
+            item_set = Set(name="3-Pc. Cutting Board Set", sku="1905")
+            db.session.add_all([board, item_set])
+            db.session.flush()
+            db.session.add(
+                ItemSetMember(set_id=item_set.id, item_id=board.id, quantity=1)
+            )
+            db.session.add(SetVariant(set=item_set, color="Red"))
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/3-pc-cutting-board-set",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Red",),
+                        "block_finishes": (),
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview([item_set])
+
+        row = preview["items"][0]
+        self.assertEqual(row["propagate_colors"], [])
+        self.assertEqual(
+            [(option["kind"], option["color"]) for option in row["remove_options"]],
+            [("handle", "Red")],
+        )
+
+    def test_variant_sync_does_not_propagate_handle_colors_to_block_items(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+
+        with self.app.app_context():
+            block = Item(
+                name="Galley Set Block (7-Slot)",
+                sku="BLOCK-7",
+                category="Storage",
+            )
+            knife = Item(name="Petite Chef", sku="1728", category="Chef Knives")
+            item_set = Set(name="Galley Set", sku="G-1")
+            db.session.add_all([block, knife, item_set])
+            db.session.flush()
+            db.session.add_all(
+                [
+                    ItemSetMember(set=item_set, item=block, quantity=1),
+                    ItemSetMember(set=item_set, item=knife, quantity=1),
+                ]
+            )
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/galley-set",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Classic",),
+                        "block_finishes": ("Cherry",),
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview([item_set])
+
+        row = preview["items"][0]
+        self.assertEqual(row["eligible_member_count"], 1)
+        self.assertEqual(row["member_create_count"], 1)
+
+    def test_variant_sync_removes_block_finish_from_tools_only_set(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+        from models import SetVariant
+
+        with self.app.app_context():
+            item_set = Set(
+                name="5-Pc. Kitchen Tool Set (Tools Only)",
+                sku="1719",
+            )
+            db.session.add(item_set)
+            db.session.flush()
+            db.session.add(
+                SetVariant(
+                    set=item_set,
+                    color="Honey",
+                    kind="block_finish",
+                )
+            )
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/5-pc-kitchen-tool-set",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Classic",),
+                        "block_finishes": ("Honey",),
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview([item_set])
+
+        row = preview["items"][0]
+        self.assertEqual(row["create_options"], [])
+        self.assertEqual(
+            [(option["kind"], option["color"]) for option in row["remove_options"]],
+            [("block_finish", "Honey")],
+        )
+
+    def test_variant_sync_removes_handle_missing_from_exact_set_skus(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+        from models import SetVariant
+
+        with self.app.app_context():
+            member = Item(name="Kitchen Tool", sku="KT-1", category="Accessories")
+            item_set = Set(name="6-Pc. Kitchen Tool Set with Holder", sku="1792")
+            db.session.add_all([member, item_set])
+            db.session.flush()
+            db.session.add(
+                ItemSetMember(set_id=item_set.id, item_id=member.id, quantity=1)
+            )
+            db.session.add(SetVariant(set=item_set, color="Red", kind="handle"))
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/kitchen-tool-sets/1792C",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Classic", "Pearl"),
+                        "block_finishes": ("Honey", "Cherry"),
+                        "handle_colors_authoritative": True,
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview([item_set])
+
+        row = preview["items"][0]
+        self.assertEqual(
+            [(option["kind"], option["color"]) for option in row["remove_options"]],
+            [("handle", "Red")],
+        )
+
+    def test_variant_sync_propagates_set_colors_only_to_applicable_members(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with self.app.app_context():
+            peeler = Item(name="Vegetable Peeler", sku="1501", category="Accessories")
+            paring = Item(name='4" Paring Knife', sku="2120", category="Paring Knives")
+            item_set = Set(name="Peel n' Pare Pack", sku="1828")
+            db.session.add_all([peeler, paring, item_set])
+            db.session.flush()
+            peeler_id = peeler.id
+            paring_id = paring.id
+            db.session.add_all(
+                [
+                    ItemVariant(item=peeler, color=UNKNOWN_COLOR),
+                    ItemVariant(item=paring, color=UNKNOWN_COLOR),
+                    ItemSetMember(set_id=item_set.id, item_id=peeler.id, quantity=1),
+                    ItemSetMember(set_id=item_set.id, item_id=paring.id, quantity=1),
+                ]
+            )
+            db.session.commit()
+
+        with (
+            mock.patch(
+                "blueprints.data.scrape_set_variant_options",
+                return_value={
+                    "handle_colors": ("Classic", "Pearl"),
+                    "block_finishes": (),
+                    "handle_colors_authoritative": True,
+                    "handle_color_member_skus": {
+                        "Classic": ("2120C",),
+                        "Pearl": ("2120W",),
+                    },
+                },
+            ),
+            mock.patch(
+                "blueprints.data_workflows.discover_cutco_item_page_url",
+                return_value="https://www.cutco.com/p/peel-n-pare-pack",
+            ),
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "1828",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+        preview_payload = json.loads(preview_json_input["value"])
+        set_preview = next(
+            item
+            for item in preview_payload["items"]
+            if item.get("entity_type") == "set"
+        )
+        self.assertEqual(set_preview["eligible_member_count"], 1)
+        self.assertEqual(set_preview["member_create_count"], 2)
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+        self.assertEqual(confirm_response.status_code, 200)
+
+        with self.app.app_context():
+            peeler = db.session.get(Item, peeler_id)
+            paring = db.session.get(Item, paring_id)
+            self.assertEqual(
+                [variant.color for variant in peeler.variants], [UNKNOWN_COLOR]
+            )
+            self.assertEqual(
+                sorted(variant.color for variant in paring.variants),
+                ["Classic", "Pearl"],
+            )
+
+    def test_set_variant_preview_does_not_recount_pending_item_variants(self):
+        from blueprints.data_workflows import _build_set_variant_sync_preview
+
+        with self.app.app_context():
+            member = Item(
+                name="Traditional Gravy Ladle",
+                sku="1573",
+                category="Flatware",
+            )
+            item_set = Set(name="Traditional Accessory Set", sku="1570")
+            db.session.add_all([member, item_set])
+            db.session.flush()
+            db.session.add(
+                ItemSetMember(set_id=item_set.id, item_id=member.id, quantity=1)
+            )
+            db.session.commit()
+
+            with (
+                mock.patch(
+                    "blueprints.data_workflows.discover_cutco_item_page_url",
+                    return_value="https://www.cutco.com/p/1570W",
+                ),
+                mock.patch(
+                    "blueprints.data_workflows.scrape_set_variant_options",
+                    return_value={
+                        "handle_colors": ("Classic",),
+                        "block_finishes": (),
+                    },
+                ),
+            ):
+                preview = _build_set_variant_sync_preview(
+                    [item_set], {member.id: {"classic"}}
+                )
+
+        row = preview["items"][0]
+        self.assertEqual(row["member_create_count"], 0)
+        self.assertEqual(row["member_covered_count"], 1)
+        self.assertEqual(preview["summary"]["variants_to_create"], 1)
 
     def test_variant_sync_can_mark_purple_campaign_variants_as_unicorns(self):
         self._login_as_admin()
@@ -1407,7 +2074,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 [variant.color for variant in promo_sheath_item.variants], ["Purple"]
             )
 
-    def test_variant_sync_skips_cutting_boards(self):
+    def test_variant_sync_adds_cutting_board_item_variants(self):
         self._login_as_admin()
         self._set_csrf_token()
 
@@ -1417,8 +2084,11 @@ class CatalogSmokeTests(SmokeBaseTest):
             category="Cutting Boards",
         )
 
-        with mock.patch("blueprints.data.scrape_item_variant_colors") as scrape_mock:
-            page_response = self.client.post(
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=("Gray", "Red"),
+        ) as scrape_mock:
+            preview_response = self.client.post(
                 "/variant-sync",
                 data={
                     "csrf_token": "test-csrf-token",
@@ -1429,15 +2099,30 @@ class CatalogSmokeTests(SmokeBaseTest):
                 follow_redirects=False,
             )
 
-        self.assertEqual(page_response.status_code, 200)
-        self.assertIn(
-            b"Cutting board items are treated as a single fallback variant.",
-            page_response.data,
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Gray", preview_response.data)
+        self.assertIn(b"Red", preview_response.data)
+        scrape_mock.assert_called()
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
         )
-        scrape_mock.assert_not_called()
+
+        self.assertEqual(confirm_response.status_code, 200)
         with self.app.app_context():
             item = db.session.get(Item, item_id)
-            self.assertEqual(len(item.variants), 1)
+            self.assertEqual(
+                sorted(variant.color for variant in item.variants), ["Gray", "Red"]
+            )
 
     def test_variant_sync_shows_fallback_only_variant(self):
         self._login_as_admin()
@@ -1621,6 +2306,326 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertNotIn("SX-STALE-1", existing_member_skus)
             self.assertIn("SX-EX-1", existing_member_skus)
             self.assertIn("SX-EX-MISS-1", existing_member_skus)
+
+    def test_missing_set_member_discovers_product_url_by_sku_for_variants(self):
+        from blueprints.catalog_sync import _create_missing_set_member_item
+
+        expected_url = (
+            "https://www.cutco.com/p/traditional-flatware-accessories/"
+            "1570W&view=product"
+        )
+
+        def scrape_variants(url):
+            return ("Pearl", "Classic") if url == expected_url else ()
+
+        with (
+            self.app.app_context(),
+            mock.patch(
+                "blueprints.catalog_sync._resolve_cutco_item_page_url",
+                side_effect=lambda url, **_kwargs: url,
+            ),
+            mock.patch(
+                "blueprints.catalog_sync.scrape_item_variant_colors",
+                side_effect=scrape_variants,
+            ) as variant_scraper,
+            mock.patch(
+                "blueprints.catalog_sync.discover_cutco_item_page_url",
+                return_value=expected_url,
+            ) as url_discovery,
+        ):
+            item = _create_missing_set_member_item(
+                {"sku": "1570W", "name": "6-Pc. Traditional Accessory Set"},
+                "Traditional Flatware Set",
+            )
+            db.session.commit()
+
+            self.assertEqual(item.cutco_url, expected_url)
+            self.assertTrue(item.set_only)
+            self.assertEqual(
+                sorted(variant.color for variant in item.variants),
+                ["Classic", "Pearl"],
+            )
+            self.assertEqual(
+                [variant.source for variant in item.variants],
+                ["catalog_sync", "catalog_sync"],
+            )
+            url_discovery.assert_called_once_with("1570W")
+            self.assertIn(mock.call(expected_url), variant_scraper.call_args_list)
+
+    def test_missing_gift_box_member_is_categorized_without_variant_scan(self):
+        from blueprints.catalog_sync import _create_missing_set_member_item
+
+        with (
+            self.app.app_context(),
+            mock.patch(
+                "blueprints.catalog_sync.scrape_item_variant_colors"
+            ) as variant_scraper,
+        ):
+            item = _create_missing_set_member_item(
+                {"sku": "2026D", "name": "Gift Box for Super Shears"},
+                "Super Shears Gift Set",
+            )
+            db.session.commit()
+
+            self.assertEqual(item.category, "Gift Boxes")
+            self.assertEqual(item.edge_type, "N/A")
+            self.assertEqual(
+                [variant.color for variant in item.variants], [UNKNOWN_COLOR]
+            )
+            variant_scraper.assert_not_called()
+
+    def test_missing_bbq_tool_member_is_categorized(self):
+        from blueprints.catalog_sync import _create_missing_set_member_item
+
+        with (
+            self.app.app_context(),
+            mock.patch(
+                "blueprints.catalog_sync._add_initial_set_member_variants",
+                return_value=0,
+            ),
+        ):
+            item = _create_missing_set_member_item(
+                {"sku": "BBQ-2", "name": "Barbecue Tongs"},
+                "3-Pc. BBQ Tool Set",
+            )
+            db.session.commit()
+
+            self.assertEqual(item.category, "BBQ Tools")
+            self.assertEqual(item.edge_type, "N/A")
+
+    def test_catalog_sync_does_not_backfill_existing_set_only_item_variants(self):
+        from blueprints.catalog_sync import _aggregate_resolved_members
+
+        with self.app.app_context():
+            item = Item(
+                name="Traditional Flatware Accessories",
+                sku="1570W",
+                set_only=True,
+                in_catalog=False,
+                availability="non-catalog",
+            )
+            db.session.add(item)
+            db.session.flush()
+            db.session.add(ItemVariant(item=item, color=UNKNOWN_COLOR))
+            db.session.commit()
+
+            with mock.patch(
+                "blueprints.catalog_sync.scrape_item_variant_colors"
+            ) as variant_scraper:
+                resolved, created = _aggregate_resolved_members(
+                    [
+                        {
+                            "sku": "1570W",
+                            "name": "Traditional Flatware Accessories",
+                            "quantity": 1,
+                        }
+                    ],
+                    {"1570W": item},
+                    {"traditional flatware accessories": item},
+                )
+                db.session.commit()
+
+            self.assertEqual(created, 0)
+            self.assertIn(item.id, resolved)
+            self.assertIsNone(item.cutco_url)
+            self.assertEqual(
+                [variant.color for variant in item.variants], [UNKNOWN_COLOR]
+            )
+            variant_scraper.assert_not_called()
+
+    def test_catalog_sync_preview_detects_variants_for_new_sets_only(self):
+        from blueprints.catalog_sync import _build_catalog_sync_preview
+
+        new_set_url = "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+        with self.app.app_context():
+            db.session.add(Set(name="Existing Set", sku="1571"))
+            db.session.commit()
+
+            with mock.patch(
+                "blueprints.catalog_sync.scrape_set_variant_options",
+                return_value={
+                    "handle_colors": ("Pearl", "Classic"),
+                    "block_finishes": (),
+                },
+            ) as variant_scraper:
+                preview = _build_catalog_sync_preview(
+                    [],
+                    [
+                        {
+                            "name": "6-Pc. Traditional Accessory Set",
+                            "sku": "1570",
+                            "url": new_set_url,
+                            "member_entries": [],
+                        },
+                        {
+                            "name": "Existing Set",
+                            "sku": "1571",
+                            "url": "https://example.com/existing-set",
+                            "member_entries": [],
+                        },
+                    ],
+                )
+
+        self.assertEqual(len(preview["new_sets"]), 1)
+        self.assertEqual(preview["new_sets"][0]["variant_colors"], ["Pearl", "Classic"])
+        variant_scraper.assert_called_once_with(new_set_url, "1570")
+
+    def test_catalog_sync_adds_variants_for_new_set_and_members_only(self):
+        from models import SetVariant
+        from startup import _ensure_unknown_variants
+
+        self._login_as_admin()
+        self._set_csrf_token()
+        member_id, _unknown_variant_id = self._add_catalog_item(
+            name="Traditional Gravy Ladle",
+            sku="1573",
+            category="Flatware",
+        )
+        set_url = "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+
+        response = self.client.post(
+            "/catalog/sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "set_count": "1",
+                "selected_sets": "6-Pc. Traditional Accessory Set",
+                "set_name_0": "6-Pc. Traditional Accessory Set",
+                "set_sku_0": "1570",
+                "set_url_0": set_url,
+                "set_variant_colors_0": json.dumps(["Pearl", "Classic"]),
+                "set_block_finishes_0": json.dumps(["Cherry"]),
+                "set_member_entries_0": json.dumps(
+                    [
+                        {
+                            "sku": "1573",
+                            "name": "Traditional Gravy Ladle",
+                            "quantity": 1,
+                        }
+                    ]
+                ),
+                "existing_set_count": "0",
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            item_set = db.session.execute(
+                db.select(Set).filter_by(sku="1570")
+            ).scalar_one()
+            member = db.session.get(Item, member_id)
+            self.assertEqual(item_set.cutco_url, set_url)
+            self.assertEqual(
+                sorted(variant.color for variant in item_set.variants),
+                ["Cherry", "Classic", "Pearl"],
+            )
+            self.assertEqual(
+                sorted((variant.kind, variant.color) for variant in item_set.variants),
+                [
+                    ("block_finish", "Cherry"),
+                    ("handle", "Classic"),
+                    ("handle", "Pearl"),
+                ],
+            )
+            self.assertEqual(
+                len(
+                    db.session.execute(
+                        db.select(SetVariant).filter_by(set_id=item_set.id)
+                    )
+                    .scalars()
+                    .all()
+                ),
+                3,
+            )
+            self.assertEqual(
+                sorted(variant.color for variant in member.variants),
+                ["Classic", "Pearl"],
+            )
+            _ensure_unknown_variants()
+            db.session.commit()
+            self.assertEqual(
+                sorted(variant.color for variant in member.variants),
+                ["Classic", "Pearl"],
+            )
+
+        with self.app.app_context():
+            existing_set = Set(name="Existing Variant Set", sku="1571")
+            db.session.add(existing_set)
+            db.session.commit()
+            existing_set_id = existing_set.id
+
+        response = self.client.post(
+            "/catalog/sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "set_count": "0",
+                "existing_set_count": "1",
+                "existing_set_name_0": "Existing Variant Set",
+                "existing_set_member_entries_0": "[]",
+                "set_variant_colors_0": json.dumps(["Pearl", "Classic"]),
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            existing_set = db.session.get(Set, existing_set_id)
+            self.assertEqual(existing_set.variants, [])
+
+    def test_catalog_sync_propagates_set_colors_only_to_applicable_members(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        peeler_id, _ = self._add_catalog_item(
+            name="Vegetable Peeler", sku="1501", category="Accessories"
+        )
+        paring_id, _ = self._add_catalog_item(
+            name='4" Paring Knife', sku="2120", category="Paring Knives"
+        )
+
+        response = self.client.post(
+            "/catalog/sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "set_count": "1",
+                "selected_sets": "Peel n' Pare Pack",
+                "set_name_0": "Peel n' Pare Pack",
+                "set_sku_0": "1828",
+                "set_url_0": "https://www.cutco.com/p/peel-n-pare-pack",
+                "set_variant_colors_0": json.dumps(["Classic", "Pearl"]),
+                "set_block_finishes_0": "[]",
+                "set_variant_member_skus_0": json.dumps(
+                    {"Classic": ["2120C"], "Pearl": ["2120W"]}
+                ),
+                "set_member_entries_0": json.dumps(
+                    [
+                        {
+                            "sku": "1501",
+                            "name": "Vegetable Peeler",
+                            "quantity": 1,
+                        },
+                        {
+                            "sku": "2120",
+                            "name": '4" Paring Knife',
+                            "quantity": 1,
+                        },
+                    ]
+                ),
+                "existing_set_count": "0",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            peeler = db.session.get(Item, peeler_id)
+            paring = db.session.get(Item, paring_id)
+            self.assertEqual(
+                [variant.color for variant in peeler.variants], [UNKNOWN_COLOR]
+            )
+            self.assertEqual(
+                sorted(variant.color for variant in paring.variants),
+                ["Classic", "Pearl"],
+            )
 
     def test_catalog_sync_confirm_reconciles_existing_set_members(self):
         self._login_as_admin()

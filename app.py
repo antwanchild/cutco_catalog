@@ -36,10 +36,10 @@ CSRF_EXEMPT = {"/admin/login", "/admin/logout"}
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
-    value = os.environ.get(name)
-    if value is None:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
         return default
-    return value.lower() in {"1", "true", "yes", "on"}
+    return raw_value.lower() in {"1", "true", "yes", "on"}
 
 
 def _setup_logging(log_dir: str, log_level: str) -> None:
@@ -180,7 +180,7 @@ def _register_error_handlers(app: Flask) -> None:
                 "error.html",
                 code=413,
                 icon="📦",
-                message="File too large - maximum upload size is 10 MB.",
+                message="Request too large - the upload or submitted form data exceeded the 10 MB limit.",
             ),
             413,
         )

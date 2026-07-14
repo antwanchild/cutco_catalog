@@ -10,9 +10,19 @@ from constants import (
     KNIFE_TASK_PRESETS,
     canonicalize_availability,
     canonicalize_category,
+    is_bbq_tool_item_name,
+    is_block_storage_item_name,
+    is_gift_box_item_name,
 )
 from extensions import db
-from models import BaseModel, Item, KnifeTask, Ownership, ensure_unknown_variant
+from models import (
+    BaseModel,
+    Item,
+    KnifeTask,
+    Ownership,
+    ensure_unknown_variant,
+    reconcile_unknown_variant,
+)
 from schema_migrations import apply_schema_migrations
 
 logger = logging.getLogger(__name__)
@@ -148,6 +158,22 @@ BOOTSTRAP_MIGRATIONS: tuple[BootstrapMigration, ...] = (
         5, "split_ownership_quantity_notes", lambda: _split_quantity_notes()
     ),
     BootstrapMigration(6, "normalize_availability", lambda: _normalize_availability()),
+    BootstrapMigration(
+        7, "categorize_gift_boxes", lambda: _categorize_uncategorized_gift_boxes()
+    ),
+    BootstrapMigration(
+        8, "categorize_bbq_tools", lambda: _categorize_uncategorized_bbq_tools()
+    ),
+    BootstrapMigration(
+        9,
+        "categorize_traditional_flatware",
+        lambda: _categorize_uncategorized_traditional_flatware(),
+    ),
+    BootstrapMigration(
+        10,
+        "remove_propagated_block_handle_variants",
+        lambda: _remove_propagated_block_handle_variants(),
+    ),
 )
 
 BOOTSTRAP_VERSION = BOOTSTRAP_MIGRATIONS[-1].version
@@ -206,10 +232,82 @@ def _normalize_availability() -> None:
         logger.info("Availability normalization: updated %d item value(s)", updated)
 
 
+def _categorize_uncategorized_gift_boxes() -> None:
+    """Categorize only clearly named gift-box items with no existing category."""
+    updated = 0
+    for item in Item.query.filter(
+        db.or_(Item.category.is_(None), Item.category == "")
+    ).all():
+        if not is_gift_box_item_name(item.name):
+            continue
+        item.category = "Gift Boxes"
+        item.edge_type = "N/A"
+        item.edge_is_unicorn = False
+        updated += 1
+    if updated:
+        logger.info("Gift box categorization: updated %d item(s)", updated)
+
+
+def _categorize_uncategorized_bbq_tools() -> None:
+    """Categorize only clearly named barbecue tools with no existing category."""
+    updated = 0
+    for item in Item.query.filter(
+        db.or_(Item.category.is_(None), Item.category == "")
+    ).all():
+        if not is_bbq_tool_item_name(item.name):
+            continue
+        item.category = "BBQ Tools"
+        item.edge_type = "N/A"
+        item.edge_is_unicorn = False
+        updated += 1
+    if updated:
+        logger.info("BBQ tool categorization: updated %d item(s)", updated)
+
+
+def _categorize_uncategorized_traditional_flatware() -> None:
+    """Categorize the known Traditional flatware set-only pieces."""
+    traditional_flatware_skus = {"1560", "1561", "1562", "1563", "1564", "1565"}
+    updated = 0
+    for item in Item.query.filter(
+        Item.sku.in_(traditional_flatware_skus),
+        db.or_(Item.category.is_(None), Item.category == ""),
+    ).all():
+        item.category = "Flatware"
+        item.edge_type = "N/A"
+        item.edge_is_unicorn = False
+        updated += 1
+    if updated:
+        logger.info("Traditional flatware categorization: updated %d item(s)", updated)
+
+
 def _ensure_unknown_variants() -> None:
-    """Ensure every item has an Unknown variant."""
+    """Ensure items without variants have an Unknown fallback."""
     for item in Item.query.all():
         ensure_unknown_variant(item)
+
+
+def _remove_propagated_block_handle_variants() -> None:
+    """Remove unowned set handle colors accidentally copied onto block items."""
+    propagation_sources = {"catalog_sync_set", "set_variant_sync"}
+    removed = 0
+    for item in Item.query.all():
+        if not is_block_storage_item_name(item.name):
+            continue
+        item_removed = 0
+        for variant in list(item.variants):
+            if variant.source not in propagation_sources or variant.ownerships:
+                continue
+            db.session.delete(variant)
+            removed += 1
+            item_removed += 1
+        if item_removed:
+            db.session.flush()
+            db.session.expire(item, ["variants"])
+            reconcile_unknown_variant(item)
+    if removed:
+        logger.info(
+            "Block variant cleanup: removed %d propagated handle variant(s)", removed
+        )
 
 
 def _split_quantity_fields_from_notes(

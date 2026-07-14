@@ -507,6 +507,330 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Stainless", "Pearl", "Black"),
             )
 
+    def test_extract_product_variant_colors_uses_web_item_options_without_item_names(
+        self,
+    ):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body><script>
+              const webItemsMap = {
+                "1570W": {
+                  "itemName": "6-Pc. Traditional Accessory Set",
+                  "displayedOptions": [{
+                    "optionType": "Flatware Handle Color",
+                    "displayedType": "Color",
+                    "optionCode": "Pearl",
+                    "description": "Pearl"
+                  }],
+                  "itemSetList": [{"name": "Traditional Gravy Ladle"}]
+                },
+                "1570C": {
+                  "itemName": "6-Pc. Traditional Accessory Set",
+                  "displayedOptions": [{
+                    "optionType": "Flatware Handle Color",
+                    "displayedType": "Color",
+                    "optionCode": "Classic",
+                    "description": "Classic"
+                  }],
+                  "itemSetList": [{"name": "Traditional Serving Spoon"}]
+                }
+              };
+            </script></body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            _extract_product_variant_colors.cache_clear()
+            self.assertEqual(
+                _extract_product_variant_colors(
+                    "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+                ),
+                ("Pearl", "Classic"),
+            )
+
+    def test_set_variant_options_reject_product_names_and_member_only_colors(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <fieldset class="swatch-group Color" data-type="Handle Color">
+                <div class="swatch product-option color-swatch" data-option="Classic"></div>
+                <div class="swatch product-option color-swatch" data-option="Pearl"></div>
+                <div class="swatch product-option color-swatch" data-option="Red"></div>
+              </fieldset>
+              <script>
+                const webItemsMap = {
+                  "3822CD": {"displayedOptions": [{"optionType": "Color", "description": "Santoku-Style"}]},
+                  "125": {"displayedOptions": [{"optionType": "Color", "description": "Red"}]},
+                  "1905": {"itemName": "3-Pc. Cutting Board Set"}
+                };
+              </script>
+            </body></html>
+        """
+        board_response = mock.Mock()
+        board_response.status_code = 200
+        board_response.text = """
+            <html><body><script>
+              const webItemsMap = {
+                "125": {"displayedOptions": [{"optionType": "Color", "description": "Red"}]},
+                "1905": {"itemName": "3-Pc. Cutting Board Set"}
+              };
+            </script></body></html>
+        """
+        with mock.patch(
+            "scraping.requests.get",
+            side_effect=lambda url, **_kwargs: (
+                board_response if "cutting-board-set" in url else response
+            ),
+        ):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options("https://www.cutco.com/p/3822CD", "3822"),
+                {
+                    "handle_colors": ("Classic", "Pearl", "Red"),
+                    "block_finishes": (),
+                },
+            )
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/3-pc-cutting-board-set", "1905"
+                ),
+                {"handle_colors": (), "block_finishes": ()},
+            )
+
+    def test_set_variant_options_separate_handles_from_block_finishes(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <h1>Kitchen Knife Set with Block</h1>
+              <script>
+              const webItemsMap = {
+                "1815C": {"displayedOptions": [
+                  {"optionType": "Handle Color", "description": "Classic"},
+                  {"optionType": "Block Finish", "description": "Cherry"}
+                ]},
+                "1815W": {"displayedOptions": [
+                  {"optionType": "Handle Color", "description": "Pearl"},
+                  {"optionType": "Block Finish", "description": "Natural"}
+                ]}
+              };
+              </script>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options("https://www.cutco.com/p/1815C", "1815"),
+                {
+                    "handle_colors": ("Classic", "Pearl"),
+                    "block_finishes": ("Cherry", "Natural"),
+                    "handle_colors_authoritative": True,
+                },
+            )
+
+    def test_set_variant_options_ignore_holder_finish_for_tools_only_set(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><head>
+              <meta property="og:title" content="Kitchen Tool Sets with Holder">
+            </head><body>
+              <h1>#1719C</h1>
+              <h1>5-Pc. Kitchen Tool Set (Tools Only)</h1>
+              <script>
+                const webItemsMap = {
+                  "1719C": {"displayedOptions": [
+                    {"optionType": "Handle Color", "description": "Classic"},
+                    {"optionType": "Block Finish", "description": "Honey"}
+                  ]},
+                  "1718C": {"displayedOptions": [
+                    {"optionType": "Block Finish", "description": "Cherry"}
+                  ]}
+                };
+              </script>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/5-pc-kitchen-tool-set", "1719"
+                ),
+                {
+                    "handle_colors": ("Classic",),
+                    "block_finishes": (),
+                    "handle_colors_authoritative": True,
+                },
+            )
+
+    def test_set_variant_options_use_sku_storage_when_heading_is_generic(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <h1>Kitchen Tool Sets</h1>
+              <script>
+                const webItemsMap = {
+                  "1718C": {
+                    "itemName": "5-Pc. Kitchen Tool Set with Holder",
+                    "itemOptions": [{
+                      "optionType": "Tools Storage",
+                      "displayedType": "Storage",
+                      "optionCode": "With Holder",
+                      "description": "With Holder"
+                    }],
+                    "displayedOptions": [
+                      {"optionType": "Handle Color", "description": "Classic"},
+                      {"optionType": "Block Finish", "description": "Honey"},
+                      {"optionType": "Block Finish", "description": "Cherry"}
+                    ]
+                  },
+                  "1719C": {
+                    "itemName": "5-Pc. Kitchen Tool Set (Tools Only)",
+                    "itemOptions": [{
+                      "optionType": "Tools Storage",
+                      "displayedType": "Storage",
+                      "optionCode": "Tools Only",
+                      "description": "Tools Only"
+                    }]
+                  }
+                };
+              </script>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/kitchen-tool-sets/1718C", "1718"
+                ),
+                {
+                    "handle_colors": ("Classic",),
+                    "block_finishes": ("Honey", "Cherry"),
+                    "handle_colors_authoritative": True,
+                },
+            )
+
+    def test_set_variant_options_ignore_family_handle_without_exact_sku(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <h1>6-Pc. Kitchen Tool Set with Holder</h1>
+              <fieldset class="swatch-group Color" data-type="Handle Color">
+                <div class="swatch product-option color-swatch" data-option="Classic"></div>
+                <div class="swatch product-option color-swatch" data-option="Pearl"></div>
+                <div class="swatch product-option color-swatch" data-option="Red"></div>
+              </fieldset>
+              <script>
+                const webItemsMap = {
+                  "1792C": {"itemOptions": [
+                    {"optionType": "Tools Handle Color", "displayedType": "Color", "description": "Classic"}
+                  ]},
+                  "1792W": {"itemOptions": [
+                    {"optionType": "Tools Handle Color", "displayedType": "Color", "description": "Pearl"}
+                  ]},
+                  "1718R": {"itemOptions": [
+                    {"optionType": "Tools Handle Color", "displayedType": "Color", "description": "Red"}
+                  ]}
+                };
+              </script>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/kitchen-tool-sets/1792C", "1792"
+                ),
+                {
+                    "handle_colors": ("Classic", "Pearl"),
+                    "block_finishes": (),
+                    "handle_colors_authoritative": True,
+                },
+            )
+
+    def test_set_variant_options_map_colors_to_changing_set_members(self):
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = """
+            <html><body>
+              <h1>Peel n' Pare Pack</h1>
+              <script>
+                const webItemsMap = {
+                  "1828CD": {
+                    "itemOptions": [
+                      {"optionType": "Handle Color", "displayedType": "Color", "description": "Classic"}
+                    ],
+                    "itemSetList": [
+                      {"childItemNumber": "1501", "itemName": "Vegetable Peeler"},
+                      {"childItemNumber": "2120C", "itemName": "4-inch Paring Knife"}
+                    ]
+                  },
+                  "1828WD": {
+                    "itemOptions": [
+                      {"optionType": "Handle Color", "displayedType": "Color", "description": "Pearl"}
+                    ],
+                    "itemSetList": [
+                      {"childItemNumber": "1501", "itemName": "Vegetable Peeler"},
+                      {"childItemNumber": "2120W", "itemName": "4-inch Paring Knife"}
+                    ]
+                  }
+                };
+              </script>
+            </body></html>
+        """
+        with mock.patch("scraping.requests.get", return_value=response):
+            scrape_set_variant_options.cache_clear()
+            self.assertEqual(
+                scrape_set_variant_options(
+                    "https://www.cutco.com/p/peel-n-pare-pack", "1828"
+                ),
+                {
+                    "handle_colors": ("Classic", "Pearl"),
+                    "block_finishes": (),
+                    "handle_colors_authoritative": True,
+                    "handle_color_member_skus": {
+                        "Classic": ("2120C",),
+                        "Pearl": ("2120W",),
+                    },
+                },
+            )
+
+    def test_discovers_product_page_url_by_exact_sku_from_category_pages(self):
+        from scraping import (
+            _cutco_product_url_lookup,
+            discover_cutco_item_page_url,
+        )
+
+        response = mock.Mock()
+        response.text = """
+            <html><body>
+              <a href="/p/traditional-flatware-accessories/1570W">Accessories</a>
+              <a href="/p/traditional-flatware-accessories/1570C">Accessories</a>
+            </body></html>
+        """
+        response.raise_for_status.return_value = None
+
+        _cutco_product_url_lookup.cache_clear()
+        with (
+            mock.patch(
+                "scraping._build_category_list",
+                return_value=[("Flatware", "https://www.cutco.com/shop/flatware")],
+            ),
+            mock.patch("scraping.requests.get", return_value=response),
+        ):
+            self.assertEqual(
+                discover_cutco_item_page_url("1570W"),
+                "https://www.cutco.com/p/traditional-flatware-accessories/1570W",
+            )
+            self.assertEqual(
+                discover_cutco_item_page_url("1570"),
+                "https://www.cutco.com/p/traditional-flatware-accessories/1570W",
+            )
+        _cutco_product_url_lookup.cache_clear()
+
     def test_dedupe_product_links_prefers_named_duplicate_anchors(self):
         soup = BeautifulSoup(
             """

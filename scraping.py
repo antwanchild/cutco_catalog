@@ -7,7 +7,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 from urllib.parse import urljoin
 
 import requests
@@ -58,6 +58,15 @@ class SetMemberEntry(TypedDict):
     name: str | None
     quantity: int
     is_set_only: bool
+
+
+class SetVariantOptions(TypedDict):
+    """Set options split by the product component they customize."""
+
+    handle_colors: tuple[str, ...]
+    block_finishes: tuple[str, ...]
+    handle_colors_authoritative: NotRequired[bool]
+    handle_color_member_skus: NotRequired[dict[str, tuple[str, ...]]]
 
 
 def _tag_attr_text(tag: PageElement | None, *attrs: str) -> str | None:
@@ -550,6 +559,52 @@ def _build_category_list() -> list[tuple[str, str]]:
             known[slug] = (name, url)
 
     return list(known.values())
+
+
+@lru_cache(maxsize=1)
+def _cutco_product_url_lookup() -> dict[str, str]:
+    """Build a SKU-to-product-URL index from Cutco's category pages."""
+
+    def _fetch_category(category_url: str) -> dict[str, str]:
+        found: dict[str, str] = {}
+        try:
+            response = requests.get(
+                category_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+            )
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            for anchor in soup.select("a[href*='/p/']"):
+                href = _tag_attr_text(anchor, "href") or ""
+                sku = _extract_sku_from_href(href, preserve_lettered_code=True)
+                if not sku:
+                    continue
+                found.setdefault(sku.upper(), urljoin("https://www.cutco.com", href))
+        except Exception as exc:
+            logger.debug("Product URL discovery failed for %s: %s", category_url, exc)
+        return found
+
+    lookup: dict[str, str] = {}
+    category_urls = [url for _name, url in _build_category_list()]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for found in pool.map(_fetch_category, category_urls):
+            for sku, url in found.items():
+                lookup.setdefault(sku, url)
+                base_sku = re.sub(r"[A-Z]+$", "", sku)
+                if base_sku and base_sku != sku:
+                    lookup.setdefault(base_sku, url)
+    logger.info("Indexed %d Cutco product URLs by SKU", len(lookup))
+    return lookup
+
+
+def discover_cutco_item_page_url(sku: str | None) -> str | None:
+    """Find a Cutco product URL by exact or handle-neutral base SKU."""
+    normalized_sku = (sku or "").strip().upper()
+    if not normalized_sku:
+        return None
+    return _cutco_product_url_lookup().get(normalized_sku)
+
+
+discover_cutco_item_page_url.cache_clear = _cutco_product_url_lookup.cache_clear  # type: ignore[attr-defined]
 
 
 def _product_link_name(anchor: Tag | None) -> str | None:
@@ -1209,6 +1264,7 @@ _VARIANT_SWATCH_FALLBACK_BLOCKLIST = {
 _VARIANT_SELECT_HINTS = (
     "color",
     "finish",
+    "style",
     "handle color",
     "handle finish",
 )
@@ -1224,6 +1280,7 @@ _VARIANT_COLOR_WORDS = {
     "burgundy",
     "champagne",
     "charcoal",
+    "cherry",
     "chrome",
     "classic",
     "clear",
@@ -1235,6 +1292,7 @@ _VARIANT_COLOR_WORDS = {
     "gray",
     "grey",
     "green",
+    "honey",
     "ivory",
     "light",
     "mahogany",
@@ -1243,6 +1301,7 @@ _VARIANT_COLOR_WORDS = {
     "navy",
     "nickel",
     "onyx",
+    "oak",
     "pearl",
     "pewter",
     "pink",
@@ -1262,6 +1321,7 @@ _VARIANT_COLOR_WORDS = {
     "tan",
     "teal",
     "white",
+    "walnut",
     "yellow",
 }
 
@@ -1305,7 +1365,9 @@ def _looks_like_variant_color(label: str | None) -> bool:
     return all(word in _VARIANT_COLOR_WORDS for word in word_set)
 
 
-def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str, ...]:
+def _collect_variant_candidates_from_swatches(
+    soup: BeautifulSoup, *, option_kind: str | None = None
+) -> tuple[str, ...]:
     """Extract color-like choices from product swatch groups."""
     candidates: list[str] = []
     seen: set[str] = set()
@@ -1318,6 +1380,13 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
             ]
         ).lower()
         if not any(keyword in group_text for keyword in ("color", "finish")):
+            continue
+        group_kind = (
+            "block_finish"
+            if "block finish" in group_text or "block color" in group_text
+            else "handle"
+        )
+        if option_kind and option_kind != group_kind:
             continue
         preferred_swatch_nodes: list[Tag] = []
         generic_swatch_nodes: list[Tag] = []
@@ -1378,7 +1447,9 @@ def _collect_variant_candidates_from_swatches(soup: BeautifulSoup) -> tuple[str,
     return tuple(candidates)
 
 
-def _collect_variant_candidates_from_selects(soup: BeautifulSoup) -> tuple[str, ...]:
+def _collect_variant_candidates_from_selects(
+    soup: BeautifulSoup, *, option_kind: str | None = None
+) -> tuple[str, ...]:
     """Extract color-like choices from select dropdowns."""
     candidates: list[str] = []
     seen: set[str] = set()
@@ -1395,6 +1466,13 @@ def _collect_variant_candidates_from_selects(soup: BeautifulSoup) -> tuple[str, 
             ]
         ).lower()
         if not any(hint in select_text for hint in _VARIANT_SELECT_HINTS):
+            continue
+        select_kind = (
+            "block_finish"
+            if "block finish" in select_text or "block color" in select_text
+            else "handle"
+        )
+        if option_kind and option_kind != select_kind:
             continue
 
         for option in select.find_all("option"):
@@ -1420,6 +1498,95 @@ def _extract_selected_page_color(soup: BeautifulSoup) -> str | None:
     return _normalize_variant_label(label)
 
 
+def _page_product_supports_block_finish(soup: BeautifulSoup) -> bool:
+    """Return whether the selected product identity includes block-style storage."""
+    product_titles: list[str] = []
+    metadata_titles: list[str] = []
+    for meta in soup.select('meta[property="og:title"], meta[name="twitter:title"]'):
+        title = _tag_attr_text(meta, "content")
+        if title:
+            metadata_titles.append(title)
+    for heading in soup.select("h1"):
+        title = heading.get_text(" ", strip=True)
+        if title and not re.fullmatch(r"#?\s*[A-Za-z0-9-]+", title):
+            product_titles.append(title)
+
+    if not product_titles:
+        product_titles = metadata_titles
+    if not product_titles:
+        # Some metadata-only responses do not expose a product heading. Preserve
+        # their structured block options rather than guessing from no identity.
+        return True
+    product_identity = " ".join(product_titles).lower()
+    return any(word in product_identity for word in ("block", "holder"))
+
+
+def _web_items_map_supports_block_finish(
+    raw_html: str, target_sku: str | None
+) -> bool | None:
+    """Return block-storage applicability from the exact SKU's structured options."""
+    normalized_target = re.sub(r"[^A-Z0-9]", "", (target_sku or "").upper())
+    if not normalized_target:
+        return None
+
+    decisions: list[bool] = []
+    search_from = 0
+    while True:
+        marker = re.search(r"\bwebItemsMap\b", raw_html[search_from:])
+        if not marker:
+            break
+        marker_index = search_from + marker.start()
+        brace_index = raw_html.find("{", marker_index)
+        if brace_index < 0:
+            break
+        block = _extract_balanced_braces(raw_html, brace_index)
+        search_from = brace_index + 1
+        if not block:
+            continue
+        try:
+            payload = json.loads(block)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        for key, product in payload.items():
+            normalized_key = re.sub(r"[^A-Z0-9]", "", str(key).upper())
+            if not re.fullmatch(
+                re.escape(normalized_target) + r"[A-Z]*", normalized_key
+            ):
+                continue
+            if not isinstance(product, dict):
+                continue
+            identity = " ".join(
+                str(product.get(field) or "") for field in ("itemName", "itemHeadline")
+            ).lower()
+            if "block" in identity or "holder" in identity:
+                decisions.append(True)
+            elif "tools only" in identity or "knives only" in identity:
+                decisions.append(False)
+            for option in product.get("itemOptions", []):
+                if not isinstance(option, dict):
+                    continue
+                option_type = " ".join(
+                    str(option.get(field) or "")
+                    for field in ("optionType", "displayedType")
+                ).lower()
+                if "storage" not in option_type:
+                    continue
+                storage_value = " ".join(
+                    str(option.get(field) or "")
+                    for field in ("description", "optionCode")
+                ).lower()
+                if "block" in storage_value or "holder" in storage_value:
+                    decisions.append(True)
+                elif "only" in storage_value:
+                    decisions.append(False)
+
+    if not decisions:
+        return None
+    return any(decisions)
+
+
 def _collect_campaign_variant_candidates(soup: BeautifulSoup) -> tuple[str, ...]:
     """Extract promo-page variant labels when a campaign page exposes them."""
     candidates: list[str] = []
@@ -1430,6 +1597,258 @@ def _collect_campaign_variant_candidates(soup: BeautifulSoup) -> tuple[str, ...]
         _collect_variant_candidate(candidates, seen, "Purple")
 
     return tuple(candidates)
+
+
+_WEB_ITEMS_MAP_LABEL_FIELDS = (
+    "name",
+    "itemName",
+    "variantName",
+    "webItemName",
+    "displayName",
+    "productName",
+    "setName",
+    "label",
+    "optionName",
+    "color",
+    "finish",
+    "style",
+)
+
+
+def _extract_balanced_braces(text: str, start_index: int) -> str | None:
+    """Return the balanced brace block starting at ``start_index`` if present."""
+    if start_index < 0 or start_index >= len(text) or text[start_index] != "{":
+        return None
+
+    depth = 0
+    in_string = False
+    quote_char = ""
+    escape = False
+
+    for index in range(start_index, len(text)):
+        char = text[index]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == quote_char:
+                in_string = False
+        else:
+            if char in {'"', "'"}:
+                in_string = True
+                quote_char = char
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start_index : index + 1]
+    return None
+
+
+def _collect_variant_candidates_from_web_items_map(
+    raw_html: str,
+    *,
+    target_sku: str | None = None,
+    option_kind: str | None = None,
+) -> tuple[str, ...]:
+    """Extract variant labels from Cutco's ``webItemsMap`` product metadata."""
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    def _walk_payload(value: object) -> None:
+        if isinstance(value, dict):
+            option_context = " ".join(
+                str(value.get(field) or "") for field in ("displayedType", "optionType")
+            ).lower()
+            context_kind = (
+                "block_finish"
+                if "block finish" in option_context or "block color" in option_context
+                else "handle"
+            )
+            if any(hint in option_context for hint in _VARIANT_SELECT_HINTS) and (
+                not option_kind or option_kind == context_kind
+            ):
+                for field in ("description", "optionCode", "label", "name"):
+                    option_label = value.get(field)
+                    if isinstance(option_label, str) and _looks_like_variant_color(
+                        option_label
+                    ):
+                        _collect_variant_candidate(candidates, seen, option_label)
+                        break
+            for key, nested_value in value.items():
+                if (
+                    isinstance(nested_value, str)
+                    and key in _WEB_ITEMS_MAP_LABEL_FIELDS
+                    and _looks_like_variant_color(nested_value)
+                    and option_kind != "block_finish"
+                ):
+                    _collect_variant_candidate(candidates, seen, nested_value)
+                else:
+                    _walk_payload(nested_value)
+        elif isinstance(value, list):
+            for nested_value in value:
+                _walk_payload(nested_value)
+
+    search_from = 0
+    while True:
+        marker = re.search(r"\bwebItemsMap\b", raw_html[search_from:])
+        if not marker:
+            break
+        marker_index = search_from + marker.start()
+        brace_index = raw_html.find("{", marker_index)
+        if brace_index < 0:
+            break
+        block = _extract_balanced_braces(raw_html, brace_index)
+        search_from = brace_index + 1
+        if not block:
+            continue
+        try:
+            payload = json.loads(block)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        payloads: list[object] = [payload]
+        normalized_target = re.sub(r"[^A-Z0-9]", "", (target_sku or "").upper())
+        if normalized_target:
+            matching_payloads = [
+                value
+                for key, value in payload.items()
+                if re.fullmatch(
+                    re.escape(normalized_target) + r"[A-Z]*",
+                    re.sub(r"[^A-Z0-9]", "", str(key).upper()),
+                )
+            ]
+            payloads = matching_payloads
+        for selected_payload in payloads:
+            _walk_payload(selected_payload)
+
+    return tuple(candidates)
+
+
+def _collect_handle_color_member_skus_from_web_items_map(
+    raw_html: str, target_sku: str | None
+) -> dict[str, tuple[str, ...]]:
+    """Map set handle colors to child SKUs that actually change by color."""
+    normalized_target = re.sub(r"[^A-Z0-9]", "", (target_sku or "").upper())
+    if not normalized_target:
+        return {}
+
+    configurations: list[tuple[str, dict[str, str]]] = []
+    search_from = 0
+    while True:
+        marker = re.search(r"\bwebItemsMap\b", raw_html[search_from:])
+        if not marker:
+            break
+        marker_index = search_from + marker.start()
+        brace_index = raw_html.find("{", marker_index)
+        if brace_index < 0:
+            break
+        block = _extract_balanced_braces(raw_html, brace_index)
+        search_from = brace_index + 1
+        if not block:
+            continue
+        try:
+            payload = json.loads(block)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        for key, product in payload.items():
+            normalized_key = re.sub(r"[^A-Z0-9]", "", str(key).upper())
+            if not re.fullmatch(
+                re.escape(normalized_target) + r"[A-Z]*", normalized_key
+            ) or not isinstance(product, dict):
+                continue
+            color = None
+            for option in product.get("itemOptions", []):
+                if not isinstance(option, dict):
+                    continue
+                option_context = " ".join(
+                    str(option.get(field) or "")
+                    for field in ("displayedType", "optionType")
+                ).lower()
+                if "color" not in option_context:
+                    continue
+                candidate = _normalize_variant_label(
+                    str(option.get("description") or option.get("optionCode") or "")
+                )
+                if candidate and _looks_like_variant_color(candidate):
+                    color = candidate
+                    break
+            if not color:
+                continue
+            members: dict[str, str] = {}
+            for member in product.get("itemSetList", []):
+                if not isinstance(member, dict):
+                    continue
+                child_sku = re.sub(
+                    r"[^A-Z0-9]",
+                    "",
+                    str(member.get("childItemNumber") or "").upper(),
+                )
+                member_name = _normalize_text_for_match(
+                    str(member.get("itemName") or "")
+                )
+                if child_sku and member_name:
+                    members[member_name] = child_sku
+            configurations.append((color, members))
+
+    colors = {color.lower() for color, _members in configurations}
+    if len(colors) < 2:
+        return {}
+    member_skus: dict[str, set[str]] = {}
+    member_names = {
+        member_name for _color, members in configurations for member_name in members
+    }
+    for member_name in member_names:
+        exact_skus = {
+            members[member_name]
+            for _color, members in configurations
+            if member_name in members
+        }
+        if len(exact_skus) < 2:
+            continue
+        for color, members in configurations:
+            child_sku = members.get(member_name)
+            if child_sku:
+                member_skus.setdefault(color, set()).add(child_sku)
+    return {
+        color: tuple(sorted(skus))
+        for color, skus in sorted(
+            member_skus.items(), key=lambda entry: entry[0].lower()
+        )
+    }
+
+
+def set_handle_color_applies_to_member(
+    member_sku: str | None,
+    color: str,
+    color_member_skus: Mapping[str, Sequence[str]] | None,
+) -> bool:
+    """Return whether an exact set configuration applies a color to one member."""
+    if not color_member_skus:
+        return True
+    allowed_skus = next(
+        (
+            skus
+            for mapped_color, skus in color_member_skus.items()
+            if mapped_color.lower() == color.lower()
+        ),
+        (),
+    )
+    normalized_member = re.sub(r"[^A-Z0-9]", "", (member_sku or "").upper())
+    if not normalized_member or not allowed_skus:
+        return False
+    return any(
+        re.fullmatch(
+            re.escape(normalized_member) + r"[A-Z]*",
+            re.sub(r"[^A-Z0-9]", "", str(allowed_sku).upper()),
+        )
+        for allowed_sku in allowed_skus
+    )
 
 
 def _page_has_size_selector(soup: BeautifulSoup) -> bool:
@@ -1456,6 +1875,8 @@ def _normalize_variant_label(value: str) -> str | None:
         return None
     if lowered.startswith("select "):
         return None
+    if lowered.startswith("choose "):
+        return None
     if lowered.startswith("image "):
         return None
     if not any(char.isalpha() for char in cleaned):
@@ -1468,48 +1889,70 @@ def _normalize_variant_label(value: str) -> str | None:
 @lru_cache(maxsize=1024)
 def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
     """Fetch a product page and return a tuple of candidate color/variant names."""
-    clean_url = url.split("&view=")[0].split("?view=")[0]
     try:
-        resp = requests.get(clean_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
-        if resp.status_code != 200:
-            logger.debug("Variant fetch: HTTP %d for %s", resp.status_code, clean_url)
-            return ()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for noise in soup.find_all(["script", "style"]):
-            noise.decompose()
+        candidate_urls = [url]
+        clean_url = url.split("&view=")[0].split("?view=")[0]
+        if clean_url != url:
+            candidate_urls.append(clean_url)
 
-        candidates: list[str] = []
-        seen: set[str] = set()
-        campaign_candidates = _collect_campaign_variant_candidates(soup)
-        for candidate in campaign_candidates:
-            key = candidate.lower()
-            if key in seen:
+        for fetch_url in candidate_urls:
+            resp = requests.get(
+                fetch_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
+            )
+            if resp.status_code != 200:
+                logger.debug(
+                    "Variant fetch: HTTP %d for %s", resp.status_code, fetch_url
+                )
                 continue
-            seen.add(key)
-            candidates.append(candidate)
-        swatch_candidates = _collect_variant_candidates_from_swatches(soup)
-        select_candidates = _collect_variant_candidates_from_selects(soup)
-        selected_color = _extract_selected_page_color(soup)
-        if selected_color and _page_has_size_selector(soup):
-            if selected_color in swatch_candidates:
+            raw_html = resp.text
+            soup = BeautifulSoup(raw_html, "html.parser")
+            for noise in soup.find_all(["script", "style"]):
+                noise.decompose()
+
+            candidates: list[str] = []
+            seen: set[str] = set()
+            campaign_candidates = _collect_campaign_variant_candidates(soup)
+            for candidate in campaign_candidates:
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(candidate)
+            web_items_candidates = _collect_variant_candidates_from_web_items_map(
+                raw_html
+            )
+            for candidate in web_items_candidates:
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(candidate)
+            swatch_candidates = _collect_variant_candidates_from_swatches(soup)
+            select_candidates = _collect_variant_candidates_from_selects(soup)
+            selected_color = _extract_selected_page_color(soup)
+            if selected_color and _page_has_size_selector(soup):
+                if selected_color in swatch_candidates:
+                    swatch_candidates = (selected_color,)
+            if not swatch_candidates and selected_color:
                 swatch_candidates = (selected_color,)
-        if not swatch_candidates and selected_color:
-            swatch_candidates = (selected_color,)
-        for candidate in swatch_candidates:
-            key = candidate.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            candidates.append(candidate)
-        for candidate in select_candidates:
-            key = candidate.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            candidates.append(candidate)
+            for candidate in swatch_candidates:
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(candidate)
+            for candidate in select_candidates:
+                key = candidate.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append(candidate)
 
-        logger.debug("Variant fetch: %s → %d candidates", clean_url, len(candidates))
-        return tuple(candidates)
+            logger.debug(
+                "Variant fetch: %s → %d candidates", fetch_url, len(candidates)
+            )
+            return tuple(candidates)
+        return ()
     except Exception as exc:
         logger.warning("Variant scrape failed for %s: %s", url, exc)
         return ()
@@ -1518,6 +1961,71 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
 def scrape_item_variant_colors(url: str) -> tuple[str, ...]:
     """Public alias for the product-page variant color scraper."""
     return _extract_product_variant_colors(url)
+
+
+@lru_cache(maxsize=512)
+def scrape_set_variant_options(url: str, sku: str | None = None) -> SetVariantOptions:
+    """Return set-wide handle colors and block finishes for one exact set SKU."""
+    empty: SetVariantOptions = {"handle_colors": (), "block_finishes": ()}
+    try:
+        response = requests.get(url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT)
+        if response.status_code != 200:
+            return empty
+        raw_html = response.text
+        soup = BeautifulSoup(raw_html, "html.parser")
+        visible_soup = BeautifulSoup(raw_html, "html.parser")
+        for noise in visible_soup.find_all(["script", "style"]):
+            noise.decompose()
+
+        def collect(kind: str) -> tuple[str, ...]:
+            candidates: list[str] = []
+            seen: set[str] = set()
+            web_items_candidates = _collect_variant_candidates_from_web_items_map(
+                raw_html, target_sku=sku, option_kind=kind
+            )
+            sources = (
+                web_items_candidates,
+                _collect_variant_candidates_from_swatches(soup, option_kind=kind),
+                _collect_variant_candidates_from_selects(soup, option_kind=kind),
+            )
+            if kind == "handle" and web_items_candidates:
+                sources = (web_items_candidates,)
+            for source in sources:
+                for candidate in source:
+                    if not _looks_like_variant_color(candidate):
+                        continue
+                    _collect_variant_candidate(candidates, seen, candidate)
+            if kind == "handle":
+                selected_color = _extract_selected_page_color(visible_soup)
+                if selected_color and _looks_like_variant_color(selected_color):
+                    _collect_variant_candidate(candidates, seen, selected_color)
+            return tuple(candidates)
+
+        structured_handle_colors = _collect_variant_candidates_from_web_items_map(
+            raw_html, target_sku=sku, option_kind="handle"
+        )
+        block_finishes = collect("block_finish")
+        supports_block_finish = _web_items_map_supports_block_finish(raw_html, sku)
+        if supports_block_finish is None:
+            supports_block_finish = _page_product_supports_block_finish(visible_soup)
+        if block_finishes and not supports_block_finish:
+            block_finishes = ()
+
+        result: SetVariantOptions = {
+            "handle_colors": collect("handle"),
+            "block_finishes": block_finishes,
+        }
+        if structured_handle_colors:
+            result["handle_colors_authoritative"] = True
+        handle_color_member_skus = _collect_handle_color_member_skus_from_web_items_map(
+            raw_html, sku
+        )
+        if handle_color_member_skus:
+            result["handle_color_member_skus"] = handle_color_member_skus
+        return result
+    except Exception as exc:
+        logger.warning("Set variant scrape failed for %s: %s", url, exc)
+        return empty
 
 
 # Preserve cache helpers on the public alias used by callers.
