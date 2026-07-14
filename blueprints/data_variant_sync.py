@@ -162,16 +162,28 @@ def variant_sync_confirm():
     touched_items = 0
     mark_purple_as_unicorn = request.form.get("mark_purple_variants_unicorn") == "on"
     confirm_target = (request.form.get("confirm_target") or "all").strip()
+    set_selection_enabled = request.form.get("set_selection_enabled") == "1"
+    selected_set_ids = {
+        int(raw_set_id)
+        for raw_set_id in request.form.getlist("selected_set_ids")
+        if raw_set_id.isdigit()
+    }
     skipped_details: list[dict] = []
 
     try:
         promo_summary = preview.get("promo_summary", {})
 
         def should_process(preview_item: dict, *, section: str) -> bool:
+            is_set = preview_item.get("entity_type") == "set"
+            set_id = preview_item.get("set_id")
+            if set_selection_enabled and is_set and set_id not in selected_set_ids:
+                return False
             if confirm_target == "all":
                 return True
             if confirm_target == "promo":
                 return section == "promo"
+            if confirm_target == "selected_sets":
+                return section == "category" and is_set and set_id in selected_set_ids
             if confirm_target.startswith("category:"):
                 return (
                     section == "category"

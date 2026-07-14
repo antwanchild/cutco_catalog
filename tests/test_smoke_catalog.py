@@ -1387,12 +1387,23 @@ class CatalogSmokeTests(SmokeBaseTest):
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
+        set_checkbox = soup.select_one(
+            f'input[name="selected_set_ids"][value="{set_id}"]'
+        )
+        self.assertIsNotNone(set_checkbox)
+        self.assertFalse(set_checkbox.has_attr("checked"))
+        self.assertIn(b"Select all", preview_response.data)
+        self.assertIn(b"Clear all", preview_response.data)
+        self.assertIn(b"Confirm Selected (0)", preview_response.data)
 
         confirm_response = self.client.post(
             "/variant-sync/confirm",
             data={
                 "csrf_token": "test-csrf-token",
                 "preview_json": preview_json_input["value"],
+                "set_selection_enabled": "1",
+                "selected_set_ids": str(set_id),
+                "confirm_target": "selected_sets",
             },
             content_type="multipart/form-data",
             follow_redirects=False,
@@ -1430,6 +1441,89 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertTrue(
                 all(variant.source == "set_variant_sync" for variant in member.variants)
             )
+
+    def test_variant_sync_only_applies_checked_set_changes(self):
+        from models import SetVariant
+
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with self.app.app_context():
+            selected_set = Set(name="Selected Block Set", sku="SEL-1")
+            unchecked_set = Set(name="Unchecked Block Set", sku="SEL-2")
+            db.session.add_all([selected_set, unchecked_set])
+            db.session.commit()
+            selected_set_id = selected_set.id
+            unchecked_set_id = unchecked_set.id
+
+        def set_preview(set_id, name, sku):
+            return {
+                "entity_type": "set",
+                "set_id": set_id,
+                "item_name": name,
+                "sku": sku,
+                "category": "Sets",
+                "status": "ready",
+                "scraped_url": None,
+                "remove_options": [],
+                "reclassify_options": [],
+                "create_options": [{"kind": "block_finish", "color": "Cherry"}],
+                "propagate_colors": [],
+                "propagate_color_member_skus": {},
+                "retained_colors": [],
+            }
+
+        preview = {
+            "items": [
+                set_preview(selected_set_id, "Selected Block Set", "SEL-1"),
+                set_preview(unchecked_set_id, "Unchecked Block Set", "SEL-2"),
+            ],
+            "summary": {
+                "items_scanned": 2,
+                "variants_found": 2,
+                "variants_to_create": 2,
+                "variants_retained": 0,
+                "items_with_no_clear_variants": 0,
+                "purple_variant_count": 0,
+            },
+            "promo_items": [],
+            "promo_summary": {},
+            "scope_label": "Entire catalog",
+        }
+        response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": json.dumps(preview),
+                "set_selection_enabled": "1",
+                "selected_set_ids": str(selected_set_id),
+                "confirm_target": "all",
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            selected_variants = (
+                db.session.execute(
+                    db.select(SetVariant).filter_by(set_id=selected_set_id)
+                )
+                .scalars()
+                .all()
+            )
+            unchecked_variants = (
+                db.session.execute(
+                    db.select(SetVariant).filter_by(set_id=unchecked_set_id)
+                )
+                .scalars()
+                .all()
+            )
+            self.assertEqual(
+                [(variant.kind, variant.color) for variant in selected_variants],
+                [("block_finish", "Cherry")],
+            )
+            self.assertEqual(unchecked_variants, [])
 
     def test_variant_sync_removes_member_only_color_from_cutting_board_set(self):
         from blueprints.data_workflows import _build_set_variant_sync_preview

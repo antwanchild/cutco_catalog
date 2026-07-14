@@ -1172,7 +1172,21 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .variant-sync-category-confirm {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
   margin-bottom: 1rem;
+}
+.variant-sync-set-selector {
+  display: inline-flex;
+  align-items: center;
+  margin-right: .35rem;
+  cursor: pointer;
+}
+.variant-sync-set-checkbox {
+  width: 1.05rem;
+  height: 1.05rem;
+  cursor: pointer;
 }
 .variant-sync-section-heading {
   margin-bottom: .4rem;

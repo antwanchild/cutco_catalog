@@ -26,6 +26,7 @@
 <form method="post" action="{{ url_for('data.variant_sync_confirm') }}">
   <input type="hidden" name="preview_json" value="{{ preview_json | e }}">
   <input type="hidden" name="scope_label" value="{{ preview.scope_label }}">
+  <input type="hidden" name="set_selection_enabled" value="1">
 
   {% if preview.promo_items %}
   <div class="form-card variant-sync-category-block variant-sync-preview-section">
@@ -133,14 +134,28 @@
     <div class="variant-sync-category-content">
       {% if category_actions.count %}
       <div class="variant-sync-category-confirm">
-        <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="category:{{ category_block.category }}">Confirm This Section Only</button>
+        {% if category_block.category == 'Sets' %}
+          <span class="muted small">Choose which set changes to apply.</span>
+          <button type="button" class="btn btn-ghost btn-sm" data-select-sets="all">Select all</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-select-sets="none">Clear all</button>
+          <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="selected_sets" data-confirm-selected-sets disabled>Confirm Selected (0)</button>
+        {% else %}
+          <button type="submit" class="btn btn-secondary btn-sm" name="confirm_target" value="category:{{ category_block.category }}">Confirm This Section Only</button>
+        {% endif %}
       </div>
       {% endif %}
 
     {% for item in category_block['items'] %}
     {% set removal_count = item.remove_options | default([]) | length %}
+    {% set item_action_count = (item.create_count | default(0)) + (item.member_create_count | default(0)) + removal_count %}
     <details class="diff-section" {% if item.create_count or item.member_create_count or removal_count %}open{% endif %}>
       <summary>
+        {% if item.entity_type == 'set' and item_action_count %}
+          <label class="variant-sync-set-selector" title="Apply changes for this set">
+            <input type="checkbox" name="selected_set_ids" value="{{ item.set_id }}" class="variant-sync-set-checkbox">
+            <span class="sr-only">Select</span>
+          </label>
+        {% endif %}
         {{ item.item_name }} <span class="muted mono">#{{ item.sku }}</span>
         {% if item.no_clear_variants %}
           <span class="badge badge-warning badge-mini">no clear variants</span>
@@ -211,7 +226,7 @@
   {% endfor %}
 
   <div class="completion-confirm-note flash flash-info variant-sync-confirm-note">
-    Missing variants are kept rather than deleted.
+    Missing variants are kept rather than deleted. Set changes are applied only to the sets checked above.
   </div>
 
   <div class="form-actions variant-sync-preview-actions">
@@ -219,4 +234,43 @@
     <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-secondary">Back</a>
   </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function() {
+  const setCheckboxes = Array.from(document.querySelectorAll('.variant-sync-set-checkbox'));
+  const confirmButtons = document.querySelectorAll('[data-confirm-selected-sets]');
+
+  function updateSetSelection() {
+    const selectedCount = setCheckboxes.filter(function(checkbox) {
+      return checkbox.checked;
+    }).length;
+    confirmButtons.forEach(function(button) {
+      button.disabled = selectedCount === 0;
+      button.textContent = 'Confirm Selected (' + selectedCount + ')';
+    });
+  }
+
+  document.querySelectorAll('.variant-sync-set-selector').forEach(function(selector) {
+    selector.addEventListener('click', function(event) {
+      event.stopPropagation();
+    });
+  });
+  setCheckboxes.forEach(function(checkbox) {
+    checkbox.addEventListener('change', updateSetSelection);
+  });
+  document.querySelectorAll('[data-select-sets]').forEach(function(button) {
+    button.addEventListener('click', function() {
+      const shouldSelect = button.dataset.selectSets === 'all';
+      setCheckboxes.forEach(function(checkbox) {
+        checkbox.checked = shouldSelect;
+      });
+      updateSetSelection();
+    });
+  });
+  updateSetSelection();
+})();
+</script>
 {% endblock %}
