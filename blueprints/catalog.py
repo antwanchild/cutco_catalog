@@ -857,6 +857,7 @@ def set_add():
         item_set = Set(
             name=name,
             sku=request.form.get("sku", "").strip().upper() or None,
+            cutco_url=request.form.get("cutco_url", "").strip() or None,
             notes=request.form.get("notes", "").strip() or None,
         )
         db.session.add(item_set)
@@ -898,6 +899,7 @@ def set_edit(set_id=None, sid=None):
     if request.method == "POST":
         item_set.name = request.form["name"].strip()
         item_set.sku = request.form.get("sku", "").strip().upper() or None
+        item_set.cutco_url = request.form.get("cutco_url", "").strip() or None
         item_set.notes = request.form.get("notes", "").strip() or None
 
         selected_item_ids: set[int] = set()
@@ -1728,6 +1730,7 @@ def catalog_sync_confirm():
                 for sku in legacy_member_skus
             ]
         set_sku = request.form.get(f"set_sku_{index}", "").strip() or None
+        set_url = request.form.get(f"set_url_{index}", "").strip() or None
 
         pre_existing_set = Set.query.filter(
             db.func.lower(Set.name) == set_name.lower()
@@ -1737,6 +1740,8 @@ def catalog_sync_confirm():
             added_sets += 1
         if set_sku and not item_set.sku:
             item_set.sku = set_sku
+        if set_url:
+            item_set.cutco_url = set_url
         if member_entries_raw:
             item_set.member_data = json.dumps(member_entries, ensure_ascii=False)
 
@@ -1787,6 +1792,9 @@ def catalog_sync_confirm():
         item_set = Set.query.filter(db.func.lower(Set.name) == set_name.lower()).first()
         if not item_set:
             continue
+        set_url = request.form.get(f"existing_set_url_{index}", "").strip()
+        if set_url:
+            item_set.cutco_url = set_url
         member_entries_raw = request.form.get(
             f"existing_set_member_entries_{index}", ""
         ).strip()

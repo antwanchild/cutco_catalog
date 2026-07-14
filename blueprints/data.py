@@ -691,6 +691,60 @@ def import_page():
             )
         else:
             if matches_set_sku:
+                if person_name and matched_set:
+                    for membership in matched_set.members:
+                        member_item = membership.item
+                        if not member_item:
+                            continue
+                        member_color = _resolve_import_variant_color(
+                            member_item.name,
+                            member_item.category or "",
+                            color,
+                        )
+                        member_variant = _find_import_variant(member_item, member_color)
+                        member_multiplier = membership.quantity or 1
+                        member_quantity_purchased = (
+                            quantity_purchased * member_multiplier
+                            if quantity_purchased is not None
+                            else (member_multiplier if member_multiplier > 1 else None)
+                        )
+                        member_quantity_given_away = (
+                            quantity_given_away * member_multiplier
+                            if quantity_given_away is not None
+                            else None
+                        )
+                        ownership_entries.append(
+                            {
+                                "row": row_num,
+                                "person": person_name,
+                                "item_name": member_item.name,
+                                "sku": member_item.sku,
+                                "item_id": member_item.id,
+                                "color": member_color,
+                                "display_color": _preview_import_color(
+                                    member_color,
+                                    (member_item.category or "")
+                                    in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES,
+                                ),
+                                "status": status,
+                                "notes": notes,
+                                "non_catalog": not member_item.in_catalog,
+                                "availability": member_item.availability,
+                                "is_sku_unicorn": False,
+                                "is_variant_unicorn": is_variant_unicorn,
+                                "is_edge_unicorn": False,
+                                "quantity_purchased": member_quantity_purchased,
+                                "quantity_given_away": member_quantity_given_away,
+                                "copy_type": copy_type,
+                                "engraving_text": engraving_text,
+                                "engraving_notes": engraving_notes,
+                                "engraving_signature": engraving_signature,
+                                "is_new_variant": member_variant is None,
+                                "is_new_person": person_name.lower()
+                                not in existing_persons,
+                            }
+                        )
+                    continue
                 bucket = set_sku_collisions
             else:
                 bucket = (

@@ -30,6 +30,9 @@ COMPLETION_COL_MAP = {
     "model#": "sku",
     "quantity": "quantity",
     "qty": "quantity",
+    "color": "color",
+    "variant": "color",
+    "handle_color": "color",
     "note": "note",
     "notes": "note",
 }

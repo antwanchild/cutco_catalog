@@ -113,6 +113,7 @@ def _build_completion_preview(
         person = (person_override or row.get("person", "") or "").strip()
         sku = normalize_sku_value(row.get("sku", ""))
         note = row.get("note", "").strip() or None
+        requested_color = (row.get("color", "") or "").strip().title() or UNKNOWN_COLOR
         quantity, qty_error = parse_positive_whole_number(row.get("quantity", ""))
 
         if qty_error:
@@ -196,6 +197,12 @@ def _build_completion_preview(
                     )
                     continue
                 member_qty = quantity * (membership.quantity or 1)
+                member_color = (
+                    UNKNOWN_COLOR
+                    if (member_item.category or "")
+                    in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+                    else requested_color
+                )
                 expanded_rows.append(
                     {
                         "input_row": row_num,
@@ -205,8 +212,10 @@ def _build_completion_preview(
                         "resolved_sku": member_item.sku,
                         "item_id": member_item.id,
                         "item_name": member_item.name,
-                        "color": UNKNOWN_COLOR,
-                        "display_color": "—",
+                        "color": member_color,
+                        "display_color": (
+                            "—" if member_color == UNKNOWN_COLOR else member_color
+                        ),
                         "quantity": member_qty,
                         "source": "Set member",
                         "note": note,
@@ -216,6 +225,12 @@ def _build_completion_preview(
             continue
 
         if matched_item:
+            item_color = (
+                UNKNOWN_COLOR
+                if (matched_item.category or "")
+                in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+                else requested_color
+            )
             expanded_rows.append(
                 {
                     "input_row": row_num,
@@ -225,8 +240,10 @@ def _build_completion_preview(
                     "resolved_sku": matched_item.sku or sku,
                     "item_id": matched_item.id,
                     "item_name": matched_item.name,
-                    "color": UNKNOWN_COLOR,
-                    "display_color": "—",
+                    "color": item_color,
+                    "display_color": (
+                        "—" if item_color == UNKNOWN_COLOR else item_color
+                    ),
                     "quantity": quantity,
                     "source": "Item",
                     "note": note,
@@ -495,6 +512,33 @@ def _resolve_variant_sync_items(
     return [], "Please choose a valid scan scope."
 
 
+def _resolve_variant_sync_sets(
+    scope: str, category: str | None, selected_skus: list[str]
+) -> list[Set]:
+    """Resolve sets that should participate in a variant sync scan."""
+    sets = Set.query.options(
+        selectinload(Set.variants), selectinload(Set.members)
+    ).all()
+    if scope == "all":
+        return sorted(
+            sets,
+            key=lambda item_set: ((item_set.sku or "").lower(), item_set.name.lower()),
+        )
+    if scope == "category":
+        return []
+    if scope != "selected":
+        return []
+    selected_lookup = set(selected_skus)
+    return sorted(
+        [
+            item_set
+            for item_set in sets
+            if normalize_sku_value(item_set.sku or "") in selected_lookup
+        ],
+        key=lambda item_set: ((item_set.sku or "").lower(), item_set.name.lower()),
+    )
+
+
 def _variant_sync_candidate_urls(item: Item) -> list[str]:
     """Return product URLs to try for a variant-sync item, in priority order."""
     candidates: list[str] = []
@@ -725,6 +769,161 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
             "has_purple_variants": purple_variant_count > 0,
         },
     }
+
+
+def _build_set_variant_sync_preview(item_sets: list[Set]) -> dict:
+    """Build variant-sync rows for sets and their member propagation."""
+    preview_items: list[dict] = []
+    variants_found = 0
+    variants_to_create = 0
+    variants_retained = 0
+    items_with_no_clear_variants = 0
+
+    for item_set in item_sets:
+        discovered_url = discover_cutco_item_page_url(item_set.sku)
+        candidate_urls = list(
+            dict.fromkeys(url for url in (item_set.cutco_url, discovered_url) if url)
+        )
+        scraped_colors: list[str] = []
+        scraped_url = None
+        for url in candidate_urls:
+            scraped_colors = list(scrape_item_variant_colors(url))
+            if scraped_colors:
+                scraped_url = url
+                break
+
+        existing_lookup = {
+            variant.color.lower(): variant for variant in item_set.variants
+        }
+        scraped_lookup = {color.lower() for color in scraped_colors}
+        create_colors = [
+            color for color in scraped_colors if color.lower() not in existing_lookup
+        ]
+        retained_colors = [
+            variant.color
+            for variant in item_set.variants
+            if variant.color.lower() not in scraped_lookup
+        ]
+        variant_rows = [
+            {
+                "color": color,
+                "status": "existing" if color.lower() in existing_lookup else "create",
+            }
+            for color in scraped_colors
+        ]
+        variant_rows.extend(
+            {"color": color, "status": "not seen in sync"} for color in retained_colors
+        )
+        member_create_count = 0
+        eligible_member_count = 0
+        for membership in item_set.members:
+            member = membership.item
+            if (
+                not member
+                or (member.category or "") in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+            ):
+                continue
+            eligible_member_count += 1
+            member_colors = {
+                variant.color.lower()
+                for variant in member.variants
+                if variant.color != UNKNOWN_COLOR
+            }
+            member_create_count += sum(
+                color.lower() not in member_colors for color in scraped_colors
+            )
+
+        variants_found += len(scraped_colors)
+        variants_to_create += len(create_colors) + member_create_count
+        variants_retained += len(retained_colors)
+        if not scraped_colors:
+            items_with_no_clear_variants += 1
+        preview_items.append(
+            {
+                "entity_type": "set",
+                "set_id": item_set.id,
+                "item_name": item_set.name,
+                "sku": item_set.sku or "—",
+                "category": "Sets",
+                "status": "ready" if scraped_colors else "skipped",
+                "skip_reason": (
+                    None if scraped_colors else "No clear set variants were detected."
+                ),
+                "variant_rows": sorted(
+                    variant_rows, key=lambda row: (row["color"].lower(), row["status"])
+                ),
+                "create_colors": create_colors,
+                "propagate_colors": scraped_colors,
+                "retained_colors": retained_colors,
+                "existing_count": len(scraped_colors) - len(create_colors),
+                "create_count": len(create_colors),
+                "retained_count": len(retained_colors),
+                "member_create_count": member_create_count,
+                "eligible_member_count": eligible_member_count,
+                "has_unknown_variant": False,
+                "no_clear_variants": not scraped_colors,
+                "has_purple_variant": any(
+                    color.lower() == "purple" for color in scraped_colors
+                ),
+                "scraped_url": scraped_url,
+                "scraped_variant_count": len(scraped_colors),
+                "swatch_count": len(scraped_colors),
+            }
+        )
+
+    return {
+        "items": preview_items,
+        "grouped_items": (
+            [{"category": "Sets", "items": preview_items}] if preview_items else []
+        ),
+        "summary": {
+            "items_scanned": len(item_sets),
+            "variants_found": variants_found,
+            "variants_to_create": variants_to_create,
+            "variants_retained": variants_retained,
+            "items_with_no_clear_variants": items_with_no_clear_variants,
+            "purple_variant_count": sum(
+                any(color.lower() == "purple" for color in row["propagate_colors"])
+                for row in preview_items
+            ),
+            "has_purple_variants": any(
+                row["has_purple_variant"] for row in preview_items
+            ),
+        },
+    }
+
+
+def _merge_variant_sync_previews(*previews: dict) -> dict:
+    """Combine item and set variant previews."""
+    merged = {
+        "items": [],
+        "grouped_items": [],
+        "summary": {
+            "items_scanned": 0,
+            "variants_found": 0,
+            "variants_to_create": 0,
+            "variants_retained": 0,
+            "items_with_no_clear_variants": 0,
+            "purple_variant_count": 0,
+            "has_purple_variants": False,
+        },
+    }
+    for preview in previews:
+        merged["items"].extend(preview.get("items", []))
+        merged["grouped_items"].extend(preview.get("grouped_items", []))
+        for key in (
+            "items_scanned",
+            "variants_found",
+            "variants_to_create",
+            "variants_retained",
+            "items_with_no_clear_variants",
+            "purple_variant_count",
+        ):
+            merged["summary"][key] += preview.get("summary", {}).get(key, 0)
+    merged["summary"]["has_purple_variants"] = (
+        merged["summary"]["purple_variant_count"] > 0
+    )
+    return merged
 
 
 def _build_purple_campaign_variant_preview() -> dict:

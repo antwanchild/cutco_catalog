@@ -223,10 +223,12 @@ class Set(BaseModel):
     if TYPE_CHECKING:
         members: Mapped[list[ItemSetMember]]
         items: Mapped[list[Item]]
+        variants: Mapped[list[SetVariant]]
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False, unique=True)
     sku = db.Column(db.String(20), nullable=True)
+    cutco_url = db.Column(db.String(300), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     member_data = db.Column(db.Text, nullable=True)
 
@@ -239,6 +241,33 @@ class Set(BaseModel):
         back_populates="sets",
         viewonly=True,
         lazy="select",
+    )
+    variants: Mapped[list[SetVariant]] = relationship(
+        "SetVariant",
+        back_populates="set",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="SetVariant.color",
+    )
+
+
+class SetVariant(BaseModel):
+    """A color-specific variant offered for a set."""
+
+    __tablename__ = "set_variants"
+
+    if TYPE_CHECKING:
+        set: Mapped[Set | None]
+
+    id = db.Column(db.Integer, primary_key=True)
+    set_id = db.Column(db.Integer, db.ForeignKey("sets.id"), nullable=False)
+    color = db.Column(db.String(80), nullable=False)
+    source = db.Column(db.String(40), nullable=True, default="manual")
+
+    set: Mapped[Set | None] = relationship("Set", back_populates="variants")
+
+    __table_args__ = (
+        db.UniqueConstraint("set_id", "color", name="uq_set_variant_color"),
     )
 
 
@@ -685,6 +714,7 @@ def _audit_tracked_models() -> tuple[type[BaseModel], ...]:
         Item,
         ItemVariant,
         Set,
+        SetVariant,
         Person,
         Ownership,
         CookwareSession,

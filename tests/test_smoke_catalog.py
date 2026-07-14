@@ -1234,6 +1234,98 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "variant_sync",
             )
 
+    def test_variant_sync_adds_set_variants_to_member_items(self):
+        from models import SetVariant
+
+        self._login_as_admin()
+        self._set_csrf_token()
+        expected_url = "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+
+        with self.app.app_context():
+            member = Item(
+                name="Traditional Gravy Ladle",
+                sku="1573",
+                category="Flatware",
+                set_only=True,
+                in_catalog=False,
+                availability="non-catalog",
+            )
+            db.session.add(member)
+            db.session.flush()
+            member_id = member.id
+            db.session.add(ItemVariant(item=member, color=UNKNOWN_COLOR))
+            item_set = Set(name="6-Pc. Traditional Accessory Set", sku="1570")
+            db.session.add(item_set)
+            db.session.flush()
+            set_id = item_set.id
+            db.session.add(
+                ItemSetMember(set_id=item_set.id, item_id=member.id, quantity=1)
+            )
+            db.session.commit()
+
+        with (
+            mock.patch(
+                "blueprints.data.scrape_item_variant_colors",
+                return_value=("Pearl", "Classic"),
+            ),
+            mock.patch(
+                "blueprints.data_workflows.discover_cutco_item_page_url",
+                return_value=expected_url,
+            ),
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "1570",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Sets Variants", preview_response.data)
+        self.assertIn(b"eligible member item", preview_response.data)
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        with self.app.app_context():
+            item_set = db.session.get(Set, set_id)
+            member = db.session.get(Item, member_id)
+            self.assertEqual(item_set.cutco_url, expected_url)
+            self.assertEqual(
+                sorted(variant.color for variant in item_set.variants),
+                ["Classic", "Pearl"],
+            )
+            self.assertEqual(
+                len(
+                    db.session.execute(db.select(SetVariant).filter_by(set_id=set_id))
+                    .scalars()
+                    .all()
+                ),
+                2,
+            )
+            self.assertEqual(
+                sorted(variant.color for variant in member.variants),
+                ["Classic", "Pearl"],
+            )
+            self.assertTrue(
+                all(variant.source == "set_variant_sync" for variant in member.variants)
+            )
+
     def test_variant_sync_can_mark_purple_campaign_variants_as_unicorns(self):
         self._login_as_admin()
         self._set_csrf_token()

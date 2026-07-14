@@ -389,6 +389,16 @@ def _schema_item_variant_source_migrations() -> None:
     )
 
 
+def _schema_set_variant_migrations() -> None:
+    """Add set product URLs and color variants."""
+    from models import SetVariant
+
+    _add_column(
+        "sets", "cutco_url", "ALTER TABLE sets ADD COLUMN cutco_url VARCHAR(300)"
+    )
+    db.metadata.tables[SetVariant.__tablename__].create(db.engine, checkfirst=True)
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
@@ -405,6 +415,7 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(9, "item_attachments", _schema_item_attachment_migrations),
     SchemaMigration(10, "item_variant_source", _schema_item_variant_source_migrations),
     SchemaMigration(11, "ownership_engraving", _schema_ownership_engraving_migrations),
+    SchemaMigration(12, "set_variants", _schema_set_variant_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

@@ -1013,10 +1013,10 @@ class ImportSmokeTests(SmokeBaseTest):
             data={
                 "csrf_token": "test-csrf-token",
                 "rows_text": (
-                    "person,sku,quantity,note\n"
-                    "Completion Collector,COMP-1,2,direct order\n"
-                    "Completion Collector,COMP-SET,2,from set\n"
-                    "Completion Collector,NOPE-1,1,missing sku\n"
+                    "person,sku,color,quantity,note\n"
+                    "Completion Collector,COMP-1,,2,direct order\n"
+                    "Completion Collector,COMP-SET,Pearl,2,from set\n"
+                    "Completion Collector,NOPE-1,,1,missing sku\n"
                 ),
             },
             content_type="multipart/form-data",
@@ -1030,6 +1030,7 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Update ownership", preview_response.data)
         self.assertIn(b"Create ownership", preview_response.data)
         self.assertIn(b"Set member", preview_response.data)
+        self.assertIn(b"Pearl", preview_response.data)
         self.assertIn(b"Item SKU not found", preview_response.data)
         self.assertIn(b"Download rolled-up CSV", preview_response.data)
 
@@ -1062,14 +1063,24 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Completion Import Result", confirm_response.data)
         self.assertIn(b"Import Summary", confirm_response.data)
         self.assertIn(b"Rows processed", confirm_response.data)
-        self.assertIn(
-            b"balanced mix of new and updated ownership entries", confirm_response.data
-        )
+        self.assertIn(b"mostly created new ownership entries", confirm_response.data)
         self.assertIn(b"Ownership entries updated", confirm_response.data)
         self.assertIn(b"Ownership entries created", confirm_response.data)
         self.assertIn(b"Download rolled-up CSV", confirm_response.data)
         self.assertIn(b"Missing Catalog SKUs", confirm_response.data)
         self.assertIn(b"Download missing SKUs CSV", confirm_response.data)
+
+        with self.app.app_context():
+            for item_id in (member_item_id, other_item_id):
+                pearl_variant = db.session.execute(
+                    db.select(ItemVariant).filter_by(item_id=item_id, color="Pearl")
+                ).scalar_one()
+                pearl_ownership = db.session.execute(
+                    db.select(Ownership).filter_by(
+                        person_id=person_id, variant_id=pearl_variant.id
+                    )
+                ).scalar_one()
+                self.assertEqual(pearl_ownership.quantity_purchased, 2)
 
         confirm_soup = BeautifulSoup(confirm_response.data, "html.parser")
         missing_payload = {"csrf_token": "test-csrf-token"}
@@ -1142,9 +1153,7 @@ class ImportSmokeTests(SmokeBaseTest):
                 )
             ).scalar_one()
             other_variant = db.session.execute(
-                db.select(ItemVariant).filter_by(
-                    item_id=other_item_id, color="Unknown / Unspecified"
-                )
+                db.select(ItemVariant).filter_by(item_id=other_item_id, color="Pearl")
             ).scalar_one()
             other_ownership = db.session.execute(
                 db.select(Ownership).filter_by(
@@ -1153,7 +1162,7 @@ class ImportSmokeTests(SmokeBaseTest):
             ).scalar_one()
             no_item_count = Item.query.filter_by(sku="NOPE-1").count()
 
-        self.assertEqual(ownership.quantity_purchased, 5)
+        self.assertEqual(ownership.quantity_purchased, 3)
         self.assertEqual(other_ownership.quantity_purchased, 2)
         self.assertEqual(no_item_count, 0)
 
@@ -1271,6 +1280,66 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"badge badge-warning", preview_response.data)
         self.assertIn(b"unchecked by default", preview_response.data)
         self.assertNotIn(b"New Catalog Items (1)", preview_response.data)
+
+    def test_collection_import_expands_colored_set_into_member_ownership(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        member_id, _variant_id = self._add_catalog_item(
+            name="Traditional Gravy Ladle",
+            sku="1573",
+            category="Flatware",
+        )
+        self._add_set(
+            name="6-Pc. Traditional Accessory Set",
+            sku="1570",
+            item_ids=(member_id,),
+        )
+
+        preview_response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "csvfile": (
+                    BytesIO(
+                        b"name,sku,owned,color,person\n"
+                        b"6-Pc. Traditional Accessory Set,1570,yes,Pearl,Set Collector\n"
+                    ),
+                    "colored_set.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Traditional Gravy Ladle", preview_response.data)
+        self.assertIn(b"Pearl", preview_response.data)
+        self.assertNotIn(b"Set SKU Collisions", preview_response.data)
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        confirm_payload = {"csrf_token": "test-csrf-token"}
+        for field in soup.select('form[action="/import/confirm"] input'):
+            name = field.get("name")
+            if not name:
+                continue
+            if field.get("type") == "checkbox":
+                if field.has_attr("checked"):
+                    confirm_payload[name] = "on"
+                continue
+            confirm_payload[name] = field.get("value", "")
+
+        confirm_response = self.client.post(
+            "/import/confirm", data=confirm_payload, follow_redirects=False
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        with self.app.app_context():
+            pearl_variant = db.session.execute(
+                db.select(ItemVariant).filter_by(item_id=member_id, color="Pearl")
+            ).scalar_one()
+            ownership = db.session.execute(
+                db.select(Ownership).filter_by(variant_id=pearl_variant.id)
+            ).scalar_one()
+            self.assertEqual(ownership.person.name, "Set Collector")
 
     def test_import_preview_normalizes_color_display(self):
         self._login_as_admin()

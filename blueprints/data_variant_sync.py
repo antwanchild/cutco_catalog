@@ -12,15 +12,25 @@ from sqlalchemy.orm import selectinload
 from blueprints.data import data_bp
 from blueprints.data_workflows import (
     _build_purple_campaign_variant_preview,
+    _build_set_variant_sync_preview,
     _build_variant_sync_preview,
+    _merge_variant_sync_previews,
     _parse_variant_sync_selected_skus,
     _resolve_variant_sync_items,
+    _resolve_variant_sync_sets,
     sync_variant_sync_helpers,
 )
-from constants import UNKNOWN_COLOR
+from constants import UNKNOWN_COLOR, VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
 from extensions import db
 from helpers import db_commit
-from models import Item, ItemVariant, record_activity, reconcile_unknown_variant
+from models import (
+    Item,
+    ItemVariant,
+    Set,
+    SetVariant,
+    record_activity,
+    reconcile_unknown_variant,
+)
 from scraping import discover_cutco_item_page_url
 import blueprints.data as data_module
 
@@ -64,7 +74,8 @@ def variant_sync_page():
     cast(Any, data_module.scrape_purple_campaign_variants).cache_clear()
     cast(Any, discover_cutco_item_page_url).cache_clear()
     items, selection_error = _resolve_variant_sync_items(scope, category, selected_skus)
-    if selection_error:
+    item_sets = _resolve_variant_sync_sets(scope, category, selected_skus)
+    if selection_error and not item_sets:
         flash(selection_error, "error")
         return render_template(
             "variant_sync.html",
@@ -74,7 +85,7 @@ def variant_sync_page():
             category=category,
             selected_skus_text=selected_skus_text,
         )
-    if not items:
+    if not items and not item_sets:
         flash(
             "No variant-sync eligible catalog items were found for that scope.",
             "warning",
@@ -88,7 +99,10 @@ def variant_sync_page():
             selected_skus_text=selected_skus_text,
         )
 
-    preview = _build_variant_sync_preview(items)
+    preview = _merge_variant_sync_previews(
+        _build_variant_sync_preview(items),
+        _build_set_variant_sync_preview(item_sets),
+    )
     promo_preview = _build_purple_campaign_variant_preview()
     preview["promo_items"] = promo_preview.get("items", [])
     preview["promo_summary"] = promo_preview.get("summary", {})
@@ -153,6 +167,75 @@ def variant_sync_confirm():
             preview_item: dict, *, allow_purple_unicorn: bool = False
         ) -> None:
             nonlocal created_variants, retained_variants, skipped_items, touched_items
+            if preview_item.get("entity_type") == "set":
+                set_id = preview_item.get("set_id")
+                item_set = db.session.get(Set, set_id) if set_id else None
+                if not item_set:
+                    skipped_items += 1
+                    return
+                if preview_item.get("status") == "skipped":
+                    skipped_items += 1
+                    skipped_details.append(
+                        {
+                            "item": item_set.name,
+                            "sku": item_set.sku or "—",
+                            "reason": preview_item.get("skip_reason")
+                            or "No clear set variants were detected.",
+                        }
+                    )
+                    return
+                scraped_url = (preview_item.get("scraped_url") or "").strip()
+                if scraped_url:
+                    item_set.cutco_url = scraped_url
+                existing_set_colors = {
+                    variant.color.lower() for variant in item_set.variants
+                }
+                for color in preview_item.get("create_colors", []):
+                    color_value = (color or "").strip()
+                    if color_value and color_value.lower() not in existing_set_colors:
+                        db.session.add(
+                            SetVariant(
+                                set=item_set,
+                                color=color_value,
+                                source="variant_sync",
+                            )
+                        )
+                        existing_set_colors.add(color_value.lower())
+                        created_variants += 1
+                for membership in item_set.members:
+                    member = membership.item
+                    if (
+                        not member
+                        or (member.category or "")
+                        in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
+                    ):
+                        continue
+                    existing_member_colors = {
+                        variant.color.lower()
+                        for variant in member.variants
+                        if variant.color != UNKNOWN_COLOR
+                    }
+                    for color in preview_item.get("propagate_colors", []):
+                        color_value = (color or "").strip()
+                        if (
+                            not color_value
+                            or color_value.lower() in existing_member_colors
+                        ):
+                            continue
+                        db.session.add(
+                            ItemVariant(
+                                item=member,
+                                color=color_value,
+                                source="set_variant_sync",
+                            )
+                        )
+                        existing_member_colors.add(color_value.lower())
+                        created_variants += 1
+                    db.session.flush()
+                    reconcile_unknown_variant(member)
+                retained_variants += len(preview_item.get("retained_colors", []))
+                touched_items += 1
+                return
             item_id = preview_item.get("item_id")
             if not item_id:
                 return

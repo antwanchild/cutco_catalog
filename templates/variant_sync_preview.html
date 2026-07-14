@@ -67,7 +67,6 @@
       {% if item.skip_reason %}
         <p class="muted">{{ item.skip_reason }}</p>
       {% endif %}
-
       {% if item.variant_rows %}
       <table class="data-table compact variant-sync-table">
         <thead>
@@ -131,6 +130,12 @@
 
       {% if item.skip_reason %}
         <p class="muted">{{ item.skip_reason }}</p>
+      {% endif %}
+      {% if item.entity_type == 'set' and not item.no_clear_variants %}
+        <p class="muted small">
+          These colors will also be added to {{ item.eligible_member_count }} eligible member item{{ 's' if item.eligible_member_count != 1 }}.
+          {% if item.member_create_count %}{{ item.member_create_count }} member variant{{ 's' if item.member_create_count != 1 }} will be created.{% endif %}
+        </p>
       {% endif %}
 
       {% if item.variant_rows %}

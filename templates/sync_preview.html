@@ -65,6 +65,7 @@
   {% endfor %}
   {% for item_set in existing_sets_data %}
   <input type="hidden" name="existing_set_name_{{ loop.index0 }}" value="{{ item_set.name }}">
+  <input type="hidden" name="existing_set_url_{{ loop.index0 }}" value="{{ item_set.url or '' }}">
   <input type="hidden" name="existing_set_member_entries_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
   {% endfor %}
 
@@ -169,6 +170,7 @@
           <input type="checkbox" name="selected_sets" value="{{ item_set.name }}" class="set-cb" checked>
           <input type="hidden" name="set_name_{{ loop.index0 }}"    value="{{ item_set.name }}">
           <input type="hidden" name="set_sku_{{ loop.index0 }}"     value="{{ item_set.sku or '' }}">
+          <input type="hidden" name="set_url_{{ loop.index0 }}"     value="{{ item_set.url or '' }}">
           <input type="hidden" name="set_member_entries_{{ loop.index0 }}" value="{{ item_set.member_data_json }}">
         </td>
         <td>{{ item_set.name }}</td>
