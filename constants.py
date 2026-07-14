@@ -117,8 +117,9 @@ def is_block_storage_item_name(name: str | None) -> bool:
 def accepts_set_handle_variants(name: str | None, category: str | None) -> bool:
     """Return whether set handle colors should propagate to an item."""
     return (
-        (category or "") not in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES
-        and not is_block_storage_item_name(name)
+        category or ""
+    ) not in SET_VARIANT_PROPAGATION_EXCLUDED_CATEGORIES and not is_block_storage_item_name(
+        name
     )
 
 
