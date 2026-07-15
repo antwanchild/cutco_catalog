@@ -17,7 +17,7 @@
   </ul>
 </div>
 
-<form method="post" class="form-card variant-sync-form">
+<form method="post" action="{{ url_for('data.variant_sync_start') }}" class="form-card variant-sync-form">
   <div id="variant-sync-overlay" style="display:none" aria-live="polite" aria-busy="true">
     <div class="sync-overlay-inner">
       <div class="sync-spinner"></div>

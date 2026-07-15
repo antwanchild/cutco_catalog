@@ -1118,6 +1118,27 @@ td.empty, p.empty { color: var(--muted); padding: 1rem 0; }
 .variant-sync-progress-scope {
   font-weight: 600;
 }
+
+.variant-sync-job-card {
+  max-width: 760px;
+}
+
+.variant-sync-job-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.variant-sync-job-heading .sync-spinner {
+  flex: 0 0 auto;
+  margin-top: .2rem;
+}
+
+.variant-sync-job-heading h2,
+.variant-sync-job-heading p {
+  margin-top: 0;
+}
 .variant-sync-actions {
   padding-top: .25rem;
 }

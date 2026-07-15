@@ -4,9 +4,21 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import threading
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from flask import flash, redirect, render_template, request, url_for
+from flask import (
+    Flask,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from sqlalchemy.orm import selectinload
 
 from blueprints.data import data_bp
@@ -20,9 +32,10 @@ from blueprints.data_workflows import (
     _resolve_variant_sync_sets,
     sync_variant_sync_helpers,
 )
-from constants import UNKNOWN_COLOR, accepts_set_handle_variants
+from constants import DATA_DIR, UNKNOWN_COLOR, accepts_set_handle_variants
 from extensions import db
 from helpers import db_commit
+from job_state import read_json_file, reset_json_file, write_json_file
 from models import (
     Item,
     ItemVariant,
@@ -36,6 +49,10 @@ from scraping import set_handle_color_applies_to_member
 import blueprints.data as data_module
 
 logger = logging.getLogger(__name__)
+
+_VARIANT_SYNC_JOB_FILE = os.path.join(DATA_DIR, "variant_sync_job.json")
+_variant_sync_job_lock = threading.Lock()
+_VARIANT_SYNC_JOB_STALE_AFTER = timedelta(minutes=30)
 
 _VARIANT_CONFIRM_ITEM_FIELDS = (
     "entity_type",
@@ -60,6 +77,65 @@ _VARIANT_CONFIRM_ITEM_FIELDS = (
 )
 
 
+def _current_flask_app() -> Flask:
+    """Return the concrete app behind Flask's context-local proxy."""
+    return cast(Flask, cast(Any, current_app)._get_current_object())
+
+
+def _variant_sync_job_defaults() -> dict:
+    return {
+        "status": "idle",
+        "progress": [],
+        "error": None,
+        "started_at": None,
+        "finished_at": None,
+        "heartbeat_at": None,
+        "preview": None,
+    }
+
+
+def _write_variant_sync_job(job_data: dict) -> None:
+    write_json_file(_VARIANT_SYNC_JOB_FILE, job_data, lock=_variant_sync_job_lock)
+
+
+def _read_variant_sync_job() -> dict:
+    job = read_json_file(_VARIANT_SYNC_JOB_FILE, _variant_sync_job_defaults())
+    if job.get("status") != "running":
+        return job
+
+    timestamp_text = job.get("heartbeat_at") or job.get("started_at")
+    stale = not timestamp_text
+    if not stale:
+        try:
+            timestamp = datetime.fromisoformat(str(timestamp_text))
+        except ValueError:
+            stale = True
+        else:
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=UTC)
+            stale = datetime.now(UTC) - timestamp > _VARIANT_SYNC_JOB_STALE_AFTER
+    if not stale:
+        return job
+
+    recovered = dict(job)
+    recovered["status"] = "error"
+    recovered["error"] = (
+        "Previous variant sync became stale. Please run the scan again."
+    )
+    recovered["finished_at"] = datetime.now(UTC).isoformat(timespec="seconds")
+    recovered["heartbeat_at"] = recovered["finished_at"]
+    _write_variant_sync_job(recovered)
+    return recovered
+
+
+def _reset_variant_sync_job() -> None:
+    reset_json_file(
+        _VARIANT_SYNC_JOB_FILE,
+        _variant_sync_job_defaults(),
+        lock=_variant_sync_job_lock,
+    )
+
+
 def _build_variant_sync_confirmation_payload(preview: dict) -> dict:
     """Strip display-only data from a variant-sync confirmation payload."""
 
@@ -77,6 +153,264 @@ def _build_variant_sync_confirmation_payload(preview: dict) -> dict:
         "promo_summary": preview.get("promo_summary", {}),
         "scope_label": preview.get("scope_label", "Entire catalog"),
     }
+
+
+def _run_variant_sync_job(
+    app,
+    *,
+    item_ids: list[int],
+    set_ids: list[int],
+    scope: str,
+    scope_label: str,
+    category: str,
+    selected_skus_text: str,
+) -> None:
+    """Build a variant preview in the background and persist live progress."""
+    with app.app_context():
+        started_at = datetime.now(UTC).isoformat(timespec="seconds")
+        progress: list[str] = []
+
+        def log(message: str) -> None:
+            progress.append(message)
+            _write_variant_sync_job(
+                {
+                    "status": "running",
+                    "progress": list(progress),
+                    "error": None,
+                    "started_at": started_at,
+                    "finished_at": None,
+                    "heartbeat_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                    "preview": None,
+                }
+            )
+
+        try:
+            sync_variant_sync_helpers(
+                data_module.scrape_item_variant_colors,
+                data_module.scrape_purple_campaign_variants,
+                data_module.scrape_set_variant_options,
+            )
+            cast(Any, data_module.scrape_item_variant_colors).cache_clear()
+            cast(Any, data_module.scrape_set_variant_options).cache_clear()
+            cast(Any, data_module.scrape_purple_campaign_variants).cache_clear()
+            cast(Any, discover_cutco_item_page_url).cache_clear()
+
+            item_lookup = {
+                item.id: item
+                for item in Item.query.options(selectinload(Item.variants))
+                .filter(Item.id.in_(item_ids))
+                .all()
+            }
+            items = [
+                item_lookup[item_id] for item_id in item_ids if item_id in item_lookup
+            ]
+            set_lookup = {
+                item_set.id: item_set
+                for item_set in Set.query.options(
+                    selectinload(Set.variants), selectinload(Set.members)
+                )
+                .filter(Set.id.in_(set_ids))
+                .all()
+            }
+            item_sets = [
+                set_lookup[set_id] for set_id in set_ids if set_id in set_lookup
+            ]
+
+            log(
+                f"Preparing {len(items)} item{'s' if len(items) != 1 else ''}"
+                f" for {scope_label.lower()}…"
+            )
+
+            def report_product_pages(checked: int, total: int, colors: int) -> None:
+                if checked == 1 or checked == total or checked % 5 == 0:
+                    log(
+                        f"Checked {checked} of {total} product pages"
+                        f" · {colors} color{'s' if colors != 1 else ''} found"
+                    )
+
+            item_preview = _build_variant_sync_preview(
+                items, progress_cb=report_product_pages
+            )
+            item_summary = item_preview["summary"]
+            log(
+                f"Item scan complete · {item_summary['variants_to_create']} new"
+                f" · {item_summary['variants_retained']} retained"
+                f" · {item_summary['items_with_no_clear_variants']} unclear"
+            )
+
+            pending_item_colors = {
+                preview_item["item_id"]: {
+                    str(color).strip().lower()
+                    for color in preview_item.get("create_colors", [])
+                    if str(color).strip()
+                }
+                for preview_item in item_preview.get("items", [])
+                if preview_item.get("item_id")
+            }
+            if item_sets:
+                log(
+                    f"Checking {len(item_sets)} set"
+                    f"{'s' if len(item_sets) != 1 else ''}…"
+                )
+            set_preview = _build_set_variant_sync_preview(
+                item_sets, pending_item_colors
+            )
+            log("Checking promotional variants…")
+            promo_preview = _build_purple_campaign_variant_preview()
+
+            preview = _merge_variant_sync_previews(item_preview, set_preview)
+            preview["promo_items"] = promo_preview.get("items", [])
+            preview["promo_summary"] = promo_preview.get("summary", {})
+            preview["scope"] = scope
+            preview["scope_label"] = scope_label
+            preview["category"] = category
+            preview["selected_skus_text"] = selected_skus_text
+
+            summary = preview["summary"]
+            log(
+                f"Preview ready · {summary['variants_to_create']} variants to create"
+                f" · {summary['variants_retained']} retained"
+            )
+            finished_at = datetime.now(UTC).isoformat(timespec="seconds")
+            _write_variant_sync_job(
+                {
+                    "status": "done",
+                    "progress": progress,
+                    "error": None,
+                    "started_at": started_at,
+                    "finished_at": finished_at,
+                    "heartbeat_at": finished_at,
+                    "preview": preview,
+                }
+            )
+        except Exception as exc:
+            logger.exception("Variant sync preview failed")
+            finished_at = datetime.now(UTC).isoformat(timespec="seconds")
+            _write_variant_sync_job(
+                {
+                    "status": "error",
+                    "progress": progress,
+                    "error": str(exc),
+                    "started_at": started_at,
+                    "finished_at": finished_at,
+                    "heartbeat_at": finished_at,
+                    "preview": None,
+                }
+            )
+
+
+def _start_variant_sync_background_job(app, **kwargs) -> threading.Thread:
+    thread = threading.Thread(
+        target=_run_variant_sync_job,
+        args=(app,),
+        kwargs=kwargs,
+        daemon=True,
+    )
+    thread.start()
+    return thread
+
+
+@data_bp.route("/variant-sync/start", methods=["POST"])
+def variant_sync_start():
+    """Validate a scan request and start its background preview job."""
+    job = _read_variant_sync_job()
+    if job.get("status") == "running":
+        return redirect(url_for("data.variant_sync_progress"))
+
+    scope = (request.form.get("scope") or "all").strip().lower()
+    category = (request.form.get("category") or "").strip()
+    selected_skus_text = request.form.get("selected_skus", "").strip()
+    selected_skus = _parse_variant_sync_selected_skus(selected_skus_text)
+    items, selection_error = _resolve_variant_sync_items(scope, category, selected_skus)
+    item_sets = _resolve_variant_sync_sets(scope, category, selected_skus)
+    if selection_error and not item_sets:
+        flash(selection_error, "error")
+        return redirect(url_for("data.variant_sync_page"))
+    if not items and not item_sets:
+        flash(
+            "No variant-sync eligible catalog items were found for that scope.",
+            "warning",
+        )
+        return redirect(url_for("data.variant_sync_page"))
+
+    scope_label = {
+        "all": "Entire catalog",
+        "category": f"Category: {category}",
+        "selected": "Selected SKUs",
+    }.get(scope, "Entire catalog")
+    now = datetime.now(UTC).isoformat(timespec="seconds")
+    _reset_variant_sync_job()
+    _write_variant_sync_job(
+        {
+            "status": "running",
+            "progress": ["Preparing variant sync…"],
+            "error": None,
+            "started_at": now,
+            "finished_at": None,
+            "heartbeat_at": now,
+            "preview": None,
+        }
+    )
+    _start_variant_sync_background_job(
+        _current_flask_app(),
+        item_ids=[item.id for item in items],
+        set_ids=[item_set.id for item_set in item_sets],
+        scope=scope,
+        scope_label=scope_label,
+        category=category,
+        selected_skus_text=selected_skus_text,
+    )
+    return redirect(url_for("data.variant_sync_progress"))
+
+
+@data_bp.route("/variant-sync/progress")
+def variant_sync_progress():
+    """Show the live progress log while a variant preview is prepared."""
+    job = _read_variant_sync_job()
+    if job.get("status") == "done" and job.get("preview"):
+        return redirect(url_for("data.variant_sync_job_preview"))
+    if job.get("status") == "idle":
+        return redirect(url_for("data.variant_sync_page"))
+    return render_template("variant_sync_progress.html", job=job)
+
+
+@data_bp.route("/variant-sync/status")
+def variant_sync_status():
+    """Return the small, poll-friendly variant sync job state."""
+    job = _read_variant_sync_job()
+    return jsonify(
+        {
+            "status": job.get("status", "idle"),
+            "progress": job.get("progress", []),
+            "error": job.get("error"),
+        }
+    )
+
+
+@data_bp.route("/variant-sync/job-preview")
+def variant_sync_job_preview():
+    """Render the completed preview from the background job."""
+    job = _read_variant_sync_job()
+    if job.get("status") == "running":
+        return redirect(url_for("data.variant_sync_progress"))
+    preview = job.get("preview")
+    if job.get("status") == "error" or not preview:
+        if job.get("error"):
+            flash(f"Variant sync failed: {job['error']}", "error")
+        return redirect(url_for("data.variant_sync_page"))
+
+    confirmation_payload = _build_variant_sync_confirmation_payload(preview)
+    preview_json = json.dumps(
+        confirmation_payload, ensure_ascii=False, separators=(",", ":")
+    )
+    return render_template(
+        "variant_sync_preview.html",
+        preview=preview,
+        preview_json=preview_json,
+        scope=preview.get("scope", "all"),
+        category=preview.get("category", ""),
+        selected_skus_text=preview.get("selected_skus_text", ""),
+    )
 
 
 @data_bp.route("/variant-sync", methods=["GET", "POST"])
