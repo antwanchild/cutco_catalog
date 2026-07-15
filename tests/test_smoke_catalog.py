@@ -1118,6 +1118,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             self.assertIn(b"Elapsed time", page_response.data)
             self.assertIn(b"Please keep this page open", page_response.data)
             self.assertIn(b"Back", page_response.data)
+            self.assertIn(b'action="/variant-sync/start"', page_response.data)
 
             preview_response = self.client.post(
                 "/variant-sync",
@@ -1203,6 +1204,77 @@ class CatalogSmokeTests(SmokeBaseTest):
         )
         self.assertIsNotNone(current_details)
         self.assertFalse(current_details.has_attr("open"))
+
+    def test_variant_sync_background_start_renders_live_progress(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        item_id, _variant_id = self._add_catalog_item(
+            name="Progress Knife", sku="PROGRESS-1"
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            job_file = os.path.join(temp_dir, "variant_sync_job.json")
+            with (
+                mock.patch(
+                    "blueprints.data_variant_sync._VARIANT_SYNC_JOB_FILE",
+                    job_file,
+                ),
+                mock.patch(
+                    "blueprints.data_variant_sync._start_variant_sync_background_job"
+                ) as start_job,
+            ):
+                start_response = self.client.post(
+                    "/variant-sync/start",
+                    data={
+                        "csrf_token": "test-csrf-token",
+                        "scope": "selected",
+                        "selected_skus": "PROGRESS-1",
+                    },
+                    follow_redirects=False,
+                )
+                progress_response = self.client.get("/variant-sync/progress")
+                status_response = self.client.get("/variant-sync/status")
+
+        self.assertEqual(start_response.status_code, 302)
+        self.assertTrue(start_response.location.endswith("/variant-sync/progress"))
+        self.assertEqual(progress_response.status_code, 200)
+        self.assertIn(
+            b"Variant sync is running in the background", progress_response.data
+        )
+        self.assertIn(b"Preparing variant sync", progress_response.data)
+        self.assertEqual(status_response.get_json()["status"], "running")
+        self.assertEqual(start_job.call_count, 1)
+        self.assertEqual(start_job.call_args.kwargs["item_ids"], [item_id])
+        self.assertEqual(start_job.call_args.kwargs["scope_label"], "Selected SKUs")
+
+    def test_variant_sync_completed_job_renders_normal_preview(self):
+        preview = {
+            "items": [],
+            "grouped_items": [],
+            "promo_items": [],
+            "promo_summary": {"has_purple_variants": False},
+            "summary": {
+                "items_scanned": 1,
+                "variants_found": 2,
+                "variants_to_create": 1,
+                "variants_retained": 0,
+                "items_with_no_clear_variants": 0,
+            },
+            "scope": "selected",
+            "scope_label": "Selected SKUs",
+            "category": "",
+            "selected_skus_text": "PROGRESS-1",
+        }
+        with mock.patch(
+            "blueprints.data_variant_sync._read_variant_sync_job",
+            return_value={"status": "done", "preview": preview},
+        ):
+            response = self.client.get("/variant-sync/job-preview")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Preview Summary", response.data)
+        self.assertIn(b"Variants to create", response.data)
+        self.assertIn(b"Selected SKUs", response.data)
 
     def test_variant_sync_replaces_unknown_only_variant_with_real_color(self):
         self._login_as_admin()

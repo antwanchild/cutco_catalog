@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Variant Sync Preview – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">🎨 Variant Sync Preview {{ help_btn("variant_sync") }}</h1>
+  <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-ghost">← Cancel</a>
+</div>
+
+<div class="form-card compact variant-sync-job-card">
+  {% if job.status == 'error' %}
+    <p class="flash flash-error">Variant sync failed: {{ job.error or 'Unknown error' }}</p>
+    <a href="{{ url_for('data.variant_sync_page') }}" class="btn btn-primary">Try Again</a>
+  {% else %}
+    <div class="variant-sync-job-heading">
+      <div class="sync-spinner" aria-hidden="true"></div>
+      <div>
+        <h2>Scanning variants…</h2>
+        <p class="muted">Variant sync is running in the background. This page will refresh when the preview is ready.</p>
+      </div>
+    </div>
+    <div class="msrp-log" id="variant-sync-progress-log" aria-live="polite" style="max-height:320px;overflow:auto">
+      {% for line in job.progress %}<div>{{ line }}</div>{% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% if job.status == 'running' %}
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+  const logEl = document.getElementById('variant-sync-progress-log');
+
+  function renderProgress(lines) {
+    logEl.replaceChildren(...(lines || []).map(function (line) {
+      const row = document.createElement('div');
+      row.textContent = line;
+      return row;
+    }));
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function poll() {
+    fetch('{{ url_for("data.variant_sync_status") }}')
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        renderProgress(data.progress);
+        if (data.status === 'running') {
+          window.setTimeout(poll, 1500);
+          return;
+        }
+        window.location.href = '{{ url_for("data.variant_sync_job_preview") }}';
+      })
+      .catch(function () { window.setTimeout(poll, 4000); });
+  }
+
+  logEl.scrollTop = logEl.scrollHeight;
+  window.setTimeout(poll, 1000);
+})();
+</script>
+{% endblock %}
+{% endif %}

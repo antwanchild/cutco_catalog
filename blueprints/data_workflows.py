@@ -5,6 +5,7 @@ import csv
 import io
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections.abc import Callable
 
 from flask import flash
 from sqlalchemy.orm import selectinload
@@ -585,7 +586,10 @@ def _scrape_variant_sync_item(
     return (), None
 
 
-def _build_variant_sync_preview(items: list[Item]) -> dict:
+def _build_variant_sync_preview(
+    items: list[Item],
+    progress_cb: Callable[[int, int, int], None] | None = None,
+) -> dict:
     """Scrape variant colors for a set of items and build preview rows."""
     preview_items: list[dict] = []
     scanned_items = 0
@@ -614,12 +618,23 @@ def _build_variant_sync_preview(items: list[Item]) -> dict:
             if _variant_sync_candidate_urls(item)
             and (item.category or "") not in VARIANT_SYNC_SINGLE_VARIANT_CATEGORIES
         }
+        product_pages_total = len(future_map)
+        product_pages_checked = 0
+        colors_found_so_far = 0
         for future in as_completed(future_map):
             item_id = future_map[future]
             colors, scraped_url = future.result()
             fetched_variants[item_id] = colors
             if scraped_url:
                 fetched_urls[item_id] = scraped_url
+            product_pages_checked += 1
+            colors_found_so_far += len(colors)
+            if progress_cb:
+                progress_cb(
+                    product_pages_checked,
+                    product_pages_total,
+                    colors_found_so_far,
+                )
 
     for item in items:
         scanned_items += 1
