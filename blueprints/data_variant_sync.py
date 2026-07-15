@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
 from flask import (
+    Flask,
     current_app,
     flash,
     jsonify,
@@ -74,6 +75,11 @@ _VARIANT_CONFIRM_ITEM_FIELDS = (
     "member_create_count",
     "member_covered_count",
 )
+
+
+def _current_flask_app() -> Flask:
+    """Return the concrete app behind Flask's context-local proxy."""
+    return cast(Flask, cast(Any, current_app)._get_current_object())
 
 
 def _variant_sync_job_defaults() -> dict:
@@ -346,7 +352,7 @@ def variant_sync_start():
         }
     )
     _start_variant_sync_background_job(
-        current_app._get_current_object(),
+        _current_flask_app(),
         item_ids=[item.id for item in items],
         set_ids=[item_set.id for item_set in item_sets],
         scope=scope,
