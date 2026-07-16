@@ -39,6 +39,7 @@ from models import (  # noqa: F401
     Person,
     SharpeningLog,
     Set,
+    User,
 )
 from scraping import (  # noqa: F401
     _build_set_member_entries,
@@ -101,6 +102,7 @@ __all__ = [
     "Person",
     "SharpeningLog",
     "Set",
+    "User",
     "_build_set_member_entries",
     "_dedupe_product_links",
     "_extract_cutco_price",
