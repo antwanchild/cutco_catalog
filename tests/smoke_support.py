@@ -17,6 +17,9 @@ import blueprints.catalog as catalog_blueprint  # noqa: F401
 from constants import UNKNOWN_COLOR, normalize_edge_for_category  # noqa: F401
 from extensions import db  # noqa: F401
 from helpers import (  # noqa: F401
+    AUTH_SESSION_KEY,
+    IDENTITY_KIND_PROXY_ADMIN,
+    IDENTITY_KIND_TOKEN_ADMIN,
     _collection_token,
     _gift_token,
     _notify_discord,
@@ -82,6 +85,9 @@ __all__ = [
     "UNKNOWN_COLOR",
     "normalize_edge_for_category",
     "db",
+    "AUTH_SESSION_KEY",
+    "IDENTITY_KIND_PROXY_ADMIN",
+    "IDENTITY_KIND_TOKEN_ADMIN",
     "_collection_token",
     "_gift_token",
     "_notify_discord",
