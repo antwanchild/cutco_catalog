@@ -2,6 +2,15 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      repair_tag:
+        description: "Existing release tag to rebuild, such as v1.105.0"
+        required: false
+        type: string
+      repair_sha:
+        description: "Commit SHA that the repair tag must reference"
+        required: false
+        type: string
   push:
     branches: [master]
 
@@ -20,15 +29,56 @@ jobs:
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
       version: ${{ steps.tag.outputs.version }}
+      release_sha: ${{ steps.release_commit.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.repair_sha || github.sha }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute next version and push tag
         id: tag
-        run: bash scripts/release_tag.sh
+        env:
+          REPAIR_TAG: ${{ inputs.repair_tag }}
+          REPAIR_SHA: ${{ inputs.repair_sha }}
+        run: |
+          if [[ -n "$REPAIR_TAG" || -n "$REPAIR_SHA" ]]; then
+            if [[ -z "$REPAIR_TAG" || -z "$REPAIR_SHA" ]]; then
+              echo "repair_tag and repair_sha must be provided together." >&2
+              exit 1
+            fi
+            if [[ ! "$REPAIR_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "repair_tag must be a semantic version tag such as v1.105.0." >&2
+              exit 1
+            fi
+
+            git fetch --force origin "refs/tags/${REPAIR_TAG}:refs/tags/${REPAIR_TAG}"
+            TAG_SHA=$(git rev-parse "${REPAIR_TAG}^{commit}")
+            HEAD_SHA=$(git rev-parse HEAD)
+            if [[ "$TAG_SHA" != "$HEAD_SHA" || "$HEAD_SHA" != "$REPAIR_SHA" ]]; then
+              echo "Repair target mismatch: tag=${TAG_SHA} checkout=${HEAD_SHA} requested=${REPAIR_SHA}" >&2
+              exit 1
+            fi
+
+            {
+              echo "new_tag=${REPAIR_TAG}"
+              echo "version=${REPAIR_TAG#v}"
+              echo "rerun=true"
+            } >> "$GITHUB_OUTPUT"
+            {
+              echo "## Release Repair"
+              echo ""
+              echo "- Existing tag: ${REPAIR_TAG}"
+              echo "- Verified commit: ${HEAD_SHA}"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            bash scripts/release_tag.sh
+          fi
+
+      - name: Resolve release commit
+        id: release_commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   # ── Build & push (runs in same workflow as auto-tag, uses its outputs) ─────
   build:
@@ -37,6 +87,8 @@ jobs:
     needs: auto-tag
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.auto-tag.outputs.new_tag }}
 
       - name: Extract version from tag
         id: version
@@ -49,25 +101,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker meta
-        id: docker_meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=raw,value=latest
-
       - name: Build & push image
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
-          tags: ${{ steps.docker_meta.outputs.tags }}
-          labels: ${{ steps.docker_meta.outputs.labels }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
           build-args: |
             APP_VERSION=${{ steps.version.outputs.version }}
-            GIT_SHA=${{ github.sha }}
+            GIT_SHA=${{ needs.auto-tag.outputs.release_sha }}
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v3.0.1
