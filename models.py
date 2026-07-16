@@ -517,6 +517,25 @@ class User(BaseModel):
         """Invalidate sessions issued with the current session version."""
         self.session_version = max(1, self.session_version or 1) + 1
 
+    def update_access(
+        self,
+        *,
+        role: str | None = None,
+        is_active: bool | None = None,
+        actor_user_id: int | None = None,
+    ) -> None:
+        """Update authorization state while preventing named-admin self-lockout."""
+        next_role = self.role if role is None else role
+        next_active = self.is_active if is_active is None else is_active
+        if (
+            actor_user_id is not None
+            and self.id == actor_user_id
+            and (next_role != USER_ROLE_ADMIN or not next_active)
+        ):
+            raise ValueError("You cannot demote or deactivate your own account.")
+        self.role = next_role
+        self.is_active = next_active
+
 
 class AuthSetupState(BaseModel):
     """Singleton claim proving that initial account setup has completed."""
@@ -949,7 +968,7 @@ def _protect_user_account_invariants(session, flush_context, instances) -> None:
         session.scalars(
             db.select(User.id).where(
                 User.role == USER_ROLE_ADMIN,
-                User.is_active.is_(True),
+                User.is_active == True,  # noqa: E712
             )
         ).all()
     )

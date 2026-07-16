@@ -111,6 +111,7 @@ def _register_blueprints(app: Flask) -> None:
     from blueprints.data import data_bp
     from blueprints.logs import logs_bp
     from blueprints.people import people_bp
+    from blueprints.user_admin import user_admin_bp
     from blueprints.views import views_bp
 
     app.register_blueprint(catalog_bp)
@@ -119,6 +120,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(views_bp)
     app.register_blueprint(data_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(user_admin_bp)
 
 
 def _register_cli(app: Flask) -> None:

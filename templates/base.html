@@ -80,12 +80,13 @@
 
     {% if is_admin() %}
       <details class="nav-group">
-        <summary class="nav-group-toggle {% if request.endpoint and request.endpoint.startswith('admin.') %}active{% endif %}">
+        <summary class="nav-group-toggle {% if request.endpoint and (request.endpoint.startswith('admin.') or request.endpoint.startswith('user_admin.')) %}active{% endif %}">
           Admin <span class="badge-admin">On</span>
         </summary>
         <div class="nav-group-menu">
           <div class="nav-group-section">
             <div class="nav-group-heading">Review</div>
+            <a href="{{ url_for('user_admin.users_list') }}" {% if request.endpoint and request.endpoint.startswith('user_admin.') %}class="active"{% endif %}>Users</a>
             <a href="{{ url_for('admin.audit_page') }}" {% if request.endpoint == 'admin.audit_page' %}class="active"{% endif %}>Audit Trail</a>
             <a href="{{ url_for('admin.diagnostics_page') }}" {% if request.endpoint == 'admin.diagnostics_page' %}class="active"{% endif %}>Diagnostics</a>
           </div>
