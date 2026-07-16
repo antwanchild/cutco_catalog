@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Users – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">👥 Users</h1>
+    <p class="muted">Manage named accounts, roles, access status, passwords, and sessions.</p>
+  </div>
+  <a href="{{ url_for('user_admin.user_create') }}" class="btn btn-primary">Add user</a>
+</div>
+
+<section class="detail-section">
+  <div class="section-heading-actions">
+    <h2 class="section-heading">Named Accounts</h2>
+    <span class="muted small">{{ users | length }} account{% if users | length != 1 %}s{% endif %}</span>
+  </div>
+  <div class="table-wrap mt-sm">
+    <table class="data-table compact">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Role</th>
+          <th>Source</th>
+          <th>Status</th>
+          <th>Password</th>
+          <th>Last login</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>
+            <a href="{{ url_for('user_admin.user_edit', user_id=user.id) }}"><strong>{{ user.label }}</strong></a>
+            <div class="muted small mono">{{ user.username }}{% if user.id == actor_user_id %} · you{% endif %}</div>
+          </td>
+          <td><span class="badge badge-{{ 'create' if user.role == 'admin' else 'info' }}">{{ user.role }}</span></td>
+          <td>{{ user.auth_source }}</td>
+          <td><span class="badge badge-{{ 'present' if user.is_active else 'missing' }}">{{ 'active' if user.is_active else 'inactive' }}</span></td>
+          <td>
+            {% if user.auth_source == 'proxy' %}
+              <span class="muted">external</span>
+            {% elif user.must_change_password %}
+              <span class="badge badge-warning">change required</span>
+            {% else %}
+              <span class="muted">set</span>
+            {% endif %}
+          </td>
+          <td class="small mono">{{ user.last_login_at or '—' }}</td>
+          <td>
+            <div class="form-actions compact-actions">
+              <a href="{{ url_for('user_admin.user_edit', user_id=user.id) }}" class="btn btn-secondary btn-xs">Edit</a>
+              {% if user.is_active %}
+                <form method="post" action="{{ url_for('user_admin.user_deactivate', user_id=user.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-danger btn-xs" {% if user.id == actor_user_id %}disabled title="You cannot deactivate yourself"{% endif %}>Deactivate</button>
+                </form>
+              {% else %}
+                <form method="post" action="{{ url_for('user_admin.user_activate', user_id=user.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-secondary btn-xs">Activate</button>
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="muted">No named accounts exist.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

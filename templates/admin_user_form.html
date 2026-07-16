@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit User' if user else 'Add User' }} – Cutco Vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ 'Edit User' if user else 'Add User' }}</h1>
+    {% if user %}<p class="muted mono">{{ user.username }} · {{ user.auth_source }}</p>{% endif %}
+  </div>
+  <a href="{{ url_for('user_admin.users_list') }}" class="btn btn-ghost">Back to users</a>
+</div>
+
+<section class="detail-section">
+  <h2 class="section-heading">Account</h2>
+  <form method="post" class="form-card compact mt-sm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if not user %}
+    <label>Username
+      <input type="text" name="username" autocomplete="off" required maxlength="120" class="input-full">
+    </label>
+    {% endif %}
+    <label>Display name
+      <input type="text" name="display_name" value="{{ user.display_name if user and user.display_name else '' }}" maxlength="160" class="input-full">
+    </label>
+    <label>Role
+      <select name="role" class="input-full">
+        {% for role in roles %}
+          <option value="{{ role }}" {% if (user and user.role == role) or (not user and role == 'user') %}selected{% endif %}>{{ role | capitalize }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if user and user.id == actor_user_id %}
+      <p class="muted small">Your own account cannot be demoted or deactivated from user administration.</p>
+    {% endif %}
+    {% if not user %}
+    <label>Temporary password
+      <input type="password" name="password" autocomplete="new-password" required minlength="12" class="input-full">
+    </label>
+    <label>Confirm temporary password
+      <input type="password" name="password_confirm" autocomplete="new-password" required minlength="12" class="input-full">
+    </label>
+    <p class="muted small">The new user must replace this password at first login.</p>
+    {% endif %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">{{ 'Save changes' if user else 'Create user' }}</button>
+      <a href="{{ url_for('user_admin.users_list') }}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</section>
+
+{% if user %}
+<section class="detail-section">
+  <h2 class="section-heading">Security Actions</h2>
+  {% if user.auth_source == 'local' and user.id != actor_user_id %}
+  <form method="post" action="{{ url_for('user_admin.user_reset_password', user_id=user.id) }}" class="form-card compact mt-sm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h3>Set temporary password</h3>
+    <p class="muted small">This revokes existing sessions and forces a password change at next login.</p>
+    <label>Temporary password
+      <input type="password" name="password" autocomplete="new-password" required minlength="12" class="input-full">
+    </label>
+    <label>Confirm temporary password
+      <input type="password" name="password_confirm" autocomplete="new-password" required minlength="12" class="input-full">
+    </label>
+    <div class="form-actions"><button type="submit" class="btn btn-secondary">Reset password</button></div>
+  </form>
+  {% elif user.auth_source == 'proxy' %}
+  <div class="form-card compact mt-sm">
+    <h3>Externally managed password</h3>
+    <p class="muted">Reset this account's password at its identity provider.</p>
+  </div>
+  {% else %}
+  <div class="form-card compact mt-sm">
+    <h3>Your password</h3>
+    <p class="muted">Use <a href="{{ url_for('admin.account_password') }}">Change Password</a> so your current session can be safely reissued.</p>
+  </div>
+  {% endif %}
+
+  <div class="form-card compact mt-sm">
+    <h3>Issued sessions</h3>
+    <p class="muted small">Invalidate every current session for this account without changing its password.</p>
+    <form method="post" action="{{ url_for('user_admin.user_revoke_sessions', user_id=user.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-danger" {% if user.id == actor_user_id %}disabled title="Use Change Password for your own account"{% endif %}>Revoke sessions</button>
+    </form>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -210,6 +210,14 @@ soon as a user exists, token login and previously issued token-admin sessions ar
 disabled. Local users can change their password from the Account/Admin menu;
 password changes revoke their other sessions.
 
+Administrators can manage named accounts at `/admin/users`. New local accounts
+receive a temporary password that must be changed at first login. Role changes,
+deactivation, password resets, and explicit session revocation invalidate the
+target account's existing sessions. A named administrator cannot demote,
+deactivate, reset, or revoke their own account through the web interface, and the
+last active administrator cannot be demoted or deactivated. Proxy-managed
+passwords remain the responsibility of the configured identity provider.
+
 ### Local account recovery
 
 User recovery commands run inside the application container and use the same

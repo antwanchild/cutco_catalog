@@ -230,6 +230,12 @@ a:hover { text-decoration: underline; }
   color: var(--text);
   background: var(--bg3);
 }
+.compact-actions {
+  align-items: center;
+  gap: .35rem;
+  margin: 0;
+}
+.compact-actions form { margin: 0; }
 .badge-admin {
   background: var(--accent2);
   color: #fff;
