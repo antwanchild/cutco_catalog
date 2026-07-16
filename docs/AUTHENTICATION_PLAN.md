@@ -281,6 +281,34 @@ Avoid exposing whether a submitted username exists on public login responses.
 - Update README, SECURITY, Docker examples, environment tables, and release notes.
 - Add an upgrade checklist and rollback notes.
 
+## Per-phase release gate
+
+Every implementation phase must remain independently deployable. A phase may be
+merged into `master` only when all of the following conditions are satisfied:
+
+- Existing public pages and signed share links retain their current behavior.
+- Every private, admin, and mutating route remains protected at least as strongly
+  as it was before the phase.
+- All authentication methods intended to remain available during that phase are
+  covered by automated tests and verified in a representative deployment.
+- New authentication behavior is disabled or backward-compatible until its full
+  authorization, recovery, and failure paths are implemented.
+- Database migrations are additive, preserve existing data, and have documented
+  backup and rollback procedures.
+- Account deactivation, role changes, and session revocation take effect without
+  leaving stale elevated access.
+- The complete automated test suite plus lint, formatting, and static type checks
+  pass.
+- Deployment and rollback instructions identify any expected session invalidation
+  or administrator action.
+- No partially implemented authentication path or temporary authorization bypass
+  is deployed to production.
+
+For Phase 1 specifically, the release must not change login or authorization
+behavior: `ADMIN_TOKEN` and configured trusted-proxy access continue to work while
+the new schema remains dormant. Later phases may retire an old path only after its
+replacement and CLI recovery path pass the same gate.
+
 ## Test matrix
 
 At minimum, automated coverage must include:

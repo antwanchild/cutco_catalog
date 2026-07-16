@@ -408,6 +408,33 @@ def _schema_set_variant_kind_migrations() -> None:
     )
 
 
+def _schema_user_auth_foundation_migrations() -> None:
+    """Create named identities and link audit events to their actors."""
+    from models import ActivityEvent, User
+
+    connection = db.session.connection()
+    db.metadata.tables[User.__tablename__].create(connection, checkfirst=True)
+    inspector = sa_inspect(connection)
+    activity_columns = {
+        column["name"] for column in inspector.get_columns("activity_events")
+    }
+    if "actor_user_id" not in activity_columns:
+        connection.execute(
+            db.text(
+                "ALTER TABLE activity_events ADD COLUMN actor_user_id "
+                "INTEGER REFERENCES users(id) ON DELETE SET NULL"
+            )
+        )
+        logger.info("Schema migration: added activity_events.actor_user_id")
+    activity_table = db.metadata.tables[ActivityEvent.__tablename__]
+    actor_index = next(
+        index
+        for index in activity_table.indexes
+        if index.name == "ix_activity_events_actor_user_id"
+    )
+    actor_index.create(connection, checkfirst=True)
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
@@ -426,6 +453,9 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(11, "ownership_engraving", _schema_ownership_engraving_migrations),
     SchemaMigration(12, "set_variants", _schema_set_variant_migrations),
     SchemaMigration(13, "set_variant_kinds", _schema_set_variant_kind_migrations),
+    SchemaMigration(
+        14, "user_auth_foundation", _schema_user_auth_foundation_migrations
+    ),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

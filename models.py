@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, Any
 
 from flask import has_request_context, request, session
 from sqlalchemy import delete as sa_delete, event, inspect as sa_inspect
-from sqlalchemy.orm import Mapped, Session as SASession, relationship
+from sqlalchemy.orm import Mapped, Session as SASession, relationship, validates
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from constants import UNKNOWN_COLOR
 from extensions import db
@@ -354,6 +355,169 @@ class Ownership(BaseModel):
         )
 
 
+USER_ROLE_USER = "user"
+USER_ROLE_ADMIN = "admin"
+USER_ROLES = frozenset({USER_ROLE_USER, USER_ROLE_ADMIN})
+USER_AUTH_SOURCE_LOCAL = "local"
+USER_AUTH_SOURCE_PROXY = "proxy"
+USER_AUTH_SOURCES = frozenset({USER_AUTH_SOURCE_LOCAL, USER_AUTH_SOURCE_PROXY})
+MIN_PASSWORD_LENGTH = 12
+
+
+def normalize_username(value: str) -> str:
+    """Return the canonical value used to identify a user."""
+    return (value or "").strip().casefold()
+
+
+class User(BaseModel):
+    """A named local or trusted-proxy application identity."""
+
+    __tablename__ = "users"
+
+    if TYPE_CHECKING:
+        audit_events: Mapped[list[ActivityEvent]]
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    display_name = db.Column(db.String(160), nullable=True)
+    password_hash = db.Column(db.String(255), nullable=True)
+    role = db.Column(db.String(20), nullable=False, default=USER_ROLE_USER)
+    auth_source = db.Column(
+        db.String(20), nullable=False, default=USER_AUTH_SOURCE_LOCAL
+    )
+    external_subject = db.Column(db.String(255), nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    must_change_password = db.Column(db.Boolean, nullable=False, default=False)
+    session_version = db.Column(db.Integer, nullable=False, default=1)
+    last_login_at = db.Column(db.String(32), nullable=True)
+    created_at = db.Column(
+        db.String(32),
+        nullable=False,
+        default=lambda: datetime.now(UTC).isoformat(timespec="seconds"),
+    )
+    updated_at = db.Column(
+        db.String(32),
+        nullable=False,
+        default=lambda: datetime.now(UTC).isoformat(timespec="seconds"),
+        onupdate=lambda: datetime.now(UTC).isoformat(timespec="seconds"),
+    )
+
+    audit_events: Mapped[list[ActivityEvent]] = relationship(
+        "ActivityEvent",
+        back_populates="actor_user",
+        foreign_keys="ActivityEvent.actor_user_id",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "auth_source",
+            "external_subject",
+            name="uq_user_auth_source_subject",
+        ),
+        db.CheckConstraint(
+            "role IN ('user', 'admin')",
+            name="ck_user_role",
+        ),
+        db.CheckConstraint(
+            "auth_source IN ('local', 'proxy')",
+            name="ck_user_auth_source",
+        ),
+        db.CheckConstraint(
+            "session_version >= 1",
+            name="ck_user_session_version",
+        ),
+    )
+
+    def __init__(self, **kwargs: Any) -> None:
+        """Initialize security-sensitive defaults before the first flush."""
+        kwargs.setdefault("role", USER_ROLE_USER)
+        kwargs.setdefault("auth_source", USER_AUTH_SOURCE_LOCAL)
+        kwargs.setdefault("is_active", True)
+        kwargs.setdefault("must_change_password", False)
+        kwargs.setdefault("session_version", 1)
+        super().__init__(**kwargs)
+
+    @validates("username")
+    def _normalize_username(self, _key: str, value: str) -> str:
+        """Normalize and validate an assigned username."""
+        normalized = normalize_username(value)
+        if not normalized:
+            raise ValueError("Username is required.")
+        if len(normalized) > 120:
+            raise ValueError("Username must be 120 characters or fewer.")
+        state = sa_inspect(self)
+        if state is not None and state.persistent and self.username != normalized:
+            raise ValueError("User identity field 'username' cannot be changed.")
+        return normalized
+
+    @validates("role")
+    def _validate_role(self, _key: str, value: str) -> str:
+        """Reject unsupported authorization roles."""
+        normalized = (value or "").strip().casefold()
+        if normalized not in USER_ROLES:
+            raise ValueError(f"Unsupported user role: {value!r}")
+        return normalized
+
+    @validates("auth_source")
+    def _validate_auth_source(self, _key: str, value: str) -> str:
+        """Reject unsupported identity sources."""
+        normalized = (value or "").strip().casefold()
+        if normalized not in USER_AUTH_SOURCES:
+            raise ValueError(f"Unsupported authentication source: {value!r}")
+        state = sa_inspect(self)
+        if state is not None and state.persistent and self.auth_source != normalized:
+            raise ValueError("User identity field 'auth_source' cannot be changed.")
+        return normalized
+
+    @validates("external_subject")
+    def _normalize_external_subject(self, _key: str, value: str | None) -> str | None:
+        """Trim an external identity subject without changing its case."""
+        normalized = (value or "").strip()
+        normalized_value = normalized or None
+        state = sa_inspect(self)
+        if (
+            state is not None
+            and state.persistent
+            and self.external_subject != normalized_value
+        ):
+            raise ValueError(
+                "User identity field 'external_subject' cannot be changed."
+            )
+        return normalized_value
+
+    @property
+    def label(self) -> str:
+        """Return the preferred human-readable identity label."""
+        return (self.display_name or "").strip() or self.username
+
+    @property
+    def has_admin_role(self) -> bool:
+        """Return whether this account currently has the admin role."""
+        return self.role == USER_ROLE_ADMIN
+
+    def set_password(self, password: str, *, require_change: bool = False) -> None:
+        """Hash and store a local password."""
+        if len(password or "") < MIN_PASSWORD_LENGTH:
+            raise ValueError(
+                f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+            )
+        self.password_hash = generate_password_hash(password)
+        self.must_change_password = require_change
+
+    def check_password(self, password: str) -> bool:
+        """Return whether a candidate matches this account's password hash."""
+        return bool(
+            self.password_hash
+            and password
+            and check_password_hash(self.password_hash, password)
+        )
+
+    def revoke_sessions(self) -> None:
+        """Invalidate sessions issued with the current session version."""
+        self.session_version = max(1, self.session_version or 1) + 1
+
+
 class ActivityEvent(BaseModel):
     """A recorded activity item for dashboard summaries."""
 
@@ -365,12 +529,22 @@ class ActivityEvent(BaseModel):
     details = db.Column(db.Text, nullable=True)
     occurred_at = db.Column(db.String(32), nullable=False, index=True)
     actor = db.Column(db.String(40), nullable=True, index=True)
+    actor_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     action = db.Column(db.String(20), nullable=True, index=True)
     entity_type = db.Column(db.String(40), nullable=True, index=True)
     entity_id = db.Column(db.Integer, nullable=True, index=True)
     entity_name = db.Column(db.String(160), nullable=True)
     source = db.Column(db.String(160), nullable=True)
     payload = db.Column(db.Text, nullable=True)
+
+    actor_user: Mapped[User | None] = relationship(
+        "User", back_populates="audit_events", foreign_keys=[actor_user_id]
+    )
 
 
 class CookwareSession(BaseModel):
@@ -677,6 +851,7 @@ def record_audit_event(
     title: str,
     details: str | None = None,
     actor: str | None = None,
+    actor_user_id: int | None = None,
     action: str | None = None,
     entity_type: str | None = None,
     entity_id: int | None = None,
@@ -693,6 +868,7 @@ def record_audit_event(
             details=details,
             occurred_at=occurred_at or _now_utc(),
             actor=actor or _current_actor(),
+            actor_user_id=actor_user_id,
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,
@@ -701,6 +877,68 @@ def record_audit_event(
             payload=_json_dump(payload),
         )
     )
+
+
+def _validate_user_account(user: User) -> None:
+    """Validate source-specific account requirements before persistence."""
+    if not user.username:
+        raise ValueError("Username is required.")
+    if user.role not in USER_ROLES:
+        raise ValueError(f"Unsupported user role: {user.role!r}")
+    if user.auth_source not in USER_AUTH_SOURCES:
+        raise ValueError(f"Unsupported authentication source: {user.auth_source!r}")
+    if (user.session_version or 0) < 1:
+        raise ValueError("Session version must be at least 1.")
+    if user.auth_source == USER_AUTH_SOURCE_LOCAL:
+        if not user.password_hash:
+            raise ValueError("Local users require a password.")
+        if user.external_subject:
+            raise ValueError("Local users cannot have an external subject.")
+    elif not user.external_subject:
+        raise ValueError("Proxy users require an external subject.")
+    elif user.password_hash:
+        raise ValueError("Proxy users cannot have a local password.")
+
+
+@event.listens_for(SASession, "before_flush")
+def _protect_user_account_invariants(session, flush_context, instances) -> None:
+    """Validate accounts and prevent removal of the last active admin."""
+    changed_users = {
+        user
+        for user in (*session.new, *session.dirty, *session.deleted)
+        if isinstance(user, User)
+    }
+    if not changed_users:
+        return
+
+    for user in changed_users:
+        if user not in session.deleted:
+            _validate_user_account(user)
+
+    persisted_admin_ids = set(
+        session.scalars(
+            db.select(User.id).where(
+                User.role == USER_ROLE_ADMIN,
+                User.is_active.is_(True),
+            )
+        ).all()
+    )
+    if not persisted_admin_ids:
+        return
+
+    resulting_admins: set[int | str] = set(persisted_admin_ids)
+    for user in changed_users:
+        if user.id is not None:
+            resulting_admins.discard(user.id)
+        if (
+            user not in session.deleted
+            and user.is_active
+            and user.role == USER_ROLE_ADMIN
+        ):
+            resulting_admins.add(user.id or f"new:{id(user)}")
+
+    if not resulting_admins:
+        raise ValueError("Cannot remove, disable, or demote the last active admin.")
 
 
 def record_activity(
@@ -895,6 +1133,7 @@ def get_recent_audit_events(
                 "details": row.details,
                 "occurred_at": row.occurred_at,
                 "actor": row.actor,
+                "actor_user_id": row.actor_user_id,
                 "action": row.action,
                 "entity_type": row.entity_type,
                 "entity_id": row.entity_id,
