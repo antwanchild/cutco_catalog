@@ -147,7 +147,7 @@ class UserAuthFoundationTests(SmokeBaseTest):
             schema_state = db.session.get(SchemaState, "schema")
             self.assertIsNotNone(schema_state)
             self.assertEqual(schema_state.version, SCHEMA_VERSION)
-            migration = db.session.get(SchemaHistory, SCHEMA_VERSION)
+            migration = db.session.get(SchemaHistory, 14)
             self.assertIsNotNone(migration)
             self.assertEqual(migration.name, "user_auth_foundation")
 

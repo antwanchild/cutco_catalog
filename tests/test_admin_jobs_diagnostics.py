@@ -78,7 +78,7 @@ class AdminDiagnosticsSmokeTests(AdminJobBaseTest):
         self.assertEqual(msrp_page.status_code, 302)
         self.assertEqual(specs_page.status_code, 302)
         self.assertEqual(diagnostics_page.status_code, 302)
-        self.assertEqual(logout_response.status_code, 302)
+        self.assertEqual(logout_response.status_code, 405)
         self.assertEqual(msrp_status.status_code, 403)
         self.assertEqual(specs_status.status_code, 403)
         self.assertEqual(msrp_status.get_json()["error"], "Unauthorized")
@@ -86,6 +86,7 @@ class AdminDiagnosticsSmokeTests(AdminJobBaseTest):
 
     def test_admin_routes_render_and_api_surfaces(self):
         self._login_as_admin()
+        self._set_csrf_token()
 
         with self.app.app_context():
             item = Item(
@@ -145,7 +146,11 @@ class AdminDiagnosticsSmokeTests(AdminJobBaseTest):
             msrp_status = self.client.get("/admin/msrp-diff/status")
             specs_status = self.client.get("/admin/specs-backfill/status")
             variants_response = self.client.get(f"/api/variants/{item_id}")
-            logout_response = self.client.get("/admin/logout", follow_redirects=False)
+            logout_response = self.client.post(
+                "/admin/logout",
+                data={"csrf_token": "test-csrf-token"},
+                follow_redirects=False,
+            )
 
         self.assertEqual(msrp_page.status_code, 200)
         self.assertIn(b"MSRP Diff", msrp_page.data)

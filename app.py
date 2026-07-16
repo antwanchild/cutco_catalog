@@ -5,7 +5,16 @@ import os
 from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, Response, jsonify, render_template, request, url_for
+from flask import (
+    Flask,
+    Response,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from sqlalchemy import func
 
 from constants import (
@@ -39,7 +48,7 @@ _LOG_FORMAT = logging.Formatter(
 )
 _LOGGING_READY = False
 _FILE_LOG_PATHS: set[str] = set()
-CSRF_EXEMPT = {"/admin/login", "/admin/logout"}
+CSRF_EXEMPT: set[str] = set()
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -121,6 +130,21 @@ def _register_hooks(app: Flask) -> None:
             and request.path not in CSRF_EXEMPT
         ):
             validate_csrf()
+
+    @app.before_request
+    def enforce_required_password_change():
+        user = current_user()
+        if user is None or not user.must_change_password:
+            return None
+        allowed_endpoints = {
+            "admin.account_password",
+            "admin.admin_logout",
+            "static",
+        }
+        if request.endpoint not in allowed_endpoints:
+            flash("Change your temporary password before continuing.", "warning")
+            return redirect(url_for("admin.account_password"))
+        return None
 
     @app.after_request
     def set_security_headers(response):

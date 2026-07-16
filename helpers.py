@@ -21,15 +21,24 @@ from flask import (
     url_for,
 )
 from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from constants import (
+    ADMIN_TOKEN,
     DISCORD_WEBHOOK_URL,
     TRUSTED_AUTH_ADMIN_GROUPS,
     TRUSTED_AUTH_GROUPS_HEADER,
     TRUSTED_AUTH_USERNAME_HEADER,
 )
 from extensions import db
-from models import Ownership, USER_ROLE_ADMIN, USER_ROLE_USER, User
+from models import (
+    Ownership,
+    USER_AUTH_SOURCE_LOCAL,
+    USER_ROLE_ADMIN,
+    USER_ROLE_USER,
+    User,
+    normalize_username,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +47,7 @@ LEGACY_ADMIN_SESSION_KEY = "is_admin"
 IDENTITY_KIND_TOKEN_ADMIN = "token_admin"
 IDENTITY_KIND_PROXY_ADMIN = "proxy_admin"
 IDENTITY_KIND_USER = "user"
+_DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,6 +183,35 @@ def establish_user_session(user: User) -> None:
     )
 
 
+def users_exist() -> bool:
+    """Return whether any named application account has been created."""
+    return db.session.execute(db.select(User.id).limit(1)).first() is not None
+
+
+def admin_token_matches(candidate: str) -> bool:
+    """Compare an admin token without content-dependent timing."""
+    return hmac.compare_digest(candidate or "", ADMIN_TOKEN)
+
+
+def authenticate_local_user(username: str, password: str) -> User | None:
+    """Validate local credentials with a generic timing path for failures."""
+    normalized_username = normalize_username(username)
+    user = db.session.execute(
+        db.select(User).where(
+            User.username == normalized_username,
+            User.auth_source == USER_AUTH_SOURCE_LOCAL,
+        )
+    ).scalar_one_or_none()
+    password_hash = user.password_hash if user and user.password_hash else None
+    password_valid = check_password_hash(
+        password_hash or _DUMMY_PASSWORD_HASH,
+        password or "",
+    )
+    if not user or not user.is_active or not password_valid:
+        return None
+    return user
+
+
 def clear_auth_session() -> None:
     """Remove current and legacy authentication state from the session."""
     session.pop(AUTH_SESSION_KEY, None)
@@ -207,6 +246,9 @@ def _identity_from_session() -> RequestIdentity | None:
     if isinstance(payload, dict):
         kind = payload.get("kind")
         if kind == IDENTITY_KIND_TOKEN_ADMIN:
+            if users_exist():
+                clear_auth_session()
+                return None
             return RequestIdentity(
                 username="admin",
                 role=USER_ROLE_ADMIN,
@@ -227,6 +269,9 @@ def _identity_from_session() -> RequestIdentity | None:
         clear_auth_session()
 
     if session.get(LEGACY_ADMIN_SESSION_KEY) is True:
+        if users_exist():
+            clear_auth_session()
+            return None
         establish_token_admin_session()
         return RequestIdentity(
             username="admin",

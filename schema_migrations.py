@@ -435,6 +435,14 @@ def _schema_user_auth_foundation_migrations() -> None:
     actor_index.create(connection, checkfirst=True)
 
 
+def _schema_local_auth_setup_migrations() -> None:
+    """Create the singleton initial-account setup claim table."""
+    from models import AuthSetupState
+
+    connection = db.session.connection()
+    db.metadata.tables[AuthSetupState.__tablename__].create(connection, checkfirst=True)
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
@@ -456,6 +464,7 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(
         14, "user_auth_foundation", _schema_user_auth_foundation_migrations
     ),
+    SchemaMigration(15, "local_auth_setup", _schema_local_auth_setup_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

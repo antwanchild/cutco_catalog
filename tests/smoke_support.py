@@ -158,8 +158,14 @@ class SmokeBaseTest(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def _login_as_admin(self):
+        self._set_csrf_token()
         self.client.post(
-            "/admin/login", data={"token": "test-admin-token"}, follow_redirects=False
+            "/admin/login",
+            data={
+                "csrf_token": "test-csrf-token",
+                "token": "test-admin-token",
+            },
+            follow_redirects=False,
         )
 
     def _set_csrf_token(self, value="test-csrf-token"):

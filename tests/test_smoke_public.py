@@ -198,9 +198,13 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn(b"Include Unknown", unknown_response.data)
 
     def test_admin_login_sets_session_flag(self):
+        self._set_csrf_token()
         response = self.client.post(
             "/admin/login",
-            data={"token": "test-admin-token"},
+            data={
+                "csrf_token": "test-csrf-token",
+                "token": "test-admin-token",
+            },
             follow_redirects=False,
         )
 

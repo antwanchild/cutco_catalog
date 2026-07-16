@@ -133,7 +133,7 @@ To enable the local hooks, install the tooling once and run `pre-commit install`
 | Variable | Default | Required | Description |
 |---|---|:---:|---|
 | `SECRET_KEY` | `cutco-vault-dev-key` | ⚠️ | Flask session secret — **change in production** |
-| `ADMIN_TOKEN` | `admin` | ⚠️ | Token required to log in as admin — **change in production** |
+| `ADMIN_TOKEN` | `admin` | ⚠️ | One-time bootstrap token used to create the first named admin — **change in production** |
 | `ADMIN_SESSION_SECONDS` | `7200` | No | Admin session lifetime in seconds (default 2 h from login time); set to `0` for browser-session only |
 | `DATABASE_URL` | `sqlite:////data/cutco.db` | No | SQLAlchemy connection string |
 | `DATA_DIR` | `/data` | No | Directory for the database and job state files |
@@ -202,7 +202,13 @@ Private pages describe collector data or allow changes:
 
 If you put an auth proxy in front of the app, authenticated requests can be treated as private by setting `TRUSTED_AUTH_USERNAME_HEADER` to the trusted username header your proxy forwards. If your proxy also forwards group membership, set `TRUSTED_AUTH_GROUPS_HEADER` and `TRUSTED_AUTH_ADMIN_GROUPS` so the app can recognize proxy-based admin access. The legacy `AUTHENTIK_USERNAME_HEADER` and `AUTHENTIK_GROUPS_HEADER` names are still accepted for compatibility, and `AUTHELIA_USERNAME_HEADER` / `AUTHELIA_GROUPS_HEADER` are also supported as fallbacks.
 
-Admin access is hybrid: local direct access still uses the app's `ADMIN_TOKEN`, while proxy-authenticated users in the configured admin group can skip the token form and go straight to admin pages.
+Admin access is hybrid: standalone installations can use named local accounts,
+while proxy-authenticated users in the configured admin group can skip the local
+login form and go straight to admin pages. On an installation with no users, open
+`/setup` and use `ADMIN_TOKEN` once to create the first named administrator. As
+soon as a user exists, token login and previously issued token-admin sessions are
+disabled. Local users can change their password from the Account/Admin menu;
+password changes revoke their other sessions.
 
 For example, you might set:
 

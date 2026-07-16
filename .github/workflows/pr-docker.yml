@@ -43,13 +43,8 @@ jobs:
 
             const previewTagPrefix = `pr-${pullRequest.number}`;
 
-            const { data: pullRequestDetails } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pullRequest.number,
-            });
-
-            if (!pullRequestDetails.labels.some((label) => label.name === requiredLabel)) {
+            const labels = pullRequest.labels || [];
+            if (!labels.some((label) => label.name === requiredLabel)) {
               core.info(`PR #${pullRequest.number} does not have the '${requiredLabel}' label. Skipping the image build.`);
               core.setOutput("ready", "false");
               return;

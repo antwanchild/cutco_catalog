@@ -96,12 +96,30 @@
           </div>
           <div class="nav-group-section nav-group-section-last">
             <div class="nav-group-heading">Session</div>
-            <a href="{{ url_for('admin.admin_logout') }}">Logout</a>
+            {% if current_user() %}
+            <a href="{{ url_for('admin.account_password') }}">Change Password</a>
+            {% endif %}
+            <form method="post" action="{{ url_for('admin.admin_logout') }}" class="nav-action-form">
+              <button type="submit" class="nav-menu-action">Logout</button>
+            </form>
+          </div>
+        </div>
+      </details>
+    {% elif current_user() %}
+      <details class="nav-group">
+        <summary class="nav-group-toggle {% if request.endpoint == 'admin.account_password' %}active{% endif %}">Account</summary>
+        <div class="nav-group-menu">
+          <div class="nav-group-section nav-group-section-last">
+            <div class="nav-group-heading">{{ current_user().label }}</div>
+            <a href="{{ url_for('admin.account_password') }}">Change Password</a>
+            <form method="post" action="{{ url_for('admin.admin_logout') }}" class="nav-action-form">
+              <button type="submit" class="nav-menu-action">Logout</button>
+            </form>
           </div>
         </div>
       </details>
     {% else %}
-      <a href="{{ url_for('admin.admin_login') }}">Admin</a>
+      <a href="{{ url_for('admin.admin_login') }}">Sign In</a>
     {% endif %}
   </div>
 </nav>
@@ -113,7 +131,9 @@
   document.addEventListener('DOMContentLoaded', function() {
     var tpl = document.getElementById('csrf-field');
     document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(function(f) {
-      f.appendChild(tpl.content.cloneNode(true));
+      if (!f.querySelector('input[name="csrf_token"]')) {
+        f.appendChild(tpl.content.cloneNode(true));
+      }
     });
   });
 
