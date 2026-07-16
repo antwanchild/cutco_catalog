@@ -3,6 +3,7 @@ import os
 from datetime import timedelta, timezone
 
 from admin_jobs_support import (
+    AUTH_SESSION_KEY,
     AdminJobBaseTest,
     BOOTSTRAP_VERSION,
     Item,
@@ -170,3 +171,4 @@ class AdminDiagnosticsSmokeTests(AdminJobBaseTest):
         self.assertEqual(logout_response.status_code, 302)
         with self.client.session_transaction() as session:
             self.assertIsNone(session.get("is_admin"))
+            self.assertIsNone(session.get(AUTH_SESSION_KEY))

@@ -27,7 +27,15 @@ from flask import (
 from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION, get_git_sha_info
 from extensions import db
 from extensions import limiter
-from helpers import admin_required, is_admin, is_trusted_proxy_admin
+from helpers import (
+    admin_required,
+    clear_auth_session,
+    establish_proxy_admin_session,
+    establish_token_admin_session,
+    is_admin,
+    is_trusted_proxy_admin,
+    trusted_proxy_username,
+)
 from models import ActivityEvent, Item, get_recent_audit_events
 from schema_migrations import get_schema_history, get_schema_state, SCHEMA_VERSION
 from startup import BOOTSTRAP_VERSION, get_bootstrap_history, get_bootstrap_state
@@ -346,15 +354,15 @@ def inject_admin_status_strip():
 def admin_login():
     """Handle admin login requests."""
     if is_trusted_proxy_admin():
-        session["is_admin"] = True
+        establish_proxy_admin_session(trusted_proxy_username())
         session.permanent = ADMIN_SESSION_SECONDS > 0
         flash("Admin access granted via proxy.", "success")
         return redirect(url_for("admin.diagnostics_page"))
-    if session.get("is_admin") is True:
+    if is_admin():
         return redirect(url_for("admin.diagnostics_page"))
     if request.method == "POST":
         if request.form.get("token") == ADMIN_TOKEN:
-            session["is_admin"] = True
+            establish_token_admin_session()
             session.permanent = ADMIN_SESSION_SECONDS > 0
             resp = redirect(url_for("catalog.catalog"))
             logger.info("Admin login successful")
@@ -369,7 +377,7 @@ def admin_login():
 def admin_logout():
     """Log the admin user out."""
     logger.info("Admin logged out")
-    session.pop("is_admin", None)
+    clear_auth_session()
     return redirect(url_for("index"))
 
 

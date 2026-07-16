@@ -13,6 +13,7 @@ from app import _teardown_logging, create_app  # noqa: F401
 import constants  # noqa: F401
 from constants import KNIFE_TASK_PRESETS  # noqa: F401
 from extensions import db  # noqa: F401
+from helpers import AUTH_SESSION_KEY  # noqa: F401
 import msrp_jobs  # noqa: F401
 from models import Item, ItemSetMember, ItemVariant, KnifeTask, Set  # noqa: F401
 from schema_migrations import (  # noqa: F401

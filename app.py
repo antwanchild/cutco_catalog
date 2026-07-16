@@ -18,7 +18,14 @@ from constants import (
     get_git_sha_info,
 )
 from extensions import db, limiter
-from helpers import _csrf_token, is_admin, is_authenticated_user, validate_csrf
+from helpers import (
+    _csrf_token,
+    current_identity,
+    current_user,
+    is_admin,
+    is_authenticated_user,
+    validate_csrf,
+)
 from models import Item, KnifeTask, Ownership, Person, Set, get_latest_activity
 from schema_migrations import get_schema_history, get_schema_state
 from startup import get_bootstrap_history, get_bootstrap_state
@@ -135,6 +142,8 @@ def _register_hooks(app: Flask) -> None:
         return dict(
             app_version=APP_VERSION,
             current_year=datetime.now().year,
+            current_identity=current_identity,
+            current_user=current_user,
             is_admin=is_admin,
             is_private_user=is_authenticated_user,
             UNKNOWN_COLOR=UNKNOWN_COLOR,

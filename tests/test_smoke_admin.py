@@ -24,7 +24,11 @@ class AdminSmokeTests(SmokeBaseTest):
         self.assertIn("Expires=", response.headers.get("Set-Cookie", ""))
         self.assertFalse(self.app.config["SESSION_REFRESH_EACH_REQUEST"])
         with self.client.session_transaction() as session:
-            self.assertTrue(session.get("is_admin"))
+            self.assertEqual(
+                session.get(AUTH_SESSION_KEY),
+                {"kind": IDENTITY_KIND_TOKEN_ADMIN},
+            )
+            self.assertNotIn("is_admin", session)
 
     def test_proxy_admin_bypasses_admin_login_form(self):
         with mock.patch("helpers.TRUSTED_AUTH_ADMIN_GROUPS", ("admins",)):
@@ -40,7 +44,14 @@ class AdminSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/diagnostics", response.headers["Location"])
         with self.client.session_transaction() as session:
-            self.assertTrue(session.get("is_admin"))
+            self.assertEqual(
+                session.get(AUTH_SESSION_KEY),
+                {
+                    "kind": IDENTITY_KIND_PROXY_ADMIN,
+                    "username": "proxy-admin",
+                },
+            )
+            self.assertNotIn("is_admin", session)
 
         home_response = self.client.get("/")
         self.assertEqual(home_response.status_code, 200)

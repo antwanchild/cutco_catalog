@@ -7,7 +7,7 @@ import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from flask import has_request_context, request, session
+from flask import has_request_context, request
 from sqlalchemy import delete as sa_delete, event, inspect as sa_inspect
 from sqlalchemy.orm import Mapped, Session as SASession, relationship, validates
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -788,9 +788,20 @@ def _current_actor() -> str:
     """Return a compact label for the current request actor."""
     if not has_request_context():
         return "system"
-    if session.get("is_admin") is True:
-        return "admin"
-    return "user"
+    from helpers import current_identity
+
+    identity = current_identity()
+    return identity.username[:40] if identity else "user"
+
+
+def _current_actor_user_id() -> int | None:
+    """Return the database user ID for the current request actor, if present."""
+    if not has_request_context():
+        return None
+    from helpers import current_identity
+
+    identity = current_identity()
+    return identity.user_id if identity else None
 
 
 def _current_source() -> str | None:
@@ -868,7 +879,9 @@ def record_audit_event(
             details=details,
             occurred_at=occurred_at or _now_utc(),
             actor=actor or _current_actor(),
-            actor_user_id=actor_user_id,
+            actor_user_id=(
+                actor_user_id if actor_user_id is not None else _current_actor_user_id()
+            ),
             action=action,
             entity_type=entity_type,
             entity_id=entity_id,
@@ -1087,6 +1100,7 @@ def _write_audit_events(session, flush_context) -> None:
                     details=entry["entity_name"],
                     occurred_at=_now_utc(),
                     actor=_current_actor(),
+                    actor_user_id=_current_actor_user_id(),
                     action=entry["action"],
                     entity_type=entry["entity_type"],
                     entity_id=entity_id,
