@@ -23,20 +23,37 @@ from flask import (
     session,
     url_for,
 )
+from sqlalchemy.exc import SQLAlchemyError
 
-from constants import ADMIN_SESSION_SECONDS, ADMIN_TOKEN, APP_VERSION, get_git_sha_info
+from constants import ADMIN_SESSION_SECONDS, APP_VERSION, get_git_sha_info
 from extensions import db
 from extensions import limiter
 from helpers import (
+    admin_token_matches,
     admin_required,
+    authenticate_local_user,
     clear_auth_session,
+    current_identity,
+    current_user,
+    db_commit,
     establish_proxy_admin_session,
     establish_token_admin_session,
+    establish_user_session,
     is_admin,
     is_trusted_proxy_admin,
     trusted_proxy_username,
+    user_required,
+    users_exist,
 )
-from models import ActivityEvent, Item, get_recent_audit_events
+from models import (
+    ActivityEvent,
+    AuthSetupState,
+    Item,
+    USER_ROLE_ADMIN,
+    User,
+    get_recent_audit_events,
+    record_audit_event,
+)
 from schema_migrations import get_schema_history, get_schema_state, SCHEMA_VERSION
 from startup import BOOTSTRAP_VERSION, get_bootstrap_history, get_bootstrap_state
 from time_utils import format_container_time
@@ -52,6 +69,7 @@ from msrp_jobs import (
 
 admin_bp = Blueprint("admin", __name__)
 logger = logging.getLogger(__name__)
+AUTH_SETUP_STATE_ID = 1
 
 
 def _current_flask_app() -> Flask:
@@ -352,7 +370,7 @@ def inject_admin_status_strip():
 @admin_bp.route("/admin/login", methods=["GET", "POST"])
 @limiter.limit("10 per minute; 30 per hour")
 def admin_login():
-    """Handle admin login requests."""
+    """Handle local, token-bootstrap, and trusted-proxy login requests."""
     if is_trusted_proxy_admin():
         establish_proxy_admin_session(trusted_proxy_username())
         session.permanent = ADMIN_SESSION_SECONDS > 0
@@ -360,20 +378,171 @@ def admin_login():
         return redirect(url_for("admin.diagnostics_page"))
     if is_admin():
         return redirect(url_for("admin.diagnostics_page"))
+    if current_identity() is not None:
+        return redirect(url_for("index"))
     if request.method == "POST":
-        if request.form.get("token") == ADMIN_TOKEN:
-            establish_token_admin_session()
-            session.permanent = ADMIN_SESSION_SECONDS > 0
-            resp = redirect(url_for("catalog.catalog"))
-            logger.info("Admin login successful")
-            flash("Admin access granted.", "success")
-            return resp
-        logger.warning("Admin login failed — wrong token")
-        flash("Wrong token.", "error")
-    return render_template("admin_login.html")
+        token_attempt = (
+            request.form.get("login_type") == "token" or "token" in request.form
+        )
+        if token_attempt:
+            if not users_exist() and admin_token_matches(request.form.get("token", "")):
+                establish_token_admin_session()
+                session.permanent = ADMIN_SESSION_SECONDS > 0
+                logger.info("Admin token bootstrap login successful")
+                flash("Admin access granted. Create a named admin account.", "success")
+                return redirect(url_for("catalog.catalog"))
+            logger.warning("Admin token bootstrap login failed")
+            flash("Token login is unavailable or the token is invalid.", "error")
+        else:
+            user = authenticate_local_user(
+                request.form.get("username", ""),
+                request.form.get("password", ""),
+            )
+            if user is not None:
+                user.last_login_at = datetime.now(timezone.utc).isoformat(
+                    timespec="seconds"
+                )
+                if db_commit(
+                    db.session,
+                    error_msg="Could not start your session — please try again.",
+                ):
+                    establish_user_session(user)
+                    session.permanent = ADMIN_SESSION_SECONDS > 0
+                    logger.info("Local login successful for user_id=%s", user.id)
+                    flash("Signed in.", "success")
+                    if user.must_change_password:
+                        return redirect(url_for("admin.account_password"))
+                    return redirect(url_for("index"))
+            logger.warning("Local login failed")
+            flash("Invalid username or password.", "error")
+    return render_template(
+        "admin_login.html",
+        setup_available=not users_exist(),
+        token_login_available=not users_exist(),
+    )
 
 
-@admin_bp.route("/admin/logout")
+@admin_bp.route("/setup", methods=["GET", "POST"])
+@limiter.limit("5 per hour")
+def initial_setup():
+    """Create the first named administrator using the bootstrap token."""
+    setup_claim = db.session.get(AuthSetupState, AUTH_SETUP_STATE_ID)
+    if users_exist() or setup_claim is not None:
+        flash("Initial account setup is already complete.", "info")
+        return redirect(url_for("admin.admin_login"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        display_name = request.form.get("display_name", "").strip() or None
+        password = request.form.get("password", "")
+        password_confirm = request.form.get("password_confirm", "")
+        if not admin_token_matches(request.form.get("token", "")):
+            flash("The setup token is invalid.", "error")
+        elif password != password_confirm:
+            flash("Passwords do not match.", "error")
+        elif display_name and len(display_name) > 160:
+            flash("Display name must be 160 characters or fewer.", "error")
+        else:
+            try:
+                user = User(
+                    username=username,
+                    display_name=display_name,
+                    role=USER_ROLE_ADMIN,
+                )
+                user.set_password(password)
+                db.session.add(user)
+                db.session.flush()
+                completed_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                db.session.add(
+                    AuthSetupState(
+                        id=AUTH_SETUP_STATE_ID,
+                        user_id=user.id,
+                        completed_at=completed_at,
+                    )
+                )
+                record_audit_event(
+                    title="Created initial administrator",
+                    actor=user.username,
+                    actor_user_id=user.id,
+                    action="create",
+                    entity_type="User",
+                    entity_id=user.id,
+                    entity_name=user.label,
+                    payload={
+                        "role": user.role,
+                        "auth_source": user.auth_source,
+                    },
+                )
+                db.session.commit()
+            except ValueError as exc:
+                db.session.rollback()
+                flash(str(exc), "error")
+            except SQLAlchemyError as exc:
+                db.session.rollback()
+                logger.warning("Initial account setup conflict: %s", exc)
+                flash(
+                    "Initial setup could not be completed. It may already be claimed.",
+                    "error",
+                )
+            else:
+                establish_user_session(user)
+                session.permanent = ADMIN_SESSION_SECONDS > 0
+                logger.info("Initial named administrator created user_id=%s", user.id)
+                flash("Administrator account created.", "success")
+                return redirect(url_for("admin.diagnostics_page"))
+
+    return render_template("initial_setup.html")
+
+
+@admin_bp.route("/account/password", methods=["GET", "POST"])
+@user_required
+def account_password():
+    """Allow a local named user to change their password."""
+    user = current_user()
+    if user is None or not user.password_hash:
+        flash("Password changes are available only for local accounts.", "error")
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        password_confirm = request.form.get("password_confirm", "")
+        if not user.check_password(current_password):
+            flash("Current password is incorrect.", "error")
+        elif new_password != password_confirm:
+            flash("New passwords do not match.", "error")
+        elif user.check_password(new_password):
+            flash("Choose a password different from your current password.", "error")
+        else:
+            try:
+                user.set_password(new_password)
+            except ValueError as exc:
+                flash(str(exc), "error")
+            else:
+                user.revoke_sessions()
+                record_audit_event(
+                    title="Changed account password",
+                    actor=user.username,
+                    actor_user_id=user.id,
+                    action="update",
+                    entity_type="User",
+                    entity_id=user.id,
+                    entity_name=user.label,
+                    payload={"session_version": user.session_version},
+                )
+                if db_commit(
+                    db.session,
+                    error_msg="Could not change your password — please try again.",
+                ):
+                    establish_user_session(user)
+                    session.permanent = ADMIN_SESSION_SECONDS > 0
+                    flash("Password changed and other sessions revoked.", "success")
+                    return redirect(url_for("index"))
+
+    return render_template("account_password.html", user=user)
+
+
+@admin_bp.route("/admin/logout", methods=["POST"])
 def admin_logout():
     """Log the admin user out."""
     logger.info("Admin logged out")

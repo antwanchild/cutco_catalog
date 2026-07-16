@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Initial Account Setup – Cutco Vault{% endblock %}
+{% block content %}
+<div class="detail-section auth-card centered">
+  <h1 class="page-title">Initial Account Setup</h1>
+  <p class="muted">Create the first named administrator. The existing admin token is required once to authorize setup.</p>
+
+  <form method="post" class="form-card compact mt-sm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Admin token
+      <input type="password" name="token" autocomplete="current-password" required class="input-full">
+    </label>
+    <label>Username
+      <input type="text" name="username" autocomplete="username" autofocus required maxlength="120" class="input-full">
+    </label>
+    <label>Display name <span class="muted">(optional)</span>
+      <input type="text" name="display_name" maxlength="160" class="input-full">
+    </label>
+    <label>Password
+      <input type="password" name="password" autocomplete="new-password" required minlength="12" class="input-full">
+    </label>
+    <label>Confirm password
+      <input type="password" name="password_confirm" autocomplete="new-password" required minlength="12" class="input-full">
+    </label>
+    <p class="muted">Use at least 12 characters. After setup, token login is disabled.</p>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Create administrator</button>
+      <a href="{{ url_for('admin.admin_login') }}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -212,6 +212,24 @@ a:hover { text-decoration: underline; }
   display: block;
   width: 100%;
 }
+.nav-action-form { width: 100%; }
+.nav-menu-action {
+  display: block;
+  width: 100%;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  padding: .3rem .6rem;
+  font: inherit;
+  font-size: .875rem;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-menu-action:hover {
+  color: var(--text);
+  background: var(--bg3);
+}
 .badge-admin {
   background: var(--accent2);
   color: #fff;

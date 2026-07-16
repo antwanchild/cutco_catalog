@@ -17,17 +17,24 @@ class ErrorSmokeTests(SmokeBaseTest):
         self.assertIn(b"Access denied.", response.data)
 
     def test_rate_limited_login_returns_429(self):
+        self._set_csrf_token()
         for _ in range(10):
             response = self.client.post(
                 "/admin/login",
-                data={"token": "wrong-token"},
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "token": "wrong-token",
+                },
                 follow_redirects=False,
             )
             self.assertIn(response.status_code, (200, 302))
 
         response = self.client.post(
             "/admin/login",
-            data={"token": "wrong-token"},
+            data={
+                "csrf_token": "test-csrf-token",
+                "token": "wrong-token",
+            },
             follow_redirects=False,
         )
 

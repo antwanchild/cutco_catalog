@@ -518,6 +518,23 @@ class User(BaseModel):
         self.session_version = max(1, self.session_version or 1) + 1
 
 
+class AuthSetupState(BaseModel):
+    """Singleton claim proving that initial account setup has completed."""
+
+    __tablename__ = "auth_setup_state"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+    )
+    completed_at = db.Column(db.String(32), nullable=False)
+
+    user: Mapped[User] = relationship("User", foreign_keys=[user_id])
+
+
 class ActivityEvent(BaseModel):
     """A recorded activity item for dashboard summaries."""
 
