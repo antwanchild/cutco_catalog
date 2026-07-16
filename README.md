@@ -210,6 +210,32 @@ soon as a user exists, token login and previously issued token-admin sessions ar
 disabled. Local users can change their password from the Account/Admin menu;
 password changes revoke their other sessions.
 
+### Local account recovery
+
+User recovery commands run inside the application container and use the same
+database and account invariants as the web application. Passwords are always
+prompted interactively and are never accepted as command-line arguments:
+
+```bash
+# Inspect account names, roles, sources, status, and forced-change state.
+docker compose exec cutco-vault sh -c 'exec gosu "$PUID:$PGID" flask --app app:create_app users list'
+
+# Create the first or an additional local administrator.
+docker compose exec cutco-vault sh -c 'exec gosu "$PUID:$PGID" flask --app app:create_app users create-admin --username owner'
+
+# Set a temporary password, revoke existing sessions, and force a change at login.
+docker compose exec cutco-vault sh -c 'exec gosu "$PUID:$PGID" flask --app app:create_app users reset-password owner'
+
+# Reactivate an account or explicitly revoke all of its current sessions.
+docker compose exec cutco-vault sh -c 'exec gosu "$PUID:$PGID" flask --app app:create_app users activate owner'
+docker compose exec cutco-vault sh -c 'exec gosu "$PUID:$PGID" flask --app app:create_app users revoke-sessions owner'
+```
+
+Use an interactive terminal for commands that prompt for a password. Restrict
+container-shell access to trusted operators because these recovery commands do
+not require a web session. Proxy-managed passwords must be reset at the identity
+provider; the application CLI rejects password resets for proxy accounts.
+
 For example, you might set:
 
 - Authentik: `TRUSTED_AUTH_USERNAME_HEADER=X-authentik-username`, `TRUSTED_AUTH_GROUPS_HEADER=X-authentik-groups`
@@ -483,19 +509,30 @@ The `any_unicorn` property on an item returns `true` if the item itself, its edg
 
 ## 💾 Backup
 
-The entire database is a single SQLite file. To back it up, copy it while the container is running (SQLite supports concurrent reads):
+The entire database is a single SQLite file. For a simple consistent backup,
+stop the service before copying it:
 
 ```bash
+docker compose stop cutco-vault
 cp ./data/cutco.db ./data/cutco.db.bak
+docker compose start cutco-vault
 ```
 
-Or with Docker:
+For a backup without downtime, use Python's SQLite backup API inside the running
+container (the image does not include the `sqlite3` command-line program):
 
 ```bash
-docker exec cutco-vault sqlite3 /data/cutco.db ".backup /data/cutco.db.bak"
+docker compose exec -T cutco-vault sh -c 'exec gosu "$PUID:$PGID" python -c "import sqlite3; source=sqlite3.connect(\"/data/cutco.db\"); backup=sqlite3.connect(\"/data/cutco.db.bak\"); source.backup(backup); backup.close(); source.close()"'
 ```
 
-Restore by replacing the file and restarting the container.
+Before deploying an authentication phase, keep a copy of both the database and
+the current image tag. Schema migration v15 is additive, so rolling back only the
+application image leaves older releases able to ignore the new tables. For a
+complete rollback, stop the service, restore the pre-upgrade database copy,
+restore the previous image tag, and start the service again. Creating the first
+named account invalidates bootstrap-token sessions; resetting a password,
+activating an account, or revoking sessions invalidates that user's existing
+named sessions.
 
 ---
 
@@ -503,7 +540,7 @@ Restore by replacing the file and restarting the container.
 
 - **💲 MSRP scraping** — Price extraction relies on Cutco.com's current page structure (JSON-LD, Open Graph meta tags, and DOM patterns). A site redesign may reduce scraping success rates until extraction strategies are updated.
 - **🔄 Catalog sync accuracy** — SKU extraction uses a six-strategy heuristic. Gift sets and bundle pages occasionally return incorrect SKUs; the `CATEGORY_OVERRIDES` dict in `constants.py` handles known exceptions.
-- **🔒 No per-user authentication** — Admin actions use token login + signed session; all non-admin pages are publicly accessible to anyone who can reach the host. Do not expose this service directly to the internet without a reverse proxy or VPN.
+- **🌐 Public catalog pages** — Product-facing catalog pages intentionally remain public. Collector data and mutation routes require a named local account or configured trusted-proxy identity; continue to use HTTPS and a trusted network, VPN, or hardened reverse proxy.
 
 ---
 

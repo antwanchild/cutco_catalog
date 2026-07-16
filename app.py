@@ -121,6 +121,12 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(admin_bp)
 
 
+def _register_cli(app: Flask) -> None:
+    from user_cli import register_user_cli
+
+    register_user_cli(app)
+
+
 def _register_hooks(app: Flask) -> None:
     @app.before_request
     def csrf_protect():
@@ -580,6 +586,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     limiter.init_app(app)
 
     _register_blueprints(app)
+    _register_cli(app)
     _register_hooks(app)
     _register_error_handlers(app)
     _register_routes(app)

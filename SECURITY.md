@@ -31,6 +31,7 @@ Cutco Vault is designed for **self-hosted, personal or small-group use** behind 
 - **Traefik + authentik friendly** — if you terminate auth at the edge, forward a trusted username header and configure `TRUSTED_AUTH_USERNAME_HEADER` to match. If your proxy forwards groups, set `TRUSTED_AUTH_GROUPS_HEADER` and `TRUSTED_AUTH_ADMIN_GROUPS` so proxy admins can be recognized too. The legacy `AUTHENTIK_USERNAME_HEADER` / `AUTHENTIK_GROUPS_HEADER` settings still work if you already used them, and `AUTHELIA_USERNAME_HEADER` / `AUTHELIA_GROUPS_HEADER` are supported as fallbacks.
 - **Admin login + signed session** — `ADMIN_TOKEN` authorizes creation of the first named administrator and temporary bootstrap access only while no user exists. Once setup completes, local username/password or configured proxy authentication is required. Proxy-admin users can skip the local form.
 - **Password and session safety** — local login failures use a generic response and a timing-safe dummy hash path. Password changes require the current password, revoke other sessions, and logout is a CSRF-protected `POST`.
+- **Offline recovery boundary** — trusted operators can list users, create an administrator, reset a local password, reactivate an account, or revoke sessions through `flask users`. Passwords are hidden interactive prompts, resets force a change at next login, and recovery actions are audited without credential material. Container-shell access is therefore administrator-equivalent and must be restricted.
 - **Session secret** — the `SECRET_KEY` environment variable protects Flask sessions and signed share tokens. Use a long random value and keep it consistent across restarts (changing it invalidates all active sessions and share links).
 - **Production startup guard** — in production mode, the app refuses to start with default `ADMIN_TOKEN` / `SECRET_KEY` values unless explicitly bypassed.
 - **Write protection** — mutating routes are private; public users can only view product-facing pages and signed share links.
@@ -39,6 +40,7 @@ Cutco Vault is designed for **self-hosted, personal or small-group use** behind 
 
 - [ ] Set `ADMIN_TOKEN` to a strong random bootstrap value (e.g. `openssl rand -hex 32`)
 - [ ] Complete `/setup` promptly and store the local administrator password securely
+- [ ] Verify `flask --app app:create_app users list` works from the application container and document who may run recovery commands
 - [ ] Set `SECRET_KEY` to a strong random value
 - [ ] Set `SESSION_COOKIE_SECURE=true` when served over HTTPS
 - [ ] If using Traefik + authentik or Authelia, forward the authenticated username into `X-Forwarded-User`/`Remote-User` or your chosen trusted header

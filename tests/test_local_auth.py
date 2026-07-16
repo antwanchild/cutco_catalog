@@ -167,6 +167,54 @@ class LocalAuthTests(SmokeBaseTest):
             ).scalar_one()
             self.assertIsNotNone(user.last_login_at)
 
+    def test_local_login_rejects_inactive_user_and_ignores_external_redirect(self):
+        self._complete_setup(username="redirect-admin")
+        self._logout()
+        with self.app.app_context():
+            user = db.session.execute(
+                db.select(User).where(User.username == "redirect-admin")
+            ).scalar_one()
+            fallback_admin = User(username="fallback-admin", role=USER_ROLE_ADMIN)
+            fallback_admin.set_password("another secure administrator password")
+            db.session.add(fallback_admin)
+            db.session.commit()
+            user.is_active = False
+            db.session.commit()
+
+        inactive = self.client.post(
+            "/admin/login?next=https://example.com/escape",
+            data={
+                "csrf_token": "test-csrf-token",
+                "login_type": "local",
+                "username": "redirect-admin",
+                "password": "correct horse battery staple",
+                "next": "https://example.com/escape",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(inactive.status_code, 200)
+        self.assertIn(b"Invalid username or password", inactive.data)
+
+        with self.app.app_context():
+            user = db.session.execute(
+                db.select(User).where(User.username == "redirect-admin")
+            ).scalar_one()
+            user.is_active = True
+            db.session.commit()
+        active = self.client.post(
+            "/admin/login?next=https://example.com/escape",
+            data={
+                "csrf_token": "test-csrf-token",
+                "login_type": "local",
+                "username": "redirect-admin",
+                "password": "correct horse battery staple",
+                "next": "https://example.com/escape",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(active.status_code, 302)
+        self.assertEqual(active.headers["Location"], "/")
+
     def test_token_login_and_existing_token_session_stop_after_setup(self):
         self._set_csrf()
         token_login = self.client.post(
