@@ -132,6 +132,11 @@ jobs:
               exit 0
             fi
 
+            if [[ "$output" == *"Release.tag_name already exists"* ]]; then
+              echo "Release ${RELEASE_TAG} already exists."
+              exit 0
+            fi
+
             echo "Release API attempt ${attempt} failed: ${output}" >&2
             if [[ "$attempt" -lt 5 ]]; then
               sleep $((attempt * 5))
