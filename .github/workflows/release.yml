@@ -114,10 +114,29 @@ jobs:
             GIT_SHA=${{ needs.auto-tag.outputs.release_sha }}
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v3.0.1
-        with:
-          tag_name: ${{ needs.auto-tag.outputs.new_tag }}
-          name: ${{ needs.auto-tag.outputs.new_tag }}
-          generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.auto-tag.outputs.new_tag }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+              echo "Release ${RELEASE_TAG} already exists."
+              exit 0
+            fi
+
+            if output=$(gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "$RELEASE_TAG" \
+              --generate-notes 2>&1); then
+              echo "$output"
+              exit 0
+            fi
+
+            echo "Release API attempt ${attempt} failed: ${output}" >&2
+            if [[ "$attempt" -lt 5 ]]; then
+              sleep $((attempt * 5))
+            fi
+          done
+
+          echo "Could not create or verify release ${RELEASE_TAG}." >&2
+          exit 1
