@@ -76,7 +76,7 @@ Notes:
 If you want to test a branch before merging, add the `docker` label to the pull request.
 
 - The PR checks page shows a `Preview Gate` check so you can see the preview opt-in state.
-- The PR workflow builds a preview image whenever the pull request is opened, updated, reopened, or labeled, tagged like `pr-123`.
+- The PR workflow builds a preview image whenever a pull request with application changes is opened, updated, reopened, or labeled, tagged like `pr-123`. Markdown-only changes do not rebuild it.
 - Keep the `docker` label on the PR while you test so the preview image stays enabled for new pushes.
 - If you add the label after the PR already exists, the next PR update or label event will build the preview image.
 - The preview tag stays fixed at `pr-123`, so the app version shown inside the container does not look like a release bump on every push.
