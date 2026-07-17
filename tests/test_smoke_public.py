@@ -124,6 +124,12 @@ class PublicSmokeTests(SmokeBaseTest):
         self.assertIn("version", payload)
         self.assertIn("git_sha", payload)
 
+    def test_stylesheet_url_is_versioned_for_proxy_cache_invalidation(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"/static/css/style.css?v=", response.data)
+
     def test_search_page_renders_results_and_shortcuts(self):
         self._login_as_admin()
         self._set_csrf_token()

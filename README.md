@@ -308,12 +308,24 @@ services:
       - traefik.enable=true
       - traefik.http.services.cutco.loadbalancer.server.port=8095
 
+      # Strip client assertions before either forwarding publicly or asking
+      # Authentik to inject its verified values.
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Username=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Uid=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Groups=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Name=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Email=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Forwarded-User=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Forwarded-Groups=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.Remote-User=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.Remote-Groups=
+
       # Public pages: catalog browsing, sets, product views, health/version
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.rule=Host(`cutco.anthonychild.com`)
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.tls=true
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.priority=1
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.middlewares=chain-no-auth-NOerrors@file
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.priority=50
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.middlewares=cutco-strip-auth@docker,chain-no-auth-NOerrors@file
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.service=cutco
 
       # Private collector pages
@@ -321,7 +333,7 @@ services:
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.priority=100
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.middlewares=chain-auth-shit-NOerrors@file
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.middlewares=cutco-strip-auth@docker,chain-auth-shit-NOerrors@file
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.service=cutco
 
       # Admin pages and mutating routes
@@ -329,11 +341,17 @@ services:
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.priority=200
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.middlewares=chain-auth-shit-NOerrors@file
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.middlewares=cutco-strip-auth@docker,chain-auth-shit-NOerrors@file
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.service=cutco
 ```
 
 Hardcode the public hostname in the Traefik `Host(...)` labels unless `DOMAIN` is defined in the compose project `.env` file or shell environment. A `DOMAIN` value under the service's `environment:` block is only passed into the Cutco container; Docker Compose does not use it to render labels before Traefik reads them.
+
+Keep the stripping middleware first in each middleware list. On protected routes,
+the following Authentik forward-auth middleware then replaces those removed
+headers with verified identity values. The public router priority must remain
+below the private and admin priorities while staying above any generic fallback
+or error-page router in the deployment.
 
 If you want Authentik to recognize proxy-authenticated users inside the app, make sure your forwardAuth middleware passes these headers through:
 
