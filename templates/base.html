@@ -97,12 +97,16 @@
           </div>
           <div class="nav-group-section nav-group-section-last">
             <div class="nav-group-heading">Session</div>
-            {% if current_user() %}
+            {% if current_user() and current_user().password_hash %}
             <a href="{{ url_for('admin.account_password') }}">Change Password</a>
             {% endif %}
+            {% if current_identity() and current_identity().source == 'proxy' %}
+            <span class="muted small">Session managed by proxy</span>
+            {% else %}
             <form method="post" action="{{ url_for('admin.admin_logout') }}" class="nav-action-form">
               <button type="submit" class="nav-menu-action">Logout</button>
             </form>
+            {% endif %}
           </div>
         </div>
       </details>
@@ -112,10 +116,16 @@
         <div class="nav-group-menu">
           <div class="nav-group-section nav-group-section-last">
             <div class="nav-group-heading">{{ current_user().label }}</div>
+            {% if current_user().password_hash %}
             <a href="{{ url_for('admin.account_password') }}">Change Password</a>
+            {% endif %}
+            {% if current_identity() and current_identity().source == 'proxy' %}
+            <span class="muted small">Session managed by proxy</span>
+            {% else %}
             <form method="post" action="{{ url_for('admin.admin_logout') }}" class="nav-action-form">
               <button type="submit" class="nav-menu-action">Logout</button>
             </form>
+            {% endif %}
           </div>
         </div>
       </details>

@@ -11,7 +11,10 @@ from extensions import db
 from models import (
     AuthSetupState,
     USER_AUTH_SOURCE_LOCAL,
+    USER_AUTH_SOURCE_PROXY,
     USER_ROLE_ADMIN,
+    USER_ROLE_USER,
+    USER_ROLES,
     User,
     normalize_username,
     record_audit_event,
@@ -135,6 +138,60 @@ def create_admin(username: str, display_name: str | None) -> None:
 
     _commit_or_fail("Could not create the administrator.")
     click.echo(f"Created administrator {user.username!r}.")
+
+
+@users_cli.command("create-proxy")
+@click.option("--username", required=True, help="Unique application username.")
+@click.option(
+    "--subject",
+    required=True,
+    help="Immutable subject asserted by the trusted authentication proxy.",
+)
+@click.option("--display-name", help="Optional human-readable account name.")
+@click.option(
+    "--role",
+    type=click.Choice(sorted(USER_ROLES), case_sensitive=False),
+    default=USER_ROLE_USER,
+    show_default=True,
+)
+def create_proxy(
+    username: str,
+    subject: str,
+    display_name: str | None,
+    role: str,
+) -> None:
+    """Pre-provision a trusted-proxy account without a local password."""
+    try:
+        cleaned_display_name = (display_name or "").strip() or None
+        if cleaned_display_name and len(cleaned_display_name) > 160:
+            raise ValueError("Display name must be 160 characters or fewer.")
+        user = User(
+            username=username,
+            display_name=cleaned_display_name,
+            role=role,
+            auth_source=USER_AUTH_SOURCE_PROXY,
+            external_subject=subject,
+        )
+        db.session.add(user)
+        db.session.flush()
+        record_audit_event(
+            title="Pre-provisioned proxy account through recovery CLI",
+            actor=CLI_ACTOR,
+            action="create",
+            entity_type="User",
+            entity_id=user.id,
+            entity_name=user.label,
+            source="flask users create-proxy",
+            payload={"role": user.role, "auth_source": user.auth_source},
+        )
+    except (ValueError, SQLAlchemyError) as exc:
+        db.session.rollback()
+        raise click.ClickException(
+            "Could not create the proxy account. Check for a username or subject conflict."
+        ) from exc
+
+    _commit_or_fail("Could not create the proxy account.")
+    click.echo(f"Created proxy {user.role} {user.username!r}.")
 
 
 @users_cli.command("reset-password")

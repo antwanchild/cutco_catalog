@@ -18,11 +18,20 @@ from flask import (
 from sqlalchemy import func
 
 from constants import (
-    ADMIN_SESSION_SECONDS,
     ADMIN_TOKEN,
     APP_VERSION,
+    AUTH_MODE,
+    AUTH_MODES,
     GIT_SHA,
     DATA_DIR,
+    PROXY_AUTH_AUTO_PROVISION,
+    SESSION_SECONDS,
+    TRUSTED_AUTH_ADMIN_GROUPS,
+    TRUSTED_AUTH_DISPLAY_NAME_HEADER,
+    TRUSTED_AUTH_GROUPS_HEADER,
+    TRUSTED_AUTH_SUBJECT_HEADER,
+    TRUSTED_AUTH_SYNC_ADMIN_ROLE,
+    TRUSTED_AUTH_USERNAME_HEADER,
     UNKNOWN_COLOR,
     get_git_sha_info,
 )
@@ -565,6 +574,15 @@ def create_app(test_config: dict | None = None) -> Flask:
             "ATTACHMENTS_DIR", os.path.join(DATA_DIR, "uploads", "items")
         ),
         LOG_LEVEL=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        AUTH_MODE=AUTH_MODE,
+        PROXY_AUTH_AUTO_PROVISION=PROXY_AUTH_AUTO_PROVISION,
+        TRUSTED_AUTH_USERNAME_HEADER=TRUSTED_AUTH_USERNAME_HEADER,
+        TRUSTED_AUTH_SUBJECT_HEADER=TRUSTED_AUTH_SUBJECT_HEADER,
+        TRUSTED_AUTH_DISPLAY_NAME_HEADER=TRUSTED_AUTH_DISPLAY_NAME_HEADER,
+        TRUSTED_AUTH_GROUPS_HEADER=TRUSTED_AUTH_GROUPS_HEADER,
+        TRUSTED_AUTH_ADMIN_GROUPS=TRUSTED_AUTH_ADMIN_GROUPS,
+        TRUSTED_AUTH_SYNC_ADMIN_ROLE=TRUSTED_AUTH_SYNC_ADMIN_ROLE,
+        SESSION_SECONDS=SESSION_SECONDS,
         TESTING=False,
     )
     app.url_map.strict_slashes = False
@@ -572,7 +590,24 @@ def create_app(test_config: dict | None = None) -> Flask:
         app.config.update(test_config)
 
     app.secret_key = app.config["SECRET_KEY"]
-    app.permanent_session_lifetime = timedelta(seconds=ADMIN_SESSION_SECONDS)
+    app.permanent_session_lifetime = timedelta(seconds=app.config["SESSION_SECONDS"])
+
+    auth_mode = str(app.config["AUTH_MODE"]).strip().casefold()
+    if auth_mode not in AUTH_MODES:
+        raise RuntimeError(
+            f"Unsupported AUTH_MODE {auth_mode!r}; choose local, proxy, or hybrid."
+        )
+    app.config["AUTH_MODE"] = auth_mode
+    if auth_mode in {"proxy", "hybrid"}:
+        if not str(app.config["TRUSTED_AUTH_USERNAME_HEADER"]).strip():
+            raise RuntimeError("TRUSTED_AUTH_USERNAME_HEADER cannot be empty.")
+        if not str(app.config["TRUSTED_AUTH_SUBJECT_HEADER"]).strip():
+            raise RuntimeError("TRUSTED_AUTH_SUBJECT_HEADER cannot be empty.")
+        if not app.testing:
+            logger.warning(
+                "Proxy authentication trusts configured identity headers. Ensure "
+                "the reverse proxy strips client-supplied copies before injection."
+            )
 
     _is_prod = os.environ.get("FLASK_ENV", "production").lower() == "production"
     _allow_insecure = _env_flag("ALLOW_INSECURE_DEFAULTS")

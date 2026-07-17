@@ -144,12 +144,17 @@ class UserAuthFoundationTests(SmokeBaseTest):
                 index["name"] for index in inspector.get_indexes("activity_events")
             }
             self.assertIn("ix_activity_events_actor_user_id", indexes)
+            user_indexes = {index["name"] for index in inspector.get_indexes("users")}
+            self.assertIn("ux_users_external_subject", user_indexes)
             schema_state = db.session.get(SchemaState, "schema")
             self.assertIsNotNone(schema_state)
             self.assertEqual(schema_state.version, SCHEMA_VERSION)
             migration = db.session.get(SchemaHistory, 14)
             self.assertIsNotNone(migration)
             self.assertEqual(migration.name, "user_auth_foundation")
+            proxy_migration = db.session.get(SchemaHistory, 16)
+            self.assertIsNotNone(proxy_migration)
+            self.assertEqual(proxy_migration.name, "proxy_identity")
 
     def test_local_user_normalizes_username_and_hashes_password(self):
         password = "correct horse battery staple"
@@ -213,6 +218,13 @@ class UserAuthFoundationTests(SmokeBaseTest):
                 ValueError, "external_subject.*cannot be changed"
             ):
                 user.external_subject = "new-proxy-subject"
+
+            user.link_proxy_subject("new-proxy-subject")
+            db.session.commit()
+            self.assertEqual(user.external_subject, "new-proxy-subject")
+            user.unlink_proxy_subject()
+            db.session.commit()
+            self.assertIsNone(user.external_subject)
 
     def test_local_and_proxy_account_requirements(self):
         with self.app.app_context():

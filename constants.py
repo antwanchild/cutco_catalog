@@ -6,6 +6,14 @@ import subprocess
 from functools import lru_cache
 from pathlib import Path
 
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().casefold() in {"1", "true", "yes", "on"}
+
+
 EDGE_TYPES = [
     "Straight",
     "Double-D",
@@ -59,14 +67,30 @@ TRUSTED_AUTH_GROUPS_HEADER = os.environ.get(
         os.environ.get("AUTHELIA_GROUPS_HEADER", "X-Forwarded-Groups"),
     ),
 )
+AUTH_MODES = frozenset({"local", "proxy", "hybrid"})
+AUTH_MODE = os.environ.get("AUTH_MODE", "hybrid").strip().casefold()
+PROXY_AUTH_AUTO_PROVISION = _env_flag("PROXY_AUTH_AUTO_PROVISION")
+TRUSTED_AUTH_SUBJECT_HEADER = os.environ.get(
+    "TRUSTED_AUTH_SUBJECT_HEADER",
+    TRUSTED_AUTH_USERNAME_HEADER,
+).strip()
+TRUSTED_AUTH_DISPLAY_NAME_HEADER = os.environ.get(
+    "TRUSTED_AUTH_DISPLAY_NAME_HEADER", ""
+).strip()
+TRUSTED_AUTH_SYNC_ADMIN_ROLE = _env_flag("TRUSTED_AUTH_SYNC_ADMIN_ROLE")
 TRUSTED_AUTH_ADMIN_GROUPS = tuple(
     group.strip()
     for group in os.environ.get("TRUSTED_AUTH_ADMIN_GROUPS", "").split(",")
     if group.strip()
 )
-ADMIN_SESSION_SECONDS = int(
-    os.environ.get("ADMIN_SESSION_SECONDS", str(2 * 60 * 60))
-)  # default 2 h
+SESSION_SECONDS = int(
+    os.environ.get(
+        "SESSION_SECONDS",
+        os.environ.get("ADMIN_SESSION_SECONDS", str(2 * 60 * 60)),
+    )
+)
+# Backward-compatible import name for one deprecation cycle.
+ADMIN_SESSION_SECONDS = SESSION_SECONDS
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
 SHARPEN_METHODS = [

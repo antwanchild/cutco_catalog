@@ -427,6 +427,11 @@ class User(BaseModel):
             "session_version >= 1",
             name="ck_user_session_version",
         ),
+        db.Index(
+            "ux_users_external_subject",
+            "external_subject",
+            unique=True,
+        ),
     )
 
     def __init__(self, **kwargs: Any) -> None:
@@ -475,11 +480,14 @@ class User(BaseModel):
         """Trim an external identity subject without changing its case."""
         normalized = (value or "").strip()
         normalized_value = normalized or None
+        if normalized_value and len(normalized_value) > 255:
+            raise ValueError("Proxy subject must be 255 characters or fewer.")
         state = sa_inspect(self)
         if (
             state is not None
             and state.persistent
             and self.external_subject != normalized_value
+            and not getattr(self, "_allow_external_subject_update", False)
         ):
             raise ValueError(
                 "User identity field 'external_subject' cannot be changed."
@@ -516,6 +524,29 @@ class User(BaseModel):
     def revoke_sessions(self) -> None:
         """Invalidate sessions issued with the current session version."""
         self.session_version = max(1, self.session_version or 1) + 1
+
+    def link_proxy_subject(self, external_subject: str) -> None:
+        """Explicitly associate a stable proxy subject with this account."""
+        normalized = (external_subject or "").strip()
+        if not normalized:
+            raise ValueError("Proxy subject is required.")
+        if len(normalized) > 255:
+            raise ValueError("Proxy subject must be 255 characters or fewer.")
+        self._allow_external_subject_update = True
+        try:
+            self.external_subject = normalized
+        finally:
+            self._allow_external_subject_update = False
+
+    def unlink_proxy_subject(self) -> None:
+        """Remove an explicit proxy link from a local account."""
+        if self.auth_source != USER_AUTH_SOURCE_LOCAL:
+            raise ValueError("A proxy-sourced account cannot remove its subject.")
+        self._allow_external_subject_update = True
+        try:
+            self.external_subject = None
+        finally:
+            self._allow_external_subject_update = False
 
     def update_access(
         self,
@@ -941,8 +972,6 @@ def _validate_user_account(user: User) -> None:
     if user.auth_source == USER_AUTH_SOURCE_LOCAL:
         if not user.password_hash:
             raise ValueError("Local users require a password.")
-        if user.external_subject:
-            raise ValueError("Local users cannot have an external subject.")
     elif not user.external_subject:
         raise ValueError("Proxy users require an external subject.")
     elif user.password_hash:

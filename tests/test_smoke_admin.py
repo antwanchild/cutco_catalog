@@ -35,29 +35,19 @@ class AdminSmokeTests(SmokeBaseTest):
             self.assertNotIn("is_admin", session)
 
     def test_proxy_admin_bypasses_admin_login_form(self):
-        with mock.patch("helpers.TRUSTED_AUTH_ADMIN_GROUPS", ("admins",)):
-            response = self.client.get(
-                "/admin/login",
-                headers={
-                    "X-Forwarded-User": "proxy-admin",
-                    "X-Forwarded-Groups": "admins,users",
-                },
-                follow_redirects=False,
-            )
+        self._add_proxy_user("proxy-admin", role="admin")
+        headers = {"X-Forwarded-User": "proxy-admin"}
+        response = self.client.get(
+            "/admin/login", headers=headers, follow_redirects=False
+        )
 
         self.assertEqual(response.status_code, 302)
         self.assertIn("/admin/diagnostics", response.headers["Location"])
         with self.client.session_transaction() as session:
-            self.assertEqual(
-                session.get(AUTH_SESSION_KEY),
-                {
-                    "kind": IDENTITY_KIND_PROXY_ADMIN,
-                    "username": "proxy-admin",
-                },
-            )
+            self.assertNotIn(AUTH_SESSION_KEY, session)
             self.assertNotIn("is_admin", session)
 
-        home_response = self.client.get("/")
+        home_response = self.client.get("/", headers=headers)
         self.assertEqual(home_response.status_code, 200)
         self.assertIn(b"Admin", home_response.data)
 
@@ -68,35 +58,34 @@ class AdminSmokeTests(SmokeBaseTest):
         self.assertIn("/admin/login", response.headers["Location"])
 
     def test_proxy_admin_group_unlocks_admin_routes(self):
-        with mock.patch("helpers.TRUSTED_AUTH_ADMIN_GROUPS", ("admins",)):
-            response = self.client.get(
-                "/admin/diagnostics",
-                headers={
-                    "X-Forwarded-User": "proxy-admin",
-                    "X-Forwarded-Groups": "admins,users",
-                },
-                follow_redirects=False,
-            )
+        self._add_proxy_user("proxy-admin", role="admin")
+        response = self.client.get(
+            "/admin/diagnostics",
+            headers={"X-Forwarded-User": "proxy-admin"},
+            follow_redirects=False,
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Diagnostics", response.data)
 
     def test_regression_proxy_auth_header_lookup_is_case_insensitive(self):
-        with mock.patch("helpers.TRUSTED_AUTH_USERNAME_HEADER", "X-Authentik-Username"):
-            response = self.client.get(
-                "/people",
-                headers={"x-authentik-username": "proxy-user"},
-                follow_redirects=False,
-            )
+        self._add_proxy_user("proxy-user")
+        self.app.config.update(
+            TRUSTED_AUTH_USERNAME_HEADER="X-Authentik-Username",
+            TRUSTED_AUTH_SUBJECT_HEADER="X-Authentik-Username",
+        )
+        response = self.client.get(
+            "/people",
+            headers={"x-authentik-username": "proxy-user"},
+            follow_redirects=False,
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Collectors", response.data)
 
     def test_proxy_auth_debug_log_names_present_headers_without_values(self):
-        with (
-            mock.patch("helpers.TRUSTED_AUTH_USERNAME_HEADER", "X-Authentik-Username"),
-            self.assertLogs("helpers", level="DEBUG") as captured,
-        ):
+        self.app.config["TRUSTED_AUTH_USERNAME_HEADER"] = "X-Authentik-Username"
+        with self.assertLogs("helpers", level="DEBUG") as captured:
             response = self.client.get(
                 "/people",
                 headers={"X-Forwarded-User": "proxy-user"},

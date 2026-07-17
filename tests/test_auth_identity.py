@@ -1,6 +1,4 @@
 # pyright: reportOptionalMemberAccess=false, reportArgumentType=false
-from unittest import mock
-
 from flask import session
 
 from helpers import (
@@ -12,7 +10,7 @@ from helpers import (
     current_user,
     establish_user_session,
 )
-from models import USER_ROLE_ADMIN, USER_ROLE_USER
+from models import USER_AUTH_SOURCE_PROXY, USER_ROLE_ADMIN, USER_ROLE_USER
 from smoke_support import ActivityEvent, SmokeBaseTest, User, db
 
 
@@ -146,22 +144,25 @@ class AuthIdentityTests(SmokeBaseTest):
             self.assertNotIn("is_admin", session)
 
     def test_proxy_request_resolves_username_and_current_role(self):
-        with (
-            mock.patch("helpers.TRUSTED_AUTH_ADMIN_GROUPS", ("admins",)),
-            self.app.test_request_context(
-                headers={
-                    "X-Forwarded-User": "proxy-admin",
-                    "X-Forwarded-Groups": "admins,users",
-                }
-            ),
-        ):
+        with self.app.app_context():
+            user = User(
+                username="proxy-admin",
+                role=USER_ROLE_ADMIN,
+                auth_source=USER_AUTH_SOURCE_PROXY,
+                external_subject="proxy-admin",
+            )
+            db.session.add(user)
+            db.session.commit()
+            user_id = user.id
+
+        with self.app.test_request_context(headers={"X-Forwarded-User": "proxy-admin"}):
             identity = current_identity()
 
         self.assertIsNotNone(identity)
         self.assertEqual(identity.username, "proxy-admin")
         self.assertEqual(identity.role, USER_ROLE_ADMIN)
         self.assertEqual(identity.source, "proxy")
-        self.assertIsNone(identity.user_id)
+        self.assertEqual(identity.user_id, user_id)
 
     def test_named_user_session_helper_and_clearer(self):
         user_id, _session_version = self._add_local_user("helper-user")

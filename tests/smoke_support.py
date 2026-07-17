@@ -173,6 +173,18 @@ class SmokeBaseTest(unittest.TestCase):
             session["csrf_token"] = value
         return value
 
+    def _add_proxy_user(self, username, *, role="user", subject=None):
+        with self.app.app_context():
+            user = User(
+                username=username,
+                role=role,
+                auth_source="proxy",
+                external_subject=subject or username,
+            )
+            db.session.add(user)
+            db.session.commit()
+            return user.id
+
     def _add_catalog_item(
         self,
         *,

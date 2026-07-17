@@ -36,12 +36,12 @@ from helpers import (
     current_identity,
     current_user,
     db_commit,
-    establish_proxy_admin_session,
     establish_token_admin_session,
     establish_user_session,
     is_admin,
-    is_trusted_proxy_admin,
-    trusted_proxy_username,
+    local_auth_enabled,
+    proxy_auth_enabled,
+    proxy_auth_failure,
     user_required,
     users_exist,
 )
@@ -371,15 +371,11 @@ def inject_admin_status_strip():
 @limiter.limit("10 per minute; 30 per hour")
 def admin_login():
     """Handle local, token-bootstrap, and trusted-proxy login requests."""
-    if is_trusted_proxy_admin():
-        establish_proxy_admin_session(trusted_proxy_username())
-        session.permanent = ADMIN_SESSION_SECONDS > 0
-        flash("Admin access granted via proxy.", "success")
-        return redirect(url_for("admin.diagnostics_page"))
-    if is_admin():
-        return redirect(url_for("admin.diagnostics_page"))
-    if current_identity() is not None:
-        return redirect(url_for("index"))
+    identity = current_identity()
+    if identity is not None:
+        return redirect(
+            url_for("admin.diagnostics_page") if identity.is_admin else url_for("index")
+        )
     if request.method == "POST":
         token_attempt = (
             request.form.get("login_type") == "token" or "token" in request.form
@@ -387,13 +383,21 @@ def admin_login():
         if token_attempt:
             if not users_exist() and admin_token_matches(request.form.get("token", "")):
                 establish_token_admin_session()
-                session.permanent = ADMIN_SESSION_SECONDS > 0
+                session.permanent = (
+                    int(
+                        current_app.config.get("SESSION_SECONDS", ADMIN_SESSION_SECONDS)
+                    )
+                    > 0
+                )
                 logger.info("Admin token bootstrap login successful")
                 flash("Admin access granted. Create a named admin account.", "success")
                 return redirect(url_for("catalog.catalog"))
             logger.warning("Admin token bootstrap login failed")
             flash("Token login is unavailable or the token is invalid.", "error")
         else:
+            if not local_auth_enabled():
+                flash("Local password login is disabled in proxy-only mode.", "error")
+                return redirect(url_for("admin.admin_login"))
             user = authenticate_local_user(
                 request.form.get("username", ""),
                 request.form.get("password", ""),
@@ -407,7 +411,14 @@ def admin_login():
                     error_msg="Could not start your session — please try again.",
                 ):
                     establish_user_session(user)
-                    session.permanent = ADMIN_SESSION_SECONDS > 0
+                    session.permanent = (
+                        int(
+                            current_app.config.get(
+                                "SESSION_SECONDS", ADMIN_SESSION_SECONDS
+                            )
+                        )
+                        > 0
+                    )
                     logger.info("Local login successful for user_id=%s", user.id)
                     flash("Signed in.", "success")
                     if user.must_change_password:
@@ -417,8 +428,11 @@ def admin_login():
             flash("Invalid username or password.", "error")
     return render_template(
         "admin_login.html",
-        setup_available=not users_exist(),
+        setup_available=not users_exist() and local_auth_enabled(),
         token_login_available=not users_exist(),
+        local_login_available=local_auth_enabled(),
+        proxy_login_enabled=proxy_auth_enabled(),
+        proxy_error=proxy_auth_failure(),
     )
 
 
@@ -426,6 +440,13 @@ def admin_login():
 @limiter.limit("5 per hour")
 def initial_setup():
     """Create the first named administrator using the bootstrap token."""
+    if not local_auth_enabled():
+        flash(
+            "Local setup is disabled in proxy-only mode. Use bootstrap token "
+            "access or the user CLI to provision a proxy administrator.",
+            "error",
+        )
+        return redirect(url_for("admin.admin_login"))
     setup_claim = db.session.get(AuthSetupState, AUTH_SETUP_STATE_ID)
     if users_exist() or setup_claim is not None:
         flash("Initial account setup is already complete.", "info")
@@ -486,7 +507,12 @@ def initial_setup():
                 )
             else:
                 establish_user_session(user)
-                session.permanent = ADMIN_SESSION_SECONDS > 0
+                session.permanent = (
+                    int(
+                        current_app.config.get("SESSION_SECONDS", ADMIN_SESSION_SECONDS)
+                    )
+                    > 0
+                )
                 logger.info("Initial named administrator created user_id=%s", user.id)
                 flash("Administrator account created.", "success")
                 return redirect(url_for("admin.diagnostics_page"))
@@ -535,7 +561,14 @@ def account_password():
                     error_msg="Could not change your password — please try again.",
                 ):
                     establish_user_session(user)
-                    session.permanent = ADMIN_SESSION_SECONDS > 0
+                    session.permanent = (
+                        int(
+                            current_app.config.get(
+                                "SESSION_SECONDS", ADMIN_SESSION_SECONDS
+                            )
+                        )
+                        > 0
+                    )
                     flash("Password changed and other sessions revoked.", "success")
                     return redirect(url_for("index"))
 
