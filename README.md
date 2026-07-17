@@ -134,15 +134,20 @@ To enable the local hooks, install the tooling once and run `pre-commit install`
 |---|---|:---:|---|
 | `SECRET_KEY` | `cutco-vault-dev-key` | ⚠️ | Flask session secret — **change in production** |
 | `ADMIN_TOKEN` | `admin` | ⚠️ | One-time bootstrap token used to create the first named admin — **change in production** |
-| `ADMIN_SESSION_SECONDS` | `7200` | No | Admin session lifetime in seconds (default 2 h from login time); set to `0` for browser-session only |
+| `SESSION_SECONDS` | `7200` | No | Local signed-session lifetime in seconds; set to `0` for browser-session only. `ADMIN_SESSION_SECONDS` remains a deprecated fallback. |
 | `DATABASE_URL` | `sqlite:////data/cutco.db` | No | SQLAlchemy connection string |
 | `DATA_DIR` | `/data` | No | Directory for the database and job state files |
 | `LOG_LEVEL` | `INFO` | No | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_DIR` | `/data/logs` | No | Directory for rotating log files |
 | `SESSION_COOKIE_SECURE` | `false` | No | Set to `true` when served over HTTPS so session cookies are sent only via TLS |
-| `TRUSTED_AUTH_USERNAME_HEADER` | `X-Forwarded-User` | No | Trusted reverse-proxy username header that marks a request as authenticated via your auth proxy |
-| `TRUSTED_AUTH_GROUPS_HEADER` | `X-Forwarded-Groups` | No | Trusted reverse-proxy groups header used to recognize proxy-admin users |
-| `TRUSTED_AUTH_ADMIN_GROUPS` | *(empty)* | No | Comma-separated group names that should count as admin when reported by the trusted proxy |
+| `AUTH_MODE` | `hybrid` | No | Authentication mode: `local`, `proxy`, or `hybrid` |
+| `PROXY_AUTH_AUTO_PROVISION` | `false` | No | Create an unrecognized proxy identity as a normal user; pre-provisioning is the safer default |
+| `TRUSTED_AUTH_USERNAME_HEADER` | `X-Forwarded-User` | No | Display/login name asserted by the trusted reverse proxy |
+| `TRUSTED_AUTH_SUBJECT_HEADER` | username header | No | Stable, immutable proxy identity key; configure a provider subject/UID header when possible |
+| `TRUSTED_AUTH_DISPLAY_NAME_HEADER` | *(empty)* | No | Optional display name used during auto-provisioning |
+| `TRUSTED_AUTH_GROUPS_HEADER` | `X-Forwarded-Groups` | No | Trusted reverse-proxy groups header |
+| `TRUSTED_AUTH_ADMIN_GROUPS` | *(empty)* | No | Comma-separated proxy groups mapped to the admin role when role sync is enabled |
+| `TRUSTED_AUTH_SYNC_ADMIN_ROLE` | `false` | No | Opt in to audited promotion/demotion from configured proxy groups |
 | `ALLOW_INSECURE_DEFAULTS` | `false` | No | Set to `true` to bypass startup safety checks that reject default `SECRET_KEY` / `ADMIN_TOKEN` in production |
 | `SYNC_BLOCKED_CATEGORIES` | *(empty)* | No | Comma-separated category names to exclude from catalog sync |
 | `DISCORD_WEBHOOK_URL` | *(empty)* | No | Incoming webhook URL for Discord notifications |
@@ -200,11 +205,15 @@ Private pages describe collector data or allow changes:
 - `/admin/*`
 - import, export, completion, sync, and other mutation routes
 
-If you put an auth proxy in front of the app, authenticated requests can be treated as private by setting `TRUSTED_AUTH_USERNAME_HEADER` to the trusted username header your proxy forwards. If your proxy also forwards group membership, set `TRUSTED_AUTH_GROUPS_HEADER` and `TRUSTED_AUTH_ADMIN_GROUPS` so the app can recognize proxy-based admin access. The legacy `AUTHENTIK_USERNAME_HEADER` and `AUTHENTIK_GROUPS_HEADER` names are still accepted for compatibility, and `AUTHELIA_USERNAME_HEADER` / `AUTHELIA_GROUPS_HEADER` are also supported as fallbacks.
+Authentication can run without an identity provider (`AUTH_MODE=local`), only
+through a trusted reverse proxy (`AUTH_MODE=proxy`), or both (`AUTH_MODE=hybrid`).
+Proxy headers are ignored in local mode. In proxy or hybrid mode, the application
+resolves a persistent user by `TRUSTED_AUTH_SUBJECT_HEADER`; matching usernames
+never silently merge accounts. Pre-provision proxy accounts in Admin → Users or
+with `flask users create-proxy`. Optional auto-provisioning always creates a
+normal user on its first request, even if an admin group is asserted.
 
-Admin access is hybrid: standalone installations can use named local accounts,
-while proxy-authenticated users in the configured admin group can skip the local
-login form and go straight to admin pages. On an installation with no users, open
+On an installation with no users, open
 `/setup` and use `ADMIN_TOKEN` once to create the first named administrator. As
 soon as a user exists, token login and previously issued token-admin sessions are
 disabled. Local users can change their password from the Account/Admin menu;
@@ -215,8 +224,10 @@ receive a temporary password that must be changed at first login. Role changes,
 deactivation, password resets, and explicit session revocation invalidate the
 target account's existing sessions. A named administrator cannot demote,
 deactivate, reset, or revoke their own account through the web interface, and the
-last active administrator cannot be demoted or deactivated. Proxy-managed
-passwords remain the responsibility of the configured identity provider.
+last active administrator cannot be demoted or deactivated. Administrators can
+pre-provision immutable proxy subjects or explicitly link/unlink a subject on a
+local account for hybrid fallback. Proxy-managed passwords remain the
+responsibility of the configured identity provider.
 
 ### Local account recovery
 
@@ -231,6 +242,9 @@ docker compose exec cutco-vault sh -c 'exec gosu "$PUID:$PGID" flask --app app:c
 # Create the first or an additional local administrator.
 docker compose exec cutco-vault sh -c 'exec gosu "$PUID:$PGID" flask --app app:create_app users create-admin --username owner'
 
+# Pre-provision a proxy-only administrator (the subject is the provider's stable ID).
+docker compose exec cutco-vault sh -c 'exec gosu "$PUID:$PGID" flask --app app:create_app users create-proxy --username owner --subject stable-provider-id --role admin'
+
 # Set a temporary password, revoke existing sessions, and force a change at login.
 docker compose exec cutco-vault sh -c 'exec gosu "$PUID:$PGID" flask --app app:create_app users reset-password owner'
 
@@ -244,7 +258,33 @@ container-shell access to trusted operators because these recovery commands do
 not require a web session. Proxy-managed passwords must be reset at the identity
 provider; the application CLI rejects password resets for proxy accounts.
 
-For example, you might set:
+### Proxy/hybrid upgrade checklist
+
+Before upgrading an installation that previously granted access directly from
+proxy headers, record the provider's stable subject/UID for each administrator.
+After the database backup and upgrade:
+
+1. Set `AUTH_MODE` explicitly (`proxy` or `hybrid`) and configure both the
+   username and stable-subject headers.
+2. Pre-provision at least one proxy administrator with `users create-proxy`, or
+   sign in with an existing local administrator and use Admin → Users.
+3. Verify the proxy strips incoming identity headers, then test normal-user and
+   admin routes through the real proxy.
+4. Leave auto-provisioning and role sync disabled unless their behavior is
+   deliberately required and tested.
+
+Migration v16 adds only a unique index for non-null proxy subjects and preserves
+all account and catalog data. It stops with an actionable error if legacy data
+contains duplicate subjects. For rollback, restore the pre-upgrade database
+backup before running the older image; sessions issued or revoked after the
+backup will not carry back. Configuration-only rollback is safer: set
+`AUTH_MODE=local` to disable all trusted-header authentication while retaining
+local accounts and proxy-link data.
+
+The reverse proxy must strip client-supplied copies of every trusted identity
+header before injecting its authenticated values. Otherwise a client could forge
+an identity. Existing `AUTHENTIK_*` and `AUTHELIA_*` username/group aliases remain
+supported. For example, you might set:
 
 - Authentik: `TRUSTED_AUTH_USERNAME_HEADER=X-authentik-username`, `TRUSTED_AUTH_GROUPS_HEADER=X-authentik-groups`
 - Authelia: `TRUSTED_AUTH_USERNAME_HEADER=Remote-User`, `TRUSTED_AUTH_GROUPS_HEADER=Remote-Groups`
@@ -260,38 +300,76 @@ services:
     image: ghcr.io/antwanchild/cutco_catalog:latest
     environment:
       - TRUSTED_AUTH_USERNAME_HEADER=X-authentik-username
+      - TRUSTED_AUTH_SUBJECT_HEADER=X-authentik-uid
       - TRUSTED_AUTH_GROUPS_HEADER=X-authentik-groups
       - TRUSTED_AUTH_ADMIN_GROUPS=authentik Admins
+      - TRUSTED_AUTH_SYNC_ADMIN_ROLE=false
     labels:
       - traefik.enable=true
       - traefik.http.services.cutco.loadbalancer.server.port=8095
 
+      # Strip client assertions before either forwarding publicly or asking
+      # Authentik to inject its verified values.
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Username=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Uid=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Groups=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Name=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Authentik-Email=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Forwarded-User=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.X-Forwarded-Groups=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.Remote-User=
+      - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.Remote-Groups=
+
       # Public pages: catalog browsing, sets, product views, health/version
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.rule=Host(`cutco.anthonychild.com`)
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.rule=Host(`cutco.example.com`)
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.tls=true
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.priority=1
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.middlewares=chain-no-auth-NOerrors@file
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.priority=50
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.middlewares=cutco-strip-auth@docker,chain-no-auth-NOerrors@file
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.service=cutco
 
       # Private collector pages
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.rule=Host(`cutco.anthonychild.com`) && (PathPrefix(`/people`) || PathPrefix(`/wishlist`) || PathPrefix(`/sharpening`) || PathPrefix(`/cookware`) || PathPrefix(`/tasks`) || Path(`/stats`) || PathPrefix(`/views/matrix`))
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.rule=Host(`cutco.example.com`) && (PathPrefix(`/people`) || PathPrefix(`/wishlist`) || PathPrefix(`/sharpening`) || PathPrefix(`/cookware`) || PathPrefix(`/tasks`) || Path(`/stats`) || PathPrefix(`/views/matrix`))
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.priority=100
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.middlewares=chain-auth-shit-NOerrors@file
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.middlewares=cutco-strip-auth@docker,chain-auth-shit-NOerrors@file
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.service=cutco
 
       # Admin pages and mutating routes
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.rule=Host(`cutco.anthonychild.com`) && (PathPrefix(`/admin`) || PathPrefix(`/data/import`) || PathPrefix(`/data/export`) || PathPrefix(`/data/completion-gaps`) || PathPrefix(`/data/completion-import`) || PathPrefix(`/data/variant-sync`) || PathPrefix(`/catalog/add`) || PathPrefix(`/catalog/`) || PathPrefix(`/sets/add`) || PathPrefix(`/sets/`) || PathPrefix(`/views/item/`) || PathPrefix(`/attachments/`))
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.rule=Host(`cutco.example.com`) && (PathPrefix(`/admin`) || PathPrefix(`/data/import`) || PathPrefix(`/data/export`) || PathPrefix(`/data/completion-gaps`) || PathPrefix(`/data/completion-import`) || PathPrefix(`/data/variant-sync`) || PathPrefix(`/catalog/add`) || PathPrefix(`/catalog/`) || PathPrefix(`/sets/add`) || PathPrefix(`/sets/`) || PathPrefix(`/views/item/`) || PathPrefix(`/attachments/`))
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.priority=200
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.middlewares=chain-auth-shit-NOerrors@file
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.middlewares=cutco-strip-auth@docker,chain-auth-shit-NOerrors@file
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.service=cutco
 ```
 
 Hardcode the public hostname in the Traefik `Host(...)` labels unless `DOMAIN` is defined in the compose project `.env` file or shell environment. A `DOMAIN` value under the service's `environment:` block is only passed into the Cutco container; Docker Compose does not use it to render labels before Traefik reads them.
+
+Keep the stripping middleware first in each middleware list. On protected routes,
+the following Authentik forward-auth middleware then replaces those removed
+headers with verified identity values. The public router priority must remain
+below the private and admin priorities while staying above any generic fallback
+or error-page router in the deployment.
+
+#### Authentik provider and outpost URLs
+
+Create Cutco as a **Forward auth (single application)** proxy provider with its
+external host set to the public HTTPS URL, for example
+`https://cutco.example.com`. In **Applications → Outposts → authentik
+Embedded Outpost**, set both `authentik_host` and `authentik_host_browser` to
+the public HTTPS Authentik URL:
+
+```yaml
+authentik_host: https://authentik.example.com
+authentik_host_browser: https://authentik.example.com
+authentik_host_insecure: false
+```
+
+Using `http://` for either public URL can make login appear to work but causes
+Authentik to issue an HTTP-issuer token; its HTTPS end-session endpoint then
+rejects the proxy sign-out request with **Bad Request**.
 
 If you want Authentik to recognize proxy-authenticated users inside the app, make sure your forwardAuth middleware passes these headers through:
 
@@ -308,7 +386,15 @@ middlewares-authentik:
       - X-authentik-uid
 ```
 
-The app reads the Authentik headers directly from Flask requests, so the important part is that Traefik forwards the Authentik username and groups into the same header names configured above.
+The app reads these headers directly from Flask requests. Traefik must forward
+the username and stable UID using the configured names and remove untrusted
+client copies. Keep `TRUSTED_AUTH_SYNC_ADMIN_ROLE=false` unless provider groups
+are intended to control application roles; when enabled, changes are audited.
+
+Proxy-authenticated users see **Sign out of Cutco** in the Account/Admin menu.
+It opens `/outpost.goauthentik.io/sign_out` on the Cutco host and invalidates the
+Cutco proxy session. Authentik may keep its central SSO session, so signing back
+into Cutco can be automatic until that Authentik session is ended separately.
 
 One practical note: the admin router above intentionally covers the app's mutating routes, but the public router still handles read-only browsing routes like `/catalog`, `/sets/<id>`, `/views/item/<id>`, `/attachments/<id>`, `/health`, and `/version`.
 

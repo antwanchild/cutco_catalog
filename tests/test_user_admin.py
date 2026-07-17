@@ -1,7 +1,6 @@
 # pyright: reportOptionalMemberAccess=false
 
 import json
-from unittest import mock
 
 from helpers import AUTH_SESSION_KEY, IDENTITY_KIND_USER
 from models import (
@@ -145,6 +144,78 @@ class UserAdminTests(SmokeBaseTest):
             self.assertNotIn(password, event.payload or "")
             self.assertNotIn("password_hash", event.payload or "")
 
+    def test_admin_preprovisions_proxy_account_without_password(self):
+        self._login_admin()
+
+        response = self.client.post(
+            "/admin/users/new",
+            data={
+                "csrf_token": "test-csrf-token",
+                "auth_source": USER_AUTH_SOURCE_PROXY,
+                "username": "proxy-person",
+                "display_name": "Proxy Person",
+                "external_subject": "stable-proxy-person",
+                "role": USER_ROLE_USER,
+            },
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            user = db.session.execute(
+                db.select(User).where(User.username == "proxy-person")
+            ).scalar_one()
+            self.assertEqual(user.external_subject, "stable-proxy-person")
+            self.assertIsNone(user.password_hash)
+            self.assertFalse(user.must_change_password)
+
+    def test_admin_explicitly_links_and_unlinks_local_proxy_identity(self):
+        self._login_admin()
+        target_id, original_version = self._add_user("hybrid-target")
+
+        linked = self.client.post(
+            f"/admin/users/{target_id}/link-proxy",
+            data={
+                "csrf_token": "test-csrf-token",
+                "external_subject": "hybrid-subject",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(linked.status_code, 302)
+        with self.app.app_context():
+            user = db.session.get(User, target_id)
+            self.assertEqual(user.external_subject, "hybrid-subject")
+            self.assertEqual(user.session_version, original_version + 1)
+
+        unlinked = self.client.post(
+            f"/admin/users/{target_id}/unlink-proxy",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(unlinked.status_code, 302)
+        with self.app.app_context():
+            user = db.session.get(User, target_id)
+            self.assertIsNone(user.external_subject)
+            self.assertEqual(user.session_version, original_version + 2)
+
+    def test_proxy_subject_collision_is_rejected_during_link(self):
+        self._login_admin()
+        self._add_user("existing-proxy", auth_source=USER_AUTH_SOURCE_PROXY)
+        target_id, _ = self._add_user("local-target")
+
+        response = self.client.post(
+            f"/admin/users/{target_id}/link-proxy",
+            data={
+                "csrf_token": "test-csrf-token",
+                "external_subject": "subject:existing-proxy",
+            },
+            follow_redirects=True,
+        )
+
+        self.assertIn(b"already linked to another account", response.data)
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(User, target_id).external_subject)
+
     def test_editing_role_revokes_target_sessions_and_is_audited(self):
         self._login_admin()
         target_id, original_version = self._add_user("promoted-user")
@@ -211,23 +282,21 @@ class UserAdminTests(SmokeBaseTest):
             with self.assertRaisesRegex(ValueError, "cannot demote or deactivate"):
                 user.update_access(is_active=False, actor_user_id=actor_id)
 
-    def test_last_active_admin_invariant_blocks_proxy_admin_deactivation(self):
-        target_id, _ = self._add_user("only-local-admin", role=USER_ROLE_ADMIN)
+    def test_proxy_admin_cannot_deactivate_its_own_persistent_account(self):
+        target_id, _ = self._add_user(
+            "proxy-admin",
+            role=USER_ROLE_ADMIN,
+            auth_source=USER_AUTH_SOURCE_PROXY,
+        )
         self._set_csrf_token()
-        headers = {
-            "X-Forwarded-User": "proxy-admin",
-            "X-Forwarded-Groups": "admins",
-        }
+        response = self.client.post(
+            f"/admin/users/{target_id}/deactivate",
+            data={"csrf_token": "test-csrf-token"},
+            headers={"X-Forwarded-User": "subject:proxy-admin"},
+            follow_redirects=True,
+        )
 
-        with mock.patch("helpers.TRUSTED_AUTH_ADMIN_GROUPS", ("admins",)):
-            response = self.client.post(
-                f"/admin/users/{target_id}/deactivate",
-                data={"csrf_token": "test-csrf-token"},
-                headers=headers,
-                follow_redirects=True,
-            )
-
-        self.assertIn(b"last active admin", response.data)
+        self.assertIn(b"cannot demote or deactivate your own account", response.data)
         with self.app.app_context():
             self.assertTrue(db.session.get(User, target_id).is_active)
 

@@ -28,11 +28,12 @@ Cutco Vault is designed for **self-hosted, personal or small-group use** behind 
 
 - **Named local accounts** — standalone installations can create a local administrator through the one-time setup flow. Passwords are stored only as Werkzeug password hashes, and account roles/status are loaded from the database on each request.
 - **Public browse, private collectors** — product pages stay public; collector, import/export, sync, and mutation routes are private.
-- **Traefik + authentik friendly** — if you terminate auth at the edge, forward a trusted username header and configure `TRUSTED_AUTH_USERNAME_HEADER` to match. If your proxy forwards groups, set `TRUSTED_AUTH_GROUPS_HEADER` and `TRUSTED_AUTH_ADMIN_GROUPS` so proxy admins can be recognized too. The legacy `AUTHENTIK_USERNAME_HEADER` / `AUTHENTIK_GROUPS_HEADER` settings still work if you already used them, and `AUTHELIA_USERNAME_HEADER` / `AUTHELIA_GROUPS_HEADER` are supported as fallbacks.
+- **Local, proxy, or hybrid authentication** — `AUTH_MODE` can disable proxy trust entirely, require a trusted proxy, or retain local password fallback. Proxy identities resolve persistent accounts by an immutable subject, not by a mutable display name.
+- **Trusted-header boundary** — the reverse proxy must strip client-supplied identity headers before injecting authenticated values. Pre-provisioning is the default; auto-provisioning is opt-in and initially grants only the user role. Proxy group-to-admin synchronization is separately opt-in and audited.
 - **Admin login + signed session** — `ADMIN_TOKEN` authorizes creation of the first named administrator and temporary bootstrap access only while no user exists. Once setup completes, local username/password or configured proxy authentication is required. Proxy-admin users can skip the local form.
 - **Password and session safety** — local login failures use a generic response and a timing-safe dummy hash path. Password changes require the current password, revoke other sessions, and logout is a CSRF-protected `POST`.
 - **Offline recovery boundary** — trusted operators can list users, create an administrator, reset a local password, reactivate an account, or revoke sessions through `flask users`. Passwords are hidden interactive prompts, resets force a change at next login, and recovery actions are audited without credential material. Container-shell access is therefore administrator-equivalent and must be restricted.
-- **User administration** — administrators can create local accounts, change roles and activation state, issue forced-change temporary passwords, and revoke sessions. Named administrators cannot use the web UI to demote, deactivate, reset, or revoke themselves, and the final active administrator is protected by a database-backed domain invariant. Proxy passwords are never set by the application.
+- **User administration** — administrators can create local or proxy accounts, explicitly link a proxy subject to a local account, change roles and activation state, issue forced-change temporary passwords, and revoke sessions. Username matches never silently link identities. Named administrators cannot use the web UI to demote, deactivate, reset, or revoke themselves, and the final active administrator is protected by a database-backed domain invariant. Proxy passwords are never set by the application.
 - **Session secret** — the `SECRET_KEY` environment variable protects Flask sessions and signed share tokens. Use a long random value and keep it consistent across restarts (changing it invalidates all active sessions and share links).
 - **Production startup guard** — in production mode, the app refuses to start with default `ADMIN_TOKEN` / `SECRET_KEY` values unless explicitly bypassed.
 - **Write protection** — mutating routes are private; public users can only view product-facing pages and signed share links.
@@ -44,8 +45,11 @@ Cutco Vault is designed for **self-hosted, personal or small-group use** behind 
 - [ ] Verify `flask --app app:create_app users list` works from the application container and document who may run recovery commands
 - [ ] Set `SECRET_KEY` to a strong random value
 - [ ] Set `SESSION_COOKIE_SECURE=true` when served over HTTPS
-- [ ] If using Traefik + authentik or Authelia, forward the authenticated username into `X-Forwarded-User`/`Remote-User` or your chosen trusted header
-- [ ] If you want proxy-based admin access, forward group membership and set `TRUSTED_AUTH_GROUPS_HEADER` plus `TRUSTED_AUTH_ADMIN_GROUPS`
+- [ ] Choose `AUTH_MODE=local`, `proxy`, or `hybrid`; use `local` when no identity proxy is deployed
+- [ ] For proxy/hybrid mode, forward both username and a stable subject/UID and configure their trusted header names
+- [ ] Ensure the reverse proxy strips all inbound trusted identity headers before injecting its own values
+- [ ] Pre-provision proxy users, or deliberately enable `PROXY_AUTH_AUTO_PROVISION=true`
+- [ ] Enable `TRUSTED_AUTH_SYNC_ADMIN_ROLE` only if provider groups should control admin roles, then verify the configured admin groups
 - [ ] Do **not** set `ALLOW_INSECURE_DEFAULTS` in production (dev/temporary bypass only)
 - [ ] Run behind a reverse proxy (nginx, Caddy, Traefik) with HTTPS
 - [ ] Restrict network access to trusted hosts or a VPN

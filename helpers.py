@@ -14,6 +14,7 @@ from flask import (
     current_app,
     flash,
     g,
+    has_app_context,
     has_request_context,
     redirect,
     request,
@@ -25,19 +26,26 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from constants import (
     ADMIN_TOKEN,
+    AUTH_MODE,
     DISCORD_WEBHOOK_URL,
+    PROXY_AUTH_AUTO_PROVISION,
     TRUSTED_AUTH_ADMIN_GROUPS,
+    TRUSTED_AUTH_DISPLAY_NAME_HEADER,
     TRUSTED_AUTH_GROUPS_HEADER,
+    TRUSTED_AUTH_SUBJECT_HEADER,
+    TRUSTED_AUTH_SYNC_ADMIN_ROLE,
     TRUSTED_AUTH_USERNAME_HEADER,
 )
 from extensions import db
 from models import (
     Ownership,
     USER_AUTH_SOURCE_LOCAL,
+    USER_AUTH_SOURCE_PROXY,
     USER_ROLE_ADMIN,
     USER_ROLE_USER,
     User,
     normalize_username,
+    record_audit_event,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,6 +56,31 @@ IDENTITY_KIND_TOKEN_ADMIN = "token_admin"
 IDENTITY_KIND_PROXY_ADMIN = "proxy_admin"
 IDENTITY_KIND_USER = "user"
 _DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
+
+
+def _auth_config(name: str, default):
+    if has_app_context():
+        return current_app.config.get(name, default)
+    return default
+
+
+def auth_mode() -> str:
+    """Return the configured local/proxy authentication mode."""
+    return str(_auth_config("AUTH_MODE", AUTH_MODE)).strip().casefold()
+
+
+def local_auth_enabled() -> bool:
+    """Return whether local password sessions are allowed."""
+    return auth_mode() in {"local", "hybrid"}
+
+
+def proxy_auth_enabled() -> bool:
+    """Return whether trusted proxy headers may resolve an identity."""
+    return auth_mode() in {"proxy", "hybrid"}
+
+
+def _configured_header(name: str, default: str) -> str:
+    return str(_auth_config(name, default) or "").strip()
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,12 +130,17 @@ def _trusted_header_debug_names() -> list[str]:
 
 def is_trusted_proxy_authenticated() -> bool:
     """Return whether the current request came through a trusted auth proxy."""
-    header_value = _request_header_value(TRUSTED_AUTH_USERNAME_HEADER)
+    if not proxy_auth_enabled():
+        return False
+    username_header = _configured_header(
+        "TRUSTED_AUTH_USERNAME_HEADER", TRUSTED_AUTH_USERNAME_HEADER
+    )
+    header_value = _request_header_value(username_header)
     authenticated = bool(header_value)
     if not authenticated and logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Trusted proxy auth header missing or empty (configured=%r, present=%s)",
-            TRUSTED_AUTH_USERNAME_HEADER,
+            username_header,
             _trusted_header_debug_names(),
         )
     return authenticated
@@ -110,12 +148,31 @@ def is_trusted_proxy_authenticated() -> bool:
 
 def trusted_proxy_username() -> str:
     """Return the username asserted by the configured trusted proxy header."""
-    return _request_header_value(TRUSTED_AUTH_USERNAME_HEADER)
+    return _request_header_value(
+        _configured_header("TRUSTED_AUTH_USERNAME_HEADER", TRUSTED_AUTH_USERNAME_HEADER)
+    )
+
+
+def trusted_proxy_subject() -> str:
+    """Return the stable subject asserted by the configured trusted proxy."""
+    return _request_header_value(
+        _configured_header("TRUSTED_AUTH_SUBJECT_HEADER", TRUSTED_AUTH_SUBJECT_HEADER)
+    )
+
+
+def trusted_proxy_display_name() -> str | None:
+    """Return the optional display name asserted by the trusted proxy."""
+    header = _configured_header(
+        "TRUSTED_AUTH_DISPLAY_NAME_HEADER", TRUSTED_AUTH_DISPLAY_NAME_HEADER
+    )
+    return _request_header_value(header) or None if header else None
 
 
 def _trusted_proxy_groups() -> set[str]:
     """Return normalized group names reported by the trusted auth proxy."""
-    raw_groups = _request_header_value(TRUSTED_AUTH_GROUPS_HEADER)
+    raw_groups = _request_header_value(
+        _configured_header("TRUSTED_AUTH_GROUPS_HEADER", TRUSTED_AUTH_GROUPS_HEADER)
+    )
     if not raw_groups:
         return set()
     groups = set()
@@ -127,11 +184,26 @@ def _trusted_proxy_groups() -> set[str]:
 
 
 def is_trusted_proxy_admin() -> bool:
-    """Return whether the trusted auth proxy says this user should be admin."""
-    if not is_trusted_proxy_authenticated() or not TRUSTED_AUTH_ADMIN_GROUPS:
+    """Return whether configured trusted groups assert admin membership."""
+    configured_groups = tuple(
+        _auth_config("TRUSTED_AUTH_ADMIN_GROUPS", TRUSTED_AUTH_ADMIN_GROUPS) or ()
+    )
+    if not is_trusted_proxy_authenticated() or not configured_groups:
         return False
-    allowed_groups = {group.casefold() for group in TRUSTED_AUTH_ADMIN_GROUPS}
+    allowed_groups = {str(group).casefold() for group in configured_groups}
     return bool(_trusted_proxy_groups() & allowed_groups)
+
+
+def proxy_auth_failure() -> str | None:
+    """Return the actionable proxy-resolution failure for this request."""
+    if not has_request_context():
+        return None
+    return getattr(g, "_proxy_auth_failure", None)
+
+
+def _reject_proxy_identity(message: str) -> None:
+    g._proxy_auth_failure = message
+    logger.warning("Trusted proxy identity rejected: %s", message)
 
 
 def _clear_identity_cache() -> None:
@@ -155,25 +227,16 @@ def establish_token_admin_session() -> None:
     _store_session_identity({"kind": IDENTITY_KIND_TOKEN_ADMIN})
 
 
-def establish_proxy_admin_session(username: str) -> None:
-    """Persist the current proxy-admin compatibility session."""
-    cleaned_username = (username or "").strip()
-    if not cleaned_username:
-        raise ValueError("Proxy username is required.")
-    _store_session_identity(
-        {
-            "kind": IDENTITY_KIND_PROXY_ADMIN,
-            "username": cleaned_username,
-        }
-    )
-
-
 def establish_user_session(user: User) -> None:
     """Persist a named user identity without storing its role in the session."""
     if user.id is None:
         raise ValueError("A user must be persisted before starting a session.")
     if not user.is_active:
         raise ValueError("An inactive user cannot start a session.")
+    if user.auth_source != USER_AUTH_SOURCE_LOCAL:
+        raise ValueError(
+            "Proxy accounts authenticate on each request through the proxy."
+        )
     _store_session_identity(
         {
             "kind": IDENTITY_KIND_USER,
@@ -255,14 +318,12 @@ def _identity_from_session() -> RequestIdentity | None:
                 source="token",
             )
         if kind == IDENTITY_KIND_PROXY_ADMIN:
-            username = payload.get("username")
-            if isinstance(username, str) and username.strip():
-                return RequestIdentity(
-                    username=username.strip(),
-                    role=USER_ROLE_ADMIN,
-                    source="proxy",
-                )
+            clear_auth_session()
+            return None
         if kind == IDENTITY_KIND_USER:
+            if auth_mode() == "proxy":
+                clear_auth_session()
+                return None
             return _identity_from_named_user(payload)
         clear_auth_session()
     elif payload is not None:
@@ -282,12 +343,127 @@ def _identity_from_session() -> RequestIdentity | None:
 
 
 def _identity_from_proxy_request() -> RequestIdentity | None:
-    """Resolve the identity asserted on the current trusted-proxy request."""
+    """Resolve or provision a database-backed trusted-proxy identity."""
     if not is_trusted_proxy_authenticated():
         return None
-    username = trusted_proxy_username()
-    role = USER_ROLE_ADMIN if is_trusted_proxy_admin() else USER_ROLE_USER
-    return RequestIdentity(username=username, role=role, source="proxy")
+    asserted_username = trusted_proxy_username()
+    normalized_username = normalize_username(asserted_username)
+    subject = trusted_proxy_subject()
+    if not normalized_username:
+        _reject_proxy_identity("The trusted proxy did not provide a username.")
+        return None
+    if not subject:
+        _reject_proxy_identity("The trusted proxy did not provide a stable subject.")
+        return None
+
+    user = db.session.execute(
+        db.select(User).where(User.external_subject == subject)
+    ).scalar_one_or_none()
+    if user is None:
+        username_owner = db.session.execute(
+            db.select(User).where(User.username == normalized_username)
+        ).scalar_one_or_none()
+        if username_owner is not None:
+            _reject_proxy_identity(
+                "That proxy username is already assigned to another account. "
+                "An administrator must link the stable proxy subject explicitly."
+            )
+            return None
+        auto_provision = bool(
+            _auth_config("PROXY_AUTH_AUTO_PROVISION", PROXY_AUTH_AUTO_PROVISION)
+        )
+        if not auto_provision:
+            _reject_proxy_identity(
+                "This proxy identity is not provisioned. Ask an administrator to "
+                "create or link the account."
+            )
+            return None
+        display_name = trusted_proxy_display_name()
+        if display_name and len(display_name) > 160:
+            _reject_proxy_identity(
+                "The proxy display name exceeds the 160-character limit."
+            )
+            return None
+        try:
+            user = User(
+                username=normalized_username,
+                display_name=display_name,
+                role=USER_ROLE_USER,
+                auth_source=USER_AUTH_SOURCE_PROXY,
+                external_subject=subject,
+            )
+            db.session.add(user)
+            db.session.flush()
+            record_audit_event(
+                title="Auto-provisioned proxy account",
+                actor=f"proxy:{normalized_username}"[:40],
+                actor_user_id=user.id,
+                action="create",
+                entity_type="User",
+                entity_id=user.id,
+                entity_name=user.label,
+                source="trusted proxy",
+                payload={
+                    "role": USER_ROLE_USER,
+                    "auth_source": USER_AUTH_SOURCE_PROXY,
+                },
+            )
+            db.session.commit()
+        except (ValueError, SQLAlchemyError):
+            db.session.rollback()
+            _reject_proxy_identity(
+                "The proxy account could not be provisioned because its identity "
+                "conflicts with an existing account."
+            )
+            return None
+    elif not user.is_active:
+        _reject_proxy_identity("This proxy account is inactive.")
+        return None
+    elif bool(
+        _auth_config("TRUSTED_AUTH_SYNC_ADMIN_ROLE", TRUSTED_AUTH_SYNC_ADMIN_ROLE)
+    ):
+        desired_role = USER_ROLE_ADMIN if is_trusted_proxy_admin() else USER_ROLE_USER
+        if user.role != desired_role:
+            before_role = user.role
+            try:
+                user.update_access(role=desired_role)
+                user.revoke_sessions()
+                record_audit_event(
+                    title="Synchronized proxy account role",
+                    actor=f"proxy:{normalized_username}"[:40],
+                    actor_user_id=user.id,
+                    action="update",
+                    entity_type="User",
+                    entity_id=user.id,
+                    entity_name=user.label,
+                    source="trusted proxy groups",
+                    payload={
+                        "role": {"before": before_role, "after": desired_role},
+                        "session_version": user.session_version,
+                    },
+                )
+                db.session.commit()
+            except ValueError as exc:
+                db.session.rollback()
+                logger.warning("Proxy role synchronization skipped: %s", exc)
+                user = db.session.execute(
+                    db.select(User).where(User.external_subject == subject)
+                ).scalar_one()
+            except SQLAlchemyError:
+                db.session.rollback()
+                _reject_proxy_identity(
+                    "The proxy account role could not be synchronized."
+                )
+                return None
+
+    g._auth_user = user
+    return RequestIdentity(
+        username=user.username,
+        role=user.role,
+        source="proxy",
+        user_id=user.id,
+        session_version=user.session_version,
+    )
 
 
 def current_identity() -> RequestIdentity | None:
@@ -327,7 +503,7 @@ def user_required(fn):
     @wraps(fn)
     def _wrapped(*args, **kwargs):
         if not is_authenticated_user():
-            flash("Authentication required.", "error")
+            flash(proxy_auth_failure() or "Authentication required.", "error")
             return redirect(url_for("admin.admin_login"))
         return fn(*args, **kwargs)
 
@@ -340,7 +516,7 @@ def admin_required(fn):
     @wraps(fn)
     def _wrapped(*args, **kwargs):
         if not is_admin():
-            flash("Admin access required.", "error")
+            flash(proxy_auth_failure() or "Admin access required.", "error")
             return redirect(url_for("admin.admin_login"))
         return fn(*args, **kwargs)
 

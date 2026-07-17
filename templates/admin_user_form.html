@@ -14,6 +14,13 @@
   <form method="post" class="form-card compact mt-sm">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% if not user %}
+    <label>Authentication source
+      <select name="auth_source" id="auth-source" class="input-full">
+        {% for source in auth_sources %}
+          <option value="{{ source }}" {% if source == 'local' %}selected{% endif %}>{{ source | capitalize }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label>Username
       <input type="text" name="username" autocomplete="off" required maxlength="120" class="input-full">
     </label>
@@ -32,13 +39,21 @@
       <p class="muted small">Your own account cannot be demoted or deactivated from user administration.</p>
     {% endif %}
     {% if not user %}
-    <label>Temporary password
-      <input type="password" name="password" autocomplete="new-password" required minlength="12" class="input-full">
-    </label>
-    <label>Confirm temporary password
-      <input type="password" name="password_confirm" autocomplete="new-password" required minlength="12" class="input-full">
-    </label>
-    <p class="muted small">The new user must replace this password at first login.</p>
+    <div id="local-account-fields">
+      <label>Temporary password
+        <input type="password" name="password" autocomplete="new-password" minlength="12" class="input-full">
+      </label>
+      <label>Confirm temporary password
+        <input type="password" name="password_confirm" autocomplete="new-password" minlength="12" class="input-full">
+      </label>
+      <p class="muted small">The new user must replace this password at first login.</p>
+    </div>
+    <div id="proxy-account-fields" hidden>
+      <label>Stable proxy subject
+        <input type="text" name="external_subject" maxlength="255" autocomplete="off" class="input-full">
+      </label>
+      <p class="muted small">Use the immutable subject asserted by the trusted proxy. This value cannot be changed after creation.</p>
+    </div>
     {% endif %}
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">{{ 'Save changes' if user else 'Create user' }}</button>
@@ -48,6 +63,36 @@
 </section>
 
 {% if user %}
+<section class="detail-section">
+  <h2 class="section-heading">Proxy Identity</h2>
+  <div class="form-card compact mt-sm">
+    {% if user.auth_source == 'proxy' %}
+      <h3>Proxy-managed account</h3>
+      <p class="muted small">Stable subject</p>
+      <p class="mono">{{ user.external_subject }}</p>
+      <p class="muted small">The source and subject are immutable. Create a replacement account if the identity provider changes its subject.</p>
+    {% elif user.external_subject %}
+      <h3>Hybrid link</h3>
+      <p class="muted small">This local account may authenticate either with its password or through the linked proxy subject.</p>
+      <p class="mono">{{ user.external_subject }}</p>
+      <form method="post" action="{{ url_for('user_admin.user_unlink_proxy', user_id=user.id) }}" class="form-actions">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger">Unlink proxy identity</button>
+      </form>
+    {% else %}
+      <h3>Link a proxy identity</h3>
+      <p class="muted small">Linking is explicit to prevent a matching proxy username from silently taking over this account.</p>
+      <form method="post" action="{{ url_for('user_admin.user_link_proxy', user_id=user.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Stable proxy subject
+          <input type="text" name="external_subject" maxlength="255" autocomplete="off" required class="input-full">
+        </label>
+        <div class="form-actions"><button type="submit" class="btn btn-secondary">Link proxy identity</button></div>
+      </form>
+    {% endif %}
+  </div>
+</section>
+
 <section class="detail-section">
   <h2 class="section-heading">Security Actions</h2>
   {% if user.auth_source == 'local' and user.id != actor_user_id %}
@@ -84,5 +129,23 @@
     </form>
   </div>
 </section>
+{% endif %}
+{% if not user %}
+<script>
+  (function() {
+    var source = document.getElementById('auth-source');
+    var localFields = document.getElementById('local-account-fields');
+    var proxyFields = document.getElementById('proxy-account-fields');
+    function updateFields() {
+      var proxy = source.value === 'proxy';
+      localFields.hidden = proxy;
+      proxyFields.hidden = !proxy;
+      localFields.querySelectorAll('input').forEach(function(input) { input.required = !proxy; });
+      proxyFields.querySelectorAll('input').forEach(function(input) { input.required = proxy; });
+    }
+    source.addEventListener('change', updateFields);
+    updateFields();
+  })();
+</script>
 {% endif %}
 {% endblock %}

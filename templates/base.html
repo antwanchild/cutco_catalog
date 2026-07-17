@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Cutco Vault{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=app_version) }}">
   <script>
     /* Apply saved theme before paint to avoid flash */
     (function() {
@@ -97,12 +97,16 @@
           </div>
           <div class="nav-group-section nav-group-section-last">
             <div class="nav-group-heading">Session</div>
-            {% if current_user() %}
+            {% if current_user() and current_user().password_hash %}
             <a href="{{ url_for('admin.account_password') }}">Change Password</a>
             {% endif %}
+            {% if current_identity() and current_identity().source == 'proxy' %}
+            <a href="/outpost.goauthentik.io/sign_out">Sign out of Cutco</a>
+            {% else %}
             <form method="post" action="{{ url_for('admin.admin_logout') }}" class="nav-action-form">
               <button type="submit" class="nav-menu-action">Logout</button>
             </form>
+            {% endif %}
           </div>
         </div>
       </details>
@@ -112,10 +116,16 @@
         <div class="nav-group-menu">
           <div class="nav-group-section nav-group-section-last">
             <div class="nav-group-heading">{{ current_user().label }}</div>
+            {% if current_user().password_hash %}
             <a href="{{ url_for('admin.account_password') }}">Change Password</a>
+            {% endif %}
+            {% if current_identity() and current_identity().source == 'proxy' %}
+            <a href="/outpost.goauthentik.io/sign_out">Sign out of Cutco</a>
+            {% else %}
             <form method="post" action="{{ url_for('admin.admin_logout') }}" class="nav-action-form">
               <button type="submit" class="nav-menu-action">Logout</button>
             </form>
+            {% endif %}
           </div>
         </div>
       </details>

@@ -443,6 +443,31 @@ def _schema_local_auth_setup_migrations() -> None:
     db.metadata.tables[AuthSetupState.__tablename__].create(connection, checkfirst=True)
 
 
+def _schema_proxy_identity_migrations() -> None:
+    """Require globally unique stable subjects for proxy account resolution."""
+    from models import User
+
+    connection = db.session.connection()
+    duplicates = connection.execute(
+        db.text(
+            "SELECT external_subject FROM users "
+            "WHERE external_subject IS NOT NULL "
+            "GROUP BY external_subject HAVING COUNT(*) > 1 LIMIT 1"
+        )
+    ).first()
+    if duplicates is not None:
+        raise RuntimeError(
+            "Duplicate proxy subjects must be resolved before schema migration v16."
+        )
+    users_table = db.metadata.tables[User.__tablename__]
+    subject_index = next(
+        index
+        for index in users_table.indexes
+        if index.name == "ux_users_external_subject"
+    )
+    subject_index.create(connection, checkfirst=True)
+
+
 SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
     SchemaMigration(1, "column_additions", _schema_column_migrations),
     SchemaMigration(2, "set_only_items", _schema_set_only_migrations),
@@ -465,6 +490,7 @@ SCHEMA_MIGRATIONS: tuple[SchemaMigration, ...] = (
         14, "user_auth_foundation", _schema_user_auth_foundation_migrations
     ),
     SchemaMigration(15, "local_auth_setup", _schema_local_auth_setup_migrations),
+    SchemaMigration(16, "proxy_identity", _schema_proxy_identity_migrations),
 )
 
 SCHEMA_VERSION = SCHEMA_MIGRATIONS[-1].version

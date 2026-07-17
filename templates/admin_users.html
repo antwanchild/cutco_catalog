@@ -35,7 +35,7 @@
             <div class="muted small mono">{{ user.username }}{% if user.id == actor_user_id %} · you{% endif %}</div>
           </td>
           <td><span class="badge badge-{{ 'create' if user.role == 'admin' else 'info' }}">{{ user.role }}</span></td>
-          <td>{{ user.auth_source }}</td>
+          <td>{{ user.auth_source }}{% if user.auth_source == 'local' and user.external_subject %}<div class="muted small">proxy linked</div>{% endif %}</td>
           <td><span class="badge badge-{{ 'present' if user.is_active else 'missing' }}">{{ 'active' if user.is_active else 'inactive' }}</span></td>
           <td>
             {% if user.auth_source == 'proxy' %}

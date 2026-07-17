@@ -42,6 +42,7 @@ class UserCliTests(SmokeBaseTest):
         for command in (
             "list",
             "create-admin",
+            "create-proxy",
             "reset-password",
             "activate",
             "revoke-sessions",
@@ -111,6 +112,65 @@ class UserCliTests(SmokeBaseTest):
             claim = db.session.get(AuthSetupState, 1)
             self.assertEqual(claim.user_id, first_user.id)
             self.assertEqual(db.session.query(User).count(), 2)
+
+    def test_create_proxy_preprovisions_subject_without_password(self):
+        result = self.app.test_cli_runner().invoke(
+            args=[
+                "users",
+                "create-proxy",
+                "--username",
+                " Proxy.Admin ",
+                "--subject",
+                "stable-cli-subject",
+                "--display-name",
+                "Proxy Administrator",
+                "--role",
+                "admin",
+            ]
+        )
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn("Created proxy admin 'proxy.admin'", result.output)
+        with self.app.app_context():
+            user = db.session.execute(db.select(User)).scalar_one()
+            self.assertEqual(user.auth_source, USER_AUTH_SOURCE_PROXY)
+            self.assertEqual(user.external_subject, "stable-cli-subject")
+            self.assertEqual(user.role, USER_ROLE_ADMIN)
+            self.assertIsNone(user.password_hash)
+            event = db.session.execute(
+                db.select(ActivityEvent).where(
+                    ActivityEvent.source == "flask users create-proxy"
+                )
+            ).scalar_one()
+            self.assertNotIn("stable-cli-subject", event.payload or "")
+
+    def test_create_proxy_rejects_duplicate_subject(self):
+        runner = self.app.test_cli_runner()
+        first = runner.invoke(
+            args=[
+                "users",
+                "create-proxy",
+                "--username",
+                "first-proxy",
+                "--subject",
+                "same-subject",
+            ]
+        )
+        second = runner.invoke(
+            args=[
+                "users",
+                "create-proxy",
+                "--username",
+                "second-proxy",
+                "--subject",
+                "same-subject",
+            ]
+        )
+
+        self.assertEqual(first.exit_code, 0, first.output)
+        self.assertNotEqual(second.exit_code, 0)
+        with self.app.app_context():
+            self.assertEqual(db.session.query(User).count(), 1)
 
     def test_reset_password_forces_change_and_revokes_existing_session(self):
         user_id, original_version = self._add_local_user(

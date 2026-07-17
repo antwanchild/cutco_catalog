@@ -7,12 +7,19 @@
   </div>
   <p class="muted">Use your Cutco Vault account to open private pages and tools.</p>
 
+  {% if proxy_error %}
+  <div class="flash flash-error mt-sm">{{ proxy_error }}</div>
+  {% elif proxy_login_enabled %}
+  <p class="muted small">Trusted-proxy sign-in is enabled. Local sign-in remains available below when configured.</p>
+  {% endif %}
+
   {% if setup_available %}
   <div class="flash flash-info mt-sm">
     No named account exists yet. <a href="{{ url_for('admin.initial_setup') }}">Create the first administrator</a>.
   </div>
   {% endif %}
 
+  {% if local_login_available %}
   <form method="post" class="form-card compact mt-sm">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="login_type" value="local">
@@ -27,6 +34,12 @@
       <a href="{{ url_for('index') }}" class="btn btn-ghost">Cancel</a>
     </div>
   </form>
+  {% else %}
+  <div class="form-card compact mt-sm">
+    <strong>Local password login is disabled.</strong>
+    <p class="muted small">Authenticate through the configured trusted proxy.</p>
+  </div>
+  {% endif %}
 
   {% if token_login_available %}
   <details class="form-card compact mt-sm">

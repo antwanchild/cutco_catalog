@@ -7,6 +7,8 @@ from extensions import db
 from helpers import admin_required, current_identity
 from models import (
     USER_AUTH_SOURCE_LOCAL,
+    USER_AUTH_SOURCE_PROXY,
+    USER_AUTH_SOURCES,
     USER_ROLE_USER,
     USER_ROLES,
     User,
@@ -78,15 +80,21 @@ def users_list():
 @user_admin_bp.route("/new", methods=["GET", "POST"])
 @admin_required
 def user_create():
-    """Create a local account with a temporary password."""
+    """Create a pre-provisioned local or trusted-proxy account."""
     if request.method == "POST":
         username = request.form.get("username", "")
         display_name = request.form.get("display_name", "").strip() or None
         role = request.form.get("role", USER_ROLE_USER)
         password = request.form.get("password", "")
         password_confirm = request.form.get("password_confirm", "")
-        if password != password_confirm:
+        auth_source = request.form.get("auth_source", USER_AUTH_SOURCE_LOCAL)
+        external_subject = request.form.get("external_subject", "").strip()
+        if auth_source not in USER_AUTH_SOURCES:
+            flash("Select a supported authentication source.", "error")
+        elif auth_source == USER_AUTH_SOURCE_LOCAL and password != password_confirm:
             flash("Passwords do not match.", "error")
+        elif auth_source == USER_AUTH_SOURCE_PROXY and not external_subject:
+            flash("A stable proxy subject is required.", "error")
         elif display_name and len(display_name) > 160:
             flash("Display name must be 160 characters or fewer.", "error")
         else:
@@ -95,9 +103,15 @@ def user_create():
                     username=username,
                     display_name=display_name,
                     role=role,
-                    auth_source=USER_AUTH_SOURCE_LOCAL,
+                    auth_source=auth_source,
+                    external_subject=(
+                        external_subject
+                        if auth_source == USER_AUTH_SOURCE_PROXY
+                        else None
+                    ),
                 )
-                user.set_password(password, require_change=True)
+                if auth_source == USER_AUTH_SOURCE_LOCAL:
+                    user.set_password(password, require_change=True)
                 db.session.add(user)
                 db.session.flush()
                 _record_user_event(
@@ -108,7 +122,7 @@ def user_create():
                         "role": user.role,
                         "auth_source": user.auth_source,
                         "is_active": user.is_active,
-                        "must_change_password": True,
+                        "must_change_password": user.must_change_password,
                     },
                 )
             except ValueError as exc:
@@ -120,7 +134,12 @@ def user_create():
             else:
                 if _commit("Could not create the account."):
                     flash(
-                        "Account created. The temporary password must be changed at login.",
+                        (
+                            "Local account created. The temporary password must be "
+                            "changed at login."
+                            if user.auth_source == USER_AUTH_SOURCE_LOCAL
+                            else "Proxy account pre-provisioned."
+                        ),
                         "success",
                     )
                     return redirect(url_for("user_admin.user_edit", user_id=user.id))
@@ -130,6 +149,7 @@ def user_create():
         user=None,
         roles=sorted(USER_ROLES),
         actor_user_id=_actor_user_id(),
+        auth_sources=sorted(USER_AUTH_SOURCES),
     )
 
 
@@ -183,7 +203,66 @@ def user_edit(user_id: int):
         user=user,
         roles=sorted(USER_ROLES),
         actor_user_id=_actor_user_id(),
+        auth_sources=sorted(USER_AUTH_SOURCES),
     )
+
+
+@user_admin_bp.route("/<int:user_id>/link-proxy", methods=["POST"])
+@admin_required
+def user_link_proxy(user_id: int):
+    """Explicitly link a stable proxy subject to a local account."""
+    user = _load_user(user_id)
+    subject = request.form.get("external_subject", "").strip()
+    if user.auth_source != USER_AUTH_SOURCE_LOCAL:
+        flash("Proxy-sourced accounts already have an immutable subject.", "error")
+    else:
+        existing = db.session.execute(
+            db.select(User).where(
+                User.external_subject == subject,
+                User.id != user.id,
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            flash("That proxy subject is already linked to another account.", "error")
+        else:
+            try:
+                user.link_proxy_subject(subject)
+                user.revoke_sessions()
+                _record_user_event(
+                    user,
+                    title="Linked proxy identity through user administration",
+                    payload={"proxy_linked": True, "sessions_revoked": True},
+                )
+            except ValueError as exc:
+                db.session.rollback()
+                flash(str(exc), "error")
+            else:
+                if _commit("Could not link the proxy identity."):
+                    flash(
+                        "Proxy identity linked; existing sessions were revoked.",
+                        "success",
+                    )
+    return redirect(url_for("user_admin.user_edit", user_id=user.id))
+
+
+@user_admin_bp.route("/<int:user_id>/unlink-proxy", methods=["POST"])
+@admin_required
+def user_unlink_proxy(user_id: int):
+    """Remove an explicit trusted-proxy link from a local account."""
+    user = _load_user(user_id)
+    if user.auth_source != USER_AUTH_SOURCE_LOCAL or not user.external_subject:
+        flash("This account does not have a removable proxy link.", "error")
+    else:
+        user.unlink_proxy_subject()
+        user.revoke_sessions()
+        _record_user_event(
+            user,
+            title="Unlinked proxy identity through user administration",
+            payload={"proxy_linked": False, "sessions_revoked": True},
+        )
+        if _commit("Could not unlink the proxy identity."):
+            flash("Proxy identity unlinked; existing sessions were revoked.", "success")
+    return redirect(url_for("user_admin.user_edit", user_id=user.id))
 
 
 def _set_active(user: User, *, active: bool) -> bool:
