@@ -77,6 +77,9 @@ class ProxyAuthTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Diagnostics", response.data)
+        self.assertIn(b'Sign out of Cutco', response.data)
+        self.assertIn(b'href="/outpost.goauthentik.io/sign_out"', response.data)
+        self.assertNotIn(b"Session managed by proxy", response.data)
         with self.app.test_request_context(
             headers=self._headers(username="renamed-upstream", subject="stable-123")
         ):
