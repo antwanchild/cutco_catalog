@@ -321,7 +321,7 @@ services:
       - traefik.http.middlewares.cutco-strip-auth.headers.customrequestheaders.Remote-Groups=
 
       # Public pages: catalog browsing, sets, product views, health/version
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.rule=Host(`cutco.anthonychild.com`)
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-public.rule=Host(`cutco.example.com`)
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.priority=50
@@ -329,7 +329,7 @@ services:
       - traefik.http.routers.${CUTCO_NAME:-cutco}-public.service=cutco
 
       # Private collector pages
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.rule=Host(`cutco.anthonychild.com`) && (PathPrefix(`/people`) || PathPrefix(`/wishlist`) || PathPrefix(`/sharpening`) || PathPrefix(`/cookware`) || PathPrefix(`/tasks`) || Path(`/stats`) || PathPrefix(`/views/matrix`))
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-private.rule=Host(`cutco.example.com`) && (PathPrefix(`/people`) || PathPrefix(`/wishlist`) || PathPrefix(`/sharpening`) || PathPrefix(`/cookware`) || PathPrefix(`/tasks`) || Path(`/stats`) || PathPrefix(`/views/matrix`))
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.priority=100
@@ -337,7 +337,7 @@ services:
       - traefik.http.routers.${CUTCO_NAME:-cutco}-private.service=cutco
 
       # Admin pages and mutating routes
-      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.rule=Host(`cutco.anthonychild.com`) && (PathPrefix(`/admin`) || PathPrefix(`/data/import`) || PathPrefix(`/data/export`) || PathPrefix(`/data/completion-gaps`) || PathPrefix(`/data/completion-import`) || PathPrefix(`/data/variant-sync`) || PathPrefix(`/catalog/add`) || PathPrefix(`/catalog/`) || PathPrefix(`/sets/add`) || PathPrefix(`/sets/`) || PathPrefix(`/views/item/`) || PathPrefix(`/attachments/`))
+      - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.rule=Host(`cutco.example.com`) && (PathPrefix(`/admin`) || PathPrefix(`/data/import`) || PathPrefix(`/data/export`) || PathPrefix(`/data/completion-gaps`) || PathPrefix(`/data/completion-import`) || PathPrefix(`/data/variant-sync`) || PathPrefix(`/catalog/add`) || PathPrefix(`/catalog/`) || PathPrefix(`/sets/add`) || PathPrefix(`/sets/`) || PathPrefix(`/views/item/`) || PathPrefix(`/attachments/`))
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.entrypoints=websecure
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.tls=true
       - traefik.http.routers.${CUTCO_NAME:-cutco}-admin.priority=200
