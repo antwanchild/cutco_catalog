@@ -353,6 +353,24 @@ headers with verified identity values. The public router priority must remain
 below the private and admin priorities while staying above any generic fallback
 or error-page router in the deployment.
 
+#### Authentik provider and outpost URLs
+
+Create Cutco as a **Forward auth (single application)** proxy provider with its
+external host set to the public HTTPS URL, for example
+`https://cutco.anthonychild.com`. In **Applications → Outposts → authentik
+Embedded Outpost**, set both `authentik_host` and `authentik_host_browser` to
+the public HTTPS Authentik URL:
+
+```yaml
+authentik_host: https://authentik.anthonychild.com
+authentik_host_browser: https://authentik.anthonychild.com
+authentik_host_insecure: false
+```
+
+Using `http://` for either public URL can make login appear to work but causes
+Authentik to issue an HTTP-issuer token; its HTTPS end-session endpoint then
+rejects the proxy sign-out request with **Bad Request**.
+
 If you want Authentik to recognize proxy-authenticated users inside the app, make sure your forwardAuth middleware passes these headers through:
 
 ```yaml
@@ -372,6 +390,11 @@ The app reads these headers directly from Flask requests. Traefik must forward
 the username and stable UID using the configured names and remove untrusted
 client copies. Keep `TRUSTED_AUTH_SYNC_ADMIN_ROLE=false` unless provider groups
 are intended to control application roles; when enabled, changes are audited.
+
+Proxy-authenticated users see **Sign out of Cutco** in the Account/Admin menu.
+It opens `/outpost.goauthentik.io/sign_out` on the Cutco host and invalidates the
+Cutco proxy session. Authentik may keep its central SSO session, so signing back
+into Cutco can be automatic until that Authentik session is ended separately.
 
 One practical note: the admin router above intentionally covers the app's mutating routes, but the public router still handles read-only browsing routes like `/catalog`, `/sets/<id>`, `/views/item/<id>`, `/attachments/<id>`, `/health`, and `/version`.
 
