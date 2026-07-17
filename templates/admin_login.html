@@ -41,21 +41,5 @@
   </div>
   {% endif %}
 
-  {% if token_login_available %}
-  <details class="form-card compact mt-sm">
-    <summary>Temporary admin-token access</summary>
-    <p class="muted">Use the existing token only while creating the first named administrator.</p>
-    <form method="post" class="mt-sm">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="login_type" value="token">
-      <label>Admin token
-        <input type="password" name="token" autocomplete="current-password" required class="input-full">
-      </label>
-      <div class="form-actions">
-        <button type="submit" class="btn btn-secondary">Use token</button>
-      </div>
-    </form>
-  </details>
-  {% endif %}
 </div>
 {% endblock %}

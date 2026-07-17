@@ -44,15 +44,7 @@ _AVAILABILITY_ALIAS_MAP = {
     "public": "public",
 }
 
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "admin")
-if ADMIN_TOKEN == "admin":
-    import warnings
-
-    warnings.warn(
-        "ADMIN_TOKEN is set to the default value 'admin'. "
-        "Set the ADMIN_TOKEN environment variable to a strong secret before exposing this service.",
-        stacklevel=2,
-    )
+INITIAL_SETUP_TOKEN = os.environ.get("INITIAL_SETUP_TOKEN", "").strip()
 TRUSTED_AUTH_USERNAME_HEADER = os.environ.get(
     "TRUSTED_AUTH_USERNAME_HEADER",
     os.environ.get(

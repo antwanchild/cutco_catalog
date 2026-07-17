@@ -163,8 +163,10 @@ If no users exist:
 1. Normal private and admin routes redirect to `/setup`.
 2. `/setup` is available only until the first administrator is successfully
    committed.
-3. The form creates one local admin with a strong password.
-4. Setup completion is audited and permanently closes web setup.
+3. The form requires a configured one-time `INITIAL_SETUP_TOKEN` and creates one
+   local admin with a strong password. It never grants a shared admin session.
+4. Setup completion is audited and permanently closes web setup; remove the
+   setup token from the deployment afterward.
 
 For unattended deployments, add a one-shot CLI command such as:
 
@@ -214,7 +216,8 @@ Use a staged rollout to avoid lockouts:
 - Remove token login code and the `ADMIN_TOKEN` constant.
 - Remove the production startup check tied to the default token.
 - Remove obsolete tests, documentation, and deployment examples.
-- Call out the required setup/recovery procedure in release notes.
+- Use `INITIAL_SETUP_TOKEN` solely to protect the first local web setup, and
+  call out the required setup/recovery procedure in release notes.
 
 Database migrations must be additive through Releases A and B. Do not rewrite or
 delete existing catalog, person, ownership, or audit data.
@@ -277,7 +280,8 @@ Avoid exposing whether a submitted username exists on public login responses.
 
 ### 6. Token deprecation and documentation
 
-- Implement the staged `ADMIN_TOKEN` bootstrap and removal behavior.
+- Remove the `ADMIN_TOKEN` bootstrap identity and replace first local web setup
+  with a one-time `INITIAL_SETUP_TOKEN` guard.
 - Update README, SECURITY, Docker examples, environment tables, and release notes.
 - Add an upgrade checklist and rollback notes.
 

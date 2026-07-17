@@ -1,5 +1,5 @@
 # pyright: reportOptionalMemberAccess=false, reportArgumentType=false
-from helpers import AUTH_SESSION_KEY, IDENTITY_KIND_TOKEN_ADMIN, IDENTITY_KIND_USER
+from helpers import AUTH_SESSION_KEY, IDENTITY_KIND_USER
 from models import (
     ActivityEvent,
     AuthSetupState,
@@ -26,7 +26,7 @@ class LocalAuthTests(SmokeBaseTest):
             "/setup",
             data={
                 "csrf_token": "test-csrf-token",
-                "token": "test-admin-token",
+                "setup_token": "test-initial-setup-token",
                 "username": username,
                 "display_name": display_name,
                 "password": password,
@@ -48,7 +48,7 @@ class LocalAuthTests(SmokeBaseTest):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Initial Account Setup", response.data)
-        self.assertIn(b'name="token"', response.data)
+        self.assertIn(b'name="setup_token"', response.data)
         self.assertIn(b'name="username"', response.data)
         self.assertIn(b'name="password_confirm"', response.data)
 
@@ -58,11 +58,11 @@ class LocalAuthTests(SmokeBaseTest):
         self.assertEqual(second_response.status_code, 302)
         self.assertIn("/admin/login", second_response.headers["Location"])
 
-    def test_initial_setup_requires_csrf_and_valid_token(self):
+    def test_initial_setup_requires_csrf_and_valid_setup_token(self):
         missing_csrf = self.client.post(
             "/setup",
             data={
-                "token": "test-admin-token",
+                "setup_token": "test-initial-setup-token",
                 "username": "owner",
                 "password": "correct horse battery staple",
                 "password_confirm": "correct horse battery staple",
@@ -75,7 +75,7 @@ class LocalAuthTests(SmokeBaseTest):
             "/setup",
             data={
                 "csrf_token": "test-csrf-token",
-                "token": "wrong-token",
+                "setup_token": "wrong-token",
                 "username": "owner",
                 "password": "correct horse battery staple",
                 "password_confirm": "correct horse battery staple",
@@ -215,60 +215,56 @@ class LocalAuthTests(SmokeBaseTest):
         self.assertEqual(active.status_code, 302)
         self.assertEqual(active.headers["Location"], "/")
 
-    def test_token_login_and_existing_token_session_stop_after_setup(self):
+    def test_admin_login_never_offers_shared_token_access(self):
+        response = self.client.get("/admin/login")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b"Admin token", response.data)
+        self.assertNotIn(b'name="token"', response.data)
+
+    def test_setup_requires_a_configured_token(self):
+        self.app.config["INITIAL_SETUP_TOKEN"] = ""
+
+        response = self.client.get("/setup")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Initial web setup is not configured", response.data)
+        self.assertIn(b"disabled", response.data)
+
         self._set_csrf()
-        token_login = self.client.post(
-            "/admin/login",
+        blocked = self.client.post(
+            "/setup",
             data={
                 "csrf_token": "test-csrf-token",
-                "token": "test-admin-token",
-            },
-            follow_redirects=False,
-        )
-        self.assertEqual(token_login.status_code, 302)
-        with self.client.session_transaction() as session:
-            self.assertEqual(
-                session[AUTH_SESSION_KEY],
-                {"kind": IDENTITY_KIND_TOKEN_ADMIN},
-            )
-
-        setup_response = self._complete_setup()
-        self.assertEqual(setup_response.status_code, 302)
-        self._logout()
-
-        blocked_login = self.client.post(
-            "/admin/login",
-            data={
-                "csrf_token": "test-csrf-token",
-                "token": "test-admin-token",
-            },
-            follow_redirects=False,
-        )
-        self.assertEqual(blocked_login.status_code, 200)
-        self.assertIn(b"Token login is unavailable", blocked_login.data)
-        with self.client.session_transaction() as session:
-            self.assertNotIn(AUTH_SESSION_KEY, session)
-
-    def test_preexisting_token_session_is_invalidated_when_user_appears(self):
-        self._set_csrf()
-        self.client.post(
-            "/admin/login",
-            data={
-                "csrf_token": "test-csrf-token",
-                "token": "test-admin-token",
+                "setup_token": "anything",
+                "username": "owner",
+                "password": "correct horse battery staple",
+                "password_confirm": "correct horse battery staple",
             },
         )
+        self.assertEqual(blocked.status_code, 200)
+        self.assertIn(b"setup token is invalid", blocked.data)
         with self.app.app_context():
-            user = User(username="new-admin", role=USER_ROLE_ADMIN)
-            user.set_password("correct horse battery staple")
-            db.session.add(user)
-            db.session.commit()
+            self.assertEqual(db.session.query(User).count(), 0)
 
-        response = self.client.get("/admin/diagnostics", follow_redirects=False)
+    def test_setup_does_not_accept_the_removed_admin_token_field(self):
+        self._set_csrf()
 
-        self.assertEqual(response.status_code, 302)
-        with self.client.session_transaction() as session:
-            self.assertNotIn(AUTH_SESSION_KEY, session)
+        response = self.client.post(
+            "/setup",
+            data={
+                "csrf_token": "test-csrf-token",
+                "token": "test-admin-token",
+                "username": "owner",
+                "password": "correct horse battery staple",
+                "password_confirm": "correct horse battery staple",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"setup token is invalid", response.data)
+        with self.app.app_context():
+            self.assertEqual(db.session.query(User).count(), 0)
 
     def test_password_change_rehashes_password_and_revokes_other_sessions(self):
         self._complete_setup(username="password-admin")

@@ -18,12 +18,12 @@ from flask import (
 from sqlalchemy import func
 
 from constants import (
-    ADMIN_TOKEN,
     APP_VERSION,
     AUTH_MODE,
     AUTH_MODES,
     GIT_SHA,
     DATA_DIR,
+    INITIAL_SETUP_TOKEN,
     PROXY_AUTH_AUTO_PROVISION,
     SESSION_SECONDS,
     TRUSTED_AUTH_ADMIN_GROUPS,
@@ -42,6 +42,7 @@ from helpers import (
     current_user,
     is_admin,
     is_authenticated_user,
+    users_exist,
     validate_csrf,
 )
 from models import Item, KnifeTask, Ownership, Person, Set, get_latest_activity
@@ -583,6 +584,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         TRUSTED_AUTH_ADMIN_GROUPS=TRUSTED_AUTH_ADMIN_GROUPS,
         TRUSTED_AUTH_SYNC_ADMIN_ROLE=TRUSTED_AUTH_SYNC_ADMIN_ROLE,
         SESSION_SECONDS=SESSION_SECONDS,
+        INITIAL_SETUP_TOKEN=INITIAL_SETUP_TOKEN,
         TESTING=False,
     )
     app.url_map.strict_slashes = False
@@ -612,10 +614,10 @@ def create_app(test_config: dict | None = None) -> Flask:
     _is_prod = os.environ.get("FLASK_ENV", "production").lower() == "production"
     _allow_insecure = _env_flag("ALLOW_INSECURE_DEFAULTS")
     if _is_prod and not _allow_insecure and not app.testing:
-        if app.secret_key == "cutco-vault-dev-key" or ADMIN_TOKEN == "admin":
+        if app.secret_key == "cutco-vault-dev-key":
             raise RuntimeError(
-                "Refusing to start in production with default SECRET_KEY or ADMIN_TOKEN. "
-                "Set strong values, or set ALLOW_INSECURE_DEFAULTS=1 to bypass."
+                "Refusing to start in production with the default SECRET_KEY. "
+                "Set a strong value, or set ALLOW_INSECURE_DEFAULTS=1 to bypass."
             )
 
     _setup_logging(app.config["LOG_DIR"], app.config["LOG_LEVEL"])
@@ -630,6 +632,15 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     with app.app_context():
         initialize_database()
+        if os.environ.get("ADMIN_TOKEN"):
+            logger.warning(
+                "ADMIN_TOKEN is no longer used and can be removed from the deployment."
+            )
+        if app.config["INITIAL_SETUP_TOKEN"] and users_exist():
+            logger.warning(
+                "INITIAL_SETUP_TOKEN is no longer needed after initial setup; "
+                "remove it from the deployment."
+            )
 
     return app
 

@@ -12,13 +12,21 @@ class AdminSmokeTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'name="update_db" checked', response.data)
 
-    def test_admin_login_sets_session_flag(self):
+    def test_local_admin_login_sets_named_session(self):
+        self._login_as_admin()
         self._set_csrf_token()
+        self.client.post(
+            "/admin/logout",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
         response = self.client.post(
             "/admin/login",
             data={
                 "csrf_token": "test-csrf-token",
-                "token": "test-admin-token",
+                "login_type": "local",
+                "username": "smoke-admin",
+                "password": "correct horse battery staple",
             },
             follow_redirects=False,
         )
@@ -29,8 +37,8 @@ class AdminSmokeTests(SmokeBaseTest):
         self.assertFalse(self.app.config["SESSION_REFRESH_EACH_REQUEST"])
         with self.client.session_transaction() as session:
             self.assertEqual(
-                session.get(AUTH_SESSION_KEY),
-                {"kind": IDENTITY_KIND_TOKEN_ADMIN},
+                session.get(AUTH_SESSION_KEY)["kind"],
+                "user",
             )
             self.assertNotIn("is_admin", session)
 

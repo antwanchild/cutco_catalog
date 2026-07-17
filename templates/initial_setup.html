@@ -3,28 +3,33 @@
 {% block content %}
 <div class="detail-section auth-card centered">
   <h1 class="page-title">Initial Account Setup</h1>
-  <p class="muted">Create the first named administrator. The existing admin token is required once to authorize setup.</p>
+  <p class="muted">Create the first named administrator. A one-time setup token authorizes this page until setup is complete.</p>
 
+  {% if not setup_token_configured %}
+  <div class="flash flash-error mt-sm">
+    Initial web setup is not configured. Set <code>INITIAL_SETUP_TOKEN</code> to a long random value, restart the app, and return here.
+  </div>
+  {% endif %}
   <form method="post" class="form-card compact mt-sm">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label>Admin token
-      <input type="password" name="token" autocomplete="current-password" required class="input-full">
+    <label>Setup token
+      <input type="password" name="setup_token" autocomplete="one-time-code" required class="input-full" {% if not setup_token_configured %}disabled{% endif %}>
     </label>
     <label>Username
-      <input type="text" name="username" autocomplete="username" autofocus required maxlength="120" class="input-full">
+      <input type="text" name="username" autocomplete="username" autofocus required maxlength="120" class="input-full" {% if not setup_token_configured %}disabled{% endif %}>
     </label>
     <label>Display name <span class="muted">(optional)</span>
-      <input type="text" name="display_name" maxlength="160" class="input-full">
+      <input type="text" name="display_name" maxlength="160" class="input-full" {% if not setup_token_configured %}disabled{% endif %}>
     </label>
     <label>Password
-      <input type="password" name="password" autocomplete="new-password" required minlength="12" class="input-full">
+      <input type="password" name="password" autocomplete="new-password" required minlength="12" class="input-full" {% if not setup_token_configured %}disabled{% endif %}>
     </label>
     <label>Confirm password
-      <input type="password" name="password_confirm" autocomplete="new-password" required minlength="12" class="input-full">
+      <input type="password" name="password_confirm" autocomplete="new-password" required minlength="12" class="input-full" {% if not setup_token_configured %}disabled{% endif %}>
     </label>
-    <p class="muted">Use at least 12 characters. After setup, token login is disabled.</p>
+    <p class="muted">Use at least 12 characters. Setup closes permanently after this account is created.</p>
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary">Create administrator</button>
+      <button type="submit" class="btn btn-primary" {% if not setup_token_configured %}disabled{% endif %}>Create administrator</button>
       <a href="{{ url_for('admin.admin_login') }}" class="btn btn-ghost">Cancel</a>
     </div>
   </form>

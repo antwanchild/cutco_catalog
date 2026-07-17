@@ -29,15 +29,14 @@ from constants import ADMIN_SESSION_SECONDS, APP_VERSION, get_git_sha_info
 from extensions import db
 from extensions import limiter
 from helpers import (
-    admin_token_matches,
     admin_required,
     authenticate_local_user,
     clear_auth_session,
     current_identity,
     current_user,
     db_commit,
-    establish_token_admin_session,
     establish_user_session,
+    initial_setup_token_matches,
     is_admin,
     local_auth_enabled,
     proxy_auth_enabled,
@@ -370,66 +369,45 @@ def inject_admin_status_strip():
 @admin_bp.route("/admin/login", methods=["GET", "POST"])
 @limiter.limit("10 per minute; 30 per hour")
 def admin_login():
-    """Handle local, token-bootstrap, and trusted-proxy login requests."""
+    """Handle local and trusted-proxy login requests."""
     identity = current_identity()
     if identity is not None:
         return redirect(
             url_for("admin.diagnostics_page") if identity.is_admin else url_for("index")
         )
     if request.method == "POST":
-        token_attempt = (
-            request.form.get("login_type") == "token" or "token" in request.form
+        if not local_auth_enabled():
+            flash("Local password login is disabled in proxy-only mode.", "error")
+            return redirect(url_for("admin.admin_login"))
+        user = authenticate_local_user(
+            request.form.get("username", ""),
+            request.form.get("password", ""),
         )
-        if token_attempt:
-            if not users_exist() and admin_token_matches(request.form.get("token", "")):
-                establish_token_admin_session()
+        if user is not None:
+            user.last_login_at = datetime.now(timezone.utc).isoformat(
+                timespec="seconds"
+            )
+            if db_commit(
+                db.session,
+                error_msg="Could not start your session — please try again.",
+            ):
+                establish_user_session(user)
                 session.permanent = (
                     int(
                         current_app.config.get("SESSION_SECONDS", ADMIN_SESSION_SECONDS)
                     )
                     > 0
                 )
-                logger.info("Admin token bootstrap login successful")
-                flash("Admin access granted. Create a named admin account.", "success")
-                return redirect(url_for("catalog.catalog"))
-            logger.warning("Admin token bootstrap login failed")
-            flash("Token login is unavailable or the token is invalid.", "error")
-        else:
-            if not local_auth_enabled():
-                flash("Local password login is disabled in proxy-only mode.", "error")
-                return redirect(url_for("admin.admin_login"))
-            user = authenticate_local_user(
-                request.form.get("username", ""),
-                request.form.get("password", ""),
-            )
-            if user is not None:
-                user.last_login_at = datetime.now(timezone.utc).isoformat(
-                    timespec="seconds"
-                )
-                if db_commit(
-                    db.session,
-                    error_msg="Could not start your session — please try again.",
-                ):
-                    establish_user_session(user)
-                    session.permanent = (
-                        int(
-                            current_app.config.get(
-                                "SESSION_SECONDS", ADMIN_SESSION_SECONDS
-                            )
-                        )
-                        > 0
-                    )
-                    logger.info("Local login successful for user_id=%s", user.id)
-                    flash("Signed in.", "success")
-                    if user.must_change_password:
-                        return redirect(url_for("admin.account_password"))
-                    return redirect(url_for("index"))
-            logger.warning("Local login failed")
-            flash("Invalid username or password.", "error")
+                logger.info("Local login successful for user_id=%s", user.id)
+                flash("Signed in.", "success")
+                if user.must_change_password:
+                    return redirect(url_for("admin.account_password"))
+                return redirect(url_for("index"))
+        logger.warning("Local login failed")
+        flash("Invalid username or password.", "error")
     return render_template(
         "admin_login.html",
         setup_available=not users_exist() and local_auth_enabled(),
-        token_login_available=not users_exist(),
         local_login_available=local_auth_enabled(),
         proxy_login_enabled=proxy_auth_enabled(),
         proxy_error=proxy_auth_failure(),
@@ -439,11 +417,11 @@ def admin_login():
 @admin_bp.route("/setup", methods=["GET", "POST"])
 @limiter.limit("5 per hour")
 def initial_setup():
-    """Create the first named administrator using the bootstrap token."""
+    """Create the first named administrator using a one-time setup token."""
     if not local_auth_enabled():
         flash(
-            "Local setup is disabled in proxy-only mode. Use bootstrap token "
-            "access or the user CLI to provision a proxy administrator.",
+            "Local setup is disabled in proxy-only mode. Provision a proxy "
+            "administrator through the user CLI.",
             "error",
         )
         return redirect(url_for("admin.admin_login"))
@@ -457,7 +435,7 @@ def initial_setup():
         display_name = request.form.get("display_name", "").strip() or None
         password = request.form.get("password", "")
         password_confirm = request.form.get("password_confirm", "")
-        if not admin_token_matches(request.form.get("token", "")):
+        if not initial_setup_token_matches(request.form.get("setup_token", "")):
             flash("The setup token is invalid.", "error")
         elif password != password_confirm:
             flash("Passwords do not match.", "error")
@@ -517,7 +495,10 @@ def initial_setup():
                 flash("Administrator account created.", "success")
                 return redirect(url_for("admin.diagnostics_page"))
 
-    return render_template("initial_setup.html")
+    return render_template(
+        "initial_setup.html",
+        setup_token_configured=bool(current_app.config.get("INITIAL_SETUP_TOKEN", "")),
+    )
 
 
 @admin_bp.route("/account/password", methods=["GET", "POST"])
