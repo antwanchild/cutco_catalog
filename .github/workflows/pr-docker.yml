@@ -3,6 +3,8 @@ name: PR Preview
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths-ignore:
+      - "**/*.md"
   pull_request_target:
     types: [closed]
 
