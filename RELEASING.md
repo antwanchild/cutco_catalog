@@ -49,3 +49,15 @@ If the app just does the same thing more correctly, consider `fix`.
 - Make sure the commit message type matches the change.
 - If you expect a new release version, use a `feat:` commit message.
 - If the change is only a bug fix or cleanup, keep it as `fix:` or another non-feature type.
+
+## Authentication-breaking releases
+
+When an authentication change removes a supported login or setup path, use
+`feat!:` and include an upgrade note. The current setup model uses a one-time
+`INITIAL_SETUP_TOKEN` only to create the first local administrator at `/setup`.
+It never grants an administrator session. Before deploying the breaking removal
+of `ADMIN_TOKEN`, ensure an existing installation has a working named local or
+proxy administrator; remove `ADMIN_TOKEN` after deployment. For a fresh local or
+hybrid installation, set a long random `INITIAL_SETUP_TOKEN`, complete `/setup`,
+then remove that value. Roll back the container image if account access has not
+been verified; the user database is additive and does not need to be recreated.

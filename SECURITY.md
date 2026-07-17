@@ -30,18 +30,18 @@ Cutco Vault is designed for **self-hosted, personal or small-group use** behind 
 - **Public browse, private collectors** — product pages stay public; collector, import/export, sync, and mutation routes are private.
 - **Local, proxy, or hybrid authentication** — `AUTH_MODE` can disable proxy trust entirely, require a trusted proxy, or retain local password fallback. Proxy identities resolve persistent accounts by an immutable subject, not by a mutable display name.
 - **Trusted-header boundary** — the reverse proxy must strip client-supplied identity headers before injecting authenticated values. Pre-provisioning is the default; auto-provisioning is opt-in and initially grants only the user role. Proxy group-to-admin synchronization is separately opt-in and audited.
-- **Admin login + signed session** — `ADMIN_TOKEN` authorizes creation of the first named administrator and temporary bootstrap access only while no user exists. Once setup completes, local username/password or configured proxy authentication is required. Proxy-admin users can skip the local form.
+- **Initial setup + signed sessions** — `INITIAL_SETUP_TOKEN` authorizes creation of the first named local administrator only while no user exists. The setup page permanently closes after that account is created; it never grants a shared administrator session. Once setup completes, local username/password or configured proxy authentication is required. Proxy-admin users can skip the local form.
 - **Password and session safety** — local login failures use a generic response and a timing-safe dummy hash path. Password changes require the current password, revoke other sessions, and logout is a CSRF-protected `POST`.
 - **Offline recovery boundary** — trusted operators can list users, create an administrator, reset a local password, reactivate an account, or revoke sessions through `flask users`. Passwords are hidden interactive prompts, resets force a change at next login, and recovery actions are audited without credential material. Container-shell access is therefore administrator-equivalent and must be restricted.
 - **User administration** — administrators can create local or proxy accounts, explicitly link a proxy subject to a local account, change roles and activation state, issue forced-change temporary passwords, and revoke sessions. Username matches never silently link identities. Named administrators cannot use the web UI to demote, deactivate, reset, or revoke themselves, and the final active administrator is protected by a database-backed domain invariant. Proxy passwords are never set by the application.
 - **Session secret** — the `SECRET_KEY` environment variable protects Flask sessions and signed share tokens. Use a long random value and keep it consistent across restarts (changing it invalidates all active sessions and share links).
-- **Production startup guard** — in production mode, the app refuses to start with default `ADMIN_TOKEN` / `SECRET_KEY` values unless explicitly bypassed.
+- **Production startup guard** — in production mode, the app refuses to start with the default `SECRET_KEY` unless explicitly bypassed. It warns when an obsolete `ADMIN_TOKEN` or no-longer-needed `INITIAL_SETUP_TOKEN` remains configured.
 - **Write protection** — mutating routes are private; public users can only view product-facing pages and signed share links.
 
 ## Hardening Checklist
 
-- [ ] Set `ADMIN_TOKEN` to a strong random bootstrap value (e.g. `openssl rand -hex 32`)
-- [ ] Complete `/setup` promptly and store the local administrator password securely
+- [ ] Before the first local web setup, set `INITIAL_SETUP_TOKEN` to a strong random value (e.g. `openssl rand -hex 32`)
+- [ ] Complete `/setup`, store the local administrator password securely, then remove `INITIAL_SETUP_TOKEN`
 - [ ] Verify `flask --app app:create_app users list` works from the application container and document who may run recovery commands
 - [ ] Set `SECRET_KEY` to a strong random value
 - [ ] Set `SESSION_COOKIE_SECURE=true` when served over HTTPS

@@ -10,7 +10,7 @@ from openpyxl import Workbook  # noqa: F401
 from bs4 import BeautifulSoup  # noqa: F401
 from flask import Flask  # noqa: F401
 
-os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
+os.environ.setdefault("INITIAL_SETUP_TOKEN", "test-initial-setup-token")
 
 from app import _teardown_logging, create_app  # noqa: F401
 import blueprints.catalog as catalog_blueprint  # noqa: F401
@@ -19,7 +19,6 @@ from extensions import db  # noqa: F401
 from helpers import (  # noqa: F401
     AUTH_SESSION_KEY,
     IDENTITY_KIND_PROXY_ADMIN,
-    IDENTITY_KIND_TOKEN_ADMIN,
     _collection_token,
     _gift_token,
     _notify_discord,
@@ -87,7 +86,6 @@ __all__ = [
     "db",
     "AUTH_SESSION_KEY",
     "IDENTITY_KIND_PROXY_ADMIN",
-    "IDENTITY_KIND_TOKEN_ADMIN",
     "_collection_token",
     "_gift_token",
     "_notify_discord",
@@ -146,6 +144,7 @@ class SmokeBaseTest(unittest.TestCase):
                 "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
                 "LOG_DIR": self.temp_dir.name,
                 "ATTACHMENTS_DIR": f"{self.temp_dir.name}/uploads/items",
+                "INITIAL_SETUP_TOKEN": "test-initial-setup-token",
             }
         )
         self.client = self.app.test_client()
@@ -160,10 +159,13 @@ class SmokeBaseTest(unittest.TestCase):
     def _login_as_admin(self):
         self._set_csrf_token()
         self.client.post(
-            "/admin/login",
+            "/setup",
             data={
                 "csrf_token": "test-csrf-token",
-                "token": "test-admin-token",
+                "setup_token": "test-initial-setup-token",
+                "username": "smoke-admin",
+                "password": "correct horse battery staple",
+                "password_confirm": "correct horse battery staple",
             },
             follow_redirects=False,
         )

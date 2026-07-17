@@ -55,7 +55,7 @@ services:
     volumes:
       - ./data:/data
     environment:
-      - ADMIN_TOKEN=your-secret-token
+      - INITIAL_SETUP_TOKEN=generate-a-long-random-one-time-value
       - SECRET_KEY=your-flask-secret
       - PUID=1000
       - PGID=1000
@@ -133,7 +133,7 @@ To enable the local hooks, install the tooling once and run `pre-commit install`
 | Variable | Default | Required | Description |
 |---|---|:---:|---|
 | `SECRET_KEY` | `cutco-vault-dev-key` | ⚠️ | Flask session secret — **change in production** |
-| `ADMIN_TOKEN` | `admin` | ⚠️ | One-time bootstrap token used to create the first named admin — **change in production** |
+| `INITIAL_SETUP_TOKEN` | *(empty)* | First web setup | One-time secret required to create the first local administrator; remove it after setup |
 | `SESSION_SECONDS` | `7200` | No | Local signed-session lifetime in seconds; set to `0` for browser-session only. `ADMIN_SESSION_SECONDS` remains a deprecated fallback. |
 | `DATABASE_URL` | `sqlite:////data/cutco.db` | No | SQLAlchemy connection string |
 | `DATA_DIR` | `/data` | No | Directory for the database and job state files |
@@ -148,7 +148,7 @@ To enable the local hooks, install the tooling once and run `pre-commit install`
 | `TRUSTED_AUTH_GROUPS_HEADER` | `X-Forwarded-Groups` | No | Trusted reverse-proxy groups header |
 | `TRUSTED_AUTH_ADMIN_GROUPS` | *(empty)* | No | Comma-separated proxy groups mapped to the admin role when role sync is enabled |
 | `TRUSTED_AUTH_SYNC_ADMIN_ROLE` | `false` | No | Opt in to audited promotion/demotion from configured proxy groups |
-| `ALLOW_INSECURE_DEFAULTS` | `false` | No | Set to `true` to bypass startup safety checks that reject default `SECRET_KEY` / `ADMIN_TOKEN` in production |
+| `ALLOW_INSECURE_DEFAULTS` | `false` | No | Set to `true` to bypass the production startup safety check for the default `SECRET_KEY` |
 | `SYNC_BLOCKED_CATEGORIES` | *(empty)* | No | Comma-separated category names to exclude from catalog sync |
 | `DISCORD_WEBHOOK_URL` | *(empty)* | No | Incoming webhook URL for Discord notifications |
 | `SHARPEN_THRESHOLD_DAYS` | `180` | No | Days before a knife is flagged overdue for sharpening |
@@ -213,11 +213,16 @@ never silently merge accounts. Pre-provision proxy accounts in Admin → Users o
 with `flask users create-proxy`. Optional auto-provisioning always creates a
 normal user on its first request, even if an admin group is asserted.
 
-On an installation with no users, open
-`/setup` and use `ADMIN_TOKEN` once to create the first named administrator. As
-soon as a user exists, token login and previously issued token-admin sessions are
-disabled. Local users can change their password from the Account/Admin menu;
+For a new local or hybrid installation, generate a setup secret before the first
+start (for example, `openssl rand -hex 32`), set it as `INITIAL_SETUP_TOKEN`, and
+open `/setup` to create the first named administrator. This is the only browser
+setup path: it is available only while no users exist and permanently closes when
+the account is created. Remove `INITIAL_SETUP_TOKEN` from the deployment after
+setup. Local users can change their password from the Account/Admin menu;
 password changes revoke their other sessions.
+
+Existing deployments can remove `ADMIN_TOKEN`; it is no longer accepted for login
+or setup and the application logs a warning if the obsolete variable is still set.
 
 Administrators can manage named accounts at `/admin/users`. New local accounts
 receive a temporary password that must be changed at first login. Role changes,

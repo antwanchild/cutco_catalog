@@ -291,18 +291,17 @@ class ProxyAuthTests(SmokeBaseTest):
 
     def test_production_proxy_mode_logs_trusted_header_warning(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            with mock.patch.object(app_module, "ADMIN_TOKEN", "strong-token"):
-                with mock.patch.object(app_module.logger, "warning") as warning:
-                    app = create_app(
-                        {
-                            "TESTING": False,
-                            "SECRET_KEY": "strong-production-secret",
-                            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{temp_dir}/test.db",
-                            "LOG_DIR": temp_dir,
-                            "ATTACHMENTS_DIR": f"{temp_dir}/uploads/items",
-                            "AUTH_MODE": "proxy",
-                        }
-                    )
+            with mock.patch.object(app_module.logger, "warning") as warning:
+                app = create_app(
+                    {
+                        "TESTING": False,
+                        "SECRET_KEY": "strong-production-secret",
+                        "SQLALCHEMY_DATABASE_URI": f"sqlite:///{temp_dir}/test.db",
+                        "LOG_DIR": temp_dir,
+                        "ATTACHMENTS_DIR": f"{temp_dir}/uploads/items",
+                        "AUTH_MODE": "proxy",
+                    }
+                )
             try:
                 self.assertTrue(
                     any(

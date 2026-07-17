@@ -23,7 +23,9 @@ class ErrorSmokeTests(SmokeBaseTest):
                 "/admin/login",
                 data={
                     "csrf_token": "test-csrf-token",
-                    "token": "wrong-token",
+                    "login_type": "local",
+                    "username": "unknown",
+                    "password": "wrong-password",
                 },
                 follow_redirects=False,
             )
@@ -33,7 +35,9 @@ class ErrorSmokeTests(SmokeBaseTest):
             "/admin/login",
             data={
                 "csrf_token": "test-csrf-token",
-                "token": "wrong-token",
+                "login_type": "local",
+                "username": "unknown",
+                "password": "wrong-password",
             },
             follow_redirects=False,
         )

@@ -3,7 +3,6 @@ from flask import session
 
 from helpers import (
     AUTH_SESSION_KEY,
-    IDENTITY_KIND_TOKEN_ADMIN,
     IDENTITY_KIND_USER,
     clear_auth_session,
     current_identity,
@@ -129,19 +128,15 @@ class AuthIdentityTests(SmokeBaseTest):
         with self.client.session_transaction() as session:
             self.assertNotIn(AUTH_SESSION_KEY, session)
 
-    def test_legacy_admin_cookie_is_migrated_to_identity_payload(self):
+    def test_legacy_admin_cookie_is_not_trusted(self):
         with self.client.session_transaction() as session:
             session["is_admin"] = True
 
         response = self.client.get("/admin/diagnostics", follow_redirects=False)
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
         with self.client.session_transaction() as session:
-            self.assertEqual(
-                session[AUTH_SESSION_KEY],
-                {"kind": IDENTITY_KIND_TOKEN_ADMIN},
-            )
-            self.assertNotIn("is_admin", session)
+            self.assertNotIn(AUTH_SESSION_KEY, session)
 
     def test_proxy_request_resolves_username_and_current_role(self):
         with self.app.app_context():

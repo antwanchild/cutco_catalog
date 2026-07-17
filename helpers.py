@@ -25,7 +25,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from constants import (
-    ADMIN_TOKEN,
     AUTH_MODE,
     DISCORD_WEBHOOK_URL,
     PROXY_AUTH_AUTO_PROVISION,
@@ -51,8 +50,6 @@ from models import (
 logger = logging.getLogger(__name__)
 
 AUTH_SESSION_KEY = "auth_identity"
-LEGACY_ADMIN_SESSION_KEY = "is_admin"
-IDENTITY_KIND_TOKEN_ADMIN = "token_admin"
 IDENTITY_KIND_PROXY_ADMIN = "proxy_admin"
 IDENTITY_KIND_USER = "user"
 _DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
@@ -218,13 +215,7 @@ def _clear_identity_cache() -> None:
 def _store_session_identity(payload: dict) -> None:
     """Persist a signed identity payload in the Flask session."""
     session[AUTH_SESSION_KEY] = payload
-    session.pop(LEGACY_ADMIN_SESSION_KEY, None)
     _clear_identity_cache()
-
-
-def establish_token_admin_session() -> None:
-    """Create the compatibility identity used by successful token login."""
-    _store_session_identity({"kind": IDENTITY_KIND_TOKEN_ADMIN})
 
 
 def establish_user_session(user: User) -> None:
@@ -251,9 +242,12 @@ def users_exist() -> bool:
     return db.session.execute(db.select(User.id).limit(1)).first() is not None
 
 
-def admin_token_matches(candidate: str) -> bool:
-    """Compare an admin token without content-dependent timing."""
-    return hmac.compare_digest(candidate or "", ADMIN_TOKEN)
+def initial_setup_token_matches(candidate: str) -> bool:
+    """Compare the configured one-time setup token without timing leaks."""
+    configured_token = str(_auth_config("INITIAL_SETUP_TOKEN", "") or "")
+    return bool(configured_token) and hmac.compare_digest(
+        candidate or "", configured_token
+    )
 
 
 def authenticate_local_user(username: str, password: str) -> User | None:
@@ -276,9 +270,8 @@ def authenticate_local_user(username: str, password: str) -> User | None:
 
 
 def clear_auth_session() -> None:
-    """Remove current and legacy authentication state from the session."""
+    """Remove current authentication state from the session."""
     session.pop(AUTH_SESSION_KEY, None)
-    session.pop(LEGACY_ADMIN_SESSION_KEY, None)
     _clear_identity_cache()
 
 
@@ -304,19 +297,10 @@ def _identity_from_named_user(payload: dict) -> RequestIdentity | None:
 
 
 def _identity_from_session() -> RequestIdentity | None:
-    """Resolve signed session state, including legacy cookie migration."""
+    """Resolve signed database-backed session state."""
     payload = session.get(AUTH_SESSION_KEY)
     if isinstance(payload, dict):
         kind = payload.get("kind")
-        if kind == IDENTITY_KIND_TOKEN_ADMIN:
-            if users_exist():
-                clear_auth_session()
-                return None
-            return RequestIdentity(
-                username="admin",
-                role=USER_ROLE_ADMIN,
-                source="token",
-            )
         if kind == IDENTITY_KIND_PROXY_ADMIN:
             clear_auth_session()
             return None
@@ -329,16 +313,6 @@ def _identity_from_session() -> RequestIdentity | None:
     elif payload is not None:
         clear_auth_session()
 
-    if session.get(LEGACY_ADMIN_SESSION_KEY) is True:
-        if users_exist():
-            clear_auth_session()
-            return None
-        establish_token_admin_session()
-        return RequestIdentity(
-            username="admin",
-            role=USER_ROLE_ADMIN,
-            source="token",
-        )
     return None
 
 

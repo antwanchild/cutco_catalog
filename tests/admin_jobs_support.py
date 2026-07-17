@@ -5,7 +5,7 @@ import unittest  # noqa: F401
 from datetime import UTC, datetime, timedelta, timezone  # noqa: F401
 from unittest import mock  # noqa: F401
 
-os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
+os.environ.setdefault("INITIAL_SETUP_TOKEN", "test-initial-setup-token")
 
 from flask import Flask  # noqa: F401
 
@@ -34,6 +34,7 @@ class AdminJobBaseTest(unittest.TestCase):
                 "SECRET_KEY": "test-secret-key",
                 "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
                 "LOG_DIR": self.temp_dir.name,
+                "INITIAL_SETUP_TOKEN": "test-initial-setup-token",
             }
         )
         self.client = self.app.test_client()
@@ -48,10 +49,13 @@ class AdminJobBaseTest(unittest.TestCase):
     def _login_as_admin(self):
         self._set_csrf_token()
         self.client.post(
-            "/admin/login",
+            "/setup",
             data={
                 "csrf_token": "test-csrf-token",
-                "token": "test-admin-token",
+                "setup_token": "test-initial-setup-token",
+                "username": "admin-job-user",
+                "password": "correct horse battery staple",
+                "password_confirm": "correct horse battery staple",
             },
             follow_redirects=False,
         )
