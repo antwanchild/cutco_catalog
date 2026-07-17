@@ -224,6 +224,28 @@ password changes revoke their other sessions.
 Existing deployments can remove `ADMIN_TOKEN`; it is no longer accepted for login
 or setup and the application logs a warning if the obsolete variable is still set.
 
+### Hybrid local-login router
+
+When `AUTH_MODE=hybrid`, the local login and first-run setup pages must bypass
+the identity-provider forward-auth middleware so that they can create or use a
+Cutco local session. They must still pass through the middleware chain that
+strips client-supplied trusted identity headers. With Traefik, add a router with
+a priority higher than the generic `/admin` router:
+
+```yaml
+- "traefik.http.routers.cutco-local-auth.rule=Host(`cutco.${DOMAIN}`) && (Path(`/admin/login`) || Path(`/setup`))"
+- "traefik.http.routers.cutco-local-auth.entrypoints=websecure"
+- "traefik.http.routers.cutco-local-auth.tls=true"
+- "traefik.http.routers.cutco-local-auth.priority=300"
+- "traefik.http.routers.cutco-local-auth.middlewares=chain-no-auth-NOerrors@file"
+- "traefik.http.routers.cutco-local-auth.service=cutco-svc"
+```
+
+`chain-no-auth-NOerrors@file` is an example name; use your no-forward-auth
+chain only if it removes inbound trusted identity headers. The login, setup, and
+password forms send `Cache-Control: no-store` so a cache cannot serve a stale
+CSRF token.
+
 Administrators can manage named accounts at `/admin/users`. New local accounts
 receive a temporary password that must be changed at first login. Role changes,
 deactivation, password resets, and explicit session revocation invalidate the

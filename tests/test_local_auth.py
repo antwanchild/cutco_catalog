@@ -219,8 +219,22 @@ class LocalAuthTests(SmokeBaseTest):
         response = self.client.get("/admin/login")
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        self.assertEqual(response.headers["Pragma"], "no-cache")
         self.assertNotIn(b"Admin token", response.data)
         self.assertNotIn(b'name="token"', response.data)
+
+    def test_setup_and_password_forms_are_not_cacheable(self):
+        setup = self.client.get("/setup")
+
+        self.assertEqual(setup.headers["Cache-Control"], "no-store")
+        self.assertEqual(setup.headers["Pragma"], "no-cache")
+
+        self._complete_setup()
+        password = self.client.get("/account/password")
+
+        self.assertEqual(password.headers["Cache-Control"], "no-store")
+        self.assertEqual(password.headers["Pragma"], "no-cache")
 
     def test_setup_requires_a_configured_token(self):
         self.app.config["INITIAL_SETUP_TOKEN"] = ""

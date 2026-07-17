@@ -166,6 +166,11 @@ def _register_hooks(app: Flask) -> None:
 
     @app.after_request
     def set_security_headers(response):
+        if request.path in {"/admin/login", "/setup", "/account/password"}:
+            # These forms contain a per-session CSRF token. A cached response can
+            # pair an old token with a newer browser session and cause a 403.
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
