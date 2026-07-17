@@ -357,13 +357,13 @@ or error-page router in the deployment.
 
 Create Cutco as a **Forward auth (single application)** proxy provider with its
 external host set to the public HTTPS URL, for example
-`https://cutco.anthonychild.com`. In **Applications → Outposts → authentik
+`https://cutco.example.com`. In **Applications → Outposts → authentik
 Embedded Outpost**, set both `authentik_host` and `authentik_host_browser` to
 the public HTTPS Authentik URL:
 
 ```yaml
-authentik_host: https://authentik.anthonychild.com
-authentik_host_browser: https://authentik.anthonychild.com
+authentik_host: https://authentik.example.com
+authentik_host_browser: https://authentik.example.com
 authentik_host_insecure: false
 ```
 
