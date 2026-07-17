@@ -1,7 +1,9 @@
 # Releasing
 
 This repo uses Conventional Commits style messages and auto-tags releases from the
-latest commit on `master`.
+latest non-documentation-only commit on `master`. A Markdown-only push does not
+create a release or rebuild the container image; the manual release-repair workflow
+remains available when needed.
 
 ## Version Bumps
 
@@ -47,4 +49,3 @@ If the app just does the same thing more correctly, consider `fix`.
 - Make sure the commit message type matches the change.
 - If you expect a new release version, use a `feat:` commit message.
 - If the change is only a bug fix or cleanup, keep it as `fix:` or another non-feature type.
-
