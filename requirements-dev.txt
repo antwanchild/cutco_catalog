@@ -4,4 +4,4 @@ black
 coverage
 pre-commit
 pyright
-ruff
+ruff==0.16.2
