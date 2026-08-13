@@ -1,18 +1,19 @@
 # pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
 from admin_jobs_support import (
-    AdminJobBaseTest,
     BOOTSTRAP_VERSION,
+    KNIFE_TASK_PRESETS,
+    SCHEMA_VERSION,
+    AdminJobBaseTest,
+    BootstrapState,
     Item,
     ItemVariant,
-    KNIFE_TASK_PRESETS,
     KnifeTask,
-    SCHEMA_VERSION,
     SchemaState,
-    BootstrapState,
     apply_schema_migrations,
     db,
     initialize_database,
 )
+
 from startup import (
     _categorize_uncategorized_bbq_tools,
     _categorize_uncategorized_gift_boxes,

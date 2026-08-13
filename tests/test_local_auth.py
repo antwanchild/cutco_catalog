@@ -1,12 +1,13 @@
 # pyright: reportOptionalMemberAccess=false, reportArgumentType=false
+from smoke_support import SmokeBaseTest, db
+
 from helpers import AUTH_SESSION_KEY, IDENTITY_KIND_USER
 from models import (
+    USER_ROLE_ADMIN,
     ActivityEvent,
     AuthSetupState,
-    USER_ROLE_ADMIN,
     User,
 )
-from smoke_support import SmokeBaseTest, db
 
 
 class LocalAuthTests(SmokeBaseTest):

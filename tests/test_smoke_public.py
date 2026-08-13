@@ -450,10 +450,10 @@ class PublicSmokeTests(SmokeBaseTest):
             sku="VW-1",
             alternate_skus="VW-ALT1, VW-ALT2",
         )
-        red_item_id, red_variant_id = self._add_catalog_item(
+        _red_item_id, red_variant_id = self._add_catalog_item(
             name="Stats Red Knife", sku="SR-1"
         )
-        purple_item_id, purple_variant_id = self._add_catalog_item(
+        _purple_item_id, purple_variant_id = self._add_catalog_item(
             name="Stats Purple Knife", sku="SP-1"
         )
         _matrix_sort_item_id, _ = self._add_catalog_item(
@@ -675,7 +675,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, variant_id = self._add_catalog_item(name="Catalog Knife", sku="CA-1")
+        item_id, _variant_id = self._add_catalog_item(name="Catalog Knife", sku="CA-1")
         set_id = self._add_set(name="Catalog Set", sku="CS-1", item_ids=(item_id,))
 
         catalog_response = self.client.get("/catalog")
@@ -725,7 +725,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, variant_id = self._add_catalog_item(name="People Knife", sku="PL-1")
+        _item_id, variant_id = self._add_catalog_item(name="People Knife", sku="PL-1")
         person_id = self._add_person(name="People Viewer", notes="")
         _wishlist_low_item_id, wishlist_low_variant_id = self._add_catalog_item(
             name="Alpha Wishlist Knife", sku="AA-2"
@@ -866,7 +866,7 @@ class PublicSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        item_id, variant_id = self._add_catalog_item(name="Export Knife", sku="EX-1")
+        _item_id, variant_id = self._add_catalog_item(name="Export Knife", sku="EX-1")
         person_id = self._add_person(name="Exporter", notes="")
         self.client.post(
             "/ownership/add",

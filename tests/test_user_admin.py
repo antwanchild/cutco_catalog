@@ -2,15 +2,16 @@
 
 import json
 
+from smoke_support import SmokeBaseTest, db
+
 from helpers import AUTH_SESSION_KEY, IDENTITY_KIND_USER
 from models import (
-    ActivityEvent,
     USER_AUTH_SOURCE_PROXY,
     USER_ROLE_ADMIN,
     USER_ROLE_USER,
+    ActivityEvent,
     User,
 )
-from smoke_support import SmokeBaseTest, db
 
 
 class UserAdminTests(SmokeBaseTest):

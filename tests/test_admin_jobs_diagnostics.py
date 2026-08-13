@@ -4,11 +4,11 @@ from datetime import timedelta, timezone
 
 from admin_jobs_support import (
     AUTH_SESSION_KEY,
-    AdminJobBaseTest,
     BOOTSTRAP_VERSION,
+    SCHEMA_VERSION,
+    AdminJobBaseTest,
     Item,
     ItemVariant,
-    SCHEMA_VERSION,
     constants,
     db,
     mock,

@@ -3,19 +3,19 @@
 import tempfile
 from unittest import mock
 
+from smoke_support import SmokeBaseTest, db
+
 import app as app_module
 from app import _teardown_logging, create_app
-
 from helpers import AUTH_SESSION_KEY, IDENTITY_KIND_PROXY_ADMIN, IDENTITY_KIND_USER
 from models import (
-    ActivityEvent,
     USER_AUTH_SOURCE_LOCAL,
     USER_AUTH_SOURCE_PROXY,
     USER_ROLE_ADMIN,
     USER_ROLE_USER,
+    ActivityEvent,
     User,
 )
-from smoke_support import SmokeBaseTest, db
 
 
 class ProxyAuthTests(SmokeBaseTest):

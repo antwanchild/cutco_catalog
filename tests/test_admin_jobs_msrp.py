@@ -1,9 +1,9 @@
 # pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
 from admin_jobs_support import (
+    UTC,
     AdminJobBaseTest,
     Flask,
     Item,
-    UTC,
     datetime,
     db,
     json,

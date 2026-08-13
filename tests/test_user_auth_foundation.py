@@ -3,11 +3,11 @@ import sqlite3
 import tempfile
 import unittest
 
+from smoke_support import ActivityEvent, SmokeBaseTest, User, db
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
 from app import _teardown_logging, create_app
-from smoke_support import ActivityEvent, SmokeBaseTest, User, db
 from models import (
     MIN_PASSWORD_LENGTH,
     USER_AUTH_SOURCE_PROXY,

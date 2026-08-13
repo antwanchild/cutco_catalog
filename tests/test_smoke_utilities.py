@@ -1034,7 +1034,7 @@ class UtilitySmokeTests(SmokeBaseTest):
 
     def test_time_utils_invalid_timezone_falls_back_to_utc(self):
         with mock.patch.dict(os.environ, {"TZ": "Not/AZone"}, clear=False):
-            tz, tz_name = container_timezone()
+            _tz, tz_name = container_timezone()
             self.assertEqual(tz_name, "UTC")
             self.assertEqual(
                 format_container_time("2026-04-20T19:18:00+00:00"),
