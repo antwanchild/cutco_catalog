@@ -373,7 +373,7 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._set_csrf_token()
 
         item_id, variant_id = self._add_catalog_item(name="Set Knife", sku="1111")
-        incomplete_item_id, incomplete_variant_id = self._add_catalog_item(
+        incomplete_item_id, _incomplete_variant_id = self._add_catalog_item(
             name="Incomplete Knife", sku="3333"
         )
         person_id = self._add_person(name="Set Owner", notes="")
@@ -2705,7 +2705,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         keep_item_id, _ = self._add_catalog_item(name="Keep Knife", sku="K-1")
         drop_item_id, _ = self._add_catalog_item(name="Drop Knife", sku="D-1")
-        new_item_id, _ = self._add_catalog_item(name="New Knife", sku="N-1")
+        _new_item_id, _ = self._add_catalog_item(name="New Knife", sku="N-1")
         existing_set_id = self._add_set(
             name="Sync Existing Set",
             sku="SX-SET-1",

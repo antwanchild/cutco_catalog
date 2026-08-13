@@ -90,7 +90,7 @@ class ImportSmokeTests(SmokeBaseTest):
     def test_import_keeps_plain_and_engraved_copies_separate(self):
         self._login_as_admin()
         self._set_csrf_token()
-        item_id, variant_id = self._add_catalog_item(
+        _item_id, variant_id = self._add_catalog_item(
             name="Imported Engraving Knife", sku="IM-ENG-1"
         )
         person_id = self._add_person(name="Engraved Importer", notes="")
@@ -894,13 +894,13 @@ class ImportSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
 
-        owned_item_id, owned_variant_id = self._add_catalog_item(
+        owned_item_id, _owned_variant_id = self._add_catalog_item(
             name="Gap Owned", sku="GAP-1"
         )
         _missing_item_id, _missing_variant_id = self._add_catalog_item(
             name="Gap Missing", sku="GAP-2"
         )
-        second_missing_item_id, _second_missing_variant_id = self._add_catalog_item(
+        _second_missing_item_id, _second_missing_variant_id = self._add_catalog_item(
             name="Gap Missing Other",
             sku="A-GAP-3",
             category="Accessories",

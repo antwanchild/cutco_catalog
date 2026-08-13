@@ -1,5 +1,5 @@
 [lint]
-select = ["E4", "E7", "E9", "F"]
+select = ["E4", "E7", "E9", "F", "I", "RUF022", "RUF059"]
 extend-select = ["D", "D400", "D401", "D404", "D413"]
 
 [lint.pydocstyle]
@@ -7,3 +7,5 @@ convention = "google"
 
 [lint.per-file-ignores]
 "tests/**/*.py" = ["D"]
+# Keep the incremental cleanup focused on tests until application imports migrate.
+"!tests/**/*.py" = ["I", "RUF059"]
