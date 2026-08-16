@@ -478,7 +478,9 @@ def user_required(fn):
     def _wrapped(*args, **kwargs):
         if not is_authenticated_user():
             flash(proxy_auth_failure() or "Authentication required.", "error")
-            return redirect(url_for("admin.admin_login"))
+            return redirect(
+                url_for("admin.admin_login", next=request.full_path.rstrip("?"))
+            )
         return fn(*args, **kwargs)
 
     return _wrapped
@@ -491,7 +493,9 @@ def admin_required(fn):
     def _wrapped(*args, **kwargs):
         if not is_admin():
             flash(proxy_auth_failure() or "Admin access required.", "error")
-            return redirect(url_for("admin.admin_login"))
+            return redirect(
+                url_for("admin.admin_login", next=request.full_path.rstrip("?"))
+            )
         return fn(*args, **kwargs)
 
     return _wrapped

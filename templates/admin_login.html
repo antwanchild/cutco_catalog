@@ -10,7 +10,12 @@
   {% if proxy_error %}
   <div class="flash flash-error mt-sm">{{ proxy_error }}</div>
   {% elif proxy_login_enabled %}
-  <p class="muted small">Trusted-proxy sign-in is enabled. Local sign-in remains available below when configured.</p>
+  <div class="form-actions mt-sm">
+    <a href="{{ url_for('admin.proxy_login', next=next_target) }}" class="btn btn-primary">Sign in with Authentik</a>
+  </div>
+  {% if local_login_available %}
+  <p class="muted small">Local sign-in remains available below for recovery.</p>
+  {% endif %}
   {% endif %}
 
   {% if setup_available %}
@@ -23,6 +28,7 @@
   <form method="post" class="form-card compact mt-sm">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="login_type" value="local">
+    <input type="hidden" name="next" value="{{ next_target }}">
     <label>Username
       <input type="text" name="username" autocomplete="username" autofocus required class="input-full">
     </label>
