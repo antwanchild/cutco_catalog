@@ -8,7 +8,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from flask import (
     Blueprint,
@@ -69,6 +69,24 @@ from msrp_jobs import (
 admin_bp = Blueprint("admin", __name__)
 logger = logging.getLogger(__name__)
 AUTH_SETUP_STATE_ID = 1
+AUTHENTIK_START_PATH = "/outpost.goauthentik.io/start"
+
+
+def _safe_internal_redirect(target: str | None) -> str:
+    """Return a local redirect target, falling back to the home page."""
+    if not target:
+        return url_for("index")
+    target = target.strip()
+    parsed = urlsplit(target)
+    if (
+        not target.startswith("/")
+        or target.startswith("//")
+        or "\\" in target
+        or parsed.scheme
+        or parsed.netloc
+    ):
+        return url_for("index")
+    return target
 
 
 def _current_flask_app() -> Flask:
@@ -402,7 +420,11 @@ def admin_login():
                 flash("Signed in.", "success")
                 if user.must_change_password:
                     return redirect(url_for("admin.account_password"))
-                return redirect(url_for("index"))
+                return redirect(
+                    _safe_internal_redirect(
+                        request.form.get("next") or request.args.get("next")
+                    )
+                )
         logger.warning("Local login failed")
         flash("Invalid username or password.", "error")
     return render_template(
@@ -411,7 +433,17 @@ def admin_login():
         local_login_available=local_auth_enabled(),
         proxy_login_enabled=proxy_auth_enabled(),
         proxy_error=proxy_auth_failure(),
+        next_target=_safe_internal_redirect(request.args.get("next")),
     )
+
+
+@admin_bp.route("/auth/proxy-login")
+def proxy_login():
+    """Start trusted-proxy authentication and return to a safe local URL."""
+    if not proxy_auth_enabled():
+        return redirect(url_for("admin.admin_login"))
+    target = _safe_internal_redirect(request.args.get("next"))
+    return redirect(f"{AUTHENTIK_START_PATH}?{urlencode({'rd': target})}")
 
 
 @admin_bp.route("/setup", methods=["GET", "POST"])
