@@ -55,6 +55,7 @@ services:
     volumes:
       - ./data:/data
     environment:
+      - AUTH_MODE=local
       - INITIAL_SETUP_TOKEN=generate-a-long-random-one-time-value
       - SECRET_KEY=your-flask-secret
       - PUID=1000
@@ -66,6 +67,9 @@ Then open `http://localhost:8095` in your browser.
 
 Notes:
 
+- Keep `AUTH_MODE=local` when opening the container directly at `localhost` or a
+  LAN address such as `http://192.168.1.4:8095`. Proxy and hybrid modes expect
+  the request to pass through a configured trusted reverse proxy.
 - Set `PUID` / `PGID` to your host user and group if you want files under the mounted `/data` volume to be owned by your normal account instead of root.
 - Gunicorn runtime files are intentionally kept inside the container (`/dev/shm` and `/tmp`) so hidden `.gunicorn` directories do not get created in bind mounts.
 - The image defaults to `TZ=UTC`, so diagnostics timestamps and job history show UTC unless you override `TZ` in the container environment.
@@ -212,6 +216,13 @@ resolves a persistent user by `TRUSTED_AUTH_SUBJECT_HEADER`; matching usernames
 never silently merge accounts. Pre-provision proxy accounts in Admin → Users or
 with `flask users create-proxy`. Optional auto-provisioning always creates a
 normal user on its first request, even if an admin group is asserted.
+
+Use `AUTH_MODE=local` when accessing Flask directly through a bound port, such as
+`http://192.168.1.4:8095`. In that mode, **Sign In** opens `/admin/login`. Use
+`proxy` or `hybrid` only when the browser-facing address is routed through the
+configured Authentik/Traefik deployment; in those modes, **Sign In** starts the
+proxy outpost flow. The local form remains directly available at `/admin/login`
+in hybrid mode.
 
 For a new local or hybrid installation, generate a setup secret before the first
 start (for example, `openssl rand -hex 32`), set it as `INITIAL_SETUP_TOKEN`, and
@@ -417,6 +428,10 @@ The app reads these headers directly from Flask requests. Traefik must forward
 the username and stable UID using the configured names and remove untrusted
 client copies. Keep `TRUSTED_AUTH_SYNC_ADMIN_ROLE=false` unless provider groups
 are intended to control application roles; when enabled, changes are audited.
+
+When proxy authentication is enabled, the main **Sign In** link starts the
+Authentik outpost flow and returns the user to the page where they started.
+`/admin/login` remains available for local password recovery in hybrid mode.
 
 Proxy-authenticated users see **Sign out of Cutco** in the Account/Admin menu.
 It opens `/outpost.goauthentik.io/sign_out` on the Cutco host and invalidates the

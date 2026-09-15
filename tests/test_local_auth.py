@@ -225,6 +225,39 @@ class LocalAuthTests(SmokeBaseTest):
         self.assertNotIn(b"Admin token", response.data)
         self.assertNotIn(b'name="token"', response.data)
 
+    def test_proxy_login_starts_authentik_and_preserves_safe_destination(self):
+        response = self.client.get(
+            "/auth/proxy-login?next=/catalog/12%3Fcolor%3DRed",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.headers["Location"],
+            "/outpost.goauthentik.io/start?rd=%2Fcatalog%2F12%3Fcolor%3DRed",
+        )
+
+    def test_proxy_login_rejects_external_destination(self):
+        response = self.client.get(
+            "/auth/proxy-login?next=https://example.com/escape",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.headers["Location"],
+            "/outpost.goauthentik.io/start?rd=%2F",
+        )
+
+    def test_navbar_uses_proxy_login_and_local_form_keeps_fallback(self):
+        home = self.client.get("/")
+        login = self.client.get("/admin/login?next=/catalog")
+
+        self.assertIn(b'href="/auth/proxy-login?next=/"', home.data)
+        self.assertIn(b"Sign in with Authentik", login.data)
+        self.assertIn(b'name="next" value="/catalog"', login.data)
+        self.assertIn(b'name="password"', login.data)
+
     def test_setup_and_password_forms_are_not_cacheable(self):
         setup = self.client.get("/setup")
 
