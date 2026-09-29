@@ -19,7 +19,11 @@ from blueprints.catalog import (  # noqa: F401
     _build_set_membership_preview,
     _load_member_snapshot,
 )
-from constants import UNKNOWN_COLOR, normalize_edge_for_category  # noqa: F401
+from constants import (  # noqa: F401
+    UNKNOWN_COLOR,
+    canonicalize_category,
+    normalize_edge_for_category,
+)
 from extensions import db  # noqa: F401
 from helpers import (  # noqa: F401
     AUTH_SESSION_KEY,
@@ -64,7 +68,6 @@ from scraping import (  # noqa: F401
     _resolve_visible_member_sku,
     _should_queue_slug,
     scrape_item_specs,
-    scrape_purple_campaign_variants,
     scrape_set_variant_options,
 )
 from time_utils import container_timezone, format_container_time  # noqa: F401
@@ -114,6 +117,7 @@ __all__ = [
     "_should_queue_slug",
     "_verify_collection_token",
     "_verify_gift_token",
+    "canonicalize_category",
     "catalog_blueprint",
     "check_wishlist_targets",
     "container_timezone",
@@ -126,7 +130,6 @@ __all__ = [
     "normalize_edge_for_category",
     "os",
     "scrape_item_specs",
-    "scrape_purple_campaign_variants",
     "scrape_set_variant_options",
     "tempfile",
     "unittest",

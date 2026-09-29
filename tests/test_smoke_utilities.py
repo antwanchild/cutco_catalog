@@ -4,6 +4,10 @@ from smoke_support import *
 
 
 class UtilitySmokeTests(SmokeBaseTest):
+    def test_current_and_legacy_top_knives_labels_share_canonical_category(self):
+        self.assertEqual(canonicalize_category("Top Knives"), "Kitchen Knives")
+        self.assertEqual(canonicalize_category("Everyday Knives"), "Kitchen Knives")
+
     def test_token_helpers_validate_and_reject_tampering(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -408,48 +412,6 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic",),
             )
 
-    def test_extract_product_variant_colors_detects_purple_campaign_pages(self):
-        response = mock.Mock()
-        response.status_code = 200
-        response.text = """
-            <html><body>
-              <h1>Cutco Cares 2026 - Alzheimer's Association</h1>
-              <p>Purple Products:</p>
-              <input type="radio" name="purple_products" value="Super Shears"
-                     data-type="Purple Products" data-code="77L">
-              <input type="radio" name="purple_products" value="Cutting Board"
-                     data-type="Purple Products" data-code="125L">
-              <input type="radio" name="purple_products" value="Santoku-Style Trimmer"
-                     data-type="Purple Products" data-code="3721LSH">
-            </body></html>
-        """
-        with mock.patch("scraping.requests.get", return_value=response):
-            _extract_product_variant_colors.cache_clear()
-            self.assertEqual(
-                _extract_product_variant_colors(
-                    "https://www.cutco.com/p/cutco-cares-alzheimers/"
-                ),
-                ("Purple",),
-            )
-
-    def test_scrape_purple_campaign_variants_includes_sheathed_promo_items(self):
-        response = mock.Mock()
-        response.status_code = 200
-        response.text = """
-            <html><body>
-              <input type="radio" name="purple_products" value="Purple Super Shears"
-                     data-type="Purple Products" data-code="77L">
-            </body></html>
-        """
-        with mock.patch("scraping.requests.get", return_value=response):
-            scrape_purple_campaign_variants.cache_clear()
-            entries = scrape_purple_campaign_variants()
-        entry_names = {entry["name"] for entry in entries}
-        self.assertIn('Purple 7" Santoku with Sheath', entry_names)
-        self.assertIn("Purple Santoku-Style Trimmer with Sheath", entry_names)
-        self.assertNotIn("Purple Traditional Cheese Knife with Sheath", entry_names)
-        self.assertNotIn('Purple 5" Petite Santoku with Sheath', entry_names)
-
     def test_extract_product_variant_colors_prefers_selected_color_on_size_pages(self):
         response = mock.Mock()
         response.status_code = 200
@@ -516,24 +478,24 @@ class UtilitySmokeTests(SmokeBaseTest):
             <html><body><script>
               const webItemsMap = {
                 "1570W": {
-                  "itemName": "6-Pc. Traditional Accessory Set",
+                  "itemName": "6-Pc. Stainless Accessory Set",
                   "displayedOptions": [{
                     "optionType": "Flatware Handle Color",
                     "displayedType": "Color",
                     "optionCode": "Pearl",
                     "description": "Pearl"
                   }],
-                  "itemSetList": [{"name": "Traditional Gravy Ladle"}]
+                  "itemSetList": [{"name": "Stainless Gravy Ladle"}]
                 },
                 "1570C": {
-                  "itemName": "6-Pc. Traditional Accessory Set",
+                  "itemName": "6-Pc. Stainless Accessory Set",
                   "displayedOptions": [{
                     "optionType": "Flatware Handle Color",
                     "displayedType": "Color",
                     "optionCode": "Classic",
                     "description": "Classic"
                   }],
-                  "itemSetList": [{"name": "Traditional Serving Spoon"}]
+                  "itemSetList": [{"name": "Stainless Serving Spoon"}]
                 }
               };
             </script></body></html>
@@ -542,7 +504,7 @@ class UtilitySmokeTests(SmokeBaseTest):
             _extract_product_variant_colors.cache_clear()
             self.assertEqual(
                 _extract_product_variant_colors(
-                    "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+                    "https://www.cutco.com/p/stainless-flatware/1570W"
                 ),
                 ("Pearl", "Classic"),
             )
@@ -807,8 +769,8 @@ class UtilitySmokeTests(SmokeBaseTest):
         response = mock.Mock()
         response.text = """
             <html><body>
-              <a href="/p/traditional-flatware-accessories/1570W">Accessories</a>
-              <a href="/p/traditional-flatware-accessories/1570C">Accessories</a>
+              <a href="/p/stainless-flatware/1570W">Accessories</a>
+              <a href="/p/stainless-flatware/1570C">Accessories</a>
             </body></html>
         """
         response.raise_for_status.return_value = None
@@ -823,11 +785,11 @@ class UtilitySmokeTests(SmokeBaseTest):
         ):
             self.assertEqual(
                 discover_cutco_item_page_url("1570W"),
-                "https://www.cutco.com/p/traditional-flatware-accessories/1570W",
+                "https://www.cutco.com/p/stainless-flatware/1570W",
             )
             self.assertEqual(
                 discover_cutco_item_page_url("1570"),
-                "https://www.cutco.com/p/traditional-flatware-accessories/1570W",
+                "https://www.cutco.com/p/stainless-flatware/1570W",
             )
         _cutco_product_url_lookup.cache_clear()
 

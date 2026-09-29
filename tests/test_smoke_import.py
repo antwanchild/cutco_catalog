@@ -1289,12 +1289,12 @@ class ImportSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
         member_id, _variant_id = self._add_catalog_item(
-            name="Traditional Gravy Ladle",
+            name="Stainless Gravy Ladle",
             sku="1573",
             category="Flatware",
         )
         self._add_set(
-            name="6-Pc. Traditional Accessory Set",
+            name="6-Pc. Stainless Accessory Set",
             sku="1570",
             item_ids=(member_id,),
         )
@@ -1307,7 +1307,7 @@ class ImportSmokeTests(SmokeBaseTest):
                 "csvfile": (
                     BytesIO(
                         b"name,sku,owned,color,person\n"
-                        b"6-Pc. Traditional Accessory Set,1570,yes,Pearl,Set Collector\n"
+                        b"6-Pc. Stainless Accessory Set,1570,yes,Pearl,Set Collector\n"
                     ),
                     "colored_set.csv",
                 ),
@@ -1316,7 +1316,7 @@ class ImportSmokeTests(SmokeBaseTest):
         )
 
         self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"Traditional Gravy Ladle", preview_response.data)
+        self.assertIn(b"Stainless Gravy Ladle", preview_response.data)
         self.assertIn(b"Pearl", preview_response.data)
         self.assertNotIn(b"Set SKU Collisions", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")

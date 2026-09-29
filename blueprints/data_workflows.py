@@ -11,12 +11,10 @@ from flask import flash
 from sqlalchemy.orm import selectinload
 
 from blueprints.import_shared import (
-    _build_item_name_lookup,
     _build_item_sku_lookup,
     _build_import_header_report,  # noqa: F401
     _build_set_sku_lookup,
     _import_row_label,  # noqa: F401
-    _normalize_variant_lookup_name,
     _read_completion_rows,  # noqa: F401
     _safe_csv_filename,  # noqa: F401
 )
@@ -40,7 +38,6 @@ from scraping import (
     _looks_like_variant_color,
     discover_cutco_item_page_url,
     scrape_item_variant_colors,
-    scrape_purple_campaign_variants,
     scrape_set_variant_options,
     set_handle_color_applies_to_member,
 )
@@ -50,14 +47,11 @@ logger = logging.getLogger(__name__)
 
 def sync_variant_sync_helpers(
     scrape_item_variant_colors_fn,
-    scrape_purple_campaign_variants_fn,
     scrape_set_variant_options_fn,
 ) -> None:
     """Keep the workflow helpers pointed at the patchable route-level scrapers."""
-    global scrape_item_variant_colors, scrape_purple_campaign_variants
-    global scrape_set_variant_options
+    global scrape_item_variant_colors, scrape_set_variant_options
     scrape_item_variant_colors = scrape_item_variant_colors_fn
-    scrape_purple_campaign_variants = scrape_purple_campaign_variants_fn
     scrape_set_variant_options = scrape_set_variant_options_fn
 
 
@@ -597,7 +591,6 @@ def _build_variant_sync_preview(
     variants_to_create = 0
     variants_retained = 0
     items_with_no_clear_variants = 0
-    purple_variant_count = 0
 
     fetched_variants: dict[int, tuple[str, ...]] = {}
     fetched_urls: dict[int, str] = {}
@@ -657,7 +650,6 @@ def _build_variant_sync_preview(
                         variant.color == UNKNOWN_COLOR for variant in item.variants
                     ),
                     "no_clear_variants": True,
-                    "has_purple_variant": False,
                 }
             )
             items_with_no_clear_variants += 1
@@ -686,7 +678,6 @@ def _build_variant_sync_preview(
                         variant.color == UNKNOWN_COLOR for variant in item.variants
                     ),
                     "no_clear_variants": True,
-                    "has_purple_variant": False,
                 }
             )
             items_with_no_clear_variants += 1
@@ -694,9 +685,6 @@ def _build_variant_sync_preview(
 
         scraped_colors = list(fetched_variants.get(item.id, ()))
         scraped_variant_total += len(scraped_colors)
-        has_purple_variant = any(color.lower() == "purple" for color in scraped_colors)
-        if has_purple_variant:
-            purple_variant_count += 1
         existing_real_variants = [
             variant for variant in item.variants if variant.color != UNKNOWN_COLOR
         ]
@@ -754,7 +742,6 @@ def _build_variant_sync_preview(
                 "retained_count": retained_count,
                 "has_unknown_variant": has_unknown_variant,
                 "no_clear_variants": no_clear_variants,
-                "has_purple_variant": has_purple_variant,
                 "scraped_url": fetched_urls.get(item.id),
                 "scraped_variant_count": len(scraped_colors),
                 "swatch_count": len(scraped_colors),
@@ -789,8 +776,6 @@ def _build_variant_sync_preview(
             "variants_to_create": variants_to_create,
             "variants_retained": variants_retained,
             "items_with_no_clear_variants": items_with_no_clear_variants,
-            "purple_variant_count": purple_variant_count,
-            "has_purple_variants": purple_variant_count > 0,
         },
     }
 
@@ -980,9 +965,6 @@ def _build_set_variant_sync_preview(
                 "eligible_member_count": eligible_member_count,
                 "has_unknown_variant": False,
                 "no_clear_variants": not scraped_options,
-                "has_purple_variant": any(
-                    color.lower() == "purple" for color in scraped_colors
-                ),
                 "scraped_url": scraped_url,
                 "scraped_variant_count": len(scraped_options),
                 "swatch_count": len(scraped_options),
@@ -1000,13 +982,6 @@ def _build_set_variant_sync_preview(
             "variants_to_create": variants_to_create,
             "variants_retained": variants_retained,
             "items_with_no_clear_variants": items_with_no_clear_variants,
-            "purple_variant_count": sum(
-                any(color.lower() == "purple" for color in row["propagate_colors"])
-                for row in preview_items
-            ),
-            "has_purple_variants": any(
-                row["has_purple_variant"] for row in preview_items
-            ),
         },
     }
 
@@ -1022,8 +997,6 @@ def _merge_variant_sync_previews(*previews: dict) -> dict:
             "variants_to_create": 0,
             "variants_retained": 0,
             "items_with_no_clear_variants": 0,
-            "purple_variant_count": 0,
-            "has_purple_variants": False,
         },
     }
     for preview in previews:
@@ -1035,210 +1008,9 @@ def _merge_variant_sync_previews(*previews: dict) -> dict:
             "variants_to_create",
             "variants_retained",
             "items_with_no_clear_variants",
-            "purple_variant_count",
         ):
             merged["summary"][key] += preview.get("summary", {}).get(key, 0)
-    merged["summary"]["has_purple_variants"] = (
-        merged["summary"]["purple_variant_count"] > 0
-    )
     return merged
-
-
-def _build_purple_campaign_variant_preview() -> dict:
-    """Scrape the purple campaign page and map promo variants to catalog items."""
-    promo_entries = list(scrape_purple_campaign_variants())
-    suppressed_promo_names = {"gift set", "package"}
-    if not promo_entries:
-        return {
-            "items": [],
-            "summary": {
-                "items_scanned": 0,
-                "variants_found": 0,
-                "variants_to_create": 0,
-                "variants_retained": 0,
-                "items_with_no_clear_variants": 0,
-                "purple_variant_count": 0,
-                "has_purple_variants": False,
-            },
-        }
-
-    catalog_items = (
-        Item.query.options(selectinload(Item.variants))
-        .filter(Item.sku.isnot(None))
-        .all()
-    )
-    sku_lookup = _build_item_sku_lookup(catalog_items)
-    name_lookup = _build_item_name_lookup(catalog_items)
-
-    preview_items: list[dict] = []
-    items_scanned = 0
-    variants_found = 0
-    variants_to_create = 0
-    variants_retained = 0
-    grouped_items: dict[int, dict] = {}
-
-    def add_preview_target(item: Item, entry: dict[str, str]) -> None:
-        nonlocal variants_to_create, variants_retained
-        group = grouped_items.setdefault(
-            item.id,
-            {
-                "item_id": item.id,
-                "item_name": item.name,
-                "sku": item.sku or entry.get("sku_hint") or "—",
-                "category": item.category or "—",
-                "status": "ready",
-                "skip_reason": None,
-                "variant_rows": [],
-                "create_colors": [],
-                "retained_colors": [],
-                "existing_count": 0,
-                "create_count": 0,
-                "retained_count": 0,
-                "has_unknown_variant": any(
-                    variant.color == UNKNOWN_COLOR for variant in item.variants
-                ),
-                "no_clear_variants": False,
-                "has_purple_variant": True,
-                "scraped_variant_count": 0,
-                "swatch_count": 0,
-                "promo_codes": [],
-                "source_label": "Purple Products",
-            },
-        )
-        group["promo_codes"].append(entry.get("promo_code"))
-        existing_colors = {variant.color.lower() for variant in item.variants}
-        color_name = "Purple"
-        color_key = color_name.lower()
-        if color_key not in {row["color"].lower() for row in group["variant_rows"]}:
-            status = "existing" if color_key in existing_colors else "create"
-            group["variant_rows"].append(
-                {
-                    "color": color_name,
-                    "status": status,
-                    "promo_code": entry.get("promo_code"),
-                }
-            )
-            group["scraped_variant_count"] += 1
-            group["swatch_count"] += 1
-            if status == "existing":
-                variants_retained += 1
-                group["retained_colors"].append(color_name)
-            else:
-                variants_to_create += 1
-                group["create_colors"].append(color_name)
-        group["create_count"] = len(group["create_colors"])
-        group["retained_count"] = len(group["retained_colors"])
-        group["existing_count"] = len(group["retained_colors"])
-
-    for entry in promo_entries:
-        items_scanned += 1
-        promo_name = entry.get("name") or "Purple Promo Item"
-        promo_name_key = _normalize_variant_lookup_name(promo_name)
-        sku_hint = normalize_sku_value(entry.get("sku_hint"))
-        if promo_name_key in suppressed_promo_names:
-            preview_items.append(
-                {
-                    "item_id": None,
-                    "item_name": promo_name,
-                    "sku": sku_hint or "—",
-                    "category": "Purple Promo",
-                    "status": "skipped",
-                    "skip_reason": "Suppressed because this is a campaign bundle item, not a standalone catalog product.",
-                    "variant_rows": [],
-                    "create_colors": [],
-                    "retained_colors": [],
-                    "existing_count": 0,
-                    "create_count": 0,
-                    "retained_count": 0,
-                    "has_unknown_variant": False,
-                    "no_clear_variants": True,
-                    "has_purple_variant": True,
-                    "promo_code": entry.get("promo_code"),
-                    "source_label": "Purple Products",
-                }
-            )
-            continue
-
-        base_name = re.sub(r"^purple\s+", "", promo_name, flags=re.I).strip()
-        base_name_key = _normalize_variant_lookup_name(base_name)
-        knife_item = sku_lookup.get(sku_hint) if sku_hint else None
-        if not knife_item:
-            knife_item = name_lookup.get(base_name_key) or name_lookup.get(
-                promo_name_key
-            )
-
-        resolved_items: list[Item] = []
-        if knife_item:
-            resolved_items.append(knife_item)
-
-        if "sheath" in promo_name_key:
-            sheath_base = re.sub(
-                r"\s+with\s+sheath\s*$", "", base_name, flags=re.I
-            ).strip()
-            sheath_candidates = (
-                f"{sheath_base} Sheath",
-                f"{sheath_base} Knife Sheath",
-            )
-            sheath_item = None
-            for candidate in sheath_candidates:
-                sheath_item = name_lookup.get(_normalize_variant_lookup_name(candidate))
-                if sheath_item:
-                    break
-            if sheath_item and (not knife_item or sheath_item.id != knife_item.id):
-                resolved_items.append(sheath_item)
-
-        if not resolved_items:
-            preview_items.append(
-                {
-                    "item_id": None,
-                    "item_name": promo_name,
-                    "sku": sku_hint or "—",
-                    "category": "Purple Promo",
-                    "status": "skipped",
-                    "skip_reason": f"No matching catalog item was found for purple promo code {entry.get('promo_code', '—')}.",
-                    "variant_rows": [],
-                    "create_colors": [],
-                    "retained_colors": [],
-                    "existing_count": 0,
-                    "create_count": 0,
-                    "retained_count": 0,
-                    "has_unknown_variant": False,
-                    "no_clear_variants": True,
-                    "has_purple_variant": True,
-                    "promo_code": entry.get("promo_code"),
-                    "source_label": "Purple Products",
-                }
-            )
-            continue
-
-        for item in resolved_items:
-            add_preview_target(item, entry)
-
-    for group in grouped_items.values():
-        variants_found += 1
-        group["promo_code"] = (
-            ", ".join([code for code in group.pop("promo_codes", []) if code]) or "—"
-        )
-        preview_items.append(group)
-
-    preview_items.sort(
-        key=lambda item: (
-            (item["sku"] or "").lower(),
-            (item["item_name"] or "").lower(),
-        )
-    )
-    return {
-        "items": preview_items,
-        "summary": {
-            "items_scanned": items_scanned,
-            "variants_found": variants_found,
-            "variants_to_create": variants_to_create,
-            "variants_retained": variants_retained,
-            "items_with_no_clear_variants": 0,
-            "purple_variant_count": variants_found,
-            "has_purple_variants": bool(variants_found),
-        },
-    }
 
 
 def _resolve_completion_gap_people(

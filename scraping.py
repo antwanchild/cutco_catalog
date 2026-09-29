@@ -1587,18 +1587,6 @@ def _web_items_map_supports_block_finish(
     return any(decisions)
 
 
-def _collect_campaign_variant_candidates(soup: BeautifulSoup) -> tuple[str, ...]:
-    """Extract promo-page variant labels when a campaign page exposes them."""
-    candidates: list[str] = []
-    seen: set[str] = set()
-
-    purple_inputs = soup.select('input[data-type*="Purple Products"]')
-    if purple_inputs:
-        _collect_variant_candidate(candidates, seen, "Purple")
-
-    return tuple(candidates)
-
-
 _WEB_ITEMS_MAP_LABEL_FIELDS = (
     "name",
     "itemName",
@@ -1911,13 +1899,6 @@ def _extract_product_variant_colors(url: str) -> tuple[str, ...]:
 
             candidates: list[str] = []
             seen: set[str] = set()
-            campaign_candidates = _collect_campaign_variant_candidates(soup)
-            for candidate in campaign_candidates:
-                key = candidate.lower()
-                if key in seen:
-                    continue
-                seen.add(key)
-                candidates.append(candidate)
             web_items_candidates = _collect_variant_candidates_from_web_items_map(
                 raw_html
             )
@@ -2031,72 +2012,6 @@ def scrape_set_variant_options(url: str, sku: str | None = None) -> SetVariantOp
 # Preserve cache helpers on the public alias used by callers.
 scrape_item_variant_colors.cache_clear = _extract_product_variant_colors.cache_clear  # type: ignore[attr-defined]
 scrape_item_variant_colors.cache_info = _extract_product_variant_colors.cache_info  # type: ignore[attr-defined]
-
-
-@lru_cache(maxsize=64)
-def scrape_purple_campaign_variants() -> tuple[dict[str, str], ...]:
-    """Fetch the Cutco Cares purple campaign page and return promo variant hints."""
-    campaign_url = "https://www.cutco.com/p/cutco-cares-alzheimers/"
-    try:
-        resp = requests.get(
-            campaign_url, headers=SCRAPE_HEADERS, timeout=REQUEST_TIMEOUT
-        )
-        if resp.status_code != 200:
-            logger.debug(
-                "Purple campaign fetch: HTTP %d for %s", resp.status_code, campaign_url
-            )
-            return ()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        candidates: list[dict[str, str]] = []
-        seen: set[tuple[str, str]] = set()
-        for promo_input in soup.select('input[data-type*="Purple Products"]'):
-            promo_name = _normalize_variant_label(
-                _tag_attr_text(promo_input, "value") or ""
-            )
-            promo_code = (_tag_attr_text(promo_input, "data-code") or "").upper()
-            if not promo_name or not promo_code:
-                continue
-            key = (promo_name.lower(), promo_code)
-            if key in seen:
-                continue
-            seen.add(key)
-            match = re.match(r"^(\d+)", promo_code)
-            sku_hint = match.group(1) if match else promo_code
-            candidates.append(
-                {
-                    "name": promo_name,
-                    "promo_code": promo_code,
-                    "sku_hint": sku_hint,
-                    "color": "Purple",
-                }
-            )
-
-        # The promo campaign also includes two sheathed purple knife offers that
-        # are easy to miss if the campaign page only exposes the generic purple
-        # entry. Keep them explicit so the promo sync can surface them too.
-        for fallback_name, fallback_code, fallback_sku_hint in (
-            ('Purple 7" Santoku with Sheath', "1766LSH", "1766"),
-            ("Purple Santoku-Style Trimmer with Sheath", "3721LSH", "3721"),
-        ):
-            key = (fallback_name.lower(), fallback_code)
-            if key in seen:
-                continue
-            seen.add(key)
-            candidates.append(
-                {
-                    "name": fallback_name,
-                    "promo_code": fallback_code,
-                    "sku_hint": fallback_sku_hint,
-                    "color": "Purple",
-                }
-            )
-        logger.debug(
-            "Purple campaign fetch: %s → %d candidates", campaign_url, len(candidates)
-        )
-        return tuple(candidates)
-    except Exception as exc:
-        logger.warning("Purple campaign scrape failed for %s: %s", campaign_url, exc)
-        return ()
 
 
 # Keep old name as alias so existing callers still work
