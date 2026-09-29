@@ -108,7 +108,7 @@
         </thead>
         <tbody>
           {% for row in item.variant_rows %}
-          <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% elif row.color|lower == 'purple sheath' %}variant-sync-sheath-row{% endif %}">
+          <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% endif %}">
             <td>
               {{ row.color }}
               {% if item.entity_type == 'set' %}

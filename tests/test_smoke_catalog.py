@@ -1361,14 +1361,11 @@ class CatalogSmokeTests(SmokeBaseTest):
     def test_variant_sync_discovers_set_only_variants_by_sku(self):
         self._login_as_admin()
         self._set_csrf_token()
-        expected_url = (
-            "https://www.cutco.com/p/traditional-flatware-accessories/"
-            "1570W&view=product"
-        )
+        expected_url = "https://www.cutco.com/p/stainless-flatware/1570W&view=product"
 
         with self.app.app_context():
             item = Item(
-                name="6-Pc. Traditional Accessory Set",
+                name="6-Pc. Stainless Accessory Set",
                 sku="1570",
                 set_only=True,
                 in_catalog=False,
@@ -1443,11 +1440,11 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         self._login_as_admin()
         self._set_csrf_token()
-        expected_url = "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+        expected_url = "https://www.cutco.com/p/stainless-flatware/1570W"
 
         with self.app.app_context():
             member = Item(
-                name="Traditional Gravy Ladle",
+                name="Stainless Gravy Ladle",
                 sku="1573",
                 category="Flatware",
                 set_only=True,
@@ -1458,7 +1455,7 @@ class CatalogSmokeTests(SmokeBaseTest):
             db.session.flush()
             member_id = member.id
             db.session.add(ItemVariant(item=member, color=UNKNOWN_COLOR))
-            item_set = Set(name="6-Pc. Traditional Accessory Set", sku="1570")
+            item_set = Set(name="6-Pc. Stainless Accessory Set", sku="1570")
             db.session.add(item_set)
             db.session.flush()
             set_id = item_set.id
@@ -1892,11 +1889,11 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         with self.app.app_context():
             member = Item(
-                name="Traditional Gravy Ladle",
+                name="Stainless Gravy Ladle",
                 sku="1573",
                 category="Flatware",
             )
-            item_set = Set(name="Traditional Accessory Set", sku="1570")
+            item_set = Set(name="Stainless Accessory Set", sku="1570")
             db.session.add_all([member, item_set])
             db.session.flush()
             db.session.add(
@@ -2162,10 +2159,7 @@ class CatalogSmokeTests(SmokeBaseTest):
     def test_missing_set_member_discovers_product_url_by_sku_for_variants(self):
         from blueprints.catalog_sync import _create_missing_set_member_item
 
-        expected_url = (
-            "https://www.cutco.com/p/traditional-flatware-accessories/"
-            "1570W&view=product"
-        )
+        expected_url = "https://www.cutco.com/p/stainless-flatware/1570W&view=product"
 
         def scrape_variants(url):
             return ("Pearl", "Classic") if url == expected_url else ()
@@ -2186,8 +2180,8 @@ class CatalogSmokeTests(SmokeBaseTest):
             ) as url_discovery,
         ):
             item = _create_missing_set_member_item(
-                {"sku": "1570W", "name": "6-Pc. Traditional Accessory Set"},
-                "Traditional Flatware Set",
+                {"sku": "1570W", "name": "6-Pc. Stainless Accessory Set"},
+                "Stainless Flatware Set",
             )
             db.session.commit()
 
@@ -2250,7 +2244,7 @@ class CatalogSmokeTests(SmokeBaseTest):
 
         with self.app.app_context():
             item = Item(
-                name="Traditional Flatware Accessories",
+                name="Stainless Flatware Accessories",
                 sku="1570W",
                 set_only=True,
                 in_catalog=False,
@@ -2268,7 +2262,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                     [
                         {
                             "sku": "1570W",
-                            "name": "Traditional Flatware Accessories",
+                            "name": "Stainless Flatware Accessories",
                             "quantity": 1,
                         }
                     ],
@@ -2288,7 +2282,7 @@ class CatalogSmokeTests(SmokeBaseTest):
     def test_catalog_sync_preview_detects_variants_for_new_sets_only(self):
         from blueprints.catalog_sync import _build_catalog_sync_preview
 
-        new_set_url = "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+        new_set_url = "https://www.cutco.com/p/stainless-flatware/1570W"
         with self.app.app_context():
             db.session.add(Set(name="Existing Set", sku="1571"))
             db.session.commit()
@@ -2304,7 +2298,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                     [],
                     [
                         {
-                            "name": "6-Pc. Traditional Accessory Set",
+                            "name": "6-Pc. Stainless Accessory Set",
                             "sku": "1570",
                             "url": new_set_url,
                             "member_entries": [],
@@ -2329,19 +2323,19 @@ class CatalogSmokeTests(SmokeBaseTest):
         self._login_as_admin()
         self._set_csrf_token()
         member_id, _unknown_variant_id = self._add_catalog_item(
-            name="Traditional Gravy Ladle",
+            name="Stainless Gravy Ladle",
             sku="1573",
             category="Flatware",
         )
-        set_url = "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+        set_url = "https://www.cutco.com/p/stainless-flatware/1570W"
 
         response = self.client.post(
             "/catalog/sync/confirm",
             data={
                 "csrf_token": "test-csrf-token",
                 "set_count": "1",
-                "selected_sets": "6-Pc. Traditional Accessory Set",
-                "set_name_0": "6-Pc. Traditional Accessory Set",
+                "selected_sets": "6-Pc. Stainless Accessory Set",
+                "set_name_0": "6-Pc. Stainless Accessory Set",
                 "set_sku_0": "1570",
                 "set_url_0": set_url,
                 "set_variant_colors_0": json.dumps(["Pearl", "Classic"]),
@@ -2350,7 +2344,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                     [
                         {
                             "sku": "1573",
-                            "name": "Traditional Gravy Ladle",
+                            "name": "Stainless Gravy Ladle",
                             "quantity": 1,
                         }
                     ]

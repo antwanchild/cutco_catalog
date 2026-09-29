@@ -4,6 +4,10 @@ from smoke_support import *
 
 
 class UtilitySmokeTests(SmokeBaseTest):
+    def test_current_and_legacy_top_knives_labels_share_canonical_category(self):
+        self.assertEqual(canonicalize_category("Top Knives"), "Kitchen Knives")
+        self.assertEqual(canonicalize_category("Everyday Knives"), "Kitchen Knives")
+
     def test_token_helpers_validate_and_reject_tampering(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -474,24 +478,24 @@ class UtilitySmokeTests(SmokeBaseTest):
             <html><body><script>
               const webItemsMap = {
                 "1570W": {
-                  "itemName": "6-Pc. Traditional Accessory Set",
+                  "itemName": "6-Pc. Stainless Accessory Set",
                   "displayedOptions": [{
                     "optionType": "Flatware Handle Color",
                     "displayedType": "Color",
                     "optionCode": "Pearl",
                     "description": "Pearl"
                   }],
-                  "itemSetList": [{"name": "Traditional Gravy Ladle"}]
+                  "itemSetList": [{"name": "Stainless Gravy Ladle"}]
                 },
                 "1570C": {
-                  "itemName": "6-Pc. Traditional Accessory Set",
+                  "itemName": "6-Pc. Stainless Accessory Set",
                   "displayedOptions": [{
                     "optionType": "Flatware Handle Color",
                     "displayedType": "Color",
                     "optionCode": "Classic",
                     "description": "Classic"
                   }],
-                  "itemSetList": [{"name": "Traditional Serving Spoon"}]
+                  "itemSetList": [{"name": "Stainless Serving Spoon"}]
                 }
               };
             </script></body></html>
@@ -500,7 +504,7 @@ class UtilitySmokeTests(SmokeBaseTest):
             _extract_product_variant_colors.cache_clear()
             self.assertEqual(
                 _extract_product_variant_colors(
-                    "https://www.cutco.com/p/traditional-flatware-accessories/1570W"
+                    "https://www.cutco.com/p/stainless-flatware/1570W"
                 ),
                 ("Pearl", "Classic"),
             )
@@ -765,8 +769,8 @@ class UtilitySmokeTests(SmokeBaseTest):
         response = mock.Mock()
         response.text = """
             <html><body>
-              <a href="/p/traditional-flatware-accessories/1570W">Accessories</a>
-              <a href="/p/traditional-flatware-accessories/1570C">Accessories</a>
+              <a href="/p/stainless-flatware/1570W">Accessories</a>
+              <a href="/p/stainless-flatware/1570C">Accessories</a>
             </body></html>
         """
         response.raise_for_status.return_value = None
@@ -781,11 +785,11 @@ class UtilitySmokeTests(SmokeBaseTest):
         ):
             self.assertEqual(
                 discover_cutco_item_page_url("1570W"),
-                "https://www.cutco.com/p/traditional-flatware-accessories/1570W",
+                "https://www.cutco.com/p/stainless-flatware/1570W",
             )
             self.assertEqual(
                 discover_cutco_item_page_url("1570"),
-                "https://www.cutco.com/p/traditional-flatware-accessories/1570W",
+                "https://www.cutco.com/p/stainless-flatware/1570W",
             )
         _cutco_product_url_lookup.cache_clear()
 

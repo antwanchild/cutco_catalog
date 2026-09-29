@@ -198,7 +198,7 @@ SCRAPE_CATEGORIES = [
     ("Chef Knives", "https://www.cutco.com/shop/chef-knives"),
     ("Paring Knives", "https://www.cutco.com/shop/paring-knives"),
     ("Outdoor Knives", "https://www.cutco.com/shop/outdoor-knives"),
-    ("Everyday Knives", "https://www.cutco.com/shop/everyday-knives"),
+    ("Top Knives", "https://www.cutco.com/shop/everyday-knives"),
     ("Table Knives", "https://www.cutco.com/shop/table-knives"),
     ("Steak Knives", "https://www.cutco.com/shop/steak-knives"),
     ("Kitchen Tools", "https://www.cutco.com/shop/kitchen-tools"),
@@ -223,6 +223,7 @@ CATEGORY_OVERRIDES: dict[str, str] = {
 
 CANONICAL_CATEGORY_ALIASES = {
     "everyday knives": "Kitchen Knives",
+    "top knives": "Kitchen Knives",
     "bakeware": "Bakeware",
     "cookware": "Cookware",
     "cutting board": "Cutting Boards",
