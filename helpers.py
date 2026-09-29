@@ -51,6 +51,7 @@ logger = logging.getLogger(__name__)
 
 AUTH_SESSION_KEY = "auth_identity"
 IDENTITY_KIND_PROXY_ADMIN = "proxy_admin"
+IDENTITY_KIND_PROXY_USER = "proxy_user"
 IDENTITY_KIND_USER = "user"
 _DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
 
@@ -275,7 +276,9 @@ def clear_auth_session() -> None:
     _clear_identity_cache()
 
 
-def _identity_from_named_user(payload: dict) -> RequestIdentity | None:
+def _identity_from_named_user(
+    payload: dict, *, source_override: str | None = None
+) -> RequestIdentity | None:
     """Resolve and validate a database-backed session identity."""
     user_id = payload.get("user_id")
     session_version = payload.get("session_version")
@@ -290,7 +293,7 @@ def _identity_from_named_user(payload: dict) -> RequestIdentity | None:
     return RequestIdentity(
         username=user.username,
         role=user.role,
-        source=user.auth_source,
+        source=source_override or user.auth_source,
         user_id=user.id,
         session_version=user.session_version,
     )
@@ -309,6 +312,11 @@ def _identity_from_session() -> RequestIdentity | None:
                 clear_auth_session()
                 return None
             return _identity_from_named_user(payload)
+        if kind == IDENTITY_KIND_PROXY_USER:
+            if not proxy_auth_enabled():
+                clear_auth_session()
+                return None
+            return _identity_from_named_user(payload, source_override="proxy")
         clear_auth_session()
     elif payload is not None:
         clear_auth_session()
@@ -438,6 +446,21 @@ def _identity_from_proxy_request() -> RequestIdentity | None:
         user_id=user.id,
         session_version=user.session_version,
     )
+
+
+def establish_proxy_session() -> RequestIdentity | None:
+    """Resolve the trusted headers on this request and persist their user."""
+    identity = _identity_from_proxy_request()
+    if identity is None or identity.user_id is None or identity.session_version is None:
+        return None
+    _store_session_identity(
+        {
+            "kind": IDENTITY_KIND_PROXY_USER,
+            "user_id": identity.user_id,
+            "session_version": identity.session_version,
+        }
+    )
+    return identity
 
 
 def current_identity() -> RequestIdentity | None:

@@ -234,7 +234,7 @@ class LocalAuthTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response.headers["Location"],
-            "/outpost.goauthentik.io/start?rd=%2Fcatalog%2F12%3Fcolor%3DRed",
+            "/outpost.goauthentik.io/start?rd=%2Fadmin%2Fauth%2Fproxy-complete%3Fnext%3D%2Fcatalog%2F12%3Fcolor%253DRed",
         )
 
     def test_proxy_login_rejects_external_destination(self):
@@ -246,7 +246,7 @@ class LocalAuthTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response.headers["Location"],
-            "/outpost.goauthentik.io/start?rd=%2F",
+            "/outpost.goauthentik.io/start?rd=%2Fadmin%2Fauth%2Fproxy-complete%3Fnext%3D%2F",
         )
 
     def test_navbar_uses_proxy_login_and_local_form_keeps_fallback(self):

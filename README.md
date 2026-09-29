@@ -221,8 +221,10 @@ Use `AUTH_MODE=local` when accessing Flask directly through a bound port, such a
 `http://192.168.1.4:8095`. In that mode, **Sign In** opens `/admin/login`. Use
 `proxy` or `hybrid` only when the browser-facing address is routed through the
 configured Authentik/Traefik deployment; in those modes, **Sign In** starts the
-proxy outpost flow. The local form remains directly available at `/admin/login`
-in hybrid mode.
+proxy outpost flow. After Authentik verifies the request, the protected
+`/admin/auth/proxy-complete` callback creates a signed Cutco session so the user
+remains signed in while browsing public pages. The local form remains directly
+available at `/admin/login` in hybrid mode.
 
 For a new local or hybrid installation, generate a setup secret before the first
 start (for example, `openssl rand -hex 32`), set it as `INITIAL_SETUP_TOKEN`, and
@@ -255,7 +257,9 @@ a priority higher than the generic `/admin` router:
 `chain-no-auth-NOerrors@file` is an example name; use your no-forward-auth
 chain only if it removes inbound trusted identity headers. The login, setup, and
 password forms send `Cache-Control: no-store` so a cache cannot serve a stale
-CSRF token.
+CSRF token. Do not add `/admin/auth/proxy-complete` to this bypass router: the
+callback must use the Authentik-protected admin router so Cutco receives verified
+identity headers before creating its session.
 
 Administrators can manage named accounts at `/admin/users`. New local accounts
 receive a temporary password that must be changed at first login. Role changes,
@@ -430,13 +434,20 @@ client copies. Keep `TRUSTED_AUTH_SYNC_ADMIN_ROLE=false` unless provider groups
 are intended to control application roles; when enabled, changes are audited.
 
 When proxy authentication is enabled, the main **Sign In** link starts the
-Authentik outpost flow and returns the user to the page where they started.
-`/admin/login` remains available for local password recovery in hybrid mode.
+Authentik outpost flow, establishes a signed Cutco session through the protected
+`/admin/auth/proxy-complete` callback, and returns the user to the page where
+they started. The generic `/admin` Traefik router shown above already protects
+this callback. Custom routing rules must protect it with forward-auth and pass
+the configured username and subject headers. `/admin/login` remains available
+for local password recovery in hybrid mode.
 
 Proxy-authenticated users see **Sign out of Cutco** in the Account/Admin menu.
-It opens `/outpost.goauthentik.io/sign_out` on the Cutco host and invalidates the
-Cutco proxy session. Authentik may keep its central SSO session, so signing back
-into Cutco can be automatic until that Authentik session is ended separately.
+It clears the signed Cutco session before opening
+`/outpost.goauthentik.io/sign_out` on the Cutco host to invalidate the proxy
+session. Authentik may keep its central SSO session, so signing back into Cutco
+can be automatic until that Authentik session is ended separately. Proxy-backed
+Cutco sessions use `SESSION_SECONDS` and are invalidated by account role, status,
+or session-version changes just like local sessions.
 
 One practical note: the admin router above intentionally covers the app's mutating routes, but the public router still handles read-only browsing routes like `/catalog`, `/sets/<id>`, `/views/item/<id>`, `/attachments/<id>`, `/health`, and `/version`.
 

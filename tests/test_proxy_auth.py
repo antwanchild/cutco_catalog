@@ -7,7 +7,12 @@ from smoke_support import SmokeBaseTest, db
 
 import app as app_module
 from app import _teardown_logging, create_app
-from helpers import AUTH_SESSION_KEY, IDENTITY_KIND_PROXY_ADMIN, IDENTITY_KIND_USER
+from helpers import (
+    AUTH_SESSION_KEY,
+    IDENTITY_KIND_PROXY_ADMIN,
+    IDENTITY_KIND_PROXY_USER,
+    IDENTITY_KIND_USER,
+)
 from models import (
     USER_AUTH_SOURCE_LOCAL,
     USER_AUTH_SOURCE_PROXY,
@@ -78,7 +83,7 @@ class ProxyAuthTests(SmokeBaseTest):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Diagnostics", response.data)
         self.assertIn(b"Sign out of Cutco", response.data)
-        self.assertIn(b'href="/outpost.goauthentik.io/sign_out"', response.data)
+        self.assertIn(b'action="/auth/proxy-logout"', response.data)
         self.assertNotIn(b"Session managed by proxy", response.data)
         with self.app.test_request_context(
             headers=self._headers(username="renamed-upstream", subject="stable-123")
@@ -89,6 +94,69 @@ class ProxyAuthTests(SmokeBaseTest):
             self.assertEqual(identity.user_id, user_id)
             self.assertEqual(identity.username, "stored-name")
             self.assertEqual(identity.source, "proxy")
+
+    def test_proxy_callback_persists_identity_on_public_pages_and_logout_clears_it(
+        self,
+    ):
+        user_id, version = self._add_user(
+            "stored-admin", role=USER_ROLE_ADMIN, subject="stable-123"
+        )
+        self._configure(TRUSTED_AUTH_SUBJECT_HEADER="X-Subject")
+
+        completed = self.client.get(
+            "/admin/auth/proxy-complete?next=/catalog",
+            headers=self._headers(username="upstream-name", subject="stable-123"),
+            follow_redirects=False,
+        )
+
+        self.assertEqual(completed.status_code, 302)
+        self.assertEqual(completed.headers["Location"], "/catalog")
+        with self.client.session_transaction() as session:
+            self.assertEqual(
+                session[AUTH_SESSION_KEY],
+                {
+                    "kind": IDENTITY_KIND_PROXY_USER,
+                    "user_id": user_id,
+                    "session_version": version,
+                },
+            )
+
+        home = self.client.get("/")
+        self.assertIn(b"Admin", home.data)
+        self.assertIn(b"Sign out of Cutco", home.data)
+        self.assertNotIn(b'href="/auth/proxy-login?', home.data)
+
+        with self.client.session_transaction() as session:
+            session["csrf_token"] = "test-csrf-token"
+        logged_out = self.client.post(
+            "/auth/proxy-logout",
+            data={"csrf_token": "test-csrf-token"},
+            follow_redirects=False,
+        )
+        self.assertEqual(logged_out.status_code, 302)
+        self.assertEqual(
+            logged_out.headers["Location"], "/outpost.goauthentik.io/sign_out"
+        )
+        with self.client.session_transaction() as session:
+            self.assertNotIn(AUTH_SESSION_KEY, session)
+
+    def test_proxy_callback_requires_headers_and_preserves_safe_destination(self):
+        self._configure(TRUSTED_AUTH_SUBJECT_HEADER="X-Subject")
+
+        missing_identity = self.client.get(
+            "/admin/auth/proxy-complete?next=/catalog", follow_redirects=False
+        )
+        external_target = self.client.get(
+            "/admin/auth/proxy-complete?next=https://example.com/escape",
+            follow_redirects=False,
+        )
+
+        self.assertEqual(missing_identity.status_code, 302)
+        self.assertEqual(
+            missing_identity.headers["Location"], "/admin/login?next=/catalog"
+        )
+        self.assertEqual(external_target.status_code, 302)
+        self.assertEqual(external_target.headers["Location"], "/admin/login?next=/")
 
     def test_unprovisioned_identity_is_rejected_with_actionable_message(self):
         self._configure(TRUSTED_AUTH_SUBJECT_HEADER="X-Subject")
