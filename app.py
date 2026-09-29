@@ -42,6 +42,7 @@ from helpers import (
     current_user,
     is_admin,
     is_authenticated_user,
+    proxy_auth_enabled,
     users_exist,
     validate_csrf,
 )
@@ -193,6 +194,7 @@ def _register_hooks(app: Flask) -> None:
             current_user=current_user,
             is_admin=is_admin,
             is_private_user=is_authenticated_user,
+            proxy_auth_enabled=proxy_auth_enabled,
             UNKNOWN_COLOR=UNKNOWN_COLOR,
             csrf_token=_csrf_token,
         )
