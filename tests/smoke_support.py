@@ -64,7 +64,6 @@ from scraping import (  # noqa: F401
     _resolve_visible_member_sku,
     _should_queue_slug,
     scrape_item_specs,
-    scrape_purple_campaign_variants,
     scrape_set_variant_options,
 )
 from time_utils import container_timezone, format_container_time  # noqa: F401
@@ -126,7 +125,6 @@ __all__ = [
     "normalize_edge_for_category",
     "os",
     "scrape_item_specs",
-    "scrape_purple_campaign_variants",
     "scrape_set_variant_options",
     "tempfile",
     "unittest",

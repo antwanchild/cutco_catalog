@@ -87,7 +87,6 @@ from scraping import (
     scrape_item_variant_colors,  # noqa: F401
     scrape_set_variant_options,  # noqa: F401
 )
-from scraping import scrape_purple_campaign_variants  # noqa: F401
 from time_utils import format_container_time
 
 data_bp = Blueprint("data", __name__)

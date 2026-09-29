@@ -1205,6 +1205,44 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIsNotNone(current_details)
         self.assertFalse(current_details.has_attr("open"))
 
+    def test_variant_sync_keeps_purple_as_a_regular_product_color(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        item_id, _unknown_variant_id = self._add_catalog_item(
+            name="Purple Handle Knife", sku="PURPLE-1"
+        )
+
+        with mock.patch(
+            "blueprints.data.scrape_item_variant_colors", return_value=("Purple",)
+        ):
+            preview_response = self.client.post(
+                "/variant-sync",
+                data={
+                    "csrf_token": "test-csrf-token",
+                    "scope": "selected",
+                    "selected_skus": "PURPLE-1",
+                },
+                content_type="multipart/form-data",
+            )
+
+        soup = BeautifulSoup(preview_response.data, "html.parser")
+        preview_json_input = soup.select_one('input[name="preview_json"]')
+        self.assertIsNotNone(preview_json_input)
+        confirm_response = self.client.post(
+            "/variant-sync/confirm",
+            data={
+                "csrf_token": "test-csrf-token",
+                "preview_json": preview_json_input["value"],
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        with self.app.app_context():
+            item = db.session.get(Item, item_id)
+            self.assertEqual([variant.color for variant in item.variants], ["Purple"])
+            self.assertFalse(item.variants[0].is_unicorn)
+
     def test_variant_sync_background_start_renders_live_progress(self):
         self._login_as_admin()
         self._set_csrf_token()
@@ -1251,8 +1289,6 @@ class CatalogSmokeTests(SmokeBaseTest):
         preview = {
             "items": [],
             "grouped_items": [],
-            "promo_items": [],
-            "promo_summary": {"has_purple_variants": False},
             "summary": {
                 "items_scanned": 1,
                 "variants_found": 2,
@@ -1569,10 +1605,7 @@ class CatalogSmokeTests(SmokeBaseTest):
                 "variants_to_create": 2,
                 "variants_retained": 0,
                 "items_with_no_clear_variants": 0,
-                "purple_variant_count": 0,
             },
-            "promo_items": [],
-            "promo_summary": {},
             "scope_label": "Entire catalog",
         }
         response = self.client.post(
@@ -1892,259 +1925,6 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(row["member_create_count"], 0)
         self.assertEqual(row["member_covered_count"], 1)
         self.assertEqual(preview["summary"]["variants_to_create"], 1)
-
-    def test_variant_sync_can_mark_purple_campaign_variants_as_unicorns(self):
-        self._login_as_admin()
-        self._set_csrf_token()
-
-        item_id, _unknown_variant_id = self._add_catalog_item(
-            name="Super Shears", sku="77"
-        )
-
-        with (
-            mock.patch(
-                "blueprints.data.scrape_item_variant_colors",
-                return_value=(),
-            ),
-            mock.patch(
-                "blueprints.data.scrape_purple_campaign_variants",
-                return_value=(
-                    {
-                        "name": "Super Shears",
-                        "promo_code": "77L",
-                        "sku_hint": "77",
-                        "color": "Purple",
-                    },
-                    {
-                        "name": "Gift Set",
-                        "promo_code": "1836LD",
-                        "sku_hint": "1836",
-                        "color": "Purple",
-                    },
-                    {
-                        "name": "Package",
-                        "promo_code": "3840LD",
-                        "sku_hint": "3840",
-                        "color": "Purple",
-                    },
-                ),
-            ),
-        ):
-            preview_response = self.client.post(
-                "/variant-sync",
-                data={
-                    "csrf_token": "test-csrf-token",
-                    "scope": "all",
-                },
-                content_type="multipart/form-data",
-                follow_redirects=False,
-            )
-
-        self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"Promo Variants", preview_response.data)
-        self.assertIn(b"Mark purple promo variants as unicorns", preview_response.data)
-        self.assertIn(
-            b"Suppressed because this is a campaign bundle item", preview_response.data
-        )
-        self.assertIn(b"suppressed", preview_response.data)
-        soup = BeautifulSoup(preview_response.data, "html.parser")
-        preview_json_input = soup.select_one('input[name="preview_json"]')
-        self.assertIsNotNone(preview_json_input)
-
-        confirm_response = self.client.post(
-            "/variant-sync/confirm",
-            data={
-                "csrf_token": "test-csrf-token",
-                "preview_json": preview_json_input["value"],
-                "mark_purple_variants_unicorn": "on",
-            },
-            content_type="multipart/form-data",
-            follow_redirects=False,
-        )
-
-        self.assertEqual(confirm_response.status_code, 200)
-        with self.app.app_context():
-            item = db.session.get(Item, item_id)
-            self.assertEqual([variant.color for variant in item.variants], ["Purple"])
-            self.assertEqual(
-                [variant.source for variant in item.variants], ["variant_sync"]
-            )
-            self.assertEqual([variant.is_unicorn for variant in item.variants], [True])
-
-    def test_variant_sync_creates_purple_sheath_variants(self):
-        self._login_as_admin()
-        self._set_csrf_token()
-
-        santoku_item_id, _ = self._add_catalog_item(name='7" Santoku', sku="1766")
-        santoku_sheath_item_id, _ = self._add_catalog_item(
-            name='7" Santoku Sheath', sku="1766-2", category="Sheaths"
-        )
-        trimmer_item_id, _ = self._add_catalog_item(
-            name="Santoku-Style Trimmer", sku="3721"
-        )
-        trimmer_sheath_item_id, _ = self._add_catalog_item(
-            name="Santoku-Style Trimmer Sheath", sku="3721-2", category="Sheaths"
-        )
-
-        with (
-            mock.patch(
-                "blueprints.data.scrape_item_variant_colors",
-                return_value=(),
-            ),
-            mock.patch(
-                "blueprints.data.scrape_purple_campaign_variants",
-                return_value=(
-                    {
-                        "name": '7" Santoku with Sheath',
-                        "promo_code": "1766LSH",
-                        "sku_hint": "1766",
-                        "color": "Purple",
-                    },
-                    {
-                        "name": "Santoku-Style Trimmer with Sheath",
-                        "promo_code": "3721LSH",
-                        "sku_hint": "3721",
-                        "color": "Purple",
-                    },
-                ),
-            ),
-        ):
-            preview_response = self.client.post(
-                "/variant-sync",
-                data={
-                    "csrf_token": "test-csrf-token",
-                    "scope": "all",
-                },
-                content_type="multipart/form-data",
-                follow_redirects=False,
-            )
-
-        self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"7&#34; Santoku Sheath", preview_response.data)
-        self.assertIn(b"Santoku-Style Trimmer Sheath", preview_response.data)
-        soup = BeautifulSoup(preview_response.data, "html.parser")
-        preview_json_input = soup.select_one('input[name="preview_json"]')
-        self.assertIsNotNone(preview_json_input)
-
-        confirm_response = self.client.post(
-            "/variant-sync/confirm",
-            data={
-                "csrf_token": "test-csrf-token",
-                "preview_json": preview_json_input["value"],
-            },
-            content_type="multipart/form-data",
-            follow_redirects=False,
-        )
-
-        self.assertEqual(confirm_response.status_code, 200)
-        with self.app.app_context():
-            santoku_item = db.session.get(Item, santoku_item_id)
-            santoku_sheath_item = db.session.get(Item, santoku_sheath_item_id)
-            trimmer_item = db.session.get(Item, trimmer_item_id)
-            trimmer_sheath_item = db.session.get(Item, trimmer_sheath_item_id)
-            self.assertEqual(
-                [variant.color for variant in santoku_item.variants], ["Purple"]
-            )
-            self.assertEqual(
-                [variant.source for variant in santoku_item.variants], ["variant_sync"]
-            )
-            self.assertEqual(
-                [variant.color for variant in santoku_sheath_item.variants], ["Purple"]
-            )
-            self.assertEqual(
-                [variant.source for variant in santoku_sheath_item.variants],
-                ["variant_sync"],
-            )
-            self.assertEqual(
-                [variant.color for variant in trimmer_item.variants], ["Purple"]
-            )
-            self.assertEqual(
-                [variant.source for variant in trimmer_item.variants], ["variant_sync"]
-            )
-            self.assertEqual(
-                [variant.color for variant in trimmer_sheath_item.variants], ["Purple"]
-            )
-            self.assertEqual(
-                [variant.source for variant in trimmer_sheath_item.variants],
-                ["variant_sync"],
-            )
-
-    def test_variant_sync_can_confirm_purple_section_only(self):
-        self._login_as_admin()
-        self._set_csrf_token()
-
-        normal_item_id, _ = self._add_catalog_item(
-            name="Normal Variant Knife", sku="NV-1"
-        )
-        promo_item_id, _ = self._add_catalog_item(name="Super Shears", sku="77")
-        promo_sheath_item_id, _ = self._add_catalog_item(
-            name="Super Shears Sheath", sku="77-2", category="Sheaths"
-        )
-
-        with (
-            mock.patch(
-                "blueprints.data.scrape_item_variant_colors",
-                return_value=("Blue",),
-            ),
-            mock.patch(
-                "blueprints.data.scrape_purple_campaign_variants",
-                return_value=(
-                    {
-                        "name": "Super Shears",
-                        "promo_code": "77L",
-                        "sku_hint": "77",
-                        "color": "Purple",
-                    },
-                    {
-                        "name": "Super Shears with Sheath",
-                        "promo_code": "77LSH",
-                        "sku_hint": "77",
-                        "color": "Purple",
-                    },
-                ),
-            ),
-        ):
-            preview_response = self.client.post(
-                "/variant-sync",
-                data={
-                    "csrf_token": "test-csrf-token",
-                    "scope": "all",
-                },
-                content_type="multipart/form-data",
-                follow_redirects=False,
-            )
-
-        self.assertEqual(preview_response.status_code, 200)
-        self.assertIn(b"Confirm Purple Promo Only", preview_response.data)
-        soup = BeautifulSoup(preview_response.data, "html.parser")
-        preview_json_input = soup.select_one('input[name="preview_json"]')
-        self.assertIsNotNone(preview_json_input)
-
-        confirm_response = self.client.post(
-            "/variant-sync/confirm",
-            data={
-                "csrf_token": "test-csrf-token",
-                "preview_json": preview_json_input["value"],
-                "confirm_target": "promo",
-            },
-            content_type="multipart/form-data",
-            follow_redirects=False,
-        )
-
-        self.assertEqual(confirm_response.status_code, 200)
-        with self.app.app_context():
-            normal_item = db.session.get(Item, normal_item_id)
-            promo_item = db.session.get(Item, promo_item_id)
-            promo_sheath_item = db.session.get(Item, promo_sheath_item_id)
-            self.assertEqual(
-                [variant.color for variant in normal_item.variants], [UNKNOWN_COLOR]
-            )
-            self.assertEqual(
-                [variant.color for variant in promo_item.variants], ["Purple"]
-            )
-            self.assertEqual(
-                [variant.color for variant in promo_sheath_item.variants], ["Purple"]
-            )
 
     def test_variant_sync_adds_cutting_board_item_variants(self):
         self._login_as_admin()

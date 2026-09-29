@@ -408,48 +408,6 @@ class UtilitySmokeTests(SmokeBaseTest):
                 ("Classic",),
             )
 
-    def test_extract_product_variant_colors_detects_purple_campaign_pages(self):
-        response = mock.Mock()
-        response.status_code = 200
-        response.text = """
-            <html><body>
-              <h1>Cutco Cares 2026 - Alzheimer's Association</h1>
-              <p>Purple Products:</p>
-              <input type="radio" name="purple_products" value="Super Shears"
-                     data-type="Purple Products" data-code="77L">
-              <input type="radio" name="purple_products" value="Cutting Board"
-                     data-type="Purple Products" data-code="125L">
-              <input type="radio" name="purple_products" value="Santoku-Style Trimmer"
-                     data-type="Purple Products" data-code="3721LSH">
-            </body></html>
-        """
-        with mock.patch("scraping.requests.get", return_value=response):
-            _extract_product_variant_colors.cache_clear()
-            self.assertEqual(
-                _extract_product_variant_colors(
-                    "https://www.cutco.com/p/cutco-cares-alzheimers/"
-                ),
-                ("Purple",),
-            )
-
-    def test_scrape_purple_campaign_variants_includes_sheathed_promo_items(self):
-        response = mock.Mock()
-        response.status_code = 200
-        response.text = """
-            <html><body>
-              <input type="radio" name="purple_products" value="Purple Super Shears"
-                     data-type="Purple Products" data-code="77L">
-            </body></html>
-        """
-        with mock.patch("scraping.requests.get", return_value=response):
-            scrape_purple_campaign_variants.cache_clear()
-            entries = scrape_purple_campaign_variants()
-        entry_names = {entry["name"] for entry in entries}
-        self.assertIn('Purple 7" Santoku with Sheath', entry_names)
-        self.assertIn("Purple Santoku-Style Trimmer with Sheath", entry_names)
-        self.assertNotIn("Purple Traditional Cheese Knife with Sheath", entry_names)
-        self.assertNotIn('Purple 5" Petite Santoku with Sheath', entry_names)
-
     def test_extract_product_variant_colors_prefers_selected_color_on_size_pages(self):
         response = mock.Mock()
         response.status_code = 200

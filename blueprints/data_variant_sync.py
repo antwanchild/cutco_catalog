@@ -23,7 +23,6 @@ from sqlalchemy.orm import selectinload
 
 from blueprints.data import data_bp
 from blueprints.data_workflows import (
-    _build_purple_campaign_variant_preview,
     _build_set_variant_sync_preview,
     _build_variant_sync_preview,
     _merge_variant_sync_previews,
@@ -148,9 +147,7 @@ def _build_variant_sync_confirmation_payload(preview: dict) -> dict:
 
     return {
         "items": [compact_item(item) for item in preview.get("items", [])],
-        "promo_items": [compact_item(item) for item in preview.get("promo_items", [])],
         "summary": preview.get("summary", {}),
-        "promo_summary": preview.get("promo_summary", {}),
         "scope_label": preview.get("scope_label", "Entire catalog"),
     }
 
@@ -187,12 +184,10 @@ def _run_variant_sync_job(
         try:
             sync_variant_sync_helpers(
                 data_module.scrape_item_variant_colors,
-                data_module.scrape_purple_campaign_variants,
                 data_module.scrape_set_variant_options,
             )
             cast(Any, data_module.scrape_item_variant_colors).cache_clear()
             cast(Any, data_module.scrape_set_variant_options).cache_clear()
-            cast(Any, data_module.scrape_purple_campaign_variants).cache_clear()
             cast(Any, discover_cutco_item_page_url).cache_clear()
 
             item_lookup = {
@@ -255,12 +250,7 @@ def _run_variant_sync_job(
             set_preview = _build_set_variant_sync_preview(
                 item_sets, pending_item_colors
             )
-            log("Checking promotional variants…")
-            promo_preview = _build_purple_campaign_variant_preview()
-
             preview = _merge_variant_sync_previews(item_preview, set_preview)
-            preview["promo_items"] = promo_preview.get("items", [])
-            preview["promo_summary"] = promo_preview.get("summary", {})
             preview["scope"] = scope
             preview["scope_label"] = scope_label
             preview["category"] = category
@@ -418,7 +408,6 @@ def variant_sync_page():
     """Render the variant sync preview page."""
     sync_variant_sync_helpers(
         data_module.scrape_item_variant_colors,
-        data_module.scrape_purple_campaign_variants,
         data_module.scrape_set_variant_options,
     )
     all_items = (
@@ -449,7 +438,6 @@ def variant_sync_page():
     # Variant color pages can change over time, so always start with a fresh scrape.
     cast(Any, data_module.scrape_item_variant_colors).cache_clear()
     cast(Any, data_module.scrape_set_variant_options).cache_clear()
-    cast(Any, data_module.scrape_purple_campaign_variants).cache_clear()
     cast(Any, discover_cutco_item_page_url).cache_clear()
     items, selection_error = _resolve_variant_sync_items(scope, category, selected_skus)
     item_sets = _resolve_variant_sync_sets(scope, category, selected_skus)
@@ -491,9 +479,6 @@ def variant_sync_page():
         item_preview,
         _build_set_variant_sync_preview(item_sets, pending_item_colors),
     )
-    promo_preview = _build_purple_campaign_variant_preview()
-    preview["promo_items"] = promo_preview.get("items", [])
-    preview["promo_summary"] = promo_preview.get("summary", {})
     preview["scope"] = scope
     preview["scope_label"] = {
         "all": "Entire catalog",
@@ -535,7 +520,6 @@ def variant_sync_confirm():
     retained_variants = 0
     skipped_items = 0
     touched_items = 0
-    mark_purple_as_unicorn = request.form.get("mark_purple_variants_unicorn") == "on"
     confirm_target = (request.form.get("confirm_target") or "all").strip()
     set_selection_enabled = request.form.get("set_selection_enabled") == "1"
     selected_set_ids = {
@@ -546,29 +530,21 @@ def variant_sync_confirm():
     skipped_details: list[dict] = []
 
     try:
-        promo_summary = preview.get("promo_summary", {})
 
-        def should_process(preview_item: dict, *, section: str) -> bool:
+        def should_process(preview_item: dict) -> bool:
             is_set = preview_item.get("entity_type") == "set"
             set_id = preview_item.get("set_id")
             if set_selection_enabled and is_set and set_id not in selected_set_ids:
                 return False
             if confirm_target == "all":
                 return True
-            if confirm_target == "promo":
-                return section == "promo"
             if confirm_target == "selected_sets":
-                return section == "category" and is_set and set_id in selected_set_ids
+                return is_set and set_id in selected_set_ids
             if confirm_target.startswith("category:"):
-                return (
-                    section == "category"
-                    and confirm_target == f"category:{preview_item.get('category', '')}"
-                )
+                return confirm_target == f"category:{preview_item.get('category', '')}"
             return True
 
-        def apply_item_preview(
-            preview_item: dict, *, allow_purple_unicorn: bool = False
-        ) -> None:
+        def apply_item_preview(preview_item: dict) -> None:
             nonlocal created_variants, retained_variants, skipped_items, touched_items
             if preview_item.get("entity_type") == "set":
                 set_id = preview_item.get("set_id")
@@ -713,20 +689,9 @@ def variant_sync_confirm():
                 variant = ItemVariant(
                     item=item, color=color_value, source="variant_sync"
                 )
-                if (
-                    allow_purple_unicorn
-                    and mark_purple_as_unicorn
-                    and color_value.lower().startswith("purple")
-                ):
-                    variant.is_unicorn = True
                 db.session.add(variant)
                 create_colors.append(color_value)
                 created_variants += 1
-            if allow_purple_unicorn:
-                for variant in item.variants:
-                    if variant.color.lower().startswith("purple"):
-                        if mark_purple_as_unicorn:
-                            variant.is_unicorn = True
             retained_variants += len(preview_item.get("retained_colors", []))
             if create_colors or preview_item.get("retained_colors") or url_changed:
                 touched_items += 1
@@ -734,27 +699,10 @@ def variant_sync_confirm():
                 reconcile_unknown_variant(item)
 
         for preview_item in preview.get("items", []):
-            if should_process(preview_item, section="category"):
+            if should_process(preview_item):
                 apply_item_preview(preview_item)
-        for preview_item in preview.get("promo_items", []):
-            if should_process(preview_item, section="promo"):
-                apply_item_preview(preview_item, allow_purple_unicorn=True)
 
         combined_summary = dict(preview.get("summary", {}))
-        for key in (
-            "items_scanned",
-            "variants_found",
-            "variants_to_create",
-            "variants_retained",
-            "items_with_no_clear_variants",
-            "purple_variant_count",
-        ):
-            combined_summary[key] = combined_summary.get(key, 0) + promo_summary.get(
-                key, 0
-            )
-        combined_summary["has_purple_variants"] = (
-            combined_summary.get("purple_variant_count", 0) > 0
-        )
 
         record_activity(
             "sync",
