@@ -35,6 +35,7 @@ from helpers import (
     current_identity,
     current_user,
     db_commit,
+    establish_proxy_session,
     establish_user_session,
     initial_setup_token_matches,
     is_admin,
@@ -70,6 +71,7 @@ admin_bp = Blueprint("admin", __name__)
 logger = logging.getLogger(__name__)
 AUTH_SETUP_STATE_ID = 1
 AUTHENTIK_START_PATH = "/outpost.goauthentik.io/start"
+AUTHENTIK_SIGN_OUT_PATH = "/outpost.goauthentik.io/sign_out"
 
 
 def _safe_internal_redirect(target: str | None) -> str:
@@ -443,7 +445,38 @@ def proxy_login():
     if not proxy_auth_enabled():
         return redirect(url_for("admin.admin_login"))
     target = _safe_internal_redirect(request.args.get("next"))
-    return redirect(f"{AUTHENTIK_START_PATH}?{urlencode({'rd': target})}")
+    completion_url = url_for("admin.proxy_login_complete", next=target)
+    return redirect(f"{AUTHENTIK_START_PATH}?{urlencode({'rd': completion_url})}")
+
+
+@admin_bp.route("/admin/auth/proxy-complete")
+def proxy_login_complete():
+    """Persist a proxy-authenticated identity before returning to the app."""
+    target = _safe_internal_redirect(request.args.get("next"))
+    if not proxy_auth_enabled():
+        return redirect(url_for("admin.admin_login", next=target))
+    identity = establish_proxy_session()
+    if identity is None:
+        flash(
+            proxy_auth_failure()
+            or "Authentik did not provide a trusted identity. Try signing in again.",
+            "error",
+        )
+        return redirect(url_for("admin.admin_login", next=target))
+    session.permanent = (
+        int(current_app.config.get("SESSION_SECONDS", ADMIN_SESSION_SECONDS)) > 0
+    )
+    logger.info("Proxy login successful for user_id=%s", identity.user_id)
+    flash("Signed in with Authentik.", "success")
+    return redirect(target)
+
+
+@admin_bp.route("/auth/proxy-logout", methods=["POST"])
+def proxy_logout():
+    """Clear the Cutco session before ending the Authentik proxy session."""
+    logger.info("Proxy user logged out")
+    clear_auth_session()
+    return redirect(AUTHENTIK_SIGN_OUT_PATH)
 
 
 @admin_bp.route("/setup", methods=["GET", "POST"])
