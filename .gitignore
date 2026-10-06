@@ -63,6 +63,7 @@ desktop.ini
 # Testing
 .pytest_cache/
 .coverage
+test-timings.txt
 htmlcov/
 .tox/
 
