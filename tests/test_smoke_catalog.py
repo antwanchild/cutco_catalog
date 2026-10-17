@@ -1,6 +1,18 @@
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
-# ruff: noqa: F403,F405
-from smoke_support import *
+# pyright: reportArgumentType=false, reportCallIssue=false, reportOptionalMemberAccess=false, reportOptionalSubscript=false
+import json
+import os
+import tempfile
+from unittest import mock
+
+from bs4 import BeautifulSoup
+from flask import Flask
+from smoke_support import SmokeBaseTest
+
+import blueprints.catalog as catalog_blueprint
+from blueprints.catalog import _build_member_name_lookup, _build_set_membership_preview
+from constants import UNKNOWN_COLOR, normalize_edge_for_category
+from extensions import db
+from models import Item, ItemSetMember, ItemVariant, Set
 
 
 class CatalogSmokeTests(SmokeBaseTest):

@@ -1,9 +1,21 @@
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
-# ruff: noqa: F403,F405
-from smoke_support import *
+import unittest
+from unittest import mock
+
+from smoke_support import SmokeBaseTest
+
+from extensions import db
+from models import Item
+from msrp_diff import find_stale_msrp_rows
+from msrp_scrape import _scrape_price_from_page
+from scraping import (
+    _extract_cutco_price,
+    _find_cutco_item_link,
+    _resolve_cutco_item_page_url,
+    scrape_item_specs,
+)
 
 
-class MsrpSmokeTests(SmokeBaseTest):
+class MsrpSmokeTests(unittest.TestCase):
     def test_msrp_scraper_reads_full_retail_fallback(self):
         html = '<html><body><script>{"fullRetail":184.0,"actualPrice":184.0}</script></body></html>'
 
@@ -63,24 +75,6 @@ class MsrpSmokeTests(SmokeBaseTest):
                 _scrape_price_from_page("https://www.cutco.com/p/medium-cutting-board"),
                 38.0,
             )
-
-    def test_find_stale_msrp_rows_flags_zero_and_missing_prices(self):
-        with self.app.app_context():
-            zero_item = Item(
-                name="Zero Knife", sku="Z-1", category="Kitchen Knives", msrp=0.0
-            )
-            missing_item = Item(
-                name="Missing Knife", sku="M-1", category="Kitchen Knives", msrp=None
-            )
-            priced_item = Item(
-                name="Priced Knife", sku="P-1", category="Kitchen Knives", msrp=18.0
-            )
-            db.session.add_all([zero_item, missing_item, priced_item])
-            db.session.commit()
-
-            rows = find_stale_msrp_rows(Item.query.all())
-
-        self.assertEqual([row["sku"] for row in rows], ["M-1", "Z-1"])
 
     def test_msrp_scraper_maps_cutting_board_family_urls_to_specific_products(self):
         cases = [
@@ -389,3 +383,23 @@ class MsrpSmokeTests(SmokeBaseTest):
             _find_cutco_item_link(html, "Super Shears with Sheath"),
             "https://www.cutco.com/p/super-shears-with-sheath",
         )
+
+
+class StaleMsrpSmokeTests(SmokeBaseTest):
+    def test_find_stale_msrp_rows_flags_zero_and_missing_prices(self):
+        with self.app.app_context():
+            zero_item = Item(
+                name="Zero Knife", sku="Z-1", category="Kitchen Knives", msrp=0.0
+            )
+            missing_item = Item(
+                name="Missing Knife", sku="M-1", category="Kitchen Knives", msrp=None
+            )
+            priced_item = Item(
+                name="Priced Knife", sku="P-1", category="Kitchen Knives", msrp=18.0
+            )
+            db.session.add_all([zero_item, missing_item, priced_item])
+            db.session.commit()
+
+            rows = find_stale_msrp_rows(Item.query.all())
+
+        self.assertEqual([row["sku"] for row in rows], ["M-1", "Z-1"])

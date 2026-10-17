@@ -1,16 +1,13 @@
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
-from admin_jobs_support import (
-    UTC,
-    AdminJobBaseTest,
-    Flask,
-    Item,
-    datetime,
-    db,
-    json,
-    mock,
-    msrp_jobs,
-    timedelta,
-)
+import json
+from datetime import UTC, datetime, timedelta
+from unittest import mock
+
+from admin_jobs_support import AdminJobBaseTest
+from flask import Flask
+
+import msrp_jobs
+from extensions import db
+from models import Item
 
 
 class AdminMsrpJobSmokeTests(AdminJobBaseTest):

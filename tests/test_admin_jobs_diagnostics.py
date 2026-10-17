@@ -1,18 +1,15 @@
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
 import os
 from datetime import timedelta, timezone
+from unittest import mock
 
-from admin_jobs_support import (
-    AUTH_SESSION_KEY,
-    BOOTSTRAP_VERSION,
-    SCHEMA_VERSION,
-    AdminJobBaseTest,
-    Item,
-    ItemVariant,
-    constants,
-    db,
-    mock,
-)
+from admin_jobs_support import AdminJobBaseTest
+
+import constants
+from extensions import db
+from helpers import AUTH_SESSION_KEY
+from models import Item, ItemVariant
+from schema_migrations import SCHEMA_VERSION
+from startup import BOOTSTRAP_VERSION
 
 
 class AdminDiagnosticsSmokeTests(AdminJobBaseTest):

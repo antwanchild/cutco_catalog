@@ -1,12 +1,12 @@
 # pyright: reportOptionalMemberAccess=false
-
 import tempfile
 from unittest import mock
 
-from smoke_support import SmokeBaseTest, db
+from smoke_support import SmokeBaseTest
 
 import app as app_module
 from app import _teardown_logging, create_app
+from extensions import db
 from helpers import (
     AUTH_SESSION_KEY,
     IDENTITY_KIND_PROXY_ADMIN,

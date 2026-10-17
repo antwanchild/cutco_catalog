@@ -1,16 +1,11 @@
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
-from admin_jobs_support import (
-    UTC,
-    AdminJobBaseTest,
-    Item,
-    ItemSetMember,
-    Set,
-    datetime,
-    db,
-    json,
-    mock,
-    timedelta,
-)
+import json
+from datetime import UTC, datetime, timedelta
+from unittest import mock
+
+from admin_jobs_support import AdminJobBaseTest
+
+from extensions import db
+from models import Item, ItemSetMember, Set
 
 
 class AdminCatalogJobSmokeTests(AdminJobBaseTest):

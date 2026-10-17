@@ -1,26 +1,42 @@
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
-# ruff: noqa: F403,F405
-from smoke_support import *
+# pyright: reportAttributeAccessIssue=false
+import json
+import os
+import unittest
+from unittest import mock
+
+from bs4 import BeautifulSoup
+from smoke_support import SmokeBaseTest
+
+from blueprints.catalog import _load_member_snapshot
+from constants import canonicalize_category
+from helpers import (
+    _collection_token,
+    _gift_token,
+    _notify_discord,
+    _verify_collection_token,
+    _verify_gift_token,
+)
+from scraping import (
+    _build_set_member_entries,
+    _collect_visible_set_piece_rows,
+    _dedupe_product_links,
+    _extract_product_variant_colors,
+    _extract_sku_from_href,
+    _infer_visible_member_sku,
+    _member_hover_title,
+    _normalize_set_member_sku,
+    _product_link_name,
+    _resolve_visible_member_sku,
+    _should_queue_slug,
+    scrape_set_variant_options,
+)
+from time_utils import container_timezone, format_container_time
 
 
-class UtilitySmokeTests(SmokeBaseTest):
+class UtilitySmokeTests(unittest.TestCase):
     def test_current_and_legacy_top_knives_labels_share_canonical_category(self):
         self.assertEqual(canonicalize_category("Top Knives"), "Kitchen Knives")
         self.assertEqual(canonicalize_category("Everyday Knives"), "Kitchen Knives")
-
-    def test_token_helpers_validate_and_reject_tampering(self):
-        self._login_as_admin()
-        self._set_csrf_token()
-
-        with self.app.app_context():
-            gift_token = _gift_token(12, 34)
-            collection_token = _collection_token(56)
-            self.assertEqual(_verify_gift_token(gift_token), (12, 34))
-            self.assertEqual(_verify_collection_token(collection_token), 56)
-            self.assertIsNone(_verify_gift_token("not-a-token"))
-            self.assertIsNone(_verify_collection_token("not-a-token"))
-            self.assertIsNone(_verify_gift_token(gift_token + "x"))
-            self.assertIsNone(_verify_collection_token(collection_token + "x"))
 
     def test_notify_discord_handles_success_and_failure(self):
         with mock.patch("helpers.DISCORD_WEBHOOK_URL", None):
@@ -1002,3 +1018,19 @@ class UtilitySmokeTests(SmokeBaseTest):
                 format_container_time("2026-04-20T19:18:00+00:00"),
                 "Apr 20, 2026, 7:18 PM UTC",
             )
+
+
+class TokenSmokeTests(SmokeBaseTest):
+    def test_token_helpers_validate_and_reject_tampering(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+
+        with self.app.app_context():
+            gift_token = _gift_token(12, 34)
+            collection_token = _collection_token(56)
+            self.assertEqual(_verify_gift_token(gift_token), (12, 34))
+            self.assertEqual(_verify_collection_token(collection_token), 56)
+            self.assertIsNone(_verify_gift_token("not-a-token"))
+            self.assertIsNone(_verify_collection_token("not-a-token"))
+            self.assertIsNone(_verify_gift_token(gift_token + "x"))
+            self.assertIsNone(_verify_collection_token(collection_token + "x"))

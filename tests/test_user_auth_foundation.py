@@ -1,18 +1,21 @@
-# pyright: reportOptionalMemberAccess=false, reportArgumentType=false
+# pyright: reportOptionalMemberAccess=false
 import sqlite3
 import tempfile
 import unittest
 
-from smoke_support import ActivityEvent, SmokeBaseTest, User, db
+from smoke_support import SmokeBaseTest
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 
 from app import _teardown_logging, create_app
+from extensions import db
 from models import (
     MIN_PASSWORD_LENGTH,
     USER_AUTH_SOURCE_PROXY,
     USER_ROLE_ADMIN,
     USER_ROLE_USER,
+    ActivityEvent,
+    User,
     record_audit_event,
 )
 from schema_migrations import SCHEMA_VERSION, SchemaHistory, SchemaState

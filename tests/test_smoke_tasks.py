@@ -1,6 +1,7 @@
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
-# ruff: noqa: F403,F405
-from smoke_support import *
+from smoke_support import SmokeBaseTest
+
+from extensions import db
+from models import KnifeTask, KnifeTaskLog
 
 
 class TaskSmokeTests(SmokeBaseTest):
