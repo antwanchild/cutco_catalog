@@ -1,7 +1,8 @@
-# pyright: reportOptionalMemberAccess=false, reportArgumentType=false
+# pyright: reportArgumentType=false, reportOptionalMemberAccess=false
 from flask import session
-from smoke_support import ActivityEvent, SmokeBaseTest, User, db
+from smoke_support import SmokeBaseTest
 
+from extensions import db
 from helpers import (
     AUTH_SESSION_KEY,
     IDENTITY_KIND_USER,
@@ -10,7 +11,13 @@ from helpers import (
     current_user,
     establish_user_session,
 )
-from models import USER_AUTH_SOURCE_PROXY, USER_ROLE_ADMIN, USER_ROLE_USER
+from models import (
+    USER_AUTH_SOURCE_PROXY,
+    USER_ROLE_ADMIN,
+    USER_ROLE_USER,
+    ActivityEvent,
+    User,
+)
 
 
 class AuthIdentityTests(SmokeBaseTest):

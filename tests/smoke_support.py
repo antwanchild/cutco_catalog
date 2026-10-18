@@ -1,139 +1,20 @@
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
-import json  # noqa: F401
-import os  # noqa: F401
-import tempfile  # noqa: F401
-import unittest  # noqa: F401
-from io import BytesIO  # noqa: F401
-from unittest import mock  # noqa: F401
-
-from bs4 import BeautifulSoup  # noqa: F401
-from flask import Flask  # noqa: F401
-from openpyxl import Workbook  # noqa: F401
+import os
+import tempfile
+import unittest
 
 os.environ.setdefault("INITIAL_SETUP_TOKEN", "test-initial-setup-token")
 
-import blueprints.catalog as catalog_blueprint  # noqa: F401
-from app import _teardown_logging, create_app  # noqa: F401
-from blueprints.catalog import (  # noqa: F401
-    _build_member_name_lookup,
-    _build_set_membership_preview,
-    _load_member_snapshot,
-)
-from constants import (  # noqa: F401
-    UNKNOWN_COLOR,
-    canonicalize_category,
-    normalize_edge_for_category,
-)
-from extensions import db  # noqa: F401
-from helpers import (  # noqa: F401
-    AUTH_SESSION_KEY,
-    IDENTITY_KIND_PROXY_ADMIN,
-    _collection_token,
-    _gift_token,
-    _notify_discord,
-    _verify_collection_token,
-    _verify_gift_token,
-    check_wishlist_targets,
-)
-from models import (  # noqa: F401
-    ActivityEvent,
-    CookwareSession,
+from app import _teardown_logging, create_app
+from extensions import db
+from models import (
     Item,
-    ItemAttachment,
     ItemSetMember,
     ItemVariant,
     KnifeTask,
-    KnifeTaskLog,
-    Ownership,
     Person,
     Set,
-    SharpeningLog,
     User,
 )
-from msrp_diff import find_stale_msrp_rows  # noqa: F401
-from msrp_scrape import _scrape_price_from_page  # noqa: F401
-from scraping import (  # noqa: F401
-    _build_set_member_entries,
-    _collect_visible_set_piece_rows,
-    _dedupe_product_links,
-    _extract_cutco_price,
-    _extract_product_variant_colors,
-    _extract_sku_from_href,
-    _find_cutco_item_link,
-    _infer_visible_member_sku,
-    _member_hover_title,
-    _normalize_set_member_sku,
-    _product_link_name,
-    _resolve_cutco_item_page_url,
-    _resolve_visible_member_sku,
-    _should_queue_slug,
-    scrape_item_specs,
-    scrape_set_variant_options,
-)
-from time_utils import container_timezone, format_container_time  # noqa: F401
-
-__all__ = [
-    "AUTH_SESSION_KEY",
-    "IDENTITY_KIND_PROXY_ADMIN",
-    "UNKNOWN_COLOR",
-    "ActivityEvent",
-    "BeautifulSoup",
-    "BytesIO",
-    "CookwareSession",
-    "Flask",
-    "Item",
-    "ItemAttachment",
-    "ItemSetMember",
-    "ItemVariant",
-    "KnifeTask",
-    "KnifeTaskLog",
-    "Ownership",
-    "Person",
-    "Set",
-    "SharpeningLog",
-    "SmokeBaseTest",
-    "User",
-    "Workbook",
-    "_build_member_name_lookup",
-    "_build_set_member_entries",
-    "_build_set_membership_preview",
-    "_collect_visible_set_piece_rows",
-    "_collection_token",
-    "_dedupe_product_links",
-    "_extract_cutco_price",
-    "_extract_product_variant_colors",
-    "_extract_sku_from_href",
-    "_find_cutco_item_link",
-    "_gift_token",
-    "_infer_visible_member_sku",
-    "_load_member_snapshot",
-    "_member_hover_title",
-    "_normalize_set_member_sku",
-    "_notify_discord",
-    "_product_link_name",
-    "_resolve_cutco_item_page_url",
-    "_resolve_visible_member_sku",
-    "_scrape_price_from_page",
-    "_should_queue_slug",
-    "_verify_collection_token",
-    "_verify_gift_token",
-    "canonicalize_category",
-    "catalog_blueprint",
-    "check_wishlist_targets",
-    "container_timezone",
-    "create_app",
-    "db",
-    "find_stale_msrp_rows",
-    "format_container_time",
-    "json",
-    "mock",
-    "normalize_edge_for_category",
-    "os",
-    "scrape_item_specs",
-    "scrape_set_variant_options",
-    "tempfile",
-    "unittest",
-]
 
 
 class SmokeBaseTest(unittest.TestCase):

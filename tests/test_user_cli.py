@@ -1,9 +1,9 @@
 # pyright: reportOptionalMemberAccess=false
-
 import json
 
-from smoke_support import SmokeBaseTest, db
+from smoke_support import SmokeBaseTest
 
+from extensions import db
 from helpers import AUTH_SESSION_KEY, IDENTITY_KIND_USER
 from models import (
     USER_AUTH_SOURCE_PROXY,

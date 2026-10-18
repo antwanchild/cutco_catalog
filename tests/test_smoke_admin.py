@@ -1,6 +1,9 @@
-# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false
-# ruff: noqa: F403,F405
-from smoke_support import *
+# pyright: reportOptionalMemberAccess=false, reportOptionalSubscript=false
+from smoke_support import SmokeBaseTest
+
+from extensions import db
+from helpers import AUTH_SESSION_KEY, check_wishlist_targets
+from models import ActivityEvent, Item
 
 
 class AdminSmokeTests(SmokeBaseTest):
