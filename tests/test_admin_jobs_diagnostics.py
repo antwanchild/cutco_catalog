@@ -44,7 +44,8 @@ class AdminDiagnosticsSmokeTests(AdminJobBaseTest):
             response = self.client.get("/admin/diagnostics")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"MDT", response.data)
+        self.assertIn(b"America/Denver", response.data)
+        self.assertRegex(response.data, rb"\bM(?:ST|DT)\b")
 
     def test_admin_diagnostics_falls_back_to_git_sha(self):
         self._login_as_admin()
