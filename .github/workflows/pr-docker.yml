@@ -1,12 +1,8 @@
 name: PR Preview
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
-    paths-ignore:
-      - "**/*.md"
   pull_request_target:
-    types: [closed]
+    types: [closed, unlabeled]
 
 permissions:
   contents: read
@@ -17,97 +13,18 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   IMAGE_NAME: ghcr.io/${{ github.repository }}
 
-concurrency:
-  group: pr-docker-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
-
 jobs:
-  build:
-    name: Build Preview Image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      pull-requests: read
-    steps:
-      - name: Resolve PR context
-        id: preview_meta
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const requiredLabel = "docker";
-            const pullRequest = context.payload.pull_request;
-
-            if (!pullRequest) {
-              core.setFailed("This preview event is not associated with a pull request.");
-              return;
-            }
-
-            const previewTagPrefix = `pr-${pullRequest.number}`;
-
-            const labels = pullRequest.labels || [];
-            if (!labels.some((label) => label.name === requiredLabel)) {
-              core.info(`PR #${pullRequest.number} does not have the '${requiredLabel}' label. Skipping the image build.`);
-              core.setOutput("ready", "false");
-              return;
-            }
-
-            const canPublishPreviewImage = pullRequest.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
-            const previewBuildNumber = Number(process.env.GITHUB_RUN_NUMBER || "1");
-
-            core.setOutput("ready", "true");
-            core.setOutput("pr_number", String(pullRequest.number));
-            core.setOutput("head_sha", pullRequest.head.sha);
-            core.setOutput("build_number", String(previewBuildNumber));
-            core.setOutput("version", previewTagPrefix);
-            core.setOutput("pr_tag", previewTagPrefix);
-            core.setOutput("can_push", String(canPublishPreviewImage));
-
-      - name: Checkout PR head
-        if: steps.preview_meta.outputs.ready == 'true'
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ steps.preview_meta.outputs.head_sha }}
-
-      - name: Log in to GHCR
-        if: steps.preview_meta.outputs.ready == 'true' && steps.preview_meta.outputs.can_push == 'true'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build preview image
-        if: steps.preview_meta.outputs.ready == 'true'
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: ${{ steps.preview_meta.outputs.can_push == 'true' }}
-          load: ${{ steps.preview_meta.outputs.can_push != 'true' }}
-          tags: ${{ env.IMAGE_NAME }}:${{ steps.preview_meta.outputs.pr_tag }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}#readme
-            org.opencontainers.image.revision=${{ steps.preview_meta.outputs.head_sha }}
-            org.opencontainers.image.version=${{ steps.preview_meta.outputs.version }}.${{ steps.preview_meta.outputs.build_number }}
-            org.opencontainers.image.ref.name=${{ steps.preview_meta.outputs.pr_tag }}
-            org.opencontainers.image.licenses=MIT
-            com.cutco.preview.build-number=${{ steps.preview_meta.outputs.build_number }}
-            com.cutco.preview.pr-number=${{ steps.preview_meta.outputs.pr_number }}
-          build-args: |
-            APP_VERSION=${{ steps.preview_meta.outputs.version }}.${{ steps.preview_meta.outputs.build_number }}
-            PR_BUILD_NUMBER=${{ steps.preview_meta.outputs.build_number }}
-            GIT_SHA=${{ steps.preview_meta.outputs.head_sha }}
-
   cleanup:
     name: Remove Preview Image
+    concurrency:
+      group: pr-docker-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'pull_request_target' &&
       (
-        github.event.action == 'closed' && github.event.pull_request.merged == true ||
-        github.event.action == 'unlabeled'
+        github.event.action == 'closed' ||
+        github.event.action == 'unlabeled' && github.event.label.name == 'docker'
       )
     permissions:
       contents: read
@@ -117,6 +34,15 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            if (pr.state === 'open' && pr.labels.some(label => label.name === 'docker')) {
+              core.info('Preview is still requested; leaving it in place.');
+              return;
+            }
             const owner = context.repo.owner;
             const packageName = context.repo.repo;
             const prTagPrefix = `pr-${context.payload.pull_request.number}`;

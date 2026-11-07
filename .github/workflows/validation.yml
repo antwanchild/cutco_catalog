@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [master]
 
@@ -13,6 +14,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PYTHON_VERSION: "3.13"
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -278,3 +280,95 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: 1
           ignore-unfixed: true
+
+  preview:
+    needs: security
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'docker')
+    name: Build Preview Image
+    concurrency:
+      group: pr-docker-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: read
+    steps:
+      - name: Resolve PR context
+        id: preview_meta
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const requiredLabel = "docker";
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            if (pullRequest.state !== 'open' || pullRequest.head.sha !== context.payload.pull_request.head.sha) {
+              core.info('This PR is closed or has newer commits; skipping the stale preview.');
+              core.setOutput('ready', 'false');
+              return;
+            }
+
+            if (!pullRequest) {
+              core.setFailed("This preview event is not associated with a pull request.");
+              return;
+            }
+
+            const previewTagPrefix = `pr-${pullRequest.number}`;
+
+            const labels = pullRequest.labels || [];
+            if (!labels.some((label) => label.name === requiredLabel)) {
+              core.info(`PR #${pullRequest.number} does not have the '${requiredLabel}' label. Skipping the image build.`);
+              core.setOutput("ready", "false");
+              return;
+            }
+
+            const canPublishPreviewImage = pullRequest.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
+            const previewBuildNumber = Number(process.env.GITHUB_RUN_NUMBER || "1");
+
+            core.setOutput("ready", "true");
+            core.setOutput("pr_number", String(pullRequest.number));
+            core.setOutput("head_sha", pullRequest.head.sha);
+            core.setOutput("build_number", String(previewBuildNumber));
+            core.setOutput("version", previewTagPrefix);
+            core.setOutput("pr_tag", previewTagPrefix);
+            core.setOutput("can_push", String(canPublishPreviewImage));
+
+      - name: Checkout PR head
+        if: steps.preview_meta.outputs.ready == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.preview_meta.outputs.head_sha }}
+
+      - name: Log in to GHCR
+        if: steps.preview_meta.outputs.ready == 'true' && steps.preview_meta.outputs.can_push == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build preview image
+        if: steps.preview_meta.outputs.ready == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ steps.preview_meta.outputs.can_push == 'true' }}
+          load: ${{ steps.preview_meta.outputs.can_push != 'true' }}
+          tags: ${{ env.IMAGE_NAME }}:${{ steps.preview_meta.outputs.pr_tag }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}#readme
+            org.opencontainers.image.revision=${{ steps.preview_meta.outputs.head_sha }}
+            org.opencontainers.image.version=${{ steps.preview_meta.outputs.version }}.${{ steps.preview_meta.outputs.build_number }}
+            org.opencontainers.image.ref.name=${{ steps.preview_meta.outputs.pr_tag }}
+            org.opencontainers.image.licenses=MIT
+            com.cutco.preview.build-number=${{ steps.preview_meta.outputs.build_number }}
+            com.cutco.preview.pr-number=${{ steps.preview_meta.outputs.pr_number }}
+          build-args: |
+            APP_VERSION=${{ steps.preview_meta.outputs.version }}.${{ steps.preview_meta.outputs.build_number }}
+            PR_BUILD_NUMBER=${{ steps.preview_meta.outputs.build_number }}
+            GIT_SHA=${{ steps.preview_meta.outputs.head_sha }}
