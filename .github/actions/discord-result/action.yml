@@ -1,0 +1,105 @@
+name: Discord workflow result
+description: Send a consistent build or release result to Discord
+inputs:
+  webhook:
+    description: Discord webhook URL
+    required: false
+  token:
+    description: GitHub token with Actions read access to look up failed jobs
+    required: true
+  project:
+    description: Display name for the project
+    required: true
+  event:
+    description: Build or release
+    required: true
+  result:
+    description: GitHub Actions conclusion
+    required: true
+  version:
+    description: Version or release tag, when available
+    required: false
+  sha:
+    description: Source commit
+    required: true
+  run-id:
+    description: Workflow run ID, defaults to the current run
+    required: false
+  run-attempt:
+    description: Workflow run attempt, defaults to the current attempt
+    required: false
+  details:
+    description: Optional project-specific status or release notes
+    required: false
+  release-url:
+    description: Link to the GitHub release, when available
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Send Discord result
+      if: inputs.webhook != ''
+      shell: bash
+      env:
+        WEBHOOK: ${{ inputs.webhook }}
+        GH_TOKEN: ${{ inputs.token }}
+        PROJECT: ${{ inputs.project }}
+        EVENT: ${{ inputs.event }}
+        RESULT: ${{ inputs.result }}
+        VERSION: ${{ inputs.version }}
+        SOURCE_SHA: ${{ inputs.sha }}
+        DETAILS: ${{ inputs.details }}
+        RELEASE_URL: ${{ inputs.release-url }}
+        RUN_ID: ${{ inputs.run-id || github.run_id }}
+        RUN_ATTEMPT: ${{ inputs.run-attempt || github.run_attempt }}
+        ACTOR: ${{ github.event.workflow_run.triggering_actor.login || github.triggering_actor }}
+        BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+        STARTED_AT: ${{ github.event.workflow_run.run_started_at }}
+        FINISHED_AT: ${{ github.event.workflow_run.updated_at }}
+      run: |
+        RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$RUN_ID"
+        case "$RESULT" in
+          success) status='Succeeded'; icon='✅'; color=3066993 ;;
+          failure) status='Failed'; icon='❌'; color=15158332 ;;
+          cancelled) status='Cancelled'; icon='⚠️'; color=16744272 ;;
+          *) status="$RESULT"; icon='⚠️'; color=16744272 ;;
+        esac
+
+        failed_jobs=''
+        if [[ "$RESULT" == 'failure' ]]; then
+          if ! failed_jobs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '.jobs[] | select(.conclusion == "failure") | "- " + .name'); then
+            failed_jobs='See the workflow run for job details.'
+          fi
+        fi
+
+        duration=''
+        if [[ "$RUN_ID" != "$GITHUB_RUN_ID" && -n "$STARTED_AT" && -n "$FINISHED_AT" ]]; then
+          seconds=$(( $(date -d "$FINISHED_AT" +%s) - $(date -d "$STARTED_AT" +%s) ))
+          duration="$((seconds / 60))m $((seconds % 60))s"
+        fi
+
+        jq -n \
+          --arg title "$icon $PROJECT · $EVENT $status" --argjson color "$color" \
+          --arg repo "$GITHUB_REPOSITORY" --arg version "$VERSION" --arg sha "$SOURCE_SHA" \
+          --arg commit_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$SOURCE_SHA" \
+          --arg run "$RUN_URL" --arg actor "$ACTOR" --arg branch "$BRANCH" \
+          --arg details "$DETAILS" --arg failed "$failed_jobs" --arg release "$RELEASE_URL" \
+          --arg duration "$duration" \
+          'def field($name; $value; $inline): {name: $name, value: $value[0:1024], inline: $inline};
+          {embeds: [{
+            title: $title, url: $run, color: $color, timestamp: (now | todateiso8601),
+            fields: ([
+              field("Repository"; $repo; true),
+              field("Branch"; $branch; true),
+              field("Triggered by"; $actor; true),
+              field("Commit"; ("[" + $sha[0:7] + "](" + $commit_url + ")"); true)
+            ] + (if $version != "" then [field("Version"; $version; true)] else [] end)
+              + (if $duration != "" then [field("Duration"; $duration; true)] else [] end)
+              + (if $failed != "" then [field("Failed jobs"; $failed; false)] else [] end)
+              + (if $details != "" then [field("Details"; $details; false)] else [] end)
+              + (if $release != "" then [field("Release"; ("[View release](" + $release + ")"); true)] else [] end)
+              + [field("Actions"; ("[View run](" + $run + ")"); true)])
+          }]}' \
+          | curl --fail-with-body --silent --show-error --max-time 30 \
+              -H 'Content-Type: application/json' --data-binary @- "$WEBHOOK"
