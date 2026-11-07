@@ -18,158 +18,31 @@ jobs:
     if: >
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'master' &&
-      (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure')
-
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      REPO: ${{ github.repository }}
-      REPO_NAME: ${{ github.event.repository.name }}
-      TZ: America/Boise
-      RUN_ID: ${{ github.event.workflow_run.id }}
-      RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
-      RUN_URL: ${{ github.event.workflow_run.html_url }}
-      RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-      RUN_STARTED_AT: ${{ github.event.workflow_run.run_started_at }}
-      RUN_UPDATED_AT: ${{ github.event.workflow_run.updated_at }}
-      BRANCH: ${{ github.event.workflow_run.head_branch }}
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-      TRIGGERED_BY: ${{ github.event.workflow_run.actor.login }}
-      COMMIT_MESSAGE: ${{ github.event.workflow_run.head_commit.message || github.event.workflow_run.display_title }}
-
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      contains(fromJSON('["success", "failure", "cancelled"]'), github.event.workflow_run.conclusion)
     steps:
-      - name: Check out repository
-        if: env.DISCORD_WEBHOOK_URL != ''
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          fetch-tags: true
-          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
 
-      - name: Fetch release tags
-        if: env.DISCORD_WEBHOOK_URL != ''
-        run: git fetch --force --tags origin
-
-      - name: Collect notification context
-        id: context
-        if: env.DISCORD_WEBHOOK_URL != ''
+      - name: Read published version
+        id: version
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          display_name=$(printf '%s' "$REPO_NAME" | tr '_-' ' ' | awk '{
-            for (i = 1; i <= NF; i++) {
-              $i = toupper(substr($i, 1, 1)) substr($i, 2)
-            }
-            print
-          }')
+          version=$(git tag --points-at "$SOURCE_SHA" --list 'v[0-9]*' --sort=-version:refname | sed -n '1p')
+          printf "value=%s\n" "$version" >> "$GITHUB_OUTPUT"
 
-          short_sha=$(printf '%s' "$HEAD_SHA" | cut -c1-7)
-
-          mapfile -t release_tags < <(git tag --points-at "$HEAD_SHA" --list 'v[0-9]*' --sort=-version:refname)
-          release_tag=${release_tags[0]:-}
-          if [ -z "$release_tag" ]; then
-            release_tag="untagged"
-          fi
-
-          version_label=${release_tag#v}
-          version_display="$release_tag"
-
-          duration_seconds=$(
-            python3 -c 'from datetime import datetime; import os; started = datetime.fromisoformat(os.environ["RUN_STARTED_AT"].replace("Z", "+00:00")); updated = datetime.fromisoformat(os.environ["RUN_UPDATED_AT"].replace("Z", "+00:00")); print(max(0, int((updated - started).total_seconds())))'
-          )
-
-          minutes=$((duration_seconds / 60))
-          seconds=$((duration_seconds % 60))
-          duration="${minutes}m ${seconds}s"
-
-          commit=$(printf '%s' "$COMMIT_MESSAGE" | tr '\n' ' ' | sed 's/[[:space:]][[:space:]]*/ /g' | cut -c1-280)
-          if [ -z "$commit" ]; then
-            commit="No commit message available"
-          fi
-
-          failed_jobs=$(
-            gh api "repos/${REPO}/actions/runs/${RUN_ID}/jobs?per_page=100" \
-              --jq '.jobs[] | select(.conclusion == "failure") | .name' \
-              | paste -sd ', ' -
-          )
-
-          if [ "$RUN_CONCLUSION" = "success" ]; then
-            status_emoji="✅"
-            status_text="Build Succeeded"
-            color=5763719
-          else
-            status_emoji="❌"
-            status_text="Build Failed"
-            color=15548997
-          fi
-
-          if [ -n "$failed_jobs" ]; then
-            failure_field_name="Failed job(s)"
-            failure_field_value="$failed_jobs"
-          else
-            failure_field_name=""
-            failure_field_value=""
-          fi
-
-          {
-            echo "display_name=${display_name}"
-            echo "short_sha=${short_sha}"
-            echo "version=${version_label}"
-            echo "version_label=${version_label}"
-            echo "version_display=${version_display}"
-            echo "duration=${duration}"
-            echo "commit=${commit}"
-            echo "status_emoji=${status_emoji}"
-            echo "status_text=${status_text}"
-            echo "color=${color}"
-            echo "failure_field_name=${failure_field_name}"
-            echo "failure_field_value=${failure_field_value}"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Send Discord notification
-        if: env.DISCORD_WEBHOOK_URL != ''
-        run: |
-          jq -n \
-            --arg username "${{ steps.context.outputs.display_name }}" \
-            --arg title "${{ steps.context.outputs.status_emoji }} ${{ steps.context.outputs.display_name }} — ${{ steps.context.outputs.status_text }}" \
-            --arg url "$RUN_URL" \
-            --arg footer "${{ steps.context.outputs.display_name }} ${{ steps.context.outputs.version_display }} • github.com/${REPO}" \
-            --arg commit_body "> ${{ steps.context.outputs.commit }}" \
-            --arg version "${{ steps.context.outputs.version_label }}" \
-            --arg actor "$TRIGGERED_BY" \
-            --arg branch "$BRANCH" \
-            --arg duration "${{ steps.context.outputs.duration }}" \
-            --arg run_link "[View run]($RUN_URL)" \
-            --arg sha "${{ steps.context.outputs.short_sha }}" \
-            --arg failure_name "${{ steps.context.outputs.failure_field_name }}" \
-            --arg failure_value "${{ steps.context.outputs.failure_field_value }}" \
-            --argjson color "${{ steps.context.outputs.color }}" \
-            '{
-              username: $username,
-              embeds: [
-                {
-                  title: $title,
-                  url: $url,
-                  color: $color,
-                  fields: (
-                    [
-                      {name: "🏷️ Version", value: $version, inline: true},
-                      {name: "👤 Triggered by", value: $actor, inline: true},
-                      {name: "🌿 Branch", value: $branch, inline: true},
-                      {name: "💬 Commit", value: $commit_body, inline: false},
-                      {name: "⏱️ Duration", value: $duration, inline: true},
-                      {name: "🔗 Run", value: $run_link, inline: true},
-                      {name: "SHA", value: $sha, inline: true}
-                    ] + (
-                      if $failure_name != "" then
-                        [{name: $failure_name, value: $failure_value, inline: false}]
-                      else
-                        []
-                      end
-                    )
-                  ),
-                  footer: {text: $footer},
-                  timestamp: now | todateiso8601
-                }
-              ]
-            }' \
-            | curl -fsSL -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
+      - name: Send Discord result
+        uses: ./.github/actions/discord-result
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          project: Cutco Catalog
+          event: Release
+          result: ${{ github.event.workflow_run.conclusion }}
+          sha: ${{ github.event.workflow_run.head_sha }}
+          version: ${{ steps.version.outputs.value }}
+          run-id: ${{ github.event.workflow_run.id }}
+          run-attempt: ${{ github.event.workflow_run.run_attempt }}
