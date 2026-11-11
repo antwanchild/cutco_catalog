@@ -112,7 +112,7 @@ jobs:
           env.DISCORD_WEBHOOK_URL != '' &&
           github.event.action == 'closed' &&
           github.event.pull_request.merged == true &&
-          (env.MERGED_BY == 'github-actions[bot]' || env.MERGED_BY == 'dependabot[bot]')
+          github.event.pull_request.merged_by.type == 'Bot'
         run: |
           content=$(cat <<EOF
           ✅ Dependabot PR #${PR_NUMBER} was auto-merged in ${REPO}.
@@ -134,8 +134,7 @@ jobs:
           env.DISCORD_WEBHOOK_URL != '' &&
           github.event.action == 'closed' &&
           github.event.pull_request.merged == true &&
-          env.MERGED_BY != 'github-actions[bot]' &&
-          env.MERGED_BY != 'dependabot[bot]'
+          github.event.pull_request.merged_by.type != 'Bot'
         run: |
           content=$(cat <<EOF
           ℹ️ Dependabot PR #${PR_NUMBER} was merged manually in ${REPO}.
