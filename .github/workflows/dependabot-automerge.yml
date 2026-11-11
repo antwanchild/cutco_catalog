@@ -15,6 +15,7 @@ jobs:
     if: github.actor == 'dependabot[bot]'
 
     env:
+      MERGE_APP_CONFIGURED: ${{ secrets.DEPENDABOT_MERGE_APP_CLIENT_ID != '' && secrets.DEPENDABOT_MERGE_APP_PRIVATE_KEY != '' }}
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
@@ -24,9 +25,26 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Create GitHub App merge token
+        id: merge-token
+        if: >
+          env.MERGE_APP_CONFIGURED == 'true' &&
+          (steps.meta.outputs.update-type != 'version-update:semver-major')
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.DEPENDABOT_MERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DEPENDABOT_MERGE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Auto-merge non-major updates
         if: steps.meta.outputs.update-type != 'version-update:semver-major'
-        run: gh pr merge --auto --squash "$PR_URL"
+        run: |
+          if [[ "$USING_MERGE_APP" != 'true' ]]; then
+            echo '::warning::Configure the Dependabot merge app secrets to enable Discord alerts after auto-merges.'
+          fi
+          gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.merge-token.outputs.token || secrets.GITHUB_TOKEN }}
+          USING_MERGE_APP: ${{ steps.merge-token.outcome == 'success' }}
