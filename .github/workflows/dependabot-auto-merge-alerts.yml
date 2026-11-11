@@ -1,0 +1,77 @@
+name: Dependabot Auto-Merge Alerts
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: dependabot-auto-merge-alerts
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Discord of completed Dependabot auto-merges
+        uses: actions/github-script@v9
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        with:
+          script: |
+            const repo = context.repo;
+            const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+            const webhook = process.env.DISCORD_WEBHOOK_URL;
+
+            // A GITHUB_TOKEN merge can suppress the pull_request closed event.
+            // Use the merge SHA and PR number to remember successful deliveries.
+            const pages = github.paginate.iterator(github.rest.pulls.list, {
+              ...repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 100,
+            });
+            for await (const { data: pulls } of pages) {
+              for (const pull of pulls) {
+                if (Date.parse(pull.updated_at) < cutoff) return;
+                if (pull.user?.login !== 'dependabot[bot]' ||
+                    !pull.merged_at || Date.parse(pull.merged_at) < cutoff) continue;
+
+                const { data: pr } = await github.rest.pulls.get({
+                  ...repo, pull_number: pull.number,
+                });
+                if (pr.merged_by?.login !== 'github-actions[bot]') continue;
+
+                const sha = pr.merge_commit_sha;
+                const statusContext = `discord/dependabot-auto-merge/${pr.number}`;
+                const { data: { statuses } } = await github.rest.repos.getCombinedStatusForRef({
+                  ...repo, ref: sha, per_page: 100,
+                });
+                if (statuses.some(status => status.context === statusContext &&
+                    status.state === 'success')) continue;
+                if (!webhook) throw new Error('Configure the DISCORD_WEBHOOK_URL Actions secret.');
+
+                const response = await fetch(webhook, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    allowed_mentions: { parse: [] },
+                    embeds: [{
+                      title: '✅ Dependabot PR Auto-Merged',
+                      description: pr.title,
+                      url: pr.html_url,
+                      timestamp: pr.merged_at,
+                      color: 3066993,
+                      footer: { text: `${repo.owner}/${repo.repo} #${pr.number}` },
+                    }],
+                  }),
+                });
+                if (!response.ok) throw new Error(`Discord returned HTTP ${response.status} for PR #${pr.number}.`);
+
+                await github.rest.repos.createCommitStatus({
+                  ...repo, sha, state: 'success', context: statusContext,
+                  description: 'Discord auto-merge notification sent',
+                });
+              }
+            }
