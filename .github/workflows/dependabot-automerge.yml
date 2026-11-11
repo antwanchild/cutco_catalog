@@ -32,7 +32,7 @@ jobs:
           (steps.meta.outputs.update-type != 'version-update:semver-major')
         uses: actions/create-github-app-token@v3
         with:
-          client-id: ${{ secrets.DEPENDABOT_MERGE_APP_CLIENT_ID }}
+          app-id: ${{ secrets.DEPENDABOT_MERGE_APP_CLIENT_ID }}
           private-key: ${{ secrets.DEPENDABOT_MERGE_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
