@@ -151,6 +151,7 @@ jobs:
           trap 'docker logs "$container"; docker rm -f "$container"' EXIT
           endpoint="$(docker port "$container" 8095/tcp)"
           for attempt in {1..30}; do
+            echo "Checking release image health (attempt $attempt/30)"
             if curl --silent --fail --max-time 3 "http://$endpoint/health" |
               jq -e --arg version "$EXPECTED_VERSION" --arg sha "$EXPECTED_SHA" \
                 '.status == "ok" and .version == $version and .git_sha == $sha'; then
