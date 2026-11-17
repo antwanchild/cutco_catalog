@@ -1,0 +1,70 @@
+name: Validate Release Image
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/validate-release-image.yml'
+      - '.github/workflows/release.yml'
+      - '.dockerignore'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - 'app.py'
+      - 'startup.py'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Smoke test and scan image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      IMAGE: cutco-release-validation:local
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the release image locally
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          provenance: false
+          tags: ${{ env.IMAGE }}
+          build-args: |
+            APP_VERSION=pr-validation
+            GIT_SHA=${{ github.sha }}
+
+      - name: Smoke test the release image
+        run: |
+          export SECRET_KEY
+          SECRET_KEY="$(openssl rand -hex 32)"
+          container="$(docker run -d --health-interval=2s --health-start-period=0s -e SECRET_KEY "$IMAGE")"
+          trap 'docker logs "$container"; docker rm -f "$container"' EXIT
+          for attempt in {1..30}; do
+            echo "Waiting for image health check (attempt $attempt/30)"
+            status="$(docker inspect --format '{{.State.Status}} {{.State.Health.Status}}' "$container")"
+            case "$status" in
+              'running healthy') exit 0 ;;
+              'running starting') sleep 2 ;;
+              *) break ;;
+            esac
+          done
+          echo "Container did not become healthy." >&2
+          exit 1
+
+      - name: Scan the release image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          TRIVY_IMAGE_SRC: docker
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 1
