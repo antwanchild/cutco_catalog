@@ -31,6 +31,18 @@ inputs:
   details:
     description: Optional project-specific status or release notes
     required: false
+  release-tag:
+    description: Published GitHub release tag for the change summary
+    required: false
+  image:
+    description: Published image reference shown on success
+    required: false
+  changes-sha:
+    description: Commit to summarize when release notes are unavailable
+    required: false
+  changelog-version:
+    description: Version to summarize from CHANGELOG.md when available
+    required: false
   release-url:
     description: Link to the GitHub release, when available
     required: false
@@ -49,6 +61,10 @@ runs:
         VERSION: ${{ inputs.version }}
         SOURCE_SHA: ${{ inputs.sha }}
         DETAILS: ${{ inputs.details }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+        IMAGE: ${{ inputs.image }}
+        CHANGES_SHA: ${{ inputs.changes-sha || inputs.sha }}
+        CHANGELOG_VERSION: ${{ inputs.changelog-version }}
         RELEASE_URL: ${{ inputs.release-url }}
         RUN_ID: ${{ inputs.run-id || github.run_id }}
         RUN_ATTEMPT: ${{ inputs.run-attempt || github.run_attempt }}
@@ -68,7 +84,10 @@ runs:
         failed_jobs=''
         if [[ "$RESULT" == 'failure' ]]; then
           if ! failed_jobs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs?per_page=100" \
-            --jq '.jobs[] | select(.conclusion == "failure") | "- " + .name'); then
+            --jq '.jobs[] | select(.conclusion == "failure") | . as $job
+              | ([.steps[]? | select(.conclusion == "failure")] | .[0]) as $step
+              | if $step then "- " + $job.name + " → [" + $step.name + "](" + $job.html_url + "#step:" + ($step.number | tostring) + ":1)"
+                else "- [" + $job.name + "](" + $job.html_url + ")" end'); then
             failed_jobs='See the workflow run for job details.'
           fi
         fi
@@ -79,15 +98,39 @@ runs:
           duration="$((seconds / 60))m $((seconds % 60))s"
         fi
 
+        changes=''
+        if [[ "$RESULT" == 'success' ]]; then
+          if [[ -n "$RELEASE_TAG" ]] && release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" 2>/dev/null); then
+            changes=$(jq -r '.body // empty' <<< "$release")
+            RELEASE_URL=$(jq -r '.html_url // empty' <<< "$release")
+          fi
+          if [[ -z "$changes" && -n "$CHANGELOG_VERSION" ]]; then
+            changes=$(gh api "repos/$GITHUB_REPOSITORY/contents/CHANGELOG.md?ref=$SOURCE_SHA" \
+              -H 'Accept: application/vnd.github.raw+json' 2>/dev/null | awk -v version="$CHANGELOG_VERSION" '
+                /^## / {
+                  if (found) exit
+                  found = index($0, "## [" version "]") == 1
+                }
+                found && /^- / { print }
+              ' || true)
+          fi
+          if [[ -z "$changes" ]]; then
+            changes=$(gh api "repos/$GITHUB_REPOSITORY/commits/$CHANGES_SHA" \
+              --jq '.commit.message | split("\n")[0]' 2>/dev/null || true)
+          fi
+        else
+          IMAGE=''
+        fi
+
         jq -n \
           --arg title "$icon $PROJECT · $EVENT $status" --argjson color "$color" \
           --arg repo "$GITHUB_REPOSITORY" --arg version "$VERSION" --arg sha "$SOURCE_SHA" \
           --arg commit_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$SOURCE_SHA" \
           --arg run "$RUN_URL" --arg actor "$ACTOR" --arg branch "$BRANCH" \
           --arg details "$DETAILS" --arg failed "$failed_jobs" --arg release "$RELEASE_URL" \
-          --arg duration "$duration" \
+          --arg duration "$duration" --arg changes "$changes" --arg image "$IMAGE" \
           'def field($name; $value; $inline): {name: $name, value: $value[0:1024], inline: $inline};
-          {embeds: [{
+          {allowed_mentions: {parse: []}, embeds: [{
             title: $title, url: $run, color: $color, timestamp: (now | todateiso8601),
             fields: ([
               field("Repository"; $repo; true),
@@ -96,7 +139,9 @@ runs:
               field("Commit"; ("[" + $sha[0:7] + "](" + $commit_url + ")"); true)
             ] + (if $version != "" then [field("Version"; $version; true)] else [] end)
               + (if $duration != "" then [field("Duration"; $duration; true)] else [] end)
-              + (if $failed != "" then [field("Failed jobs"; $failed; false)] else [] end)
+              + (if $failed != "" then [field("Failure location"; $failed; false)] else [] end)
+              + (if $image != "" then [field("Published image"; $image; false)] else [] end)
+              + (if $changes != "" then [field("What changed"; $changes; false)] else [] end)
               + (if $details != "" then [field("Details"; $details; false)] else [] end)
               + (if $release != "" then [field("Release"; ("[View release](" + $release + ")"); true)] else [] end)
               + [field("Actions"; ("[View run](" + $run + ")"); true)])
