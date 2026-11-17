@@ -44,5 +44,7 @@ jobs:
           result: ${{ github.event.workflow_run.conclusion }}
           sha: ${{ github.event.workflow_run.head_sha }}
           version: ${{ steps.version.outputs.value }}
+          release-tag: ${{ steps.version.outputs.value }}
+          image: ghcr.io/${{ github.repository }}:latest
           run-id: ${{ github.event.workflow_run.id }}
           run-attempt: ${{ github.event.workflow_run.run_attempt }}
