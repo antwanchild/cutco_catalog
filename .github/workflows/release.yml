@@ -164,3 +164,28 @@ jobs:
 
           echo "Could not create or verify release ${RELEASE_TAG}." >&2
           exit 1
+
+  notify-manual-release:
+    name: Notify Discord of manual release
+    if: always() && github.event_name == 'workflow_dispatch'
+    needs: [auto-tag, build]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Send Discord result
+        uses: ./.github/actions/discord-result
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          project: Cutco Catalog
+          event: Release
+          result: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || needs.build.result }}
+          sha: ${{ needs.auto-tag.outputs.release_sha || github.sha }}
+          version: ${{ needs.auto-tag.outputs.new_tag }}
+          release-tag: ${{ needs.auto-tag.outputs.new_tag }}
+          image: ghcr.io/${{ github.repository }}:latest
