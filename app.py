@@ -652,5 +652,14 @@ def create_app(test_config: dict | None = None) -> Flask:
     return app
 
 
+def create_preloaded_app() -> Flask:
+    """Initialize the app before Gunicorn forks its workers."""
+    app = create_app()
+    with app.app_context():
+        # Each worker needs its own connections, separate from startup.
+        db.engine.dispose()
+    return app
+
+
 if __name__ == "__main__":
     create_app().run(host="0.0.0.0", port=8080, debug=False)
