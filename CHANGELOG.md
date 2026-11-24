@@ -247,4 +247,3 @@ Back up the database before upgrading; this release leaves existing authenticati
 - Prevent catalog sync background jobs from stalling. ([#38](https://github.com/antwanchild/cutco_catalog/pull/38))
 
 [Release details](https://github.com/antwanchild/cutco_catalog/releases/tag/v1.101.25)
-
