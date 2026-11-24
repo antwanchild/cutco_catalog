@@ -1,0 +1,30 @@
+name: Changelog
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  notes:
+    name: Validate release notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate the next release section
+        env:
+          RELEASE_COMMIT_MSG: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA"...HEAD | grep -qv '\.md$'; then
+            bash scripts/release_tag.sh --check
+          else
+            echo "Markdown-only PR: notes may remain under Unreleased."
+          fi

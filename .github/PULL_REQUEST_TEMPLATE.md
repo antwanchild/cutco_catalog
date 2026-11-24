@@ -17,11 +17,15 @@
 ## Changelog
 
 - [ ] Added a user-facing entry under `Unreleased` in `CHANGELOG.md`
+- [ ] Finalized the expected version section in this PR (required for release-producing changes)
 - [ ] No entry needed (explain why below)
-<!-- Select one. Every release-producing PR needs an entry, including dependency
+<!-- Add an entry and finalize it for release-producing PRs, or explain why no
+entry is needed. Every release-producing PR needs an entry, including dependency
 updates. Use Added, Changed, Deprecated, Removed, Fixed, Security, or Docs as
-appropriate. Leave version numbers and release dates to the release workflow.
-See RELEASING.md for details. -->
+appropriate. Before merging a release-producing PR, finalize Unreleased for the
+version calculated from the intended squash title and latest release tag. Commit
+the dated section here and rerun the read-only release check. Refresh it if another
+release merges first. See RELEASING.md for commands. -->
 
 ## Related documentation
 

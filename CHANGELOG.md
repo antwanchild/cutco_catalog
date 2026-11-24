@@ -10,6 +10,13 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.0.40] - 2026-11-24
+
+### Fixed
+
+- Publish release tags from the approved commit without pushing changelog commits
+  directly to protected master. Validate finalized release notes before tagging.
+
 ### Docs
 
 - Add shared coding-agent guidance and a Claude entry point, and refresh local
