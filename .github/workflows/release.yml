@@ -185,11 +185,24 @@ jobs:
             docker push "$tag"
           done <<< "$IMAGE_TAGS"
 
+      - name: Extract curated release notes
+        env:
+          RELEASE_TAG: ${{ needs.auto-tag.outputs.new_tag }}
+        run: |
+          # Historical repair tags predate the curated changelog.
+          if [ -f scripts/changelog.py ] && [ -f CHANGELOG.md ]; then
+            python3 scripts/changelog.py notes "$RELEASE_TAG" --output "$RUNNER_TEMP/release-notes.md"
+          fi
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.auto-tag.outputs.new_tag }}
         run: |
+          notes_args=(--generate-notes)
+          if [ -f "$RUNNER_TEMP/release-notes.md" ]; then
+            notes_args=(--notes-file "$RUNNER_TEMP/release-notes.md")
+          fi
           for attempt in 1 2 3 4 5; do
             if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
               echo "Release ${RELEASE_TAG} already exists."
@@ -199,7 +212,7 @@ jobs:
             if output=$(gh release create "$RELEASE_TAG" \
               --verify-tag \
               --title "$RELEASE_TAG" \
-              --generate-notes 2>&1); then
+              "${notes_args[@]}" 2>&1); then
               echo "$output"
               exit 0
             fi

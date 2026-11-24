@@ -725,6 +725,9 @@ Shared logic lives in `models.py`, `helpers.py`, `scraping.py`, `msrp_helpers.py
 
 ## 💻 Development
 
+See [CHANGELOG.md](CHANGELOG.md) for release history and
+[RELEASING.md](RELEASING.md) for changelog and versioning conventions.
+
 ```bash
 # Install dependencies
 pip install -r requirements.txt
