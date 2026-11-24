@@ -10,6 +10,12 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+### Docs
+
+- Add shared coding-agent guidance and a Claude entry point, and refresh local
+  development commands and architecture references. Prompt PR authors to review
+  related documentation and keep shared agent guidance current.
+
 ### Changed
 
 - Publish curated release notes grouped by change type, with dated version history

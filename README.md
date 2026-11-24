@@ -695,13 +695,13 @@ named sessions.
 
 | Layer | Technology |
 |---|---|
-| 🐍 Backend | Python 3.13, Flask 3.1 |
+| 🐍 Backend | Flask 3.1; Python 3.13 in CI (runtime version in `Dockerfile`) |
 | 🗄️ Database | SQLite (via SQLAlchemy) |
 | 🚀 App Server | Gunicorn (4 workers) |
 | 🕷️ Scraping | Requests, BeautifulSoup4, lxml |
 | 📊 Charts | Chart.js (CDN, no extra dependency) |
 | 📥 Excel Import | openpyxl |
-| 🐳 Container | Docker (`python:3.13-slim`) |
+| 🐳 Container | Docker (Python base image pinned in `Dockerfile`) |
 | 🎨 Frontend | Jinja2 templates, vanilla CSS/JS |
 
 ---
@@ -717,9 +717,13 @@ Routes are split across Flask Blueprints for maintainability:
 | `logs` | `/sharpening`, `/cookware`, `/tasks`, `/tasks/manage` |
 | `views` | `/views/matrix`, `/stats` |
 | `data` | `/import`, `/export` |
-| `admin` | `/admin/*`, `/api/variants` |
+| `admin` | Authentication, diagnostics, jobs, and `/api/variants` |
+| `user_admin` | `/admin/users` |
 
-Shared logic lives in `models.py`, `helpers.py`, `scraping.py`, `msrp_helpers.py`, and `constants.py`. `app.py` is the thin factory that wires everything together.
+Shared logic lives in `models.py`, `helpers.py`, `scraping.py`, and `constants.py`.
+MSRP extraction, comparison, and background work live in `msrp_scrape.py`,
+`msrp_diff.py`, and `msrp_jobs.py`. `app.py` wires the application together;
+`schema_migrations.py` and `startup.py` manage database upgrades and initialization.
 
 ---
 
@@ -727,17 +731,29 @@ Shared logic lives in `models.py`, `helpers.py`, `scraping.py`, `msrp_helpers.py
 
 See [CHANGELOG.md](CHANGELOG.md) for release history and
 [RELEASING.md](RELEASING.md) for changelog and versioning conventions.
+[AGENTS.md](AGENTS.md) contains shared coding-agent guidance;
+[CLAUDE.md](CLAUDE.md) imports it for Claude.
+
+CI uses the Python version in `.github/workflows/validation.yml`. The Docker
+runtime version is defined separately in `Dockerfile`.
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-pip install ruff
+# Create an isolated environment and install development dependencies
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
 
-# Run locally
-flask --app app:create_app run --debug
+# Run locally with a disposable data directory
+# Set SECRET_KEY and INITIAL_SETUP_TOKEN in your environment for local setup.
+DATA_DIR="$PWD/data" AUTH_MODE=local flask --app app:create_app run --debug
 
-# Lint
-ruff check app.py blueprints/ models.py helpers.py scraping.py msrp_helpers.py constants.py
+# Lint, formatting, and types
+ruff check .
+black --check .
+pyright
+
+# Tests
+python -m unittest discover -s tests -p 'test_*.py'
 ```
 
 The database is created automatically on first run. All schema migrations are applied at startup — no migration tool required.
