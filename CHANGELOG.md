@@ -10,6 +10,14 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.0.41] - 2026-11-24
+
+### Fixed
+
+- Show release-note section names as bold labels in Discord notifications and join
+  wrapped bullet lines for cleaner spacing. Preserve full notes in GitHub releases.
+- Explicitly select separate editor schemas for composite actions and workflows.
+
 ## [v3.0.40] - 2026-11-24
 
 ### Fixed

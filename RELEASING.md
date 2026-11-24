@@ -94,6 +94,9 @@ section containing at least one bullet, then tags the approved commit and pushes
 only that tag. Missing notes fail before tag creation or image publication. The
 image and GitHub release notes come from the tagged commit. Existing releases are
 left untouched on reruns; branch protection stays enabled without a bot bypass.
+Discord notifications format Markdown headings as bold section labels and join
+soft-wrapped prose and bullets for embed display. GitHub release notes retain
+the original Markdown.
 The `Changelog` PR workflow validates the intended squash title against current
 tags for PRs containing non-Markdown changes. Changing the title reruns that check.
 

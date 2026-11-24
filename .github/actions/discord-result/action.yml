@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-action.json
 name: Discord workflow result
 description: Send a consistent build or release result to Discord
 inputs:
@@ -111,7 +112,7 @@ runs:
                   if (found) exit
                   found = index($0, "## [" version "]") == 1
                 }
-                found && /^- / { print }
+                found && !/^## / { print }
               ' || true)
           fi
           if [[ -z "$changes" ]]; then
@@ -120,6 +121,10 @@ runs:
           fi
         else
           IMAGE=''
+        fi
+
+        if [[ -n "$changes" ]]; then
+          changes=$(printf '%s' "$changes" | python3 "$GITHUB_ACTION_PATH/format_notes.py")
         fi
 
         jq -n \
