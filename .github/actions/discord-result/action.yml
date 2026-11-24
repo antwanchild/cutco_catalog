@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-action.json
 name: Discord workflow result
 description: Send a consistent build or release result to Discord
 inputs:
