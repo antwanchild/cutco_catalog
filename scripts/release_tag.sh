@@ -57,8 +57,12 @@ if git rev-parse -q --verify "refs/tags/${NEW_TAG}" >/dev/null; then
   echo "Tag ${NEW_TAG} already exists on this commit; skipping tag creation."
   RERUN=true
 else
+  python3 scripts/changelog.py finalize "$NEW_TAG"
+  git add CHANGELOG.md
+  git commit -m "docs: finalize changelog for ${NEW_TAG}"
   git tag "$NEW_TAG"
-  git push origin "$NEW_TAG"
+  # Publish the finalized changelog and its tag together; reject concurrent updates.
+  git push --atomic origin HEAD:master "refs/tags/${NEW_TAG}"
   RERUN=false
 fi
 
