@@ -77,29 +77,30 @@ configuration, or database changes, explain what an existing installation must
 do and any rollback limitations. Do not use commit titles as a substitute for
 release notes.
 
-The release job keeps the existing version calculation. Before tagging, it:
+Release preparation happens in the reviewed PR; the release job never commits
+or pushes to `master`. After updating Unreleased:
 
-1. Requires at least one Unreleased bullet.
-2. Moves those entries into a section named `## [vX.Y.Z] - YYYY-MM-DD` using
-   the UTC release date, leaving a fresh Unreleased section.
-3. Commits that changelog update and atomically pushes the commit to `master`
-   with its release tag. A concurrent branch update causes the push to fail
-   rather than publishing a tag with an unrecorded changelog update.
-4. Builds the tagged commit and uses its version section as the GitHub release
-   body. Existing releases are left untouched on reruns.
+1. Fetch current tags (`git fetch origin master --tags`) and determine the next
+   version using the intended squash commit title and the version bump rules above.
+2. Run `python3 scripts/changelog.py finalize vX.Y.Z` to move Unreleased into a
+   dated version section (UTC preparation date). Commit the result in the PR.
+3. Validate without creating tags or pushing:
+   `RELEASE_COMMIT_MSG="fix: your intended squash title" bash scripts/release_tag.sh --check`.
+4. Merge the PR with that squash title after checks pass. If another release merges
+   first, update the pending section's version and revalidate before merging.
 
-The workflow token must be allowed to push the changelog commit to `master`;
-branch protection must permit that workflow if protection is enabled. Pushes
-using `GITHUB_TOKEN` do not trigger another release workflow run. If a concurrent
-push rejects publication, rerun from the latest master commit.
+The release workflow calculates the version as before, requires a matching version
+section containing at least one bullet, then tags the approved commit and pushes
+only that tag. Missing notes fail before tag creation or image publication. The
+image and GitHub release notes come from the tagged commit. Existing releases are
+left untouched on reruns; branch protection stays enabled without a bot bypass.
+The `Changelog` PR workflow validates the intended squash title against current
+tags for PRs containing non-Markdown changes. Changing the title reruns that check.
 
-To preview finalization without modifying the repository changelog:
-
-```bash
-cp CHANGELOG.md /tmp/cutco-changelog-preview.md
-python3 scripts/changelog.py finalize v999.0.0 --changelog /tmp/cutco-changelog-preview.md
-python3 scripts/changelog.py notes v999.0.0 --changelog /tmp/cutco-changelog-preview.md
-```
+Markdown-only PRs may leave entries in Unreleased until the next release-producing
+PR. Do not run `scripts/release_tag.sh` without `--check` for local validation.
+A failed run from before this fix still uses the old script; merge this fix to
+start a new release run rather than rerunning the old commit.
 
 Historical repair tags without the changelog tooling retain GitHub-generated
 notes. The changelog includes a selective historical backfill verified against published

@@ -13,7 +13,7 @@ def release_notes(text: str, tag: str) -> str:
         text,
         re.MULTILINE | re.DOTALL,
     )
-    if match is None or not match.group(1).strip():
+    if match is None or not re.search(r"^- \S", match.group(1), re.MULTILINE):
         raise ValueError(f"No curated notes found for {tag}")
     return match.group(1).strip() + "\n"
 

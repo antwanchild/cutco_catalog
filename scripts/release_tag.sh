@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-COMMIT_MSG=$(git log -1 --pretty=%B)
-mapfile -t HEAD_TAGS < <(git tag --points-at HEAD --list 'v[0-9]*' --sort=-version:refname)
-HEAD_TAG=${HEAD_TAGS[0]:-}
+COMMIT_MSG=${RELEASE_COMMIT_MSG:-$(git log -1 --pretty=%B)}
+HEAD_TAG=$(git tag --points-at HEAD --list 'v[0-9]*' --sort=-version:refname | sed -n '1p')
 
 if [ -n "$HEAD_TAG" ]; then
   echo "Head already has release tag ${HEAD_TAG}; skipping tag creation."
@@ -25,8 +24,7 @@ if [ -n "$HEAD_TAG" ]; then
   exit 0
 fi
 
-mapfile -t TAGS < <(git tag --list 'v[0-9]*' --sort=-version:refname)
-LAST_TAG=${TAGS[0]:-}
+LAST_TAG=$(git tag --list 'v[0-9]*' --sort=-version:refname | sed -n '1p')
 LAST_TAG=${LAST_TAG:-v0.0.0}
 VERSION=${LAST_TAG#v}
 IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
@@ -43,7 +41,17 @@ else
 fi
 
 NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
-echo "Tagging as ${NEW_TAG}"
+echo "Next release: ${NEW_TAG}"
+
+# Notes must already be approved in the PR; never write to protected master.
+if ! python3 scripts/changelog.py notes "$NEW_TAG" >/dev/null; then
+  echo "Finalize CHANGELOG.md for ${NEW_TAG} in the PR before merging." >&2
+  exit 1
+fi
+if [ "${1:-}" = "--check" ]; then
+  echo "Curated notes verified for ${NEW_TAG}; no refs changed."
+  exit 0
+fi
 
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -57,12 +65,8 @@ if git rev-parse -q --verify "refs/tags/${NEW_TAG}" >/dev/null; then
   echo "Tag ${NEW_TAG} already exists on this commit; skipping tag creation."
   RERUN=true
 else
-  python3 scripts/changelog.py finalize "$NEW_TAG"
-  git add CHANGELOG.md
-  git commit -m "docs: finalize changelog for ${NEW_TAG}"
   git tag "$NEW_TAG"
-  # Publish the finalized changelog and its tag together; reject concurrent updates.
-  git push --atomic origin HEAD:master "refs/tags/${NEW_TAG}"
+  git push origin "refs/tags/${NEW_TAG}"
   RERUN=false
 fi
 
@@ -78,5 +82,5 @@ fi
   echo "- Commit message: ${COMMIT_MSG}"
   echo "- Previous tag: ${LAST_TAG}"
   echo "- Computed tag: ${NEW_TAG}"
-  echo "- Rerun: $( [ \"$RERUN\" = "true" ] && echo yes || echo no )"
+  echo "- Rerun: $( [ "$RERUN" = "true" ] && echo yes || echo no )"
 } >> "$GITHUB_STEP_SUMMARY"

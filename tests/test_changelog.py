@@ -31,6 +31,10 @@ class ChangelogTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             release_notes("## [v1.0.10] - 2026-01-01\n- Other release.\n", "v1.0.1")
 
+    def test_heading_only_release_notes_fail(self):
+        with self.assertRaises(ValueError):
+            release_notes("## [v1.0.1] - 2026-11-24\n\n### Fixed\n", "v1.0.1")
+
     def test_invalid_tag_fails(self):
         with self.assertRaises(ValueError):
             finalize("## [Unreleased]\n- Fix.\n", "invalid", "2026-11-24")

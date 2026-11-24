@@ -94,13 +94,16 @@ dependency updates. Use only relevant categories and explain required upgrade
 steps for breaking configuration, authentication, or schema changes. Markdown-only
 work can add a Docs entry for the next release.
 
-Leave release versions, dates, and finalized sections to the release workflow.
+Before merging a release-producing PR, finalize Unreleased into the expected
+version section using `scripts/changelog.py finalize vX.Y.Z`. Commit that change
+in the PR. Run `RELEASE_COMMIT_MSG="<squash title>" bash scripts/release_tag.sh --check`
+to validate the expected version without pushing. Refresh the version if another
+release merges first. See `RELEASING.md` for the preparation process.
 Use Conventional Commit titles: `feat:` for new user capabilities, `fix:` for
 corrections, and `feat!:` or a `BREAKING CHANGE:` footer for breaking changes.
 Other non-documentation-only changes currently also produce patch releases.
-Do not manually run `scripts/release_tag.sh` for validation: it commits and pushes
-to master and creates a release tag. Use the disposable changelog preview described
-in `RELEASING.md` instead.
+Do not run `scripts/release_tag.sh` without `--check` for local validation:
+it creates and pushes a release tag. The `--check` mode is read-only.
 
 When changing shared agent guidance, edit this file. Keep `CLAUDE.md` as the small
 entry point that imports it, and keep README development instructions consistent.
