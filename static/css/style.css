@@ -683,6 +683,18 @@ a:hover { text-decoration: underline; }
   z-index: 35;
 }
 
+.import-selection-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .35rem 1rem;
+}
+
+.import-sku-filter {
+  margin: 0;
+}
+
 .import-accept-checkbox {
   display: inline-block;
   margin: 0 auto;
