@@ -511,11 +511,6 @@ def import_page():
             "import_page.html", people=Person.query.order_by(Person.name).all()
         )
 
-    if person_override:
-        for row in parsed_rows:
-            row["owned_raw"] = row.get("owned_raw", "yes")
-            row["_person_override"] = person_override
-
     existing_items = _build_item_sku_lookup(Item.query.all())
     existing_set_skus = _build_set_sku_lookup(Set.query.all())
     existing_names = _build_item_name_lookup(
@@ -594,9 +589,7 @@ def import_page():
             continue
         notes = note_text or row.get("notes", "").strip() or None
         owned_raw = row.get("owned_raw", row.get("status", "yes"))
-        status, person_name = _parse_owned_raw(
-            owned_raw, row.get("_person_override") or row.get("person", "")
-        )
+        status, person_name = _parse_owned_raw(owned_raw, row.get("person", ""))
 
         if person_override:
             person_name = person_override

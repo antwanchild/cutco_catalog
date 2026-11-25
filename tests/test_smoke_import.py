@@ -780,7 +780,9 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Price: 12.50", response.data)
         self.assertIn(b"Rep only", response.data)
         self.assertIn(b"badge-off-catalog", response.data)
-        self.assertIn(b"item + own", response.data)
+        self.assertIn(b"item + collection", response.data)
+        self.assertIn(b'name="item_person_0" value="Collector Two"', response.data)
+        self.assertIn(b'<option value="Wishlist" selected>', response.data)
         self.assertIn(b'item_quantity_purchased_0" value="4"', response.data)
         self.assertIn(b'item_quantity_given_away_0" value="2"', response.data)
         self.assertIn(b'own_quantity_purchased_0" value="2"', response.data)
@@ -790,6 +792,30 @@ class ImportSmokeTests(SmokeBaseTest):
         self.assertIn(b"Given Away", response.data)
         self.assertNotIn(b"Gift Box:", response.data)
         self.assertNotIn(b"Sheath:", response.data)
+
+    def test_import_person_override_preserves_status_column(self):
+        self._login_as_admin()
+        self._set_csrf_token()
+        self._add_person(name="Collector", notes="")
+
+        response = self.client.post(
+            "/import",
+            data={
+                "mode": "preview",
+                "csrf_token": "test-csrf-token",
+                "person_override": "Collector",
+                "csvfile": (
+                    BytesIO(b"name,sku,status\nWishlist Knife,WK-1,Wishlist\n"),
+                    "wishlist.csv",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'name="item_person_0" value="Collector"', response.data)
+        self.assertIn(b'<option value="Wishlist" selected>', response.data)
+        self.assertNotIn(b'<option value="Owned" selected>', response.data)
 
     def test_import_preview_rejects_decimal_quantity_values(self):
         self._login_as_admin()

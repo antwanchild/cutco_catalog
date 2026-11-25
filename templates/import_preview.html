@@ -122,7 +122,7 @@
           <td>
             <input type="text" name="item_person_{{ item.form_index }}" value="{{ item.person or '' }}" class="input-xs">
             {% if item.person %}
-              <span class="badge badge-info badge-mini" title="Accepting this row creates both a catalog item and ownership">item + own</span>
+              <span class="badge badge-info badge-mini" title="Accepting this row adds a catalog item and a collection entry with the selected status">item + collection</span>
             {% endif %}
           </td>
           <td>
