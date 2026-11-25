@@ -10,6 +10,13 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.0.45] - 2026-11-25
+
+### Fixed
+
+- Preserve Wishlist and other collection statuses in spreadsheet imports, even
+  when assigning rows to a collector, and clarify the preview label.
+
 ## [v3.0.44] - 2026-11-25
 
 ### Fixed

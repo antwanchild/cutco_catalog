@@ -21,6 +21,7 @@ from blueprints.import_shared import (
     _resolve_import_variant_color,  # noqa: F401
     _safe_csv_filename,  # noqa: F401
 )
+from constants import STATUS_OPTIONS
 from models import Item
 
 
@@ -28,9 +29,13 @@ from models import Item
 def _parse_owned_raw(owned_raw: str, default_person: str | None):
     """Parse 'Owned?' cell. Returns (status, person_name)."""
     raw_value = owned_raw.strip()
-    if raw_value.lower() in {"yes", "y", "true", "1"}:
+    normalized_value = raw_value.casefold()
+    for status in STATUS_OPTIONS:
+        if normalized_value == status.casefold():
+            return status, default_person
+    if normalized_value in {"yes", "y", "true", "1"}:
         return "Owned", default_person
-    if raw_value.lower() in {"no", "n", "false", "0", ""}:
+    if normalized_value in {"no", "n", "false", "0", "", "not owned"}:
         return "Wishlist", default_person
     return "Owned", raw_value or default_person
 
