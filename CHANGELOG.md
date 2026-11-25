@@ -10,6 +10,13 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.2.0] - 2026-11-25
+
+### Added
+
+- Filter the import preview to rows missing a SKU from the sticky summary bar.
+  The filter keeps existing import selections and reports hidden selected rows.
+
 ## [v3.1.1] - 2026-11-25
 
 ### Fixed

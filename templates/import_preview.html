@@ -6,9 +6,15 @@
   <a href="{{ url_for('data.import_page') }}" class="btn btn-ghost">← Back</a>
 </div>
 
-<p id="import-selection-summary" class="flash flash-info import-selection-summary" role="status" hidden>
-  <strong>Selected for import:</strong> <span></span>
-</p>
+<div id="import-selection-summary" class="flash flash-info import-selection-summary" hidden>
+  <div class="import-selection-controls">
+    <span role="status"><strong>Selected for import:</strong> <span id="import-selection-counts"></span></span>
+    <label class="checkbox-label import-sku-filter">
+      <input type="checkbox" id="import-missing-sku-only"> Missing SKU only
+    </label>
+  </div>
+  <p id="import-sku-filter-status" role="status" class="small" hidden></p>
+</div>
 
 {% if errors %}
 <div class="flash flash-error">
@@ -34,6 +40,7 @@
 </div>
 
 {% macro render_grouped_item_section(title, rows, groups, intro, offset, checked_by_default=True, show_set_badge=False) %}
+<section class="import-filter-section">
 <h2>{{ title }} ({{ rows | length }})</h2>
 <p class="muted">{{ intro }}</p>
 <p class="muted small">Same SKU rows are grouped together here, but each row still confirms separately so variant-specific values stay intact.</p>
@@ -147,9 +154,11 @@
   </div>
 </details>
 {% endfor %}
+</section>
 {% endmacro %}
 
 {% macro render_grouped_ownership_section(title, rows, groups, intro) %}
+<section class="import-filter-section">
 <h2>{{ title }} ({{ rows | length }})</h2>
 <p class="muted">{{ intro }}</p>
 <p class="muted small">Same SKU rows are grouped together here, but each row still confirms separately so variant-specific quantities stay intact.</p>
@@ -255,6 +264,7 @@
   </div>
 </details>
 {% endfor %}
+</section>
 {% endmacro %}
 
 {% if already_in_catalog %}
@@ -361,6 +371,7 @@
 
   {# ── Set Rows ───────────────────────────────────────────────────────── #}
   {% if set_rows %}
+  <section class="import-filter-section">
   <h2>Set Rows ({{ set_rows | length }})</h2>
   <p class="muted">Rows with <code>set_members</code> create or update sets. Member SKUs are linked after item rows in the same file are processed.</p>
   <div class="table-wrap">
@@ -404,6 +415,7 @@
       </tbody>
     </table>
   </div>
+  </section>
   {% endif %}
 
   {# ── Ownership Entries ──────────────────────────────────────────────── #}
@@ -433,17 +445,50 @@
 (() => {
   const form = document.getElementById('import-confirm-form');
   const summary = document.getElementById('import-selection-summary');
-  const summaryText = summary.querySelector('span');
+  const summaryText = document.getElementById('import-selection-counts');
+  const missingSkuOnly = document.getElementById('import-missing-sku-only');
+  const filterStatus = document.getElementById('import-sku-filter-status');
   const navbar = document.querySelector('.navbar');
   const rows = Array.from(form.querySelectorAll('.import-accept-checkbox'), checkbox => {
     const row = checkbox.closest('tr');
     return {
       checkbox,
+      row,
+      sku: row.querySelector('[name^="item_sku_"], [name^="own_item_sku_"], [name^="set_sku_"]').value.trim(),
+      group: row.closest('.import-sku-group'),
+      section: row.closest('.import-filter-section'),
       owner: row.querySelector('[name^="item_person_"], [name^="own_person_"]'),
       status: row.querySelector('[name^="item_status_"], [name^="own_status_"]'),
       unicornFlags: row.querySelectorAll('input[name*="_unicorn_"]')
     };
   });
+
+  const filterContainers = new Set(rows.flatMap(({group, section}) => group ? [group, section] : [section]));
+
+  function updateFilter() {
+    const visibleContainers = new Set();
+    let visibleRows = 0;
+    let hiddenSelected = 0;
+    for (const {row, checkbox, sku, group, section} of rows) {
+      row.hidden = missingSkuOnly.checked && Boolean(sku);
+      if (row.hidden) {
+        if (checkbox.checked) hiddenSelected++;
+      } else {
+        visibleRows++;
+        visibleContainers.add(section);
+        if (group) visibleContainers.add(group);
+      }
+    }
+    for (const container of filterContainers) container.hidden = !visibleContainers.has(container);
+
+    const messages = [];
+    if (missingSkuOnly.checked && !visibleRows) messages.push('No rows are missing a SKU.');
+    if (hiddenSelected === 1) messages.push('1 hidden row is still selected for import.');
+    if (hiddenSelected > 1) messages.push(`${hiddenSelected} hidden rows are still selected for import.`);
+    const message = messages.join(' ');
+    if (filterStatus.textContent !== message) filterStatus.textContent = message;
+    filterStatus.hidden = !message;
+  }
 
   function updateSummary() {
     const counts = new Map([
@@ -467,12 +512,20 @@
     if (summaryText.textContent !== text) summaryText.textContent = text;
   }
 
-  form.addEventListener('change', updateSummary);
+  missingSkuOnly.addEventListener('change', updateFilter);
+  form.addEventListener('change', () => {
+    updateSummary();
+    if (missingSkuOnly.checked) updateFilter();
+  });
   form.addEventListener('input', event => {
     if (event.target.matches('[name^="item_person_"]')) updateSummary();
   });
-  window.addEventListener('pageshow', updateSummary);
+  window.addEventListener('pageshow', () => {
+    updateSummary();
+    updateFilter();
+  });
   updateSummary();
+  updateFilter();
   if (rows.length) {
     const updateSummaryOffset = () => {
       summary.style.setProperty('--import-summary-top', `${navbar.offsetHeight}px`);
