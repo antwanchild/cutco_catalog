@@ -182,7 +182,7 @@ To block specific categories from ever appearing in the sync preview, set `SYNC_
 SYNC_BLOCKED_CATEGORIES=Tableware,Accessories
 ```
 
-Variant color maintenance lives on a separate **Variant Sync** page. It scans product pages for color options, previews `existing` / `create` / `not seen in sync` states, and only creates missing variants. Missing variants are retained so possible unicorn colors are not deleted by accident. You can open it from the catalog page or the More menu.
+Variant color maintenance lives on a separate **Variant Sync** page. It scans product pages for color options, previews `existing` / `create` / `not seen in sync` states, and creates missing variants. Explicitly limited product colors are saved under their color names and marked as unicorns, including existing matches. Missing variants are retained so possible unicorn colors are not deleted by accident. You can open it from the catalog page or the More menu.
 
 ## 🔐 Public vs Private Pages
 

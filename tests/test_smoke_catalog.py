@@ -1217,15 +1217,25 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertIsNotNone(current_details)
         self.assertFalse(current_details.has_attr("open"))
 
-    def test_variant_sync_keeps_purple_as_a_regular_product_color(self):
+    def test_variant_sync_applies_limited_labels_without_changing_regular_colors(self):
         self._login_as_admin()
         self._set_csrf_token()
         item_id, _unknown_variant_id = self._add_catalog_item(
             name="Purple Handle Knife", sku="PURPLE-1"
         )
 
+        with self.app.app_context():
+            db.session.add(ItemVariant(item_id=item_id, color="Blue"))
+            db.session.commit()
+
         with mock.patch(
-            "blueprints.data.scrape_item_variant_colors", return_value=("Purple",)
+            "blueprints.data.scrape_item_variant_colors",
+            return_value=(
+                "Purple",
+                "Orange Camo",
+                "Limited Orange Camo",
+                "Blue (Limited Edition)",
+            ),
         ):
             preview_response = self.client.post(
                 "/variant-sync",
@@ -1237,6 +1247,9 @@ class CatalogSmokeTests(SmokeBaseTest):
                 content_type="multipart/form-data",
             )
 
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertIn(b"Unicorn", preview_response.data)
+        self.assertNotIn(b"Limited Orange Camo", preview_response.data)
         soup = BeautifulSoup(preview_response.data, "html.parser")
         preview_json_input = soup.select_one('input[name="preview_json"]')
         self.assertIsNotNone(preview_json_input)
@@ -1252,8 +1265,10 @@ class CatalogSmokeTests(SmokeBaseTest):
         self.assertEqual(confirm_response.status_code, 200)
         with self.app.app_context():
             item = db.session.get(Item, item_id)
-            self.assertEqual([variant.color for variant in item.variants], ["Purple"])
-            self.assertFalse(item.variants[0].is_unicorn)
+            self.assertEqual(
+                {variant.color: variant.is_unicorn for variant in item.variants},
+                {"Purple": False, "Orange Camo": True, "Blue": True},
+            )
 
     def test_variant_sync_background_start_renders_live_progress(self):
         self._login_as_admin()

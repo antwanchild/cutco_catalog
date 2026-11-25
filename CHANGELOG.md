@@ -10,6 +10,13 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.0.44] - 2026-11-25
+
+### Fixed
+
+- Save explicitly limited product colors under their actual color names and flag
+  them as variant unicorns when confirming Variant Sync.
+
 ## [v3.0.43] - 2026-11-25
 
 ### Fixed

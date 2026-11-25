@@ -64,6 +64,7 @@ _VARIANT_CONFIRM_ITEM_FIELDS = (
     "skip_reason",
     "scraped_url",
     "create_colors",
+    "limited_colors",
     "retained_colors",
     "remove_options",
     "reclassify_options",
@@ -674,26 +675,46 @@ def variant_sync_confirm():
                 item.cutco_url = scraped_url
 
             existing_real = {
-                variant.color.lower()
+                variant.color.casefold(): variant
                 for variant in item.variants
                 if variant.color != UNKNOWN_COLOR
             }
+            limited_colors = {
+                color.casefold() for color in preview_item.get("limited_colors", [])
+            }
+            flagged_variant = False
+            for key in limited_colors & existing_real.keys():
+                variant = existing_real[key]
+                if not variant.is_unicorn:
+                    variant.is_unicorn = True
+                    flagged_variant = True
+
             create_colors = []
             for color in preview_item.get("create_colors", []):
                 color_value = (color or "").strip()
                 if not color_value:
                     continue
-                if color_value.lower() in existing_real:
+                key = color_value.casefold()
+                if key in existing_real:
                     retained_variants += 1
                     continue
                 variant = ItemVariant(
-                    item=item, color=color_value, source="variant_sync"
+                    item=item,
+                    color=color_value,
+                    is_unicorn=key in limited_colors,
+                    source="variant_sync",
                 )
                 db.session.add(variant)
+                existing_real[key] = variant
                 create_colors.append(color_value)
                 created_variants += 1
             retained_variants += len(preview_item.get("retained_colors", []))
-            if create_colors or preview_item.get("retained_colors") or url_changed:
+            if (
+                create_colors
+                or flagged_variant
+                or preview_item.get("retained_colors")
+                or url_changed
+            ):
                 touched_items += 1
                 db.session.flush()
                 reconcile_unknown_variant(item)

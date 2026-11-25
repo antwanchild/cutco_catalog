@@ -580,6 +580,25 @@ def _scrape_variant_sync_item(
     return (), None
 
 
+_LIMITED_COLOR_MARKER = re.compile(
+    r"^limited(?:[ -]+edition\b)?(?:\s*[:–—-]\s*|\s+|$)"
+    r"|\s+(?:\(limited(?:[ -]+edition)?\)|(?:[–—-]\s*)?limited[ -]+edition)$",
+    re.IGNORECASE,
+)
+
+
+def _variant_sync_colors(labels: tuple[str, ...]) -> dict[str, tuple[str, bool]]:
+    """Keep one color per label and preserve explicit limited-edition evidence."""
+    colors: dict[str, tuple[str, bool]] = {}
+    for label in labels:
+        color, markers = _LIMITED_COLOR_MARKER.subn("", label.strip())
+        if color:
+            key = color.casefold()
+            existing_color, is_unicorn = colors.get(key, (color, False))
+            colors[key] = (existing_color, is_unicorn or bool(markers))
+    return colors
+
+
 def _build_variant_sync_preview(
     items: list[Item],
     progress_cb: Callable[[int, int, int], None] | None = None,
@@ -683,15 +702,17 @@ def _build_variant_sync_preview(
             items_with_no_clear_variants += 1
             continue
 
-        scraped_colors = list(fetched_variants.get(item.id, ()))
+        scraped_colors = _variant_sync_colors(fetched_variants.get(item.id, ()))
         scraped_variant_total += len(scraped_colors)
         existing_real_variants = [
             variant for variant in item.variants if variant.color != UNKNOWN_COLOR
         ]
         existing_lookup = {
-            variant.color.lower(): variant for variant in existing_real_variants
+            variant.color.casefold(): variant for variant in existing_real_variants
         }
-        scraped_lookup = {color.lower() for color in scraped_colors}
+        limited_colors = [
+            color for color, limited in scraped_colors.values() if limited
+        ]
 
         variant_rows: list[dict] = []
         create_colors: list[str] = []
@@ -699,17 +720,19 @@ def _build_variant_sync_preview(
         existing_count = 0
         create_count = 0
 
-        for color in scraped_colors:
-            status = "existing" if color.lower() in existing_lookup else "create"
+        for key, (color, limited) in scraped_colors.items():
+            status = "existing" if key in existing_lookup else "create"
             if status == "existing":
                 existing_count += 1
             else:
                 create_count += 1
                 create_colors.append(color)
-            variant_rows.append({"color": color, "status": status})
+            variant_rows.append(
+                {"color": color, "status": status, "is_unicorn": limited}
+            )
 
         for variant in existing_real_variants:
-            if variant.color.lower() in scraped_lookup:
+            if variant.color.casefold() in scraped_colors:
                 continue
             retained_colors.append(variant.color)
             variant_rows.append({"color": variant.color, "status": "not seen in sync"})
@@ -736,6 +759,7 @@ def _build_variant_sync_preview(
                 ),
                 "variant_rows": variant_rows,
                 "create_colors": create_colors,
+                "limited_colors": limited_colors,
                 "retained_colors": retained_colors,
                 "existing_count": existing_count,
                 "create_count": create_count,
