@@ -10,6 +10,13 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.0.46] - 2026-11-25
+
+### Fixed
+
+- Fix the Upgrade Check release lookup so the spreadsheet import fix can be
+  published in the Docker image.
+
 ## [v3.0.45] - 2026-11-25
 
 ### Fixed
