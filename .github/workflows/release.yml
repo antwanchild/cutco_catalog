@@ -188,9 +188,23 @@ jobs:
           container=""
 
           # Choose the highest published stable version below the candidate, including on repair runs.
-          published_versions="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
-            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name |
-              select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | ltrimstr("v")')"
+          published_versions=""
+          page=1
+          while true; do
+            releases="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100&page=$page")"
+            if ! page_size="$(jq -er 'select(type == "array") | length' <<< "$releases")" ||
+              [[ -z "$page_size" ]]; then
+              echo "::error::Could not read GitHub Releases page $page."
+              exit 1
+            fi
+            page_versions="$(jq -r '.[] | select(.draft == false and .prerelease == false) | .tag_name |
+              select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | ltrimstr("v")' <<< "$releases")"
+            published_versions+=$'\n'"$page_versions"
+            if (( page_size < 100 )); then
+              break
+            fi
+            page=$((page + 1))
+          done
           previous_version="$(printf '%s\n' "$published_versions" "$EXPECTED_VERSION" |
             sort -Vu | awk -v version="$EXPECTED_VERSION" '$0 == version { print previous } { previous = $0 }')"
           if [[ -z "$previous_version" ]]; then
