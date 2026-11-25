@@ -111,6 +111,7 @@
           <tr class="{% if row.status == 'fallback only' %}variant-sync-fallback-row{% endif %}">
             <td>
               {{ row.color }}
+              {% if row.is_unicorn %}<span class="badge badge-unicorn badge-mini">Unicorn</span>{% endif %}
               {% if item.entity_type == 'set' %}
                 <span class="badge badge-mini {% if row.kind == 'block_finish' %}badge-warning{% else %}badge-info{% endif %}">{{ 'block finish' if row.kind == 'block_finish' else 'handle' }}</span>
               {% endif %}
