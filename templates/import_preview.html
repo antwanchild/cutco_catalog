@@ -6,7 +6,7 @@
   <a href="{{ url_for('data.import_page') }}" class="btn btn-ghost">← Back</a>
 </div>
 
-<p id="import-selection-summary" class="flash flash-info" role="status" hidden>
+<p id="import-selection-summary" class="flash flash-info import-selection-summary" role="status" hidden>
   <strong>Selected for import:</strong> <span></span>
 </p>
 
@@ -434,6 +434,7 @@
   const form = document.getElementById('import-confirm-form');
   const summary = document.getElementById('import-selection-summary');
   const summaryText = summary.querySelector('span');
+  const navbar = document.querySelector('.navbar');
   const rows = Array.from(form.querySelectorAll('.import-accept-checkbox'), checkbox => {
     const row = checkbox.closest('tr');
     return {
@@ -472,7 +473,14 @@
   });
   window.addEventListener('pageshow', updateSummary);
   updateSummary();
-  summary.hidden = rows.length === 0;
+  if (rows.length) {
+    const updateSummaryOffset = () => {
+      summary.style.setProperty('--import-summary-top', `${navbar.offsetHeight}px`);
+    };
+    updateSummaryOffset();
+    new ResizeObserver(updateSummaryOffset).observe(navbar);
+    summary.hidden = false;
+  }
 })();
 </script>
 
