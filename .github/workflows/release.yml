@@ -139,31 +139,102 @@ jobs:
             APP_VERSION=${{ steps.version.outputs.version }}
             GIT_SHA=${{ needs.auto-tag.outputs.release_sha }}
 
-      - name: Smoke test the release image
+      - name: Verify fresh install and upgrade
+        shell: bash
         env:
           IMAGE: ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
           EXPECTED_VERSION: ${{ steps.version.outputs.version }}
           EXPECTED_SHA: ${{ needs.auto-tag.outputs.release_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_REPOSITORY: ghcr.io/${{ github.repository }}
         run: |
           export SECRET_KEY
           SECRET_KEY="$(openssl rand -hex 32)"
-          container="$(docker run -d -p 127.0.0.1::8095 -e SECRET_KEY "$IMAGE")"
-          trap 'docker logs "$container"; docker rm -f "$container"' EXIT
-          endpoint="$(docker port "$container" 8095/tcp)"
-          for attempt in {1..30}; do
-            echo "Checking release image health (attempt $attempt/30)"
-            if curl --silent --fail --max-time 3 "http://$endpoint/health" |
-              jq -e --arg version "$EXPECTED_VERSION" --arg sha "$EXPECTED_SHA" \
-                '.status == "ok" and .version == $version and .git_sha == $sha'; then
-              exit 0
+          container=""
+          volume=""
+          cleanup() {
+            if [[ -n "$container" ]]; then
+              docker logs "$container"
+              docker rm -f "$container"
             fi
-            if [[ "$(docker inspect --format '{{.State.Running}}' "$container")" != 'true' ]]; then
-              break
+            if [[ -n "$volume" ]]; then
+              docker volume rm "$volume"
             fi
-            sleep 2
-          done
-          echo "Container health or release metadata verification failed." >&2
-          exit 1
+          }
+          trap cleanup EXIT
+
+          check_health() {
+            container="$(docker run -d -p 127.0.0.1::8095 -e SECRET_KEY "$@" "$IMAGE")"
+            local endpoint
+            endpoint="$(docker port "$container" 8095/tcp)"
+            for attempt in {1..30}; do
+              echo "Checking release image health (attempt $attempt/30)"
+              if curl --silent --fail --max-time 3 "http://$endpoint/health" |
+                jq -e --arg version "$EXPECTED_VERSION" --arg sha "$EXPECTED_SHA" \
+                  '.status == "ok" and .version == $version and .git_sha == $sha'; then
+                return 0
+              fi
+              if [[ "$(docker inspect --format '{{.State.Running}}' "$container")" != 'true' ]]; then
+                break
+              fi
+              sleep 2
+            done
+            echo "Container health or release metadata verification failed." >&2
+            return 1
+          }
+
+          check_health
+          docker rm -f "$container"
+          container=""
+
+          # Choose the highest published stable version below the candidate, including on repair runs.
+          published_versions="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name |
+              select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | ltrimstr("v")')"
+          previous_version="$(printf '%s\n' "$published_versions" "$EXPECTED_VERSION" |
+            sort -Vu | awk -v version="$EXPECTED_VERSION" '$0 == version { print previous } { previous = $0 }')"
+          if [[ -z "$previous_version" ]]; then
+            echo "::notice::No earlier stable release is available for an upgrade check."
+            exit 0
+          fi
+
+          previous_image="$IMAGE_REPOSITORY:$previous_version"
+          docker pull "$previous_image"
+          volume="$(docker volume create)"
+          docker run --rm -i -e SECRET_KEY -v "$volume:/data" "$previous_image" python - <<'PYTHON'
+          from app import create_app
+          from extensions import db
+          from models import Item, ItemVariant, Ownership, Person
+
+          with create_app().app_context():
+              item = Item(name="Upgrade check knife", sku="CI-UPGRADE")
+              variant = ItemVariant(item=item, color="Classic")
+              person = Person(name="Upgrade check collector")
+              db.session.add(Ownership(variant=variant, person=person, quantity_purchased=2))
+              db.session.commit()
+          PYTHON
+
+          check_health -v "$volume:/data"
+          docker exec -i "$container" python - <<'PYTHON'
+          import sqlite3
+
+          with sqlite3.connect("file:/data/cutco.db?mode=ro", uri=True) as db:
+              rows = db.execute(
+                  """
+                  SELECT items.name, item_variants.color, people.name, ownership.quantity_purchased
+                  FROM items
+                  JOIN item_variants ON item_variants.item_id = items.id
+                  JOIN ownership ON ownership.variant_id = item_variants.id
+                  JOIN people ON people.id = ownership.person_id
+                  WHERE items.sku = ?
+                  """,
+                  ("CI-UPGRADE",),
+              ).fetchall()
+          expected = [("Upgrade check knife", "Classic", "Upgrade check collector", 2)]
+          if rows != expected:
+              raise SystemExit(f"Upgrade did not preserve the sample collection: {rows!r}")
+          print("Upgrade preserved the sample collection.")
+          PYTHON
 
       - name: Scan the release image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
