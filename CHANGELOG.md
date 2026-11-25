@@ -10,6 +10,13 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.0.42] - 2026-11-25
+
+### Changed
+
+- Verify that release images preserve sample catalog and ownership data when
+  upgrading from the previous published release.
+
 ## [v3.0.41] - 2026-11-24
 
 ### Fixed
