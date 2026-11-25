@@ -135,7 +135,7 @@
       </details>
     {% else %}
       {% set sign_in_target = request.full_path.rstrip('?') %}
-      <a href="{{ url_for('admin.proxy_login', next=sign_in_target) if proxy_auth_enabled() else url_for('admin.admin_login', next=sign_in_target) }}">Sign In</a>
+      <a href="{{ url_for('admin.proxy_login', next=sign_in_target) if config['AUTH_MODE'] == 'proxy' else url_for('admin.admin_login', next=sign_in_target) }}">Sign In</a>
     {% endif %}
   </div>
 </nav>
