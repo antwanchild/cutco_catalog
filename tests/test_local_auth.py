@@ -250,14 +250,27 @@ class LocalAuthTests(SmokeBaseTest):
             "/outpost.goauthentik.io/start?rd=%2Fadmin%2Fauth%2Fproxy-complete%3Fnext%3D%2F",
         )
 
-    def test_navbar_uses_proxy_login_and_local_form_keeps_fallback(self):
-        home = self.client.get("/")
+    def test_hybrid_navbar_opens_login_page_with_both_options(self):
+        home = self.client.get("/catalog")
         login = self.client.get("/admin/login?next=/catalog")
 
-        self.assertIn(b'href="/auth/proxy-login?next=/"', home.data)
+        self.assertEqual(home.status_code, 200)
+        self.assertIn(b'href="/admin/login?next=/catalog">Sign In</a>', home.data)
+        self.assertEqual(login.status_code, 200)
+        self.assertIn(b'href="/auth/proxy-login?next=/catalog"', login.data)
         self.assertIn(b"Sign in with Authentik", login.data)
         self.assertIn(b'name="next" value="/catalog"', login.data)
         self.assertIn(b'name="password"', login.data)
+
+    def test_navbar_sign_in_for_single_auth_modes(self):
+        for mode, path in (("local", "/admin/login"), ("proxy", "/auth/proxy-login")):
+            with self.subTest(mode=mode):
+                self.app.config["AUTH_MODE"] = mode
+                response = self.client.get("/")
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(
+                    f'href="{path}?next=/">Sign In</a>'.encode(), response.data
+                )
 
     def test_setup_and_password_forms_are_not_cacheable(self):
         setup = self.client.get("/setup")

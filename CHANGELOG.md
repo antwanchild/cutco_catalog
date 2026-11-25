@@ -10,6 +10,13 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.0.43] - 2026-11-25
+
+### Fixed
+
+- Open the login page from **Sign In** in hybrid mode so local users can sign
+  in over the direct LAN address and still choose Authentik on the proxied hostname.
+
 ## [v3.0.42] - 2026-11-25
 
 ### Changed
