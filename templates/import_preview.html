@@ -6,6 +6,10 @@
   <a href="{{ url_for('data.import_page') }}" class="btn btn-ghost">← Back</a>
 </div>
 
+<p id="import-selection-summary" class="flash flash-info" role="status" hidden>
+  <strong>Selected for import:</strong> <span></span>
+</p>
+
 {% if errors %}
 <div class="flash flash-error">
   <strong>{{ errors | length }} row(s) could not be parsed:</strong>
@@ -319,7 +323,7 @@
 </details>
 {% endif %}
 
-<form method="post" action="{{ url_for('data.import_confirm') }}"
+<form id="import-confirm-form" method="post" action="{{ url_for('data.import_confirm') }}"
       data-submit-progress="Importing the selected items… This may take a moment.">
   <input type="hidden" name="total_rows" value="{{ total_rows or 0 }}">
   <input type="hidden" name="item_count" value="{{ item_rows_total }}">
@@ -424,5 +428,52 @@
   {% endif %}
 
 </form>
+
+<script>
+(() => {
+  const form = document.getElementById('import-confirm-form');
+  const summary = document.getElementById('import-selection-summary');
+  const summaryText = summary.querySelector('span');
+  const rows = Array.from(form.querySelectorAll('.import-accept-checkbox'), checkbox => {
+    const row = checkbox.closest('tr');
+    return {
+      checkbox,
+      owner: row.querySelector('[name^="item_person_"], [name^="own_person_"]'),
+      status: row.querySelector('[name^="item_status_"], [name^="own_status_"]'),
+      unicornFlags: row.querySelectorAll('input[name*="_unicorn_"]')
+    };
+  });
+
+  function updateSummary() {
+    const counts = new Map([
+      ['Owned', 0], ['Wishlist', 0], ['Sold', 0], ['Traded', 0],
+      ['Catalog only', 0], ['Sets', 0], ['🦄 Unicorns', 0]
+    ]);
+
+    for (const { checkbox, owner, status, unicornFlags } of rows) {
+      if (!checkbox.checked) continue;
+
+      const category = status ? (owner?.value.trim() ? status.value : 'Catalog only') : 'Sets';
+      counts.set(category, (counts.get(category) || 0) + 1);
+
+      if (Array.from(unicornFlags).some(flag => flag.type === 'checkbox' ? flag.checked : flag.value === 'on')) {
+        counts.set('🦄 Unicorns', counts.get('🦄 Unicorns') + 1);
+      }
+    }
+
+    const labels = Array.from(counts, ([label, count]) => count ? `${count} ${label}` : '').filter(Boolean);
+    const text = labels.join(' · ') || 'No rows selected';
+    if (summaryText.textContent !== text) summaryText.textContent = text;
+  }
+
+  form.addEventListener('change', updateSummary);
+  form.addEventListener('input', event => {
+    if (event.target.matches('[name^="item_person_"]')) updateSummary();
+  });
+  window.addEventListener('pageshow', updateSummary);
+  updateSummary();
+  summary.hidden = rows.length === 0;
+})();
+</script>
 
 {% endblock %}
