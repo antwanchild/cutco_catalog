@@ -10,6 +10,13 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.1.0] - 2026-11-25
+
+### Added
+
+- Show a live summary of selected import rows by collection status, with separate
+  counts for catalog-only rows, sets, and rows flagged as unicorns.
+
 ## [v3.0.46] - 2026-11-25
 
 ### Fixed
