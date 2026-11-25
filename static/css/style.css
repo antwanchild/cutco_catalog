@@ -677,6 +677,12 @@ a:hover { text-decoration: underline; }
 .import-accept-cell {
   text-align: center;
 }
+.import-selection-summary {
+  position: sticky;
+  top: var(--import-summary-top, 52px);
+  z-index: 35;
+}
+
 .import-accept-checkbox {
   display: inline-block;
   margin: 0 auto;

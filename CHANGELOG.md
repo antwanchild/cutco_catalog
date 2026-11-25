@@ -10,6 +10,12 @@ remain available in [GitHub Releases](https://github.com/antwanchild/cutco_catal
 
 ## [Unreleased]
 
+## [v3.1.1] - 2026-11-25
+
+### Fixed
+
+- Keep the import selection summary visible below the navigation while scrolling.
+
 ## [v3.1.0] - 2026-11-25
 
 ### Added
